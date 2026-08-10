@@ -1,0 +1,13 @@
+{
+  "extends": "@blackbox/typescript-config/react-library.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@blackbox/ui/*": ["./src/*"]
+    },
+    "noEmit": true,
+    "emitDeclarationOnly": false
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

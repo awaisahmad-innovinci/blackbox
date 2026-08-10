@@ -1,0 +1,17 @@
+appId: com.blackbox.desktop
+productName: Blackbox
+directories:
+  output: release
+files:
+  - out/**/*
+  - package.json
+mac:
+  target:
+    - dmg
+  category: public.app-category.productivity
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage

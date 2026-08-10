@@ -1,0 +1,27 @@
+{
+  "name": "blackbox",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @blackbox/web dev",
+    "dev:desktop": "pnpm --filter @blackbox/desktop dev",
+    "dev:api": "pnpm --filter @blackbox/api dev",
+    "build": "turbo run build",
+    "build:web": "pnpm --filter @blackbox/web build",
+    "build:desktop": "pnpm --filter @blackbox/desktop build",
+    "build:api": "pnpm --filter @blackbox/api build",
+    "start:web": "pnpm --filter @blackbox/web start",
+    "start:api": "pnpm --filter @blackbox/api start:prod",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "pnpm@9.14.2",
+  "engines": {
+    "node": ">=20"
+  }
+}
