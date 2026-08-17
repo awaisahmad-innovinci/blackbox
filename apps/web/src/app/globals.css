@@ -1,2 +1,39 @@
 @import "@blackbox/ui/globals.css";
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display), var(--font-sans), ui-sans-serif, sans-serif;
+  }
+
+  .bb-page {
+    @apply mx-auto w-full max-w-6xl space-y-8;
+  }
+
+  .bb-page-narrow {
+    @apply mx-auto w-full max-w-2xl space-y-8;
+  }
+
+  .bb-surface {
+    @apply rounded-xl border border-border/80 bg-card shadow-xs;
+  }
+
+  .bb-auth-canvas {
+    background:
+      radial-gradient(
+        ellipse 90% 60% at 10% -10%,
+        color-mix(in oklch, var(--ring) 18%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 70% 50% at 100% 0%,
+        color-mix(in oklch, var(--primary) 10%, transparent),
+        transparent 50%
+      ),
+      linear-gradient(
+        180deg,
+        oklch(0.99 0.01 240),
+        oklch(0.96 0.015 220)
+      );
+  }
+}

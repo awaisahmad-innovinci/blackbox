@@ -1,4 +1,5 @@
 import { Button } from "@blackbox/ui/button";
+import { OFFLINE_AUTHORIZATION_DAYS_DEFAULT } from "@blackbox/shared";
 
 export default function App() {
   return (
@@ -6,7 +7,9 @@ export default function App() {
       <h1 className="text-3xl font-semibold tracking-tight">Blackbox</h1>
       <p className="text-muted-foreground max-w-md text-center">
         Electron desktop app consuming shared{" "}
-        <code className="text-foreground">@blackbox/ui</code> components.
+        <code className="text-foreground">@blackbox/ui</code> and{" "}
+        <code className="text-foreground">@blackbox/shared</code> (offline TTL{" "}
+        {OFFLINE_AUTHORIZATION_DAYS_DEFAULT}d).
       </p>
       <Button>Get started</Button>
     </main>

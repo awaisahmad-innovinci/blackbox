@@ -14,16 +14,14 @@ port = 54322
 shadow_port = 54320
 major_version = 15
 
+# Schema migrations live in supabase/migrations/ (plural — required by the Supabase CLI).
+
 [db.pooler]
 enabled = false
 port = 54329
 pool_mode = "transaction"
 default_pool_size = 20
 max_client_conn = 100
-
-[db.migrations]
-enabled = true
-# Schema migrations live in supabase/migrations (plural — required by the Supabase CLI).
 
 [db.seed]
 enabled = true

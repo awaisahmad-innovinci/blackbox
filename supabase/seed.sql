@@ -1,2 +1,5 @@
 -- Seed data for local development.
 -- Runs after migrations when `supabase db reset` is used.
+--
+-- Phase 1 permission catalog is seeded in migration 20260811115449_phase1_schema.sql.
+-- Do NOT seed tenants, users, or roles here — those are created during tenant signup (Auth step).

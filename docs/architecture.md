@@ -13,6 +13,7 @@ pnpm workspaces + Turborepo monorepo.
 | Desktop | `apps/desktop` | Electron + Vite + React renderer |
 | API | `apps/api` | NestJS |
 | UI | `packages/ui` | Shared shadcn / Radix / Tailwind (`@blackbox/ui`) |
+| Shared | `packages/shared` | Permissions, roles, auth/device DTOs (`@blackbox/shared`) |
 | TS configs | `packages/typescript-config` | Shared `tsconfig` bases |
 | ESLint | `packages/eslint-config` | Shared ESLint flat configs |
 | DB | `supabase/migrations/` | Supabase CLI migrations (plural) |
@@ -125,8 +126,36 @@ apps/desktop/
 - Entry: `apps/api/src/main.ts` (default port `4000`)
 - Health: `GET /health`
 - No UI dependencies
-- Database schema lives under `supabase/migrations/`, not inside Nest
-- Wire Postgres/Supabase clients later via env vars; do not invent a second migration system
+- Tenant isolation: JWT `tenantId` + app-layer filters — not client-supplied `tenant_id`
+- Auth endpoints: see [auth-api.md](./auth-api.md)
+- Access JWT claims (minimal): `sub` (user id), `tenantId`; TTLs 15m access / 7d refresh
+- Login `identifier` is email-or-username without `tenant_id`; 0 or >1 matches → generic 401
+- Signup seeds role permissions by **permission key** from the migration catalog (not hard-coded UUIDs)
+
+### RBAC (permission-based)
+
+- Authorization checks **permission keys** from `@blackbox/shared` — never role names (`OWNER`, etc.).
+- Resolution path: `User → user_roles → roles → role_permissions → permissions`, always scoped by JWT `tenantId`.
+- `@RequirePermissions(...keys)` uses **AND** semantics (caller must hold every listed key).
+- Guards: `JwtAuthGuard` (who) then `PermissionsGuard` (allowed). Auth routes stay without permission gates.
+- Smoke surface: `GET /rbac/check` requires `permissions.read` → 200 / 403 / 401; returns `{ ok: true }` only.
+- Tenant admin APIs: see [admin-api.md](./admin-api.md) (users, roles, permissions catalog, devices read/revoke, tenant settings)
+- Web admin UI: see [web-admin.md](./web-admin.md) (session + permission-aware `/app`)
+
+### Data access (locked)
+
+```
+NestJS → TypeORM → Supabase PostgreSQL
+```
+
+- **ORM:** TypeORM only (`@nestjs/typeorm` + `typeorm` + `pg`). Do not introduce Drizzle or a second ORM.
+- **Schema source of truth:** `supabase/migrations/` — never TypeORM migrations, never `synchronize: true`.
+- **Config:** `apps/api/src/db/db.module.ts` connects with `DATABASE_URL` and `synchronize: false`.
+  The application must never auto-alter the database schema.
+- **Entities:** `apps/api/src/db/entities/` mirrors Phase 1 tables (`tenants`, `permissions`,
+  `roles`, `role_permissions`, `users`, `user_roles`, `devices`, `device_users`,
+  `refresh_tokens`, `sync_cursors`), including composite PKs/FKs, uniques, indexes,
+  defaults, and `onDelete` behavior. CHECK constraints remain Postgres-enforced only.
 
 ## Supabase
 
@@ -140,6 +169,33 @@ was removed on purpose. The Supabase CLI expects `migrations/`.
 | `supabase db reset` | Replay migrations + `seed.sql` |
 
 Config: `supabase/config.toml`. Seed: `supabase/seed.sql`.
+
+### Phase 1 schema
+
+Migration `20260811115449_phase1_schema.sql` creates:
+
+`tenants`, `permissions`, `roles`, `role_permissions`, `users`, `user_roles`,
+`devices`, `device_users`, `refresh_tokens`, `sync_cursors`.
+
+- Global permission catalog is seeded in that migration (12 Phase 1 keys).
+- Tenants, users, and roles are **not** seeded — created at signup (Auth step).
+- Junction tables `user_roles` and `device_users` use **composite FKs**
+  `(tenant_id, …)` so relationships cannot cross tenants at the DB layer.
+
+### Tenant isolation and RLS (important)
+
+**Primary Phase 1 enforcement is NestJS server-side tenant context**, not Postgres RLS.
+
+- Nest will connect with `DATABASE_URL` (typically the Postgres role used by the API —
+  local Supabase `postgres` or a dedicated app role). That connection is **privileged**
+  relative to end users: it can read/write all tenants unless the application filters by
+  `tenant_id` from the authenticated JWT.
+- **Do not** treat “Supabase client with user JWT + RLS” as Phase 1 isolation — the app
+  does **not** use Supabase Auth. Client-supplied `tenant_id` must never authorize access.
+- RLS policies are **not** enabled in Phase 1 migrations on purpose, to avoid a false sense
+  of security while the API uses a service-style connection. If RLS is added later, it must
+  be designed for the actual Nest connection role (e.g. `SET LOCAL` request tenant +
+  policies), and documented alongside the connection string — not assumed from Supabase Auth.
 
 ## Turbo / pnpm commands
 
@@ -201,6 +257,7 @@ Turbo pipelines: `build` depends on `^build`; `dev` is persistent and uncached.
 @blackbox/desktop          apps/desktop
 @blackbox/api              apps/api
 @blackbox/ui               packages/ui
+@blackbox/shared           packages/shared
 @blackbox/typescript-config packages/typescript-config
 @blackbox/eslint-config    packages/eslint-config
 ```

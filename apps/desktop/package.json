@@ -13,6 +13,7 @@
     "clean": "rm -rf out dist .turbo"
   },
   "dependencies": {
+    "@blackbox/shared": "workspace:*",
     "@blackbox/ui": "workspace:*",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

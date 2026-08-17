@@ -26,16 +26,20 @@ export default defineConfig({
   },
   renderer: {
     root: resolve("src/renderer"),
+    resolve: {
+      alias: {
+        "@renderer": resolve("src/renderer/src"),
+      },
+    },
     build: {
       rollupOptions: {
         input: {
           index: resolve("src/renderer/index.html"),
         },
       },
-    },
-    resolve: {
-      alias: {
-        "@renderer": resolve("src/renderer/src"),
+      commonjsOptions: {
+        include: [/node_modules/, /packages\/shared/],
+        transformMixedEsModules: true,
       },
     },
     plugins: [react(), tailwindcss()],
