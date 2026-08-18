@@ -1,0 +1,135 @@
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import type { InventoryOutDetail } from "@blackbox/shared";
+import { Button } from "@blackbox/ui/button";
+import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+
+export function InventoryOutDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [detail, setDetail] = useState<InventoryOutDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    void inventoryOutApi
+      .get(id)
+      .then((row) => {
+        if (!cancelled) setDetail(row);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, "Failed to load inventory out"));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (error && !detail) {
+    return (
+      <div
+        role="alert"
+        className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
+      >
+        {error}
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return <p className="text-muted-foreground text-sm">Loading…</p>;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {detail.outNumber}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {detail.status} · Inventory out
+          </p>
+        </div>
+        <Button variant="ghost" onClick={() => navigate("/inventory/out")}>
+          Back
+        </Button>
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Overview</h2>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">Warehouse</dt>
+            <dd className="font-medium">{detail.warehouseName}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Out date</dt>
+            <dd className="font-medium">{detail.outDate}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Reference</dt>
+            <dd className="font-medium">{detail.reference || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Notes</dt>
+            <dd className="font-medium">{detail.notes || "—"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Bill</h2>
+        <div className="border-border overflow-x-auto rounded-lg border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Barcode</th>
+                <th className="px-4 py-3 font-medium">Product</th>
+                <th className="px-4 py-3 font-medium">SKU</th>
+                <th className="px-4 py-3 font-medium">Qty</th>
+                <th className="px-4 py-3 font-medium">Avg cost</th>
+                <th className="px-4 py-3 font-medium">Line total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detail.items.map((item) => (
+                <tr key={item.id} className="border-border border-t">
+                  <td className="px-4 py-3 tabular-nums">
+                    {item.barcode || "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.productName}
+                    {item.variantName ? ` · ${item.variantName}` : ""}
+                  </td>
+                  <td className="px-4 py-3">{item.sku}</td>
+                  <td className="px-4 py-3 tabular-nums">{item.quantity}</td>
+                  <td className="px-4 py-3 tabular-nums">{item.unitCost}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {item.lineTotal.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <section className="ml-auto grid max-w-sm gap-2 text-sm">
+          <div className="flex justify-between gap-6">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="tabular-nums">
+              {detail.subtotal.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex justify-between gap-6 font-medium">
+            <span>Total</span>
+            <span className="tabular-nums">{detail.total.toLocaleString()}</span>
+          </div>
+        </section>
+      </section>
+    </div>
+  );
+}

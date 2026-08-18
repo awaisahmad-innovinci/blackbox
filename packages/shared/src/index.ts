@@ -34,6 +34,20 @@ import {
   DEFAULT_CURRENCY_BY_COUNTRY as defaultCurrencyByCountry,
 } from "./onboarding";
 
+import {
+  ENTITY_STATUSES as entityStatusesList,
+  UNIT_TYPES as unitTypesList,
+  INVENTORY_MOVEMENT_TYPES as inventoryMovementTypesList,
+  PURCHASE_ORDER_STATUSES as purchaseOrderStatusesList,
+  GOODS_RECEIPT_STATUSES as goodsReceiptStatusesList,
+  VENDOR_CONTACT_TYPES as vendorContactTypesList,
+  PAYMENT_TERMS as paymentTermsList,
+  PAYMENT_TERMS_LABELS as paymentTermsLabels,
+  PRODUCT_TYPES as productTypesList,
+  PRODUCT_TYPE_LABELS as productTypeLabels,
+  DEMO_STORE_TENANT_ID as demoStoreTenantId,
+} from "./inventory";
+
 export type { Permission, DefaultRole };
 export type {
   AuthClient,
@@ -59,6 +73,76 @@ export type {
   OnboardingBusinessRequest,
   OnboardingLocationRequest,
 } from "./onboarding";
+export type {
+  EntityStatus,
+  UnitType,
+  InventoryMovementType,
+  PurchaseOrderStatus,
+  GoodsReceiptStatus,
+  DashboardSummary,
+  VendorContactType,
+  PaymentTerms,
+  VendorContactInput,
+  RequiredVendorContactInput,
+  VendorContact,
+  VendorGroup,
+  TaxonomyListQuery,
+  CreateVendorGroupRequest,
+  UpdateVendorGroupRequest,
+  VendorListItem,
+  VendorDetail,
+  CreateVendorRequest,
+  UpdateVendorRequest,
+  VendorListQuery,
+  PaginatedVendors,
+  VendorSku,
+  CreateVendorSkuRequest,
+  UpdateVendorSkuRequest,
+  SkuSearchResult,
+  SkuDetail,
+  SkuSupplier,
+  UnitListItem,
+  ProductType,
+  Brand,
+  CreateBrandRequest,
+  UpdateBrandRequest,
+  Category,
+  CreateCategoryRequest,
+  UpdateCategoryRequest,
+  ProductListItem,
+  ProductDetail,
+  CreateProductRequest,
+  UpdateProductRequest,
+  ProductListQuery,
+  PaginatedProducts,
+  ProductSkuDetail,
+  CreateProductSkuRequest,
+  UpdateProductSkuRequest,
+  ProductSupplierRow,
+  WarehouseStockRow,
+  StockMovementRow,
+  WarehouseListItem,
+  PurchaseOrderItemRow,
+  PurchaseOrderListItem,
+  PurchaseOrderDetail,
+  CreatePurchaseOrderItemRequest,
+  CreatePurchaseOrderRequest,
+  UpdatePurchaseOrderRequest,
+  UpdatePurchaseOrderItemPriceRequest,
+  PurchaseOrderListQuery,
+  PaginatedPurchaseOrders,
+  ReceivingLineDraft,
+  ReceivingDraft,
+  CreateGoodsReceiptItemRequest,
+  CreateGoodsReceiptRequest,
+  GoodsReceiptItemRow,
+  GoodsReceiptDetail,
+  CreateInventoryOutItemRequest,
+  CreateInventoryOutRequest,
+  InventoryOutItemRow,
+  InventoryOutDetail,
+  InventoryOutStatus,
+} from "./inventory";
 
 /** Own bindings so Vite/Rollup CJS interop sees named exports. */
 export const PERMISSIONS = permissionsList;
@@ -87,3 +171,15 @@ export const CURRENCIES = currenciesList;
 export const CURRENCY_CODES = currencyCodesList;
 export const isCurrencyCode = checkIsCurrencyCode;
 export const DEFAULT_CURRENCY_BY_COUNTRY = defaultCurrencyByCountry;
+
+export const ENTITY_STATUSES = entityStatusesList;
+export const UNIT_TYPES = unitTypesList;
+export const INVENTORY_MOVEMENT_TYPES = inventoryMovementTypesList;
+export const PURCHASE_ORDER_STATUSES = purchaseOrderStatusesList;
+export const GOODS_RECEIPT_STATUSES = goodsReceiptStatusesList;
+export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
+export const PAYMENT_TERMS = paymentTermsList;
+export const PAYMENT_TERMS_LABELS = paymentTermsLabels;
+export const PRODUCT_TYPES = productTypesList;
+export const PRODUCT_TYPE_LABELS = productTypeLabels;
+export const DEMO_STORE_TENANT_ID = demoStoreTenantId;

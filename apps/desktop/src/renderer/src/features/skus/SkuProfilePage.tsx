@@ -1,0 +1,505 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import type {
+  SkuDetail,
+  SkuSupplier,
+  WarehouseStockRow,
+} from "@blackbox/shared";
+import { Button } from "@blackbox/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@blackbox/ui/dialog";
+import { Input } from "@blackbox/ui/input";
+import { Label } from "@blackbox/ui/label";
+import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { skusApi } from "@renderer/lib/api/skus";
+import { unitsApi } from "@renderer/lib/api/units";
+import type { UnitListItem } from "@blackbox/shared";
+
+export function SkuProfilePage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [sku, setSku] = useState<SkuDetail | null>(null);
+  const [suppliers, setSuppliers] = useState<SkuSupplier[]>([]);
+  const [inventory, setInventory] = useState<WarehouseStockRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [units, setUnits] = useState<UnitListItem[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [variantName, setVariantName] = useState("");
+  const [skuCode, setSkuCode] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [sizeValue, setSizeValue] = useState("");
+  const [sizeUnit, setSizeUnit] = useState("");
+  const [baseUnitId, setBaseUnitId] = useState("");
+  const [purchaseUnitId, setPurchaseUnitId] = useState("");
+  const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
+  const [costPrice, setCostPrice] = useState("0");
+  const [sellingPrice, setSellingPrice] = useState("0");
+  const [reorderLevel, setReorderLevel] = useState("0");
+  const [minimumStockLevel, setMinimumStockLevel] = useState("0");
+  const [maximumStockLevel, setMaximumStockLevel] = useState("");
+  const [trackInventory, setTrackInventory] = useState(true);
+
+  async function reload() {
+    if (!id) return;
+    const [detail, vendors, stock] = await Promise.all([
+      skusApi.get(id),
+      skusApi.listVendors(id),
+      skusApi.listInventory(id),
+    ]);
+    setSku(detail);
+    setSuppliers(vendors);
+    setInventory(stock);
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    void reload().catch((err: unknown) => {
+      if (!cancelled) {
+        setError(getApiErrorMessage(err, "Failed to load SKU"));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  function openEdit() {
+    if (!sku) return;
+    setVariantName(sku.variantName);
+    setSkuCode(sku.sku);
+    setBarcode(sku.barcode ?? "");
+    setSizeValue(sku.sizeValue ?? "");
+    setSizeUnit(sku.sizeUnit ?? "");
+    setBaseUnitId(sku.baseUnitId ?? "");
+    setPurchaseUnitId(sku.purchaseUnitId ?? "");
+    setUnitsPerPurchaseUnit(String(sku.unitsPerPurchaseUnit));
+    setCostPrice(String(sku.costPrice));
+    setSellingPrice(String(sku.sellingPrice));
+    setReorderLevel(String(sku.reorderLevel));
+    setMinimumStockLevel(String(sku.minimumStockLevel));
+    setMaximumStockLevel(
+      sku.maximumStockLevel == null ? "" : String(sku.maximumStockLevel),
+    );
+    setTrackInventory(sku.trackInventory);
+    setFormError(null);
+    void unitsApi.list().then(setUnits).catch(() => undefined);
+    setEditOpen(true);
+  }
+
+  async function onSaveEdit() {
+    if (!id) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      const updated = await skusApi.update(id, {
+        variantName: variantName.trim(),
+        sku: skuCode.trim(),
+        barcode: barcode.trim() || null,
+        sizeValue: sizeValue.trim() || null,
+        sizeUnit: sizeUnit.trim() || null,
+        baseUnitId: baseUnitId || null,
+        purchaseUnitId: purchaseUnitId || null,
+        unitsPerPurchaseUnit: Number(unitsPerPurchaseUnit),
+        costPrice: Number(costPrice),
+        sellingPrice: Number(sellingPrice),
+        reorderLevel: Number(reorderLevel),
+        minimumStockLevel: Number(minimumStockLevel),
+        maximumStockLevel:
+          maximumStockLevel.trim() === ""
+            ? null
+            : Number(maximumStockLevel),
+        trackInventory,
+        status: sku?.status,
+      });
+      try {
+        await window.blackbox?.localDb?.upsertProductSku({
+          id: updated.id,
+          productId: updated.productId,
+          variantName: updated.variantName,
+          sku: updated.sku,
+          barcode: updated.barcode,
+          sizeValue: updated.sizeValue,
+          sizeUnit: updated.sizeUnit,
+          baseUnitId: updated.baseUnitId,
+          baseUnitName: updated.baseUnitName,
+          purchaseUnitId: updated.purchaseUnitId,
+          purchaseUnitName: updated.purchaseUnitName,
+          unitsPerPurchaseUnit: updated.unitsPerPurchaseUnit,
+          costPrice: updated.costPrice,
+          sellingPrice: updated.sellingPrice,
+          reorderLevel: updated.reorderLevel,
+          minimumStockLevel: updated.minimumStockLevel,
+          maximumStockLevel: updated.maximumStockLevel,
+          trackInventory: updated.trackInventory,
+          status: updated.status,
+        });
+      } catch {
+        /* optional cache */
+      }
+      setSku(updated);
+      setEditOpen(false);
+    } catch (err: unknown) {
+      setFormError(getApiErrorMessage(err, "Failed to update SKU"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onDeactivate() {
+    if (!id || !sku) return;
+    if (!window.confirm(`Deactivate SKU ${sku.sku}?`)) return;
+    try {
+      const updated = await skusApi.deactivate(id);
+      setSku(updated);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to deactivate"));
+    }
+  }
+
+  if (error && !sku) {
+    return (
+      <div
+        role="alert"
+        className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
+      >
+        {error}
+      </div>
+    );
+  }
+
+  if (!sku) {
+    return <p className="text-muted-foreground text-sm">Loading…</p>;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-muted-foreground text-sm">
+            <Link
+              to={`/products/${sku.productId}`}
+              className="text-primary hover:underline"
+            >
+              {sku.productName}
+            </Link>{" "}
+            · {sku.productCode}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            {sku.variantName || sku.sku}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {sku.sku}
+            {sku.barcode ? ` · ${sku.barcode}` : ""} ·{" "}
+            <span className="capitalize">{sku.status}</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={openEdit}>
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            disabled={sku.status === "inactive"}
+            onClick={() => void onDeactivate()}
+          >
+            Deactivate
+          </Button>
+          <Button variant="ghost" onClick={() => navigate(-1)}>
+            Back
+          </Button>
+        </div>
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Overview</h2>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">Size</dt>
+            <dd className="font-medium">
+              {[sku.sizeValue, sku.sizeUnit].filter(Boolean).join(" ") || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Base unit</dt>
+            <dd className="font-medium">{sku.baseUnitName || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Purchase unit</dt>
+            <dd className="font-medium">
+              {sku.purchaseUnitName || "—"}
+              {sku.unitsPerPurchaseUnit
+                ? ` (${sku.unitsPerPurchaseUnit} base)`
+                : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Cost / Selling</dt>
+            <dd className="font-medium tabular-nums">
+              {sku.costPrice} / {sku.sellingPrice}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Reorder / Min / Max</dt>
+            <dd className="font-medium tabular-nums">
+              {sku.reorderLevel} / {sku.minimumStockLevel} /{" "}
+              {sku.maximumStockLevel ?? "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Track inventory</dt>
+            <dd className="font-medium">{sku.trackInventory ? "Yes" : "No"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-medium">Inventory by warehouse</h2>
+        <div className="border-border overflow-hidden rounded-lg border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Warehouse</th>
+                <th className="px-4 py-3 font-medium">On hand</th>
+                <th className="px-4 py-3 font-medium">Reserved</th>
+                <th className="px-4 py-3 font-medium">Available</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inventory.length === 0 ? (
+                <tr className="border-border border-t">
+                  <td
+                    colSpan={4}
+                    className="text-muted-foreground px-4 py-6 text-center"
+                  >
+                    No stock lines.
+                  </td>
+                </tr>
+              ) : (
+                inventory.map((row) => (
+                  <tr key={row.warehouseId} className="border-border border-t">
+                    <td className="px-4 py-3">{row.warehouseName}</td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {row.quantityOnHand}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {row.quantityReserved}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {row.quantityAvailable}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-medium">Suppliers</h2>
+        <div className="border-border overflow-hidden rounded-lg border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Vendor</th>
+                <th className="px-4 py-3 font-medium">Cost</th>
+                <th className="px-4 py-3 font-medium">MOQ</th>
+                <th className="px-4 py-3 font-medium">Lead Time</th>
+                <th className="px-4 py-3 font-medium">Preferred</th>
+              </tr>
+            </thead>
+            <tbody>
+              {suppliers.length === 0 ? (
+                <tr className="border-border border-t">
+                  <td
+                    colSpan={5}
+                    className="text-muted-foreground px-4 py-6 text-center"
+                  >
+                    No suppliers linked.
+                  </td>
+                </tr>
+              ) : (
+                suppliers.map((s) => (
+                  <tr key={s.vendorSkuId} className="border-border border-t">
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/vendors/${s.vendorId}`}
+                        className="text-primary hover:underline"
+                      >
+                        {s.vendorName}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">{s.purchasePrice}</td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {s.minimumOrderQuantity}
+                    </td>
+                    <td className="px-4 py-3">{s.leadTimeDays} days</td>
+                    <td className="px-4 py-3">{s.isPreferred ? "Yes" : "No"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit SKU</DialogTitle>
+          </DialogHeader>
+          {formError ? (
+            <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
+              {formError}
+            </div>
+          ) : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Variant</Label>
+              <Input
+                value={variantName}
+                onChange={(e) => setVariantName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>SKU</Label>
+              <Input
+                value={skuCode}
+                onChange={(e) => setSkuCode(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Barcode</Label>
+              <Input
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="Scan or type barcode"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Size value</Label>
+              <Input
+                value={sizeValue}
+                onChange={(e) => setSizeValue(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Size unit</Label>
+              <Input
+                value={sizeUnit}
+                onChange={(e) => setSizeUnit(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Base unit</Label>
+              <select
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={baseUnitId}
+                onChange={(e) => setBaseUnitId(e.target.value)}
+              >
+                <option value="">—</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Purchase unit</Label>
+              <select
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={purchaseUnitId}
+                onChange={(e) => setPurchaseUnitId(e.target.value)}
+              >
+                <option value="">—</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Units / purchase</Label>
+              <Input
+                value={unitsPerPurchaseUnit}
+                onChange={(e) => setUnitsPerPurchaseUnit(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cost</Label>
+              <Input
+                value={costPrice}
+                onChange={(e) => setCostPrice(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Selling</Label>
+              <Input
+                value={sellingPrice}
+                onChange={(e) => setSellingPrice(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Reorder</Label>
+              <Input
+                value={reorderLevel}
+                onChange={(e) => setReorderLevel(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Min stock</Label>
+              <Input
+                value={minimumStockLevel}
+                onChange={(e) => setMinimumStockLevel(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Max stock</Label>
+              <Input
+                value={maximumStockLevel}
+                onChange={(e) => setMaximumStockLevel(e.target.value)}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={trackInventory}
+                onChange={(e) => setTrackInventory(e.target.checked)}
+              />
+              Track inventory
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={() => setEditOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={saving}
+              onClick={() => void onSaveEdit()}
+            >
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

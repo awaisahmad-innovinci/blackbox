@@ -5,6 +5,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { DbModule } from "./db/db.module";
 import { DevicesModule } from "./devices/devices.module";
+import { InventoryModule } from "./inventory/inventory.module";
 import { PermissionsCatalogModule } from "./permissions/permissions-catalog.module";
 import { RbacModule } from "./rbac/rbac.module";
 import { RolesModule } from "./roles/roles.module";
@@ -25,6 +26,7 @@ import { UsersModule } from "./users/users.module";
     RolesModule,
     PermissionsCatalogModule,
     DevicesModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

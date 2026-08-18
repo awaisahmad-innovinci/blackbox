@@ -13,7 +13,7 @@ pnpm workspaces + Turborepo monorepo.
 | Desktop | `apps/desktop` | Electron + Vite + React renderer |
 | API | `apps/api` | NestJS |
 | UI | `packages/ui` | Shared shadcn / Radix / Tailwind (`@blackbox/ui`) |
-| Shared | `packages/shared` | Permissions, roles, auth/device DTOs (`@blackbox/shared`) |
+| Shared | `packages/shared` | Permissions, roles, auth/device/inventory DTOs (`@blackbox/shared`) |
 | TS configs | `packages/typescript-config` | Shared `tsconfig` bases |
 | ESLint | `packages/eslint-config` | Shared ESLint flat configs |
 | DB | `supabase/migrations/` | Supabase CLI migrations (plural) |
@@ -81,7 +81,7 @@ Hooks (e.g. sidebar mobile): `import { useIsMobile } from "@blackbox/ui/hooks/us
 
 ```css
 @import "@blackbox/ui/globals.css";
-@source "../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
 ```
 
 4. Import components in pages/layouts as needed.
@@ -94,7 +94,7 @@ Hooks (e.g. sidebar mobile): `import { useIsMobile } from "@blackbox/ui/hooks/us
 
 ```css
 @import "@blackbox/ui/globals.css";
-@source "../../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../../../packages/ui/src/**/*.{ts,tsx}";
 ```
 
 4. Same component imports as web — no Next-only APIs in shared UI.

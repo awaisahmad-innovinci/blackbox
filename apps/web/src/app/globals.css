@@ -1,5 +1,5 @@
 @import "@blackbox/ui/globals.css";
-@source "../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
 
 @layer utilities {
   .font-display {

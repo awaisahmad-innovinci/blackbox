@@ -1,17 +1,93 @@
-import { Button } from "@blackbox/ui/button";
-import { OFFLINE_AUTHORIZATION_DAYS_DEFAULT } from "@blackbox/shared";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AppShell } from "./app/AppShell";
+import { PlaceholderPage } from "./app/PlaceholderPage";
+import { BrandFormPage } from "./features/brands/BrandFormPage";
+import { BrandsListPage } from "./features/brands/BrandsListPage";
+import { CategoriesListPage } from "./features/categories/CategoriesListPage";
+import { CategoryFormPage } from "./features/categories/CategoryFormPage";
+import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
+import { InventoryOutPage } from "./features/inventory/InventoryOutPage";
+import { ProductFormPage } from "./features/products/ProductFormPage";
+import { ProductProfilePage } from "./features/products/ProductProfilePage";
+import { ProductsListPage } from "./features/products/ProductsListPage";
+import { GoodsReceiptProfilePage } from "./features/purchasing/GoodsReceiptProfilePage";
+import { PurchaseOrderFormPage } from "./features/purchasing/PurchaseOrderFormPage";
+import { PurchaseOrderProfilePage } from "./features/purchasing/PurchaseOrderProfilePage";
+import { PurchaseOrdersListPage } from "./features/purchasing/PurchaseOrdersListPage";
+import { ReceivePurchaseOrderPage } from "./features/purchasing/ReceivePurchaseOrderPage";
+import { SkuProfilePage } from "./features/skus/SkuProfilePage";
+import { VendorGroupFormPage } from "./features/vendor-groups/VendorGroupFormPage";
+import { VendorGroupsListPage } from "./features/vendor-groups/VendorGroupsListPage";
+import { VendorFormPage } from "./features/vendors/VendorFormPage";
+import { VendorProfilePage } from "./features/vendors/VendorProfilePage";
+import { VendorsListPage } from "./features/vendors/VendorsListPage";
 
+/** Phase A+: no auth — open Dashboard immediately. */
 export default function App() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-3xl font-semibold tracking-tight">Blackbox</h1>
-      <p className="text-muted-foreground max-w-md text-center">
-        Electron desktop app consuming shared{" "}
-        <code className="text-foreground">@blackbox/ui</code> and{" "}
-        <code className="text-foreground">@blackbox/shared</code> (offline TTL{" "}
-        {OFFLINE_AUTHORIZATION_DAYS_DEFAULT}d).
-      </p>
-      <Button>Get started</Button>
-    </main>
+    <HashRouter>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="products" element={<ProductsListPage />} />
+          <Route path="products/new" element={<ProductFormPage />} />
+          <Route path="products/:id" element={<ProductProfilePage />} />
+          <Route path="products/:id/edit" element={<ProductFormPage />} />
+          <Route path="brands" element={<BrandsListPage />} />
+          <Route path="brands/new" element={<BrandFormPage />} />
+          <Route path="brands/:id/edit" element={<BrandFormPage />} />
+          <Route path="categories" element={<CategoriesListPage />} />
+          <Route path="categories/new" element={<CategoryFormPage />} />
+          <Route path="categories/:id/edit" element={<CategoryFormPage />} />
+          <Route path="vendors" element={<VendorsListPage />} />
+          <Route path="vendors/new" element={<VendorFormPage />} />
+          <Route path="vendors/:id" element={<VendorProfilePage />} />
+          <Route path="vendors/:id/edit" element={<VendorFormPage />} />
+          <Route path="vendor-groups" element={<VendorGroupsListPage />} />
+          <Route path="vendor-groups/new" element={<VendorGroupFormPage />} />
+          <Route
+            path="vendor-groups/:id/edit"
+            element={<VendorGroupFormPage />}
+          />
+          <Route path="skus/:id" element={<SkuProfilePage />} />
+          <Route path="inventory/out" element={<InventoryOutPage />} />
+          <Route
+            path="inventory/out/:id"
+            element={<InventoryOutDetailPage />}
+          />
+          <Route path="purchase-orders" element={<PurchaseOrdersListPage />} />
+          <Route
+            path="purchase-orders/new"
+            element={<PurchaseOrderFormPage />}
+          />
+          <Route
+            path="purchase-orders/:id"
+            element={<PurchaseOrderProfilePage />}
+          />
+          <Route
+            path="purchase-orders/:id/edit"
+            element={<PurchaseOrderFormPage />}
+          />
+          <Route
+            path="purchase-orders/:id/receive"
+            element={<ReceivePurchaseOrderPage />}
+          />
+          <Route
+            path="goods-receipts/:id"
+            element={<GoodsReceiptProfilePage />}
+          />
+          <Route
+            path="purchasing"
+            element={<Navigate to="/purchase-orders" replace />}
+          />
+          <Route
+            path="warehouses"
+            element={<PlaceholderPage title="Warehouses" />}
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </HashRouter>
   );
 }

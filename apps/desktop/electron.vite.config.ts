@@ -29,6 +29,12 @@ export default defineConfig({
     resolve: {
       alias: {
         "@renderer": resolve("src/renderer/src"),
+        /**
+         * Resolve the workspace package to TS source: its published build is
+         * CommonJS, and Vite's pre-bundle of it goes stale whenever shared
+         * gains exports, breaking named imports until the cache is cleared.
+         */
+        "@blackbox/shared": resolve("../../packages/shared/src/index.ts"),
       },
     },
     build: {
@@ -36,10 +42,6 @@ export default defineConfig({
         input: {
           index: resolve("src/renderer/index.html"),
         },
-      },
-      commonjsOptions: {
-        include: [/node_modules/, /packages\/shared/],
-        transformMixedEsModules: true,
       },
     },
     plugins: [react(), tailwindcss()],
