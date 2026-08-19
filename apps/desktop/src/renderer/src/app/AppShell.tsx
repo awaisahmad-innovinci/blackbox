@@ -5,17 +5,30 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@blackbox/ui/dropdown-menu";
+import { useSession } from "@renderer/lib/session/context";
+import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/warehouses", label: "Warehouses" },
 ] as const;
 
+const DEVICE_LABEL: Record<string, string> = {
+  unknown: "Device status unknown",
+  unbound: "Device not registered",
+  pending: "Device awaiting approval",
+  trusted: "Device trusted",
+  revoked: "Device revoked",
+};
+
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, offline, deviceState, signOut } = useSession();
+  const sync = useSyncStatus();
   const vendorsActive =
     location.pathname.startsWith("/vendors") ||
     location.pathname.startsWith("/vendor-groups");
@@ -138,8 +151,67 @@ export function AppShell() {
               </DropdownMenuContent>
             </DropdownMenu>
           </nav>
+
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void syncNow()}
+              disabled={sync.syncing}
+              className={cn(
+                "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                sync.lastError
+                  ? "text-destructive hover:bg-destructive/10"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+              title={sync.lastError ?? "Sync pending changes now"}
+            >
+              {sync.syncing
+                ? "Syncing…"
+                : sync.lastError
+                  ? `Sync issue${sync.pending ? ` · ${sync.pending} queued` : ""}`
+                  : sync.pending
+                    ? `${sync.pending} queued`
+                    : "Synced"}
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
+                {user?.fullName ?? user?.username ?? "Account"}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <div className="px-2 py-1.5 text-xs">
+                  <p className="font-medium">{user?.email ?? "Offline session"}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {DEVICE_LABEL[deviceState] ?? DEVICE_LABEL.unknown}
+                    {offline ? " · working offline" : ""}
+                  </p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => void syncNow()}>
+                  Sync now
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void signOut()}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
+      {deviceState === "pending" || deviceState === "revoked" ? (
+        <div
+          role="status"
+          className={cn(
+            "border-b px-6 py-2 text-center text-xs",
+            deviceState === "revoked"
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : "border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200",
+          )}
+        >
+          {deviceState === "revoked"
+            ? "This device was revoked. Local changes will not sync — contact an owner."
+            : "This device is awaiting owner approval. Changes are saved locally and sync once it is trusted."}
+        </div>
+      ) : null}
       <main
         className="mx-auto w-full max-w-6xl flex-1 px-6 py-8"
         data-enter-nav=""

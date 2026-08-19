@@ -12,6 +12,8 @@ import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { UpdateVendorSkuPriceDialog } from "./UpdateVendorSkuPriceDialog";
 
 type DraftLine = ReceivingLineDraft & {
@@ -140,6 +142,99 @@ export function ReceivePurchaseOrderPage() {
     setSaving(true);
     setError(null);
     try {
+      if (await isDeviceBound()) {
+        const localId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const receipt: GoodsReceiptDetail = {
+          id: localId,
+          receiptNumber: `LOCAL-${localId.slice(0, 8)}`,
+          purchaseOrderId: id,
+          poNumber: header.poNumber,
+          vendorId: header.vendorId,
+          vendorName: header.vendorName,
+          warehouseId: header.warehouseId,
+          warehouseName: header.warehouseName,
+          status: "POSTED",
+          receivedAt: receiptDate,
+          voucherNumber: voucherNumber.trim() || null,
+          subtotal,
+          discount: discountAmount,
+          tax: taxN,
+          otherCharges: otherN,
+          total: grandTotal,
+          notes: notes.trim(),
+          items: lines.map((l) => ({
+            id: crypto.randomUUID(),
+            purchaseOrderItemId: l.purchaseOrderItemId,
+            productSkuId: l.productSkuId,
+            vendorSkuId: l.vendorSkuId,
+            productName: l.productName,
+            variantName: l.variantName,
+            sku: l.sku,
+            vendorSkuCode: l.vendorSkuCode,
+            purchaseUnitId: l.purchaseUnitId,
+            purchaseUnitName: l.purchaseUnitName,
+            unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
+            orderedQuantity: l.orderedQuantity,
+            receivedQuantity: l.receiveQuantity,
+            poUnitCost: l.poUnitCost,
+            receivingUnitCost: l.receivingUnitCost,
+            lineTotal: l.receiveQuantity * l.receivingUnitCost,
+          })),
+          createdAt: now,
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "goods_receipt",
+          entityId: localId,
+          operation: "UPSERT",
+          payload: receipt as unknown as Record<string, unknown>,
+        });
+        await commitLocalChange({
+          entityType: "purchase_order",
+          entityId: id,
+          operation: "UPSERT",
+          payload: {
+            id,
+            poNumber: header.poNumber,
+            vendorId: header.vendorId,
+            vendorName: header.vendorName,
+            warehouseId: header.warehouseId,
+            warehouseName: header.warehouseName,
+            status: "RECEIVED",
+          },
+        });
+        for (const line of lines) {
+          if (!(line.receiveQuantity > 0)) continue;
+          const movementId = crypto.randomUUID();
+          const delta =
+            line.receiveQuantity *
+            (line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1);
+          await commitLocalChange({
+            entityType: "inventory_movement",
+            entityId: movementId,
+            operation: "EVENT",
+            payload: {
+              id: movementId,
+              productSkuId: line.productSkuId,
+              sku: line.sku,
+              variantName: line.variantName,
+              warehouseId: header.warehouseId,
+              warehouseName: header.warehouseName,
+              movementType: "PURCHASE_RECEIPT",
+              quantity: delta,
+              delta,
+              referenceType: "goods_receipt",
+              referenceId: localId,
+              reason: `Receipt ${receipt.receiptNumber}`,
+              createdAt: now,
+            },
+          });
+        }
+        void syncNow();
+        setSuccess(receipt);
+        return;
+      }
       const receipt = await goodsReceiptsApi.createReceipt(id, {
         receiptDate,
         voucherNumber: voucherNumber.trim() || null,

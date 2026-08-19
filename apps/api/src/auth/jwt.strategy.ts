@@ -6,6 +6,7 @@ import type { JwtPayload } from "@blackbox/shared";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { Repository } from "typeorm";
 import type { TenantContext } from "../common/tenant-context";
+import { Device } from "../db/entities/device.entity";
 import { Tenant } from "../db/entities/tenant.entity";
 import { User } from "../db/entities/user.entity";
 import { PermissionsService } from "../rbac/permissions.service";
@@ -16,6 +17,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     config: ConfigService,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
+    @InjectRepository(Device) private readonly devices: Repository<Device>,
     private readonly permissionsService: PermissionsService,
   ) {
     super({
@@ -38,6 +40,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       throw new UnauthorizedException("Tenant inactive");
     }
 
+    const deviceId: string | null = payload.deviceId ?? null;
+    if (deviceId) {
+      const device = await this.devices.findOne({
+        where: { id: deviceId, tenantId: user.tenantId },
+      });
+      if (!device || device.status === "revoked") {
+        throw new UnauthorizedException("Device revoked or unknown");
+      }
+    }
+
     const userPermissions =
       await this.permissionsService.getPermissionsForUser(
         user.id,
@@ -49,6 +61,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       tenantId: user.tenantId,
       email: user.email,
       permissions: userPermissions,
+      deviceId,
     };
   }
 }

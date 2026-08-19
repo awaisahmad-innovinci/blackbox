@@ -16,6 +16,8 @@ import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { vendorsApi } from "@renderer/lib/api/vendors";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 
 type ContactForm = {
   name: string;
@@ -280,6 +282,59 @@ export function VendorFormPage() {
 
     let saved: VendorDetail;
     try {
+      if (await isDeviceBound()) {
+        const localId = isEdit && id ? id : crypto.randomUUID();
+        const now = new Date().toISOString();
+        const contacts: VendorDetail["contacts"] = [];
+        const addContact = (
+          type: VendorDetail["contacts"][number]["contactType"],
+          c: ContactForm,
+        ) => {
+          if (!c.name.trim() && !c.phone.trim() && !c.email.trim()) return;
+          contacts.push({
+            id: crypto.randomUUID(),
+            contactType: type,
+            name: c.name.trim() || null,
+            phone: c.phone.trim() || null,
+            email: c.email.trim() || null,
+          });
+        };
+        addContact("PRIMARY", form.primaryContact);
+        addContact("OTHER", form.otherContact);
+        addContact("MANAGER", form.managerContact);
+        addContact("SALESPERSON", form.salespersonContact);
+        saved = {
+          id: localId,
+          name: body.name,
+          vendorCode: body.vendorCode,
+          groupId: body.groupId ?? null,
+          groupName: groups.find((g) => g.id === body.groupId)?.name ?? null,
+          status: body.status ?? "active",
+          address: body.address ?? null,
+          city: body.city ?? null,
+          state: body.state ?? null,
+          country: body.country ?? null,
+          postalCode: body.postalCode ?? null,
+          salesTarget: body.salesTarget ?? null,
+          creditLimit: body.creditLimit ?? null,
+          paymentTerms: body.paymentTerms ?? null,
+          taxNumber: body.taxNumber ?? null,
+          notes: body.notes ?? "",
+          contacts,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "vendor",
+          entityId: localId,
+          operation: saved.status === "inactive" ? "DELETE" : "UPSERT",
+          payload: saved as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setSaving(false);
+        navigate(`/vendors/${localId}`);
+        return;
+      }
       saved = isEdit && id
         ? await vendorsApi.update(id, body)
         : await vendorsApi.create(body);

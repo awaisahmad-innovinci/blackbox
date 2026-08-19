@@ -132,6 +132,7 @@ Backend recalculates line and header totals. Creating/submitting/cancelling does
 |--------|------|-------|
 | `GET` | `/purchase-orders/:id/receiving` | SUBMITTED PO with no POSTED receipt; draft header + lines (PO cost + current vendor purchase price) |
 | `POST` | `/purchase-orders/:id/receipts` | Atomic confirm: create `POSTED` GR + items + `PURCHASE_RECEIPT` movements + stock upsert + PO → `RECEIVED` |
+| `GET` | `/goods-receipts` | Paginated list (`search`, `vendorId`, `warehouseId`, `status`, `dateFrom`, `dateTo`, `page`, `pageSize`) |
 | `GET` | `/goods-receipts/:id` | Receipt detail (View Receipt) |
 
 Rules: one POSTED receipt per PO; `0 ≤ receivedQty ≤ orderedQty`; inventory delta = `receivedQty × units_per_purchase_unit` (PO line snapshot); never mutate historical PO `unit_cost`. Receipt numbers: `GRN-YYYY-######`. Optional vendor SKU purchase-price updates use existing `PATCH /vendor-skus/:id` (outside the receive transaction).
@@ -143,9 +144,17 @@ Rules: one POSTED receipt per PO; `0 ≤ receivedQty ≤ orderedQty`; inventory 
 | `GET` | `/skus?q=&warehouseId=` | When `warehouseId` is set, each result includes `quantityAvailable` and `costPrice` (avg) |
 | `GET` | `/skus/by-barcode?barcode=&warehouseId=` | Exact barcode match; returns warehouse availability + avg cost (404 if unknown) |
 | `POST` | `/inventory-out` | Atomic confirm: `POSTED` header + items + `INVENTORY_OUT` movements + stock decrease; persists `subtotal` / `total` |
+| `GET` | `/inventory-out` | Paginated list (`search`, `warehouseId`, `dateFrom`, `dateTo`, `page`, `pageSize`) |
 | `GET` | `/inventory-out/:id` | Read-only bill detail (lines + subtotal + total) |
 
 Rules: `0 < qty ≤ quantity_available` in the selected warehouse; movements store **positive** qty with type `INVENTORY_OUT`; do **not** change `product_skus.cost_price` on outbound. Out numbers: `IO-YYYY-######`. Snapshot `unit_cost` from avg cost at post. Line total = qty × avg cost; **no discount/tax** so `subtotal === total`. Desktop bill has a trailing barcode scan row (Enter adds/increments qty by 1).
+
+## Inventory movements
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `GET` | `/inventory-movements` | Tenant-wide paginated list (`productSkuId`, `warehouseId`, `since`, `page`, `pageSize`); includes `referenceType` / `referenceId` |
+| `GET` | `/products/:id/movements` | Product-scoped recent movements (existing) |
 
 ## SKUs / units
 
@@ -160,13 +169,54 @@ Rules: `0 < qty ≤ quantity_available` in the selected warehouse; movements sto
 | `GET` | `/skus/:id/vendors` | Suppliers for SKU |
 | `GET` | `/units` | Purchase units for selects |
 
+## Master-data CSV import
+
+The Dashboard **Upload Old Data** action accepts any one-to-nine template CSV
+files directly, or one complete ZIP containing all nine (maximum 10 MB per file):
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/inventory-imports/master-data` | Multipart field `files` (one-to-nine CSVs) or `file` (one complete ZIP); atomically imports the supplied master data |
+
+The user templates are checked into
+[`docs/import-templates/master-data/`](import-templates/master-data/). Give that
+folder to users; the app does not download templates. Users can upload only the
+file they changed, or select a related subset. Filenames and headers must remain
+unchanged. ZIP uploads must contain all nine files at the archive root; unused
+files in a ZIP stay header-only.
+
+Import order: units → brands → categories → warehouses → vendor groups →
+products → product SKUs → vendors/contacts → vendor-SKU pricing. References use
+the natural keys documented in the template README and may resolve from either
+the same upload or existing tenant data. `06_products.csv` defines a permanent,
+tenant-unique `import_key`; SKU rows refer to it with `product_import_key`.
+
+Allowed values:
+
+- `status`: `active`, `inactive`
+- unit `type`: `count`, `weight`, `volume`, `length`, `other`
+- `product_type`: `STOCK_ITEM`, `CONSUMABLE`, `RESALABLE`
+- `payment_terms`: `CASH`, `7_DAYS`, `15_DAYS`, `30_DAYS`, `45_DAYS`, `CUSTOM`
+- booleans: `true`, `false`
+
+Rows are upserted by stable keys, so repeating an upload updates units, named
+reference data, warehouses, products, SKUs, vendors, and vendor-SKU links rather
+than duplicating them. The API validates all selected files before committing.
+Any file/row error rolls back the selected upload and returns file, line, column,
+and message details.
+After a successful cloud import, desktop automatically runs the existing full
+Sync to refresh SQLite. Historical transactions and opening stock are not part
+of this master-data format.
+
 ## Desktop
 
 - No login; **Inventory** ▼ → Add Product / See Products / Brands / Categories / Inventory Out; **Purchasing** ▼ → Create Purchase Order / Purchase Orders; **Vendors** ▼ → Add Vendor / See Vendors / Vendor Groups.
 - Brands `/brands`, Categories `/categories`, Vendor Groups `/vendor-groups` — list + create/edit + soft deactivate.
 - Inventory Out at `/inventory/out` (detail at `/inventory/out/:id`) — bill table with live totals and barcode scan row.
-- After successful product/SKU/vendor/PO/goods-receipt writes, renderer upserts into local SQLite via IPC.
-- Lists and profiles still read from the HTTP API while online.
+- After successful product/SKU/vendor/PO/goods-receipt/inventory-out writes, renderer upserts into local SQLite via IPC.
+- **Local-first reads (Phase 2):** Dashboard cards, Products list, Vendors list, and Purchase Orders list use SQLite when the local DB is connected **and** `sync_meta.last_full_pull_at` is set; otherwise they fall back to the HTTP API. Each page shows a “Showing local data” / “Showing API data” hint. Profile/detail pages still use the API.
+- **Sync (Dashboard):** Click **Sync** on the local-DB banner to pull cloud data into SQLite: reference data, products/SKUs, vendors/vendor-SKUs, purchase orders, stock, goods receipts, inventory outs, and inventory movements. Upsert-by-id only; schema is not recreated. Writes `sync_meta.last_full_pull_at`. Does not push local→cloud or resolve conflicts.
+- **Upload Old Data (Dashboard):** Select one changed CSV, a related subset, or a complete ZIP. Unselected templates are optional. Existing rows are updated, then full Sync refreshes local SQLite.
 
 ## Later
 

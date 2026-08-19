@@ -6,6 +6,7 @@ export interface TenantContext {
   tenantId: string;
   email: string;
   permissions: Permission[];
+  deviceId: string | null;
 }
 
 export const REQUEST_TENANT_CONTEXT = "tenantContext";

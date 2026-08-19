@@ -5,6 +5,8 @@ import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Skeleton } from "@blackbox/ui/skeleton";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import type { DataSourceMode } from "@renderer/lib/local-db/data-source";
+import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 
 export type TaxonomyRow = {
   id: string;
@@ -29,12 +31,14 @@ export function TaxonomyListPage({
   load: (query: {
     status?: EntityStatus | "all";
     q?: string;
-  }) => Promise<TaxonomyRow[]>;
+  }) => Promise<{ rows: TaxonomyRow[]; mode: DataSourceMode }>;
 }) {
   const navigate = useNavigate();
+  const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EntityStatus | "all">("all");
   const [items, setItems] = useState<TaxonomyRow[]>([]);
+  const [dataSource, setDataSource] = useState<DataSourceMode>("api");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,8 +51,10 @@ export function TaxonomyListPage({
         status,
         q: search.trim() || undefined,
       })
-        .then((rows) => {
-          if (!cancelled) setItems(rows);
+        .then((result) => {
+          if (cancelled) return;
+          setItems(result.rows);
+          setDataSource(result.mode);
         })
         .catch((err: unknown) => {
           if (!cancelled) {
@@ -63,7 +69,7 @@ export function TaxonomyListPage({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, load, title]);
+  }, [search, status, load, title, dataVersion]);
 
   return (
     <div className="space-y-6">
@@ -71,6 +77,9 @@ export function TaxonomyListPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {dataSource === "local" ? "Showing local data" : "Showing API data"}
+          </p>
         </div>
         <Button onClick={() => navigate(`${basePath}/new`)}>{createLabel}</Button>
       </div>

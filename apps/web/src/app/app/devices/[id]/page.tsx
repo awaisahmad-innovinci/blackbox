@@ -16,7 +16,12 @@ import {
   FormSuccess,
   SectionCard,
 } from "@/components/section-card";
-import { getDevice, revokeDevice, type DeviceDto } from "@/lib/admin-api";
+import {
+  getDevice,
+  revokeDevice,
+  trustDevice,
+  type DeviceDto,
+} from "@/lib/admin-api";
 import { toUserFacingError } from "@/lib/api-error";
 
 export default function DeviceDetailPage() {
@@ -29,6 +34,7 @@ export default function DeviceDetailPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [trustConfirmOpen, setTrustConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,6 +51,23 @@ export default function DeviceDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function onTrust() {
+    if (!device) return;
+    setBusy(true);
+    setSuccess(null);
+    setFormError(null);
+    try {
+      const updated = await trustDevice(device.id);
+      setDevice(updated);
+      setTrustConfirmOpen(false);
+      setSuccess("Device trusted. Desktop sync is now allowed.");
+    } catch (err) {
+      setFormError(toUserFacingError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onRevoke() {
     if (!device) return;
@@ -124,6 +147,20 @@ export default function DeviceDetailPage() {
               </dl>
             </SectionCard>
 
+            {hasPermission("devices.manage") && device.status === "pending" ? (
+              <SectionCard
+                title="Trust device"
+                description="Allow this desktop to push and pull incremental sync."
+              >
+                <Button
+                  disabled={busy}
+                  onClick={() => setTrustConfirmOpen(true)}
+                >
+                  Trust device
+                </Button>
+              </SectionCard>
+            ) : null}
+
             {hasPermission("devices.manage") && device.status !== "revoked" ? (
               <SectionCard
                 title="Danger zone"
@@ -141,6 +178,16 @@ export default function DeviceDetailPage() {
           </>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={trustConfirmOpen}
+        onOpenChange={setTrustConfirmOpen}
+        title="Trust this device?"
+        description="The desktop can push and pull sync for this tenant once trusted."
+        confirmLabel="Trust device"
+        loading={busy}
+        onConfirm={onTrust}
+      />
 
       <ConfirmDialog
         open={confirmOpen}

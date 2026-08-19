@@ -40,6 +40,9 @@ export interface LoginRequest {
   identifier: string;
   password: string;
   client: AuthClient;
+  /** Desktop machine fingerprint; bound to JWT deviceId when provided. */
+  fingerprint?: string;
+  deviceName?: string;
 }
 
 export interface RefreshRequest {
@@ -59,4 +62,6 @@ export interface JwtPayload {
   /** User id */
   sub: string;
   tenantId: string;
+  /** Present on desktop sessions bound to a registered device. */
+  deviceId?: string;
 }

@@ -1,6 +1,9 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { PlaceholderPage } from "./app/PlaceholderPage";
+import { SignInPage } from "./features/auth/SignInPage";
+import { SessionProvider } from "./lib/session/session-context";
+import { useSession } from "./lib/session/context";
 import { BrandFormPage } from "./features/brands/BrandFormPage";
 import { BrandsListPage } from "./features/brands/BrandsListPage";
 import { CategoriesListPage } from "./features/categories/CategoriesListPage";
@@ -23,8 +26,29 @@ import { VendorFormPage } from "./features/vendors/VendorFormPage";
 import { VendorProfilePage } from "./features/vendors/VendorProfilePage";
 import { VendorsListPage } from "./features/vendors/VendorsListPage";
 
-/** Phase A+: no auth — open Dashboard immediately. */
 export default function App() {
+  return (
+    <SessionProvider>
+      <AuthenticatedApp />
+    </SessionProvider>
+  );
+}
+
+function AuthenticatedApp() {
+  const { status } = useSession();
+
+  if (status === "loading") {
+    return (
+      <div className="bg-background text-muted-foreground flex min-h-screen items-center justify-center text-sm">
+        Restoring session…
+      </div>
+    );
+  }
+
+  if (status === "signed-out") {
+    return <SignInPage />;
+  }
+
   return (
     <HashRouter>
       <Routes>

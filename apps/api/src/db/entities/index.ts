@@ -5,6 +5,8 @@ import { Permission } from "./permission.entity";
 import { RefreshToken } from "./refresh-token.entity";
 import { RolePermission } from "./role-permission.entity";
 import { Role } from "./role.entity";
+import { SyncChange } from "./sync-change.entity";
+import { SyncConflict } from "./sync-conflict.entity";
 import { SyncCursor } from "./sync-cursor.entity";
 import { Tenant } from "./tenant.entity";
 import { UserRole } from "./user-role.entity";
@@ -39,6 +41,8 @@ export const entities = [
   DeviceUser,
   RefreshToken,
   SyncCursor,
+  SyncChange,
+  SyncConflict,
   Location,
   Category,
   Brand,
@@ -71,6 +75,8 @@ export {
   DeviceUser,
   RefreshToken,
   SyncCursor,
+  SyncChange,
+  SyncConflict,
   Location,
   Category,
   Brand,

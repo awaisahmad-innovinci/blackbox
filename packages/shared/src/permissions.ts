@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   "permissions.read",
   "devices.read",
   "devices.manage",
+  "sync.use",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -32,6 +33,7 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   "permissions.read": "View the permission catalog",
   "devices.read": "List and view devices",
   "devices.manage": "Register, trust, revoke, and manage device associations",
+  "sync.use": "Push and pull incremental desktop sync",
 };
 
 export function isPermission(value: string): value is Permission {

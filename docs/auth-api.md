@@ -1,4 +1,4 @@
-# Auth API (Phase 1)
+# Auth API
 
 NestJS uses **TypeORM** against Supabase PostgreSQL with `synchronize: false`.
 Schema is applied only via `supabase/migrations/` — not TypeORM migrations.
@@ -18,6 +18,7 @@ NestJS AuthModule → TypeORM → Supabase PostgreSQL
 | POST | `/auth/refresh` | public (`refreshToken`) |
 | POST | `/auth/logout` | public (`refreshToken`) |
 | GET | `/auth/me` | Bearer access JWT |
+| GET | `/devices/me` | Bearer access JWT + `desktop.access` |
 
 Auth routes do **not** use `@RequirePermissions` — authentication stays separate from RBAC authorization.
 Permission checks use `JwtAuthGuard` + `PermissionsGuard` on other routes (e.g. `GET /rbac/check`).
@@ -50,6 +51,61 @@ Hash lookup → reject expired/revoked → verify user/tenant active → rotate 
 ### Logout (`POST /auth/logout`)
 
 Revoke matching refresh token by hash; idempotent `{ success: true }`.
+
+## Who creates credentials
+
+1. The first account is created by **`POST /auth/signup-tenant`**: it creates the tenant, the
+   system roles with their permissions, the OWNER user, and a `cloud-hub` device row used as the
+   origin device for changes written through the REST API.
+2. Every other account is created by the owner (or anyone with `users.write`) through
+   **`POST /users`** in the web admin, and roles are assigned with **`PUT /users/:id/roles`**.
+   The owner sets the initial password; the user signs in with email or username.
+3. Permissions are never attached to a user directly. They resolve through
+   `user_roles → role_permissions → permissions`, so changing a role changes what the user can do
+   on the next token issue or refresh.
+
+Only accounts whose roles include **`desktop.access`** can sign in from the desktop app; the login
+endpoint rejects a desktop client without it with `403`. Sync additionally requires `sync.use`.
+
+## Desktop device sessions
+
+Desktop login sends `client: "desktop"` plus a machine `fingerprint`, and the server:
+
+1. Verifies the credentials and the `desktop.access` permission.
+2. Finds or creates the `devices` row for `(tenant_id, fingerprint)` with status `pending`, and
+   upserts the `device_users` link that carries the offline authorization window.
+3. Issues an access token whose `deviceId` claim binds the session to that device, and stores the
+   refresh token with the same `device_id`.
+
+A `pending` device can read `/devices/me` and `/sync/status` but cannot push or pull — an owner
+must trust it (`POST /devices/:id/trust`, web admin → Devices → Trust device). Revoking a device
+(`POST /devices/:id/revoke`) also revokes its refresh tokens, so the desktop is signed out on its
+next request.
+
+### Desktop token lifecycle
+
+The access token lives 15 minutes and the desktop refreshes it automatically: `apiFetch` retries a
+`401` once after rotating the refresh token, with a single-flight guard so parallel requests do not
+revoke each other's token. If refresh fails, the stored tokens are cleared and the app returns to
+the sign-in screen. When the API is unreachable, tokens are kept and the app opens in offline mode
+against the local SQLite database; queued changes push after the next successful sign-in or sync.
+
+## Database tables
+
+| Table | Holds | Key columns |
+|-------|-------|-------------|
+| `tenants` | One row per business; login fails if inactive | `id`, `name`, `is_active` |
+| `users` | Login identity and Argon2 password hash | `id`, `tenant_id`, `email`, `username`, `password_hash`, `is_active` |
+| `roles` | System roles per tenant (OWNER, MANAGER, …) | `id`, `tenant_id`, `key`, `name` |
+| `permissions` | Global catalog of permission keys | `id`, `key` |
+| `role_permissions` | Which permissions a role grants | `role_id`, `permission_id` |
+| `user_roles` | Which roles a user has | `user_id`, `role_id` |
+| `refresh_tokens` | SHA-256 hash of each refresh token, rotation chain | `token_hash`, `user_id`, `device_id`, `expires_at`, `revoked_at`, `replaced_by` |
+| `devices` | Registered machines and their trust state | `id`, `tenant_id`, `fingerprint`, `status`, `trusted_at`, `revoked_at`, `needs_full_resync` |
+| `device_users` | Which users may work offline on a device | `device_id`, `user_id`, `offline_enabled`, `offline_expires_at`, `last_online_at` |
+
+Passwords live only in `users.password_hash`; refresh tokens only as hashes in `refresh_tokens`.
+Access tokens are never stored server-side — they are verified from their signature and claims.
 
 ## Security
 

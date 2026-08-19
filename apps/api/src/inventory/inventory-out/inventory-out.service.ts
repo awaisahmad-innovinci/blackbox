@@ -6,9 +6,12 @@ import {
 import type {
   InventoryOutDetail,
   InventoryOutItemRow,
+  InventoryOutListItem,
   InventoryOutStatus,
+  PaginatedInventoryOuts,
 } from "@blackbox/shared";
-import { DataSource, EntityManager } from "typeorm";
+import { DataSource, EntityManager, Repository } from "typeorm";
+import { InjectRepository } from "@nestjs/typeorm";
 import {
   InventoryMovement,
   InventoryOut,
@@ -19,6 +22,7 @@ import {
 } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { CreateInventoryOutDto } from "./dto/inventory-out.dto";
+import { ListInventoryOutQueryDto } from "./dto/list-inventory-out-query.dto";
 
 function toNum(value: string | null | undefined): number {
   if (value == null || value === "") return 0;
@@ -34,7 +38,92 @@ export class InventoryOutService {
   constructor(
     private readonly fixedTenant: FixedTenantContext,
     private readonly dataSource: DataSource,
+    @InjectRepository(InventoryOut)
+    private readonly outs: Repository<InventoryOut>,
+    @InjectRepository(InventoryOutItem)
+    private readonly outItems: Repository<InventoryOutItem>,
+    @InjectRepository(Warehouse)
+    private readonly warehouses: Repository<Warehouse>,
   ) {}
+
+  async list(query: ListInventoryOutQueryDto): Promise<PaginatedInventoryOuts> {
+    const tenantId = this.fixedTenant.tenantId;
+    const page = query.page ?? 1;
+    const pageSize = Math.min(query.pageSize ?? 25, 100);
+
+    const qb = this.outs
+      .createQueryBuilder("io")
+      .where("io.tenant_id = :tenantId", { tenantId });
+
+    if (query.warehouseId) {
+      qb.andWhere("io.warehouse_id = :warehouseId", {
+        warehouseId: query.warehouseId,
+      });
+    }
+    if (query.dateFrom) {
+      qb.andWhere("io.out_date >= :dateFrom", { dateFrom: query.dateFrom });
+    }
+    if (query.dateTo) {
+      qb.andWhere("io.out_date <= :dateTo", { dateTo: query.dateTo });
+    }
+    if (query.search?.trim()) {
+      const term = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        `(LOWER(io.out_number) LIKE :term
+          OR LOWER(COALESCE(io.reference, '')) LIKE :term)`,
+        { term },
+      );
+    }
+
+    const total = await qb.getCount();
+    const rows = await qb
+      .orderBy("io.out_date", "DESC")
+      .addOrderBy("io.created_at", "DESC")
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getMany();
+
+    const ids = rows.map((r) => r.id);
+    const itemCounts = new Map<string, number>();
+    if (ids.length > 0) {
+      const counts = await this.outItems
+        .createQueryBuilder("i")
+        .select("i.inventory_out_id", "outId")
+        .addSelect("COUNT(*)", "cnt")
+        .where("i.tenant_id = :tenantId", { tenantId })
+        .andWhere("i.inventory_out_id IN (:...ids)", { ids })
+        .groupBy("i.inventory_out_id")
+        .getRawMany<{ outId: string; cnt: string }>();
+      for (const row of counts) itemCounts.set(row.outId, Number(row.cnt));
+    }
+
+    const warehouseNames = new Map<string, string>();
+    const warehouseIds = [...new Set(rows.map((r) => r.warehouseId))];
+    if (warehouseIds.length > 0) {
+      const warehouses = await this.warehouses
+        .createQueryBuilder("w")
+        .where("w.id IN (:...warehouseIds)", { warehouseIds })
+        .getMany();
+      for (const w of warehouses) warehouseNames.set(w.id, w.name);
+    }
+
+    const items: InventoryOutListItem[] = rows.map((io) => ({
+      id: io.id,
+      outNumber: io.outNumber,
+      warehouseId: io.warehouseId,
+      warehouseName: warehouseNames.get(io.warehouseId) ?? "—",
+      outDate:
+        typeof io.outDate === "string"
+          ? io.outDate.slice(0, 10)
+          : String(io.outDate).slice(0, 10),
+      reference: io.reference,
+      status: io.status as InventoryOutStatus,
+      total: toNum(io.total),
+      itemCount: itemCounts.get(io.id) ?? 0,
+    }));
+
+    return { items, total, page, pageSize };
+  }
 
   async create(dto: CreateInventoryOutDto): Promise<InventoryOutDetail> {
     const tenantId = this.fixedTenant.tenantId;

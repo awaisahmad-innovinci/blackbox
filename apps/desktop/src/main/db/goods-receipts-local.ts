@@ -94,3 +94,11 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
   });
   tx();
 }
+
+export function upsertGoodsReceiptsLocal(rows: GoodsReceiptDetail[]): void {
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    for (const row of rows) upsertGoodsReceiptLocal(row);
+  });
+  tx();
+}

@@ -24,6 +24,7 @@ export function BrandFormPage() {
       titleEdit="Edit Brand"
       basePath="/brands"
       entityLabel="brand"
+      syncEntityType="brand"
       loadOne={loadOne}
       create={create}
       update={update}

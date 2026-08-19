@@ -10,6 +10,8 @@ import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { skusApi } from "@renderer/lib/api/skus";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
 import {
@@ -172,6 +174,70 @@ export function InventoryOutPage() {
 
     setSaving(true);
     try {
+      if (await isDeviceBound()) {
+        const localId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const warehouseName =
+          warehouses.find((w) => w.id === warehouseId)?.name ?? "";
+        const items = lines.map((l) => ({
+          id: crypto.randomUUID(),
+          productSkuId: l.productSkuId,
+          productName: l.productName,
+          variantName: l.variantName,
+          sku: l.sku,
+          barcode: l.barcode,
+          quantity: l.quantity,
+          unitCost: l.costPrice,
+          lineTotal: lineTotal(l),
+        }));
+        const detail: InventoryOutDetail = {
+          id: localId,
+          outNumber: `LOCAL-${localId.slice(0, 8)}`,
+          warehouseId,
+          warehouseName,
+          outDate,
+          reference: reference.trim() || null,
+          notes: notes.trim(),
+          status: "POSTED",
+          subtotal: items.reduce((sum, i) => sum + i.lineTotal, 0),
+          total: items.reduce((sum, i) => sum + i.lineTotal, 0),
+          items,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "inventory_out",
+          entityId: localId,
+          operation: "UPSERT",
+          payload: detail as unknown as Record<string, unknown>,
+        });
+        for (const item of items) {
+          const movementId = crypto.randomUUID();
+          await commitLocalChange({
+            entityType: "inventory_movement",
+            entityId: movementId,
+            operation: "EVENT",
+            payload: {
+              id: movementId,
+              productSkuId: item.productSkuId,
+              sku: item.sku,
+              variantName: item.variantName,
+              warehouseId,
+              warehouseName,
+              movementType: "INVENTORY_OUT",
+              quantity: item.quantity,
+              delta: -item.quantity,
+              referenceType: "inventory_out",
+              referenceId: localId,
+              reason: `Inventory out ${detail.outNumber}`,
+              createdAt: now,
+            },
+          });
+        }
+        void syncNow();
+        setSuccess(detail);
+        return;
+      }
       const detail = await inventoryOutApi.create({
         warehouseId,
         outDate,
@@ -182,6 +248,13 @@ export function InventoryOutPage() {
           quantity: l.quantity,
         })),
       });
+
+      try {
+        await window.blackbox?.localDb?.upsertInventoryOut(detail);
+      } catch {
+        /* optional cache */
+      }
+
       setSuccess(detail);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to post inventory out"));

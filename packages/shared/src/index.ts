@@ -66,6 +66,33 @@ export type {
   DeviceUser,
   RegisterDeviceRequest,
 } from "./devices";
+export {
+  SYNC_STREAMS,
+  SYNC_OPERATIONS,
+  SYNC_PUSH_BATCH_SIZE,
+  SYNC_PULL_BATCH_SIZE,
+  SYNC_MAX_BODY_BYTES,
+  SYNC_MAX_PAYLOAD_BYTES,
+  streamForEntity,
+} from "./sync";
+export type {
+  SyncStream,
+  SyncOperation,
+  SyncEntityType,
+  MasterDataEntityType,
+  InventoryEntityType,
+  PurchasingEntityType,
+  SyncChangeInput,
+  SyncPushRequest,
+  SyncPushItemStatus,
+  SyncPushItemResult,
+  SyncPushResponse,
+  SyncChangeDto,
+  SyncPullResponse,
+  SyncStreamStatus,
+  SyncStatusResponse,
+  SyncConflictAckRequest,
+} from "./sync";
 export type {
   BusinessType,
   CountryCode,
@@ -137,11 +164,25 @@ export type {
   CreateGoodsReceiptRequest,
   GoodsReceiptItemRow,
   GoodsReceiptDetail,
+  GoodsReceiptListItem,
+  GoodsReceiptListQuery,
+  PaginatedGoodsReceipts,
   CreateInventoryOutItemRequest,
   CreateInventoryOutRequest,
   InventoryOutItemRow,
   InventoryOutDetail,
   InventoryOutStatus,
+  InventoryOutListItem,
+  InventoryOutListQuery,
+  PaginatedInventoryOuts,
+  InventoryMovementListItem,
+  InventoryMovementListQuery,
+  PaginatedInventoryMovements,
+  MasterDataImportFile,
+  MasterDataImportError,
+  MasterDataImportFileResult,
+  MasterDataImportResult,
+  MasterDataImportFailure,
 } from "./inventory";
 
 /** Own bindings so Vite/Rollup CJS interop sees named exports. */
@@ -177,6 +218,7 @@ export const UNIT_TYPES = unitTypesList;
 export const INVENTORY_MOVEMENT_TYPES = inventoryMovementTypesList;
 export const PURCHASE_ORDER_STATUSES = purchaseOrderStatusesList;
 export const GOODS_RECEIPT_STATUSES = goodsReceiptStatusesList;
+export { MASTER_DATA_IMPORT_FILES } from "./inventory";
 export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
 export const PAYMENT_TERMS = paymentTermsList;
 export const PAYMENT_TERMS_LABELS = paymentTermsLabels;

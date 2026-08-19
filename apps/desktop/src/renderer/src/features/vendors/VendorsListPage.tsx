@@ -7,9 +7,15 @@ import { Skeleton } from "@blackbox/ui/skeleton";
 import { ApiError } from "@renderer/lib/api/client";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { vendorsApi } from "@renderer/lib/api/vendors";
+import {
+  resolveDataSourceMode,
+  type DataSourceMode,
+} from "@renderer/lib/local-db/data-source";
+import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 
 export function VendorsListPage() {
   const navigate = useNavigate();
+  const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EntityStatus | "">("");
   const [groupId, setGroupId] = useState("");
@@ -17,38 +23,64 @@ export function VendorsListPage() {
   const [items, setItems] = useState<VendorListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<DataSourceMode>("api");
 
   useEffect(() => {
-    void vendorGroupsApi.list().then(setGroups).catch(() => undefined);
-  }, []);
+    let cancelled = false;
+    void (async () => {
+      const mode = await resolveDataSourceMode();
+      if (cancelled) return;
+      setDataSource(mode);
+      try {
+        if (mode === "local" && window.blackbox?.localDb?.listVendorGroups) {
+          setGroups(await window.blackbox.localDb.listVendorGroups());
+        } else {
+          setGroups(await vendorGroupsApi.list());
+        }
+      } catch {
+        /* filters optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
       setLoading(true);
       setError(null);
-      void vendorsApi
-        .list({
-          search: search.trim() || undefined,
-          status: status || undefined,
-          groupId: groupId || undefined,
-        })
-        .then((res) => {
-          if (!cancelled) setItems(res.items);
-        })
-        .catch((err: unknown) => {
+      void (async () => {
+        try {
+          const mode = await resolveDataSourceMode();
           if (cancelled) return;
-          setError(err instanceof ApiError ? err.message : "Failed to load vendors");
-        })
-        .finally(() => {
+          setDataSource(mode);
+          const query = {
+            search: search.trim() || undefined,
+            status: status || undefined,
+            groupId: groupId || undefined,
+          };
+          const res =
+            mode === "local" && window.blackbox?.localDb?.listVendors
+              ? await window.blackbox.localDb.listVendors(query)
+              : await vendorsApi.list(query);
+          if (!cancelled) setItems(res.items);
+        } catch (err: unknown) {
+          if (cancelled) return;
+          setError(
+            err instanceof ApiError ? err.message : "Failed to load vendors",
+          );
+        } finally {
           if (!cancelled) setLoading(false);
-        });
+        }
+      })();
     }, 200);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, groupId]);
+  }, [search, status, groupId, dataVersion]);
 
   return (
     <div className="space-y-6">
@@ -57,6 +89,11 @@ export function VendorsListPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Vendors</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Suppliers for this store.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {dataSource === "local"
+              ? "Showing local data"
+              : "Showing API data"}
           </p>
         </div>
         <Button onClick={() => navigate("/vendors/new")}>+ Add Vendor</Button>

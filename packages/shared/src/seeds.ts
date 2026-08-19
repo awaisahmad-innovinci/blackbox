@@ -20,7 +20,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "permissions.read",
     "devices.read",
     "tenant.settings.read",
+    "sync.use",
   ],
-  WAREHOUSE_MANAGER: ["desktop.access"],
-  CASHIER: ["desktop.access"],
+  WAREHOUSE_MANAGER: ["desktop.access", "sync.use"],
+  CASHIER: ["desktop.access", "sync.use"],
 };

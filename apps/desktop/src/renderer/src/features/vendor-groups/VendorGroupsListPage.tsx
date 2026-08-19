@@ -1,11 +1,15 @@
 import { useCallback } from "react";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
+import {
+  loadTaxonomyRows,
+  type TaxonomyQuery,
+} from "@renderer/lib/local-db/taxonomy-source";
 import { TaxonomyListPage } from "../taxonomy/TaxonomyListPage";
 
 export function VendorGroupsListPage() {
   const load = useCallback(
-    (query: Parameters<typeof vendorGroupsApi.list>[0]) =>
-      vendorGroupsApi.list(query),
+    (query: TaxonomyQuery) =>
+      loadTaxonomyRows("vendor_group", query, (q) => vendorGroupsApi.list(q)),
     [],
   );
   return (

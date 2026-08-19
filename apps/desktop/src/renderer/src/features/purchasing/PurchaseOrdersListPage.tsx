@@ -14,9 +14,15 @@ import { ApiError } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
+import {
+  resolveDataSourceMode,
+  type DataSourceMode,
+} from "@renderer/lib/local-db/data-source";
+import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 
 export function PurchaseOrdersListPage() {
   const navigate = useNavigate();
+  const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PurchaseOrderStatus | "">("");
   const [vendorId, setVendorId] = useState("");
@@ -28,49 +34,87 @@ export function PurchaseOrdersListPage() {
   const [items, setItems] = useState<PurchaseOrderListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<DataSourceMode>("api");
 
   useEffect(() => {
-    void vendorsApi
-      .list({ status: "active", pageSize: 100 })
-      .then((r) => setVendors(r.items))
-      .catch(() => undefined);
-    void warehousesApi.list().then(setWarehouses).catch(() => undefined);
-  }, []);
+    let cancelled = false;
+    void (async () => {
+      const mode = await resolveDataSourceMode();
+      if (cancelled) return;
+      setDataSource(mode);
+      try {
+        if (mode === "local" && window.blackbox?.localDb?.listVendors) {
+          const vendorsRes = await window.blackbox.localDb.listVendors({
+            status: "active",
+            pageSize: 100,
+          });
+          setVendors(vendorsRes.items);
+          setWarehouses(await window.blackbox.localDb.listWarehouses!());
+        } else {
+          const vendorsRes = await vendorsApi.list({
+            status: "active",
+            pageSize: 100,
+          });
+          setVendors(vendorsRes.items);
+          setWarehouses(await warehousesApi.list());
+        }
+      } catch {
+        /* filters optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
       setLoading(true);
       setError(null);
-      void purchaseOrdersApi
-        .list({
-          search: search.trim() || undefined,
-          status: status || undefined,
-          vendorId: vendorId || undefined,
-          warehouseId: warehouseId || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        })
-        .then((res) => {
+      void (async () => {
+        try {
+          const mode = await resolveDataSourceMode();
+          if (cancelled) return;
+          setDataSource(mode);
+          const query = {
+            search: search.trim() || undefined,
+            status: status || undefined,
+            vendorId: vendorId || undefined,
+            warehouseId: warehouseId || undefined,
+            dateFrom: dateFrom || undefined,
+            dateTo: dateTo || undefined,
+          };
+          const res =
+            mode === "local" && window.blackbox?.localDb?.listPurchaseOrders
+              ? await window.blackbox.localDb.listPurchaseOrders(query)
+              : await purchaseOrdersApi.list(query);
           if (!cancelled) setItems(res.items);
-        })
-        .catch((err: unknown) => {
+        } catch (err: unknown) {
           if (cancelled) return;
           setError(
             err instanceof ApiError
               ? err.message
               : "Failed to load purchase orders",
           );
-        })
-        .finally(() => {
+        } finally {
           if (!cancelled) setLoading(false);
-        });
+        }
+      })();
     }, 200);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, vendorId, warehouseId, dateFrom, dateTo]);
+  }, [
+    search,
+    status,
+    vendorId,
+    warehouseId,
+    dateFrom,
+    dateTo,
+    dataVersion,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -81,6 +125,11 @@ export function PurchaseOrdersListPage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Draft, submit, and track orders to suppliers.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {dataSource === "local"
+              ? "Showing local data"
+              : "Showing API data"}
           </p>
         </div>
         <Button onClick={() => navigate("/purchase-orders/new")}>

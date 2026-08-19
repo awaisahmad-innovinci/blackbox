@@ -454,6 +454,135 @@ create table if not exists vendor_contacts (
       addItem("line_total", "line_total real not null default 0");
     },
   },
+  {
+    id: "006_inventory_out",
+    sql: `
+create table if not exists inventory_outs (
+  id text primary key,
+  tenant_id text not null,
+  out_number text not null,
+  warehouse_id text not null,
+  out_date text not null,
+  reference text,
+  notes text not null default '',
+  status text not null default 'POSTED',
+  subtotal real not null default 0,
+  total real not null default 0,
+  created_at text not null,
+  updated_at text not null,
+  sync_status text not null default 'synced',
+  server_updated_at text,
+  unique (tenant_id, out_number)
+);
+
+create table if not exists inventory_out_items (
+  id text primary key,
+  tenant_id text not null,
+  inventory_out_id text not null,
+  product_sku_id text not null,
+  quantity real not null,
+  unit_cost real not null default 0,
+  created_at text not null,
+  updated_at text not null,
+  sync_status text not null default 'synced',
+  server_updated_at text
+);
+
+create index if not exists inventory_outs_tenant_id_idx on inventory_outs (tenant_id);
+create index if not exists inventory_outs_warehouse_id_idx on inventory_outs (warehouse_id);
+create index if not exists inventory_out_items_tenant_id_idx on inventory_out_items (tenant_id);
+create index if not exists inventory_out_items_out_id_idx on inventory_out_items (inventory_out_id);
+create index if not exists inventory_out_items_product_sku_id_idx on inventory_out_items (product_sku_id);
+`,
+  },
+  {
+    id: "007_inventory_out_align",
+    sql: `-- column adds applied in after()`,
+    after: (db) => {
+      const outCols = (
+        db.prepare("pragma table_info(inventory_outs)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      const addOut = (name: string, ddl: string) => {
+        if (!outCols.includes(name)) {
+          db.exec(`alter table inventory_outs add column ${ddl}`);
+        }
+      };
+      addOut("reference", "reference text");
+      addOut("subtotal", "subtotal real not null default 0");
+      addOut("total", "total real not null default 0");
+
+      if (outCols.includes("reference_number")) {
+        db.exec(`
+          update inventory_outs
+          set reference = coalesce(reference, reference_number)
+          where reference is null and reference_number is not null
+        `);
+      }
+      if (outCols.includes("total_cost")) {
+        db.exec(`
+          update inventory_outs
+          set total = case when total = 0 then coalesce(total_cost, 0) else total end
+        `);
+      }
+
+      const itemCols = (
+        db.prepare("pragma table_info(inventory_out_items)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      const addItem = (name: string, ddl: string) => {
+        if (!itemCols.includes(name)) {
+          db.exec(`alter table inventory_out_items add column ${ddl}`);
+        }
+      };
+      addItem("unit_cost", "unit_cost real not null default 0");
+      if (itemCols.includes("average_cost")) {
+        db.exec(`
+          update inventory_out_items
+          set unit_cost = case when unit_cost = 0 then coalesce(average_cost, 0) else unit_cost end
+        `);
+      }
+    },
+  },
+  {
+    id: "008_sync_outbox",
+    sql: `
+create table if not exists local_sync_outbox (
+  change_id text primary key,
+  tenant_id text not null,
+  origin_device_id text not null,
+  stream text not null,
+  entity_type text not null,
+  entity_id text not null,
+  operation text not null,
+  payload text not null,
+  base_entity_version integer not null default 0,
+  created_at text not null default (datetime('now')),
+  status text not null default 'pending',
+  attempts integer not null default 0,
+  last_error text,
+  acked_at text,
+  cloud_seq text
+);
+
+create table if not exists local_applied_changes (
+  change_id text primary key,
+  seq integer not null,
+  stream text not null,
+  applied_at text not null default (datetime('now'))
+);
+
+create table if not exists local_sync_state (
+  stream text primary key,
+  pull_cursor text not null default '0',
+  last_push_at text,
+  last_pull_at text,
+  last_error text
+);
+`,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

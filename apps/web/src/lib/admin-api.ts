@@ -166,6 +166,10 @@ export function getDevice(id: string) {
   return apiFetch<DeviceDto>(`/devices/${id}`);
 }
 
+export function trustDevice(id: string) {
+  return apiJson<DeviceDto>(`/devices/${id}/trust`, "POST");
+}
+
 export function revokeDevice(id: string) {
   return apiJson<DeviceDto>(`/devices/${id}/revoke`, "POST");
 }

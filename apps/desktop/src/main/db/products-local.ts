@@ -103,3 +103,19 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
     serverUpdatedAt: ts,
   });
 }
+
+export function upsertProductsLocal(rows: ProductDetail[]): void {
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    for (const row of rows) upsertProductLocal(row);
+  });
+  tx();
+}
+
+export function upsertProductSkusLocal(rows: ProductSkuDetail[]): void {
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    for (const row of rows) upsertProductSkuLocal(row);
+  });
+  tx();
+}

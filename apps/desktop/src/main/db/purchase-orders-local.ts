@@ -89,3 +89,11 @@ export function upsertPurchaseOrderLocal(detail: PurchaseOrderDetail): void {
   });
   tx();
 }
+
+export function upsertPurchaseOrdersLocal(rows: PurchaseOrderDetail[]): void {
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    for (const row of rows) upsertPurchaseOrderLocal(row);
+  });
+  tx();
+}
