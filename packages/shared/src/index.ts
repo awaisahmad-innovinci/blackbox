@@ -137,11 +137,25 @@ export type {
   CreateGoodsReceiptRequest,
   GoodsReceiptItemRow,
   GoodsReceiptDetail,
+  GoodsReceiptListItem,
+  GoodsReceiptListQuery,
+  PaginatedGoodsReceipts,
   CreateInventoryOutItemRequest,
   CreateInventoryOutRequest,
   InventoryOutItemRow,
   InventoryOutDetail,
   InventoryOutStatus,
+  InventoryOutListItem,
+  InventoryOutListQuery,
+  PaginatedInventoryOuts,
+  InventoryMovementListItem,
+  InventoryMovementListQuery,
+  PaginatedInventoryMovements,
+  MasterDataImportFile,
+  MasterDataImportError,
+  MasterDataImportFileResult,
+  MasterDataImportResult,
+  MasterDataImportFailure,
 } from "./inventory";
 
 /** Own bindings so Vite/Rollup CJS interop sees named exports. */
@@ -177,6 +191,7 @@ export const UNIT_TYPES = unitTypesList;
 export const INVENTORY_MOVEMENT_TYPES = inventoryMovementTypesList;
 export const PURCHASE_ORDER_STATUSES = purchaseOrderStatusesList;
 export const GOODS_RECEIPT_STATUSES = goodsReceiptStatusesList;
+export { MASTER_DATA_IMPORT_FILES } from "./inventory";
 export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
 export const PAYMENT_TERMS = paymentTermsList;
 export const PAYMENT_TERMS_LABELS = paymentTermsLabels;

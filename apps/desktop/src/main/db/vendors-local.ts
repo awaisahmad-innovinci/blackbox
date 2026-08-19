@@ -139,3 +139,19 @@ export function deactivateVendorSkuLocal(id: string): void {
     `update vendor_skus set status = 'inactive', updated_at = ?, sync_status = 'synced' where id = ?`,
   ).run(nowIso(), id);
 }
+
+export function upsertVendorsLocal(rows: VendorDetail[]): void {
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    for (const row of rows) upsertVendorLocal(row);
+  });
+  tx();
+}
+
+export function upsertVendorSkusLocal(rows: VendorSku[]): void {
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    for (const row of rows) upsertVendorSkuLocal(row);
+  });
+  tx();
+}

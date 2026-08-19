@@ -17,6 +17,7 @@ import { Tenant } from "./tenant.entity";
 
 @Entity({ name: "products" })
 @Unique("products_tenant_id_product_code_key", ["tenantId", "productCode"])
+@Unique("products_tenant_id_import_key_key", ["tenantId", "importKey"])
 @Index("products_tenant_id_idx", ["tenantId"])
 @Index("products_brand_id_idx", ["brandId"])
 @Index("products_category_id_idx", ["categoryId"])
@@ -33,6 +34,9 @@ export class Product {
 
   @Column({ name: "product_code", type: "text" })
   productCode!: string;
+
+  @Column({ name: "import_key", type: "text", nullable: true })
+  importKey!: string | null;
 
   @Column({ name: "brand_id", type: "uuid", nullable: true })
   brandId!: string | null;

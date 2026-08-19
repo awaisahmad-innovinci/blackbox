@@ -14,6 +14,10 @@ import { ApiError } from "@renderer/lib/api/client";
 import { brandsApi } from "@renderer/lib/api/brands";
 import { categoriesApi } from "@renderer/lib/api/categories";
 import { productsApi } from "@renderer/lib/api/products";
+import {
+  resolveDataSourceMode,
+  type DataSourceMode,
+} from "@renderer/lib/local-db/data-source";
 
 export function ProductsListPage() {
   const navigate = useNavigate();
@@ -26,10 +30,29 @@ export function ProductsListPage() {
   const [items, setItems] = useState<ProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<DataSourceMode>("api");
 
   useEffect(() => {
-    void brandsApi.list().then(setBrands).catch(() => undefined);
-    void categoriesApi.list().then(setCategories).catch(() => undefined);
+    let cancelled = false;
+    void (async () => {
+      const mode = await resolveDataSourceMode();
+      if (cancelled) return;
+      setDataSource(mode);
+      try {
+        if (mode === "local" && window.blackbox?.localDb?.listBrands) {
+          setBrands(await window.blackbox.localDb.listBrands());
+          setCategories(await window.blackbox.localDb.listCategories!());
+        } else {
+          setBrands(await brandsApi.list());
+          setCategories(await categoriesApi.list());
+        }
+      } catch {
+        /* filters optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -37,25 +60,31 @@ export function ProductsListPage() {
     const t = setTimeout(() => {
       setLoading(true);
       setError(null);
-      void productsApi
-        .list({
-          search: search.trim() || undefined,
-          status: status || undefined,
-          brandId: brandId || undefined,
-          categoryId: categoryId || undefined,
-        })
-        .then((res) => {
+      void (async () => {
+        try {
+          const mode = await resolveDataSourceMode();
+          if (cancelled) return;
+          setDataSource(mode);
+          const query = {
+            search: search.trim() || undefined,
+            status: status || undefined,
+            brandId: brandId || undefined,
+            categoryId: categoryId || undefined,
+          };
+          const res =
+            mode === "local" && window.blackbox?.localDb?.listProducts
+              ? await window.blackbox.localDb.listProducts(query)
+              : await productsApi.list(query);
           if (!cancelled) setItems(res.items);
-        })
-        .catch((err: unknown) => {
+        } catch (err: unknown) {
           if (cancelled) return;
           setError(
             err instanceof ApiError ? err.message : "Failed to load products",
           );
-        })
-        .finally(() => {
+        } finally {
           if (!cancelled) setLoading(false);
-        });
+        }
+      })();
     }, 200);
     return () => {
       cancelled = true;
@@ -70,6 +99,11 @@ export function ProductsListPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Catalog items and SKUs for this store.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {dataSource === "local"
+              ? "Showing local data"
+              : "Showing API data"}
           </p>
         </div>
         <Button onClick={() => navigate("/products/new")}>+ Add Product</Button>

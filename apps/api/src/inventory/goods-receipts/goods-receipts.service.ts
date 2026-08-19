@@ -7,7 +7,9 @@ import { InjectRepository } from "@nestjs/typeorm";
 import type {
   GoodsReceiptDetail,
   GoodsReceiptItemRow,
+  GoodsReceiptListItem,
   GoodsReceiptStatus,
+  PaginatedGoodsReceipts,
   ReceivingDraft,
   ReceivingLineDraft,
 } from "@blackbox/shared";
@@ -20,10 +22,13 @@ import {
   ProductSku,
   PurchaseOrder,
   PurchaseOrderItem,
+  Vendor,
   VendorSku,
+  Warehouse,
 } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { CreateGoodsReceiptDto } from "./dto/goods-receipt.dto";
+import { ListGoodsReceiptsQueryDto } from "./dto/list-goods-receipts-query.dto";
 
 function toNum(value: string | null | undefined): number {
   if (value == null || value === "") return 0;
@@ -49,7 +54,123 @@ export class GoodsReceiptsService {
     private readonly orderItems: Repository<PurchaseOrderItem>,
     @InjectRepository(VendorSku)
     private readonly vendorSkus: Repository<VendorSku>,
+    @InjectRepository(Vendor)
+    private readonly vendors: Repository<Vendor>,
+    @InjectRepository(Warehouse)
+    private readonly warehouses: Repository<Warehouse>,
   ) {}
+
+  async list(query: ListGoodsReceiptsQueryDto): Promise<PaginatedGoodsReceipts> {
+    const tenantId = this.fixedTenant.tenantId;
+    const page = query.page ?? 1;
+    const pageSize = Math.min(query.pageSize ?? 25, 100);
+
+    const qb = this.receipts
+      .createQueryBuilder("gr")
+      .where("gr.tenant_id = :tenantId", { tenantId });
+
+    if (query.status) {
+      qb.andWhere("gr.status = :status", { status: query.status });
+    }
+    if (query.vendorId) {
+      qb.andWhere("gr.vendor_id = :vendorId", { vendorId: query.vendorId });
+    }
+    if (query.warehouseId) {
+      qb.andWhere("gr.warehouse_id = :warehouseId", {
+        warehouseId: query.warehouseId,
+      });
+    }
+    if (query.dateFrom) {
+      qb.andWhere("gr.received_at >= :dateFrom", { dateFrom: query.dateFrom });
+    }
+    if (query.dateTo) {
+      qb.andWhere("gr.received_at <= :dateTo", { dateTo: query.dateTo });
+    }
+    if (query.search?.trim()) {
+      const term = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        `(LOWER(gr.receipt_number) LIKE :term
+          OR EXISTS (
+            SELECT 1 FROM purchase_orders po
+            WHERE po.id = gr.purchase_order_id AND LOWER(po.po_number) LIKE :term
+          )
+          OR EXISTS (
+            SELECT 1 FROM vendors v
+            WHERE v.id = gr.vendor_id AND LOWER(v.name) LIKE :term
+          ))`,
+        { term },
+      );
+    }
+
+    const total = await qb.getCount();
+    const rows = await qb
+      .orderBy("gr.received_at", "DESC", "NULLS LAST")
+      .addOrderBy("gr.created_at", "DESC")
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getMany();
+
+    const ids = rows.map((r) => r.id);
+    const itemCounts = new Map<string, number>();
+    if (ids.length > 0) {
+      const counts = await this.receiptItems
+        .createQueryBuilder("i")
+        .select("i.goods_receipt_id", "grId")
+        .addSelect("COUNT(*)", "cnt")
+        .where("i.tenant_id = :tenantId", { tenantId })
+        .andWhere("i.goods_receipt_id IN (:...ids)", { ids })
+        .groupBy("i.goods_receipt_id")
+        .getRawMany<{ grId: string; cnt: string }>();
+      for (const row of counts) itemCounts.set(row.grId, Number(row.cnt));
+    }
+
+    const vendorNames = new Map<string, string>();
+    const warehouseNames = new Map<string, string>();
+    const poNumbers = new Map<string, string>();
+    const vendorIds = [
+      ...new Set(rows.map((r) => r.vendorId).filter((id): id is string => !!id)),
+    ];
+    const warehouseIds = [...new Set(rows.map((r) => r.warehouseId))];
+    const poIds = [...new Set(rows.map((r) => r.purchaseOrderId))];
+    if (vendorIds.length > 0) {
+      const vendors = await this.vendors
+        .createQueryBuilder("v")
+        .where("v.id IN (:...vendorIds)", { vendorIds })
+        .getMany();
+      for (const v of vendors) vendorNames.set(v.id, v.name);
+    }
+    if (warehouseIds.length > 0) {
+      const warehouses = await this.warehouses
+        .createQueryBuilder("w")
+        .where("w.id IN (:...warehouseIds)", { warehouseIds })
+        .getMany();
+      for (const w of warehouses) warehouseNames.set(w.id, w.name);
+    }
+    if (poIds.length > 0) {
+      const orders = await this.orders
+        .createQueryBuilder("po")
+        .where("po.id IN (:...poIds)", { poIds })
+        .getMany();
+      for (const po of orders) poNumbers.set(po.id, po.poNumber);
+    }
+
+    const items: GoodsReceiptListItem[] = rows.map((gr) => ({
+      id: gr.id,
+      receiptNumber: gr.receiptNumber,
+      purchaseOrderId: gr.purchaseOrderId,
+      poNumber: poNumbers.get(gr.purchaseOrderId) ?? "—",
+      vendorId: gr.vendorId,
+      vendorName: gr.vendorId ? (vendorNames.get(gr.vendorId) ?? null) : null,
+      warehouseId: gr.warehouseId,
+      warehouseName: warehouseNames.get(gr.warehouseId) ?? "—",
+      status: gr.status as GoodsReceiptStatus,
+      receivedAt: gr.receivedAt?.toISOString() ?? null,
+      total: toNum(gr.total),
+      itemCount: itemCounts.get(gr.id) ?? 0,
+    }));
+
+    return { items, total, page, pageSize };
+  }
 
   async getReceivingDraft(purchaseOrderId: string): Promise<ReceivingDraft> {
     const tenantId = this.fixedTenant.tenantId;

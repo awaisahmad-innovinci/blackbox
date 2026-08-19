@@ -673,6 +673,39 @@ export interface GoodsReceiptDetail {
   updatedAt: string;
 }
 
+export interface GoodsReceiptListItem {
+  id: string;
+  receiptNumber: string;
+  purchaseOrderId: string;
+  poNumber: string;
+  vendorId: string | null;
+  vendorName: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  status: GoodsReceiptStatus;
+  receivedAt: string | null;
+  total: number;
+  itemCount: number;
+}
+
+export interface GoodsReceiptListQuery {
+  search?: string;
+  vendorId?: string;
+  warehouseId?: string;
+  status?: GoodsReceiptStatus;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedGoodsReceipts {
+  items: GoodsReceiptListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface CreateInventoryOutItemRequest {
   productSkuId: string;
   quantity: number;
@@ -712,4 +745,103 @@ export interface InventoryOutDetail {
   items: InventoryOutItemRow[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InventoryOutListItem {
+  id: string;
+  outNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  outDate: string;
+  reference: string | null;
+  status: InventoryOutStatus;
+  total: number;
+  itemCount: number;
+}
+
+export interface InventoryOutListQuery {
+  search?: string;
+  warehouseId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedInventoryOuts {
+  items: InventoryOutListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface InventoryMovementListItem {
+  id: string;
+  productSkuId: string;
+  sku: string;
+  variantName: string;
+  warehouseId: string;
+  warehouseName: string;
+  movementType: InventoryMovementType;
+  quantity: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  reason: string;
+  createdAt: string;
+}
+
+export interface InventoryMovementListQuery {
+  productSkuId?: string;
+  warehouseId?: string;
+  since?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedInventoryMovements {
+  items: InventoryMovementListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const MASTER_DATA_IMPORT_FILES = [
+  "01_units.csv",
+  "02_brands.csv",
+  "03_categories.csv",
+  "04_warehouses.csv",
+  "05_vendor_groups.csv",
+  "06_products.csv",
+  "07_product_skus.csv",
+  "08_vendors.csv",
+  "09_vendor_skus.csv",
+] as const;
+
+export type MasterDataImportFile = (typeof MASTER_DATA_IMPORT_FILES)[number];
+
+export interface MasterDataImportError {
+  file: MasterDataImportFile | "archive";
+  line: number | null;
+  column: string | null;
+  message: string;
+}
+
+export interface MasterDataImportFileResult {
+  file: MasterDataImportFile;
+  rows: number;
+  created: number;
+  updated: number;
+}
+
+export interface MasterDataImportResult {
+  ok: true;
+  files: MasterDataImportFileResult[];
+  totalRows: number;
+  totalCreated: number;
+  totalUpdated: number;
+}
+
+export interface MasterDataImportFailure {
+  ok: false;
+  errors: MasterDataImportError[];
 }

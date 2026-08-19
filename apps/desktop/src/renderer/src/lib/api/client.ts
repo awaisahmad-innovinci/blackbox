@@ -7,6 +7,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -43,21 +44,28 @@ export async function apiFetch<T>(
     ...init,
     headers: {
       Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.body && !(init.body instanceof FormData)
+        ? { "Content-Type": "application/json" }
+        : {}),
       ...init?.headers,
     },
   });
 
   if (!res.ok) {
     let message = res.statusText || `HTTP ${res.status}`;
+    let details: unknown;
     try {
-      const body = (await res.json()) as { message?: string | string[] };
+      const body = (await res.json()) as {
+        message?: string | string[];
+        errors?: unknown;
+      };
       if (typeof body.message === "string") message = body.message;
       else if (Array.isArray(body.message)) message = body.message.join(", ");
+      details = body.errors;
     } catch {
       /* ignore */
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, details);
   }
 
   if (res.status === 204) {

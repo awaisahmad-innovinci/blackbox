@@ -182,6 +182,13 @@ export function InventoryOutPage() {
           quantity: l.quantity,
         })),
       });
+
+      try {
+        await window.blackbox?.localDb?.upsertInventoryOut(detail);
+      } catch {
+        /* optional cache */
+      }
+
       setSuccess(detail);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to post inventory out"));
