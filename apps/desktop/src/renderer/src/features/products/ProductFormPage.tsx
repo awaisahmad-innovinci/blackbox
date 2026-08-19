@@ -10,6 +10,8 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { brandsApi } from "@renderer/lib/api/brands";
 import { categoriesApi } from "@renderer/lib/api/categories";
 import { productsApi } from "@renderer/lib/api/products";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 
 export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -93,12 +95,87 @@ export function ProductFormPage() {
       status,
     };
 
+    if (await isDeviceBound()) {
+      try {
+        const localId = isEdit && id ? id : crypto.randomUUID();
+        const local = {
+          id: localId,
+          name: name.trim(),
+          productCode: isEdit ? "" : `LOCAL-${localId.slice(0, 8)}`,
+          brandId,
+          brandName: brands.find((b) => b.id === brandId)?.name ?? "",
+          categoryId,
+          categoryName: categories.find((c) => c.id === categoryId)?.name ?? "",
+          productType,
+          description: description.trim(),
+          imagePath: null,
+          status,
+          totalOnHand: 0,
+          totalReserved: 0,
+          totalAvailable: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await commitLocalChange({
+          entityType: "product",
+          entityId: localId,
+          operation: status === "inactive" ? "DELETE" : "UPSERT",
+          payload: local,
+        });
+        void syncNow();
+        setSaving(false);
+        navigate(`/products/${localId}`);
+        return;
+      } catch (err: unknown) {
+        setSaving(false);
+        setError(getApiErrorMessage(err, "Failed to save product locally"));
+        return;
+      }
+    }
+
     let saved;
     try {
       saved = isEdit
         ? await productsApi.update(id!, body)
         : await productsApi.create(body);
     } catch (err: unknown) {
+      if (!isEdit && err instanceof TypeError && window.blackbox?.sync) {
+        const localId = crypto.randomUUID();
+        const local = {
+          id: localId,
+          name: name.trim(),
+          productCode: `LOCAL-${localId.slice(0, 8)}`,
+          brandId,
+          brandName: "",
+          categoryId,
+          categoryName: "",
+          productType,
+          description: description.trim(),
+          imagePath: null,
+          status,
+          totalOnHand: 0,
+          totalReserved: 0,
+          totalAvailable: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        try {
+          await window.blackbox.localDb?.upsertProduct(local);
+          await window.blackbox.sync.enqueue({
+            stream: "master_data",
+            entityType: "product",
+            entityId: localId,
+            operation: "UPSERT",
+            payload: local,
+            baseEntityVersion: 0,
+          });
+          setSaving(false);
+          navigate(`/products/${localId}`);
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
       setSaving(false);
       setError(getApiErrorMessage(err, "Failed to save product"));
       return;

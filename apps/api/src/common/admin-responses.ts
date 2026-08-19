@@ -55,6 +55,9 @@ export type DeviceResponse = {
   status: string;
   trustedAt: Date | null;
   revokedAt: Date | null;
+  lastSyncAt: Date | null;
+  lastSyncError: string | null;
+  needsFullResync: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -124,6 +127,9 @@ export function toDeviceResponse(device: Device): DeviceResponse {
     status: device.status,
     trustedAt: device.trustedAt,
     revokedAt: device.revokedAt,
+    lastSyncAt: device.lastSyncAt,
+    lastSyncError: device.lastSyncError,
+    needsFullResync: device.needsFullResync,
     createdAt: device.createdAt,
     updatedAt: device.updatedAt,
   };

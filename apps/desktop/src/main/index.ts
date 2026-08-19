@@ -26,6 +26,7 @@ import {
   getLocalDbStatus,
   initLocalDb,
   recordLocalDbInitError,
+  reopenLocalDb,
 } from "./db";
 import {
   upsertGoodsReceiptLocal,
@@ -47,6 +48,7 @@ import {
   upsertPurchaseOrdersLocal,
 } from "./db/purchase-orders-local";
 import { upsertStockRowsLocal } from "./db/stock-local";
+import { upsertWarehousesLocal } from "./db/warehouses-local";
 import { getSyncMeta, setSyncMeta } from "./db/sync-meta";
 import {
   upsertBrandsLocal,
@@ -71,7 +73,24 @@ import {
   listVendorsLocal,
   listWarehousesLocal,
 } from "./db/queries-local";
-import { upsertWarehousesLocal } from "./db/warehouses-local";
+import {
+  getOrCreateFingerprint,
+  readIdentity,
+  writeIdentity,
+  type DeviceIdentity,
+} from "./db/identity";
+import {
+  enqueueOutbox,
+  listPendingOutbox,
+  markOutboxAcked,
+  markOutboxPending,
+  markOutboxPushing,
+  markOutboxRejected,
+  pendingOutboxCount,
+  getPullCursor,
+  resetStalePushing,
+} from "./db/outbox-local";
+import { applyPullBatch, commitLocalMutation } from "./db/sync-apply";
 
 function createWindow(): void {
   const preloadPath = join(__dirname, "../preload/index.js");
@@ -280,6 +299,81 @@ function registerIpc(): void {
     (_event, status?: EntityStatus | "all") => listVendorGroupsLocal(status),
   );
   ipcMain.handle("localDb:listWarehouses", () => listWarehousesLocal());
+
+  ipcMain.handle("identity:getFingerprint", () => getOrCreateFingerprint());
+  ipcMain.handle("identity:get", () => readIdentity());
+  ipcMain.handle(
+    "identity:bind",
+    (_event, identity: DeviceIdentity) => {
+      writeIdentity({
+        ...identity,
+        instanceId: identity.instanceId || crypto.randomUUID(),
+      });
+      reopenLocalDb();
+      resetStalePushing();
+      return { ok: true as const, path: getLocalDbStatus().connected ? getLocalDbStatus() : null };
+    },
+  );
+  ipcMain.handle("sync:listOutbox", (_event, limit?: number) =>
+    listPendingOutbox(limit ?? 100),
+  );
+  ipcMain.handle("sync:markPushing", (_event, ids: string[]) => {
+    markOutboxPushing(ids);
+    return { ok: true as const };
+  });
+  ipcMain.handle(
+    "sync:markAcked",
+    (_event, changeId: string, seq?: string) => {
+      markOutboxAcked(changeId, seq);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "sync:markPending",
+    (_event, changeId: string, error: string) => {
+      markOutboxPending(changeId, error);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "sync:markRejected",
+    (_event, changeId: string, error: string) => {
+      markOutboxRejected(changeId, error);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle("sync:pullCursor", (_event, stream: string) =>
+    getPullCursor(stream),
+  );
+  ipcMain.handle(
+    "sync:applyPull",
+    (
+      _event,
+      payload: {
+        changes: import("@blackbox/shared").SyncChangeDto[];
+        nextCursor: string;
+        stream: string;
+      },
+    ) => {
+      applyPullBatch(payload.changes, payload.nextCursor, payload.stream);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle("sync:pendingCount", () => pendingOutboxCount());
+  ipcMain.handle(
+    "sync:enqueue",
+    (
+      _event,
+      input: Parameters<typeof enqueueOutbox>[0],
+    ) => ({ changeId: enqueueOutbox(input) }),
+  );
+  ipcMain.handle(
+    "sync:commit",
+    (
+      _event,
+      input: Parameters<typeof commitLocalMutation>[0],
+    ) => ({ changeId: commitLocalMutation(input) }),
+  );
 }
 
 app.disableHardwareAcceleration();

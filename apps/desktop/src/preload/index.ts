@@ -122,4 +122,49 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listWarehouses",
       ) as Promise<WarehouseListItem[]>,
   },
+  identity: {
+    getFingerprint: () =>
+      ipcRenderer.invoke("identity:getFingerprint") as Promise<string>,
+    get: () =>
+      ipcRenderer.invoke("identity:get") as Promise<{
+        tenantId: string;
+        deviceId: string;
+        instanceId: string;
+      } | null>,
+    bind: (identity: {
+      tenantId: string;
+      deviceId: string;
+      instanceId: string;
+    }) => ipcRenderer.invoke("identity:bind", identity) as Promise<{ ok: true }>,
+  },
+  sync: {
+    listOutbox: (limit?: number) => ipcRenderer.invoke("sync:listOutbox", limit),
+    markPushing: (ids: string[]) =>
+      ipcRenderer.invoke("sync:markPushing", ids) as Promise<{ ok: true }>,
+    markAcked: (changeId: string, seq?: string) =>
+      ipcRenderer.invoke("sync:markAcked", changeId, seq) as Promise<{
+        ok: true;
+      }>,
+    markPending: (changeId: string, error: string) =>
+      ipcRenderer.invoke("sync:markPending", changeId, error) as Promise<{
+        ok: true;
+      }>,
+    markRejected: (changeId: string, error: string) =>
+      ipcRenderer.invoke("sync:markRejected", changeId, error) as Promise<{
+        ok: true;
+      }>,
+    pullCursor: (stream: string) =>
+      ipcRenderer.invoke("sync:pullCursor", stream) as Promise<string>,
+    applyPull: (payload: {
+      changes: import("@blackbox/shared").SyncChangeDto[];
+      nextCursor: string;
+      stream: string;
+    }) => ipcRenderer.invoke("sync:applyPull", payload) as Promise<{ ok: true }>,
+    pendingCount: () =>
+      ipcRenderer.invoke("sync:pendingCount") as Promise<number>,
+    enqueue: (input: unknown) =>
+      ipcRenderer.invoke("sync:enqueue", input) as Promise<{ changeId: string }>,
+    commit: (input: unknown) =>
+      ipcRenderer.invoke("sync:commit", input) as Promise<{ changeId: string }>,
+  },
 });

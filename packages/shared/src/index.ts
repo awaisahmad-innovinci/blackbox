@@ -66,6 +66,33 @@ export type {
   DeviceUser,
   RegisterDeviceRequest,
 } from "./devices";
+export {
+  SYNC_STREAMS,
+  SYNC_OPERATIONS,
+  SYNC_PUSH_BATCH_SIZE,
+  SYNC_PULL_BATCH_SIZE,
+  SYNC_MAX_BODY_BYTES,
+  SYNC_MAX_PAYLOAD_BYTES,
+  streamForEntity,
+} from "./sync";
+export type {
+  SyncStream,
+  SyncOperation,
+  SyncEntityType,
+  MasterDataEntityType,
+  InventoryEntityType,
+  PurchasingEntityType,
+  SyncChangeInput,
+  SyncPushRequest,
+  SyncPushItemStatus,
+  SyncPushItemResult,
+  SyncPushResponse,
+  SyncChangeDto,
+  SyncPullResponse,
+  SyncStreamStatus,
+  SyncStatusResponse,
+  SyncConflictAckRequest,
+} from "./sync";
 export type {
   BusinessType,
   CountryCode,

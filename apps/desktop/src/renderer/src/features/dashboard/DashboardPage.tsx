@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
 import { Skeleton } from "@blackbox/ui/skeleton";
 import { dashboardApi } from "@renderer/lib/api/dashboard";
 import { ApiError } from "@renderer/lib/api/client";
+import { getAccessToken } from "@renderer/lib/api/session";
+import { syncApi } from "@renderer/lib/api/sync";
+import {
+  bumpDataVersion,
+  getSyncStatus,
+  syncNow,
+  useSyncDataVersion,
+} from "@renderer/lib/sync/sync-status";
 import {
   resolveDataSourceMode,
   type DataSourceMode,
@@ -16,6 +24,7 @@ import {
   type SyncProgress,
 } from "@renderer/lib/local-db/pull";
 import { ImportMasterDataDialog } from "./ImportMasterDataDialog";
+import { DeviceSessionCard } from "./DeviceSessionCard";
 
 type LocalDbStatus = Awaited<
   ReturnType<NonNullable<NonNullable<Window["blackbox"]>["localDb"]>["getStatus"]>
@@ -51,6 +60,7 @@ function formatSyncedAt(iso: string): string {
 }
 
 export function DashboardPage() {
+  const dataVersion = useSyncDataVersion();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,7 +108,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     void loadSummary();
-  }, [loadSummary]);
+  }, [loadSummary, dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,9 +167,59 @@ export function DashboardPage() {
       message: "Starting sync…",
     });
     try {
+      const token = getAccessToken();
+      if (token) {
+        try {
+          const status = await syncApi.status();
+          setSyncProgress({
+            phase: "reference",
+            done: 0,
+            total: 1,
+            message: "Incremental sync…",
+          });
+          if (!status.needsFullResync && lastSyncedAt) {
+            if (!(await syncNow())) {
+              throw new Error(
+                getSyncStatus().lastError ?? "Incremental sync failed",
+              );
+            }
+            const now = new Date().toISOString();
+            await window.blackbox?.localDb?.setSyncMeta(
+              LAST_FULL_PULL_AT_KEY,
+              now,
+            );
+            setLastSyncedAt(now);
+            setSyncProgress({
+              phase: "done",
+              done: 1,
+              total: 1,
+              message: "Incremental sync complete",
+            });
+            await loadSummary();
+            return;
+          }
+        } catch {
+          /* fall through to full pull */
+        }
+      }
       const result = await runFullPull((progress) => {
         setSyncProgress(progress);
       });
+      if (token) {
+        try {
+          const status = await syncApi.status();
+          for (const stream of status.streams) {
+            await window.blackbox?.sync?.applyPull({
+              changes: [],
+              nextCursor: stream.serverSeq,
+              stream: stream.stream,
+            });
+          }
+          await syncApi.completeFullResync();
+        } catch {
+          /* cursors optional until device is trusted */
+        }
+      }
       setLastSyncedAt(result.lastSyncedAt);
       setSyncProgress({
         phase: "done",
@@ -167,6 +227,7 @@ export function DashboardPage() {
         total: 1,
         message: "Sync complete",
       });
+      bumpDataVersion();
       await loadSummary();
     } catch (err: unknown) {
       if (err instanceof SyncPullError) {
@@ -203,6 +264,7 @@ export function DashboardPage() {
         total: 1,
         message: "Import Sync complete",
       });
+      bumpDataVersion();
       await loadSummary();
     } catch (error: unknown) {
       const message =
@@ -246,6 +308,8 @@ export function DashboardPage() {
         onImported={onMasterDataImported}
       />
 
+      <DeviceSessionCard />
+
       {localDbLoading ? (
         <Skeleton className="h-12 w-full rounded-lg" />
       ) : localDbStatus?.connected ? (
@@ -256,27 +320,27 @@ export function DashboardPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="font-medium">Local database connected</p>
-              <p className="text-muted-foreground mt-1 break-all text-xs">
+              {/* <p className="text-muted-foreground mt-1 break-all text-xs">
                 {localDbStatus.path} · {localDbStatus.migrationsApplied}{" "}
                 migrations applied
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs">
+              </p> */}
+              {/* <p className="text-muted-foreground mt-1 text-xs">
                 {lastSyncedAt
                   ? `Last synced: ${formatSyncedAt(lastSyncedAt)}`
                   : "Not synced yet — pull cloud data into the local database."}
-              </p>
+              </p> */}
               {syncing && syncProgress ? (
                 <p className="mt-2 text-xs font-medium">{syncProgress.message}</p>
               ) : null}
             </div>
-            <Button
+            {/* <Button
               type="button"
               size="sm"
               disabled={syncing}
               onClick={() => void onSync()}
             >
               {syncing ? "Syncing…" : "Sync"}
-            </Button>
+            </Button> */}
           </div>
         </div>
       ) : (

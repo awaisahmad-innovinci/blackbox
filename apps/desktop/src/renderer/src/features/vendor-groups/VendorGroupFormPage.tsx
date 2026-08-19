@@ -25,6 +25,7 @@ export function VendorGroupFormPage() {
       titleEdit="Edit Vendor Group"
       basePath="/vendor-groups"
       entityLabel="vendor group"
+      syncEntityType="vendor_group"
       loadOne={loadOne}
       create={create}
       update={update}

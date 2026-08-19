@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { EntityStatus } from "@blackbox/shared";
+import type { EntityStatus, SyncEntityType } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import type { TaxonomyRow } from "./TaxonomyListPage";
 
 export function TaxonomyFormPage({
@@ -17,6 +19,7 @@ export function TaxonomyFormPage({
   create,
   update,
   deactivate,
+  syncEntityType,
 }: {
   titleNew: string;
   titleEdit: string;
@@ -33,6 +36,10 @@ export function TaxonomyFormPage({
     body: { name: string; description?: string; status?: EntityStatus },
   ) => Promise<TaxonomyRow>;
   deactivate: (id: string) => Promise<TaxonomyRow>;
+  syncEntityType?: Extract<
+    SyncEntityType,
+    "brand" | "category" | "vendor_group"
+  >;
 }) {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
@@ -82,6 +89,18 @@ export function TaxonomyFormPage({
         description: description.trim(),
         status,
       };
+      if (syncEntityType && (await isDeviceBound())) {
+        const rowId = isEdit && id ? id : crypto.randomUUID();
+        await commitLocalChange({
+          entityType: syncEntityType,
+          entityId: rowId,
+          operation: status === "inactive" ? "DELETE" : "UPSERT",
+          payload: { id: rowId, ...body },
+        });
+        void syncNow();
+        navigate(basePath);
+        return;
+      }
       if (isEdit && id) {
         await update(id, body);
       } else {
@@ -100,6 +119,17 @@ export function TaxonomyFormPage({
     setError(null);
     setSaving(true);
     try {
+      if (syncEntityType && (await isDeviceBound())) {
+        await commitLocalChange({
+          entityType: syncEntityType,
+          entityId: id,
+          operation: "DELETE",
+          payload: { id, name, description, status: "inactive" },
+        });
+        void syncNow();
+        navigate(basePath);
+        return;
+      }
       await deactivate(id);
       navigate(basePath);
     } catch (err: unknown) {

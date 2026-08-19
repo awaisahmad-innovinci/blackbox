@@ -18,9 +18,11 @@ import {
   resolveDataSourceMode,
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
+import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 
 export function ProductsListPage() {
   const navigate = useNavigate();
+  const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EntityStatus | "">("");
   const [brandId, setBrandId] = useState("");
@@ -53,7 +55,7 @@ export function ProductsListPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +92,7 @@ export function ProductsListPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, brandId, categoryId]);
+  }, [search, status, brandId, categoryId, dataVersion]);
 
   return (
     <div className="space-y-6">

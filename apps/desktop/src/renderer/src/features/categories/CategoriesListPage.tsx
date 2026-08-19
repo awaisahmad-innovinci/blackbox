@@ -1,11 +1,15 @@
 import { useCallback } from "react";
 import { categoriesApi } from "@renderer/lib/api/categories";
+import {
+  loadTaxonomyRows,
+  type TaxonomyQuery,
+} from "@renderer/lib/local-db/taxonomy-source";
 import { TaxonomyListPage } from "../taxonomy/TaxonomyListPage";
 
 export function CategoriesListPage() {
   const load = useCallback(
-    (query: Parameters<typeof categoriesApi.list>[0]) =>
-      categoriesApi.list(query),
+    (query: TaxonomyQuery) =>
+      loadTaxonomyRows("category", query, (q) => categoriesApi.list(q)),
     [],
   );
   return (

@@ -43,6 +43,15 @@ export class Device {
   @Column({ name: "revoked_at", type: "timestamptz", nullable: true })
   revokedAt!: Date | null;
 
+  @Column({ name: "last_sync_at", type: "timestamptz", nullable: true })
+  lastSyncAt!: Date | null;
+
+  @Column({ name: "last_sync_error", type: "text", nullable: true })
+  lastSyncError!: string | null;
+
+  @Column({ name: "needs_full_resync", type: "boolean", default: false })
+  needsFullResync!: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

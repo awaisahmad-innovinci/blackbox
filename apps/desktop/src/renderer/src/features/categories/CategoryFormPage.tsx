@@ -25,6 +25,7 @@ export function CategoryFormPage() {
       titleEdit="Edit Category"
       basePath="/categories"
       entityLabel="category"
+      syncEntityType="category"
       loadOne={loadOne}
       create={create}
       update={update}

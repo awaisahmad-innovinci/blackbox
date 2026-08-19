@@ -546,6 +546,43 @@ create index if not exists inventory_out_items_product_sku_id_idx on inventory_o
       }
     },
   },
+  {
+    id: "008_sync_outbox",
+    sql: `
+create table if not exists local_sync_outbox (
+  change_id text primary key,
+  tenant_id text not null,
+  origin_device_id text not null,
+  stream text not null,
+  entity_type text not null,
+  entity_id text not null,
+  operation text not null,
+  payload text not null,
+  base_entity_version integer not null default 0,
+  created_at text not null default (datetime('now')),
+  status text not null default 'pending',
+  attempts integer not null default 0,
+  last_error text,
+  acked_at text,
+  cloud_seq text
+);
+
+create table if not exists local_applied_changes (
+  change_id text primary key,
+  seq integer not null,
+  stream text not null,
+  applied_at text not null default (datetime('now'))
+);
+
+create table if not exists local_sync_state (
+  stream text primary key,
+  pull_cursor text not null default '0',
+  last_push_at text,
+  last_pull_at text,
+  last_error text
+);
+`,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

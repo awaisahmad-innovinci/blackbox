@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
-import { app } from "electron";
-import { join } from "node:path";
+import { sqlitePathFor, readIdentity } from "./identity";
 import { runLocalMigrations } from "./migrations";
+import { resetStalePushing } from "./outbox-local";
 
 export type LocalDbStatus =
   | {
@@ -31,13 +31,13 @@ export function getLocalDb(): Database.Database {
 export function initLocalDb(): Database.Database {
   if (db) return db;
 
-  const dir = app.getPath("userData");
-  const path = join(dir, "blackbox-local.sqlite");
+  const path = sqlitePathFor(readIdentity());
   dbPath = path;
   db = new Database(path);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   runLocalMigrations(db);
+  resetStalePushing();
   initError = null;
   return db;
 }
@@ -74,6 +74,11 @@ export function getLocalDbStatus(): LocalDbStatus {
       error: message,
     };
   }
+}
+
+export function reopenLocalDb(): Database.Database {
+  closeLocalDb();
+  return initLocalDb();
 }
 
 export function closeLocalDb(): void {

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
@@ -11,6 +12,7 @@ import { CurrentUser } from "../common/current-user.decorator";
 import type { TenantContext } from "../common/tenant-context";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
+import { RegisterDeviceDto } from "./dto/register-device.dto";
 import { DevicesService } from "./devices.service";
 
 @Controller("devices")
@@ -24,6 +26,27 @@ export class DevicesController {
     return this.devicesService.list(user.tenantId);
   }
 
+  /** Declared before `:id` so the literal segment wins route matching. */
+  @Get("me")
+  @RequirePermissions("desktop.access")
+  current(@CurrentUser() user: TenantContext) {
+    return this.devicesService.current(user.tenantId, user.deviceId);
+  }
+
+  @Post("register")
+  @RequirePermissions("desktop.access")
+  register(
+    @CurrentUser() user: TenantContext,
+    @Body() dto: RegisterDeviceDto,
+  ) {
+    return this.devicesService.register(
+      user.tenantId,
+      user.userId,
+      dto.fingerprint,
+      dto.name,
+    );
+  }
+
   @Get(":id")
   @RequirePermissions("devices.read")
   getById(
@@ -31,6 +54,15 @@ export class DevicesController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.devicesService.getById(user.tenantId, id);
+  }
+
+  @Post(":id/trust")
+  @RequirePermissions("devices.manage")
+  trust(
+    @CurrentUser() user: TenantContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.devicesService.trust(user.tenantId, id);
   }
 
   @Post(":id/revoke")

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -13,6 +14,7 @@ import {
   DEFAULT_ROLE_NAMES,
   DEFAULT_ROLE_PERMISSIONS,
   DEFAULT_ROLES,
+  OFFLINE_AUTHORIZATION_DAYS_DEFAULT,
   REFRESH_TOKEN_TTL_SECONDS,
   type AuthResponse,
   type AuthUser,
@@ -20,6 +22,8 @@ import {
   type Permission,
 } from "@blackbox/shared";
 import { DataSource, IsNull, QueryFailedError, Repository } from "typeorm";
+import { DeviceUser } from "../db/entities/device-user.entity";
+import { Device } from "../db/entities/device.entity";
 import { Permission as PermissionEntity } from "../db/entities/permission.entity";
 import { RefreshToken } from "../db/entities/refresh-token.entity";
 import { RolePermission } from "../db/entities/role-permission.entity";
@@ -54,6 +58,9 @@ export class AuthService {
     private readonly permissions: Repository<PermissionEntity>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokens: Repository<RefreshToken>,
+    @InjectRepository(Device) private readonly devices: Repository<Device>,
+    @InjectRepository(DeviceUser)
+    private readonly deviceUsers: Repository<DeviceUser>,
   ) {}
 
   private accessTtlSeconds(): number {
@@ -141,6 +148,16 @@ export class AuthService {
           }),
         );
 
+        await manager.save(
+          manager.create(Device, {
+            tenantId: tenant.id,
+            fingerprint: "cloud-hub",
+            name: "Cloud hub",
+            status: "trusted",
+            trustedAt: new Date(),
+          }),
+        );
+
         return created;
       });
     } catch (error) {
@@ -154,10 +171,6 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
-    // client is behavior-only (web vs desktop); never an authorization mechanism.
-    void dto.client;
-
-    // Ambiguous cross-tenant matches (0 or >1) → same generic 401.
     const user = await this.findUserByIdentifier(dto.identifier);
     if (!user || !user.isActive) {
       throw new UnauthorizedException("Invalid credentials");
@@ -173,7 +186,28 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
-    return this.issueAuthResponse(user);
+    let deviceId: string | null = null;
+    if (dto.client === "desktop") {
+      const permissions = await this.permissionsService.getPermissionsForUser(
+        user.id,
+        user.tenantId,
+      );
+      if (!permissions.includes("desktop.access")) {
+        throw new ForbiddenException(
+          "This account is not allowed to sign in on the desktop app",
+        );
+      }
+    }
+    if (dto.client === "desktop" && dto.fingerprint?.trim()) {
+      deviceId = await this.bindDesktopDevice(
+        user.id,
+        user.tenantId,
+        dto.fingerprint.trim(),
+        dto.deviceName?.trim() || "Desktop",
+      );
+    }
+
+    return this.issueAuthResponse(user, deviceId);
   }
 
   async refresh(rawRefreshToken: string): Promise<AuthResponse> {
@@ -207,6 +241,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       tenantId: user.tenantId,
+      ...(stored.deviceId ? { deviceId: stored.deviceId } : {}),
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -288,7 +323,10 @@ export class AuthService {
     return rows[0] ?? null;
   }
 
-  private async issueAuthResponse(user: User): Promise<AuthResponse> {
+  private async issueAuthResponse(
+    user: User,
+    deviceId: string | null = null,
+  ): Promise<AuthResponse> {
     const userPermissions =
       await this.permissionsService.getPermissionsForUser(
         user.id,
@@ -301,6 +339,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       tenantId: user.tenantId,
+      ...(deviceId ? { deviceId } : {}),
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -314,6 +353,19 @@ export class AuthService {
 
     // One active web refresh token per user (deviceId null): update in place.
     await this.dataSource.transaction(async (manager) => {
+      if (deviceId) {
+        await manager.save(
+          manager.create(RefreshToken, {
+            userId: user.id,
+            tenantId: user.tenantId,
+            deviceId,
+            tokenHash,
+            expiresAt,
+          }),
+        );
+        return;
+      }
+
       const activeWeb = await manager.find(RefreshToken, {
         where: {
           userId: user.id,
@@ -358,6 +410,56 @@ export class AuthService {
         expiresIn: accessTtl,
       },
     };
+  }
+
+  private async bindDesktopDevice(
+    userId: string,
+    tenantId: string,
+    fingerprint: string,
+    name: string,
+  ): Promise<string> {
+    let device = await this.devices.findOne({
+      where: { tenantId, fingerprint },
+    });
+    if (device?.status === "revoked") {
+      throw new UnauthorizedException("Device revoked");
+    }
+    if (!device) {
+      device = await this.devices.save(
+        this.devices.create({
+          tenantId,
+          fingerprint,
+          name,
+          status: "pending",
+        }),
+      );
+    }
+
+    const expires = new Date();
+    expires.setUTCDate(
+      expires.getUTCDate() + OFFLINE_AUTHORIZATION_DAYS_DEFAULT,
+    );
+    const existing = await this.deviceUsers.findOne({
+      where: { deviceId: device.id, userId },
+    });
+    if (existing) {
+      existing.lastOnlineAt = new Date();
+      existing.offlineExpiresAt = expires;
+      existing.offlineEnabled = true;
+      await this.deviceUsers.save(existing);
+    } else {
+      await this.deviceUsers.save(
+        this.deviceUsers.create({
+          tenantId,
+          deviceId: device.id,
+          userId,
+          offlineEnabled: true,
+          offlineExpiresAt: expires,
+          lastOnlineAt: new Date(),
+        }),
+      );
+    }
+    return device.id;
   }
 
   private toAuthUser(user: User, perms: Permission[]): AuthUser {

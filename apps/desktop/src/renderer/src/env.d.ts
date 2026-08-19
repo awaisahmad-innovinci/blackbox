@@ -103,6 +103,44 @@ declare global {
         ) => Promise<VendorGroup[]>;
         listWarehouses: () => Promise<WarehouseListItem[]>;
       };
+      identity?: {
+        getFingerprint: () => Promise<string>;
+        get: () => Promise<{
+          tenantId: string;
+          deviceId: string;
+          instanceId: string;
+        } | null>;
+        bind: (identity: {
+          tenantId: string;
+          deviceId: string;
+          instanceId: string;
+        }) => Promise<{ ok: true }>;
+      };
+      sync?: {
+        listOutbox: (limit?: number) => Promise<unknown>;
+        markPushing: (ids: string[]) => Promise<{ ok: true }>;
+        markAcked: (
+          changeId: string,
+          seq?: string,
+        ) => Promise<{ ok: true }>;
+        markPending: (
+          changeId: string,
+          error: string,
+        ) => Promise<{ ok: true }>;
+        markRejected: (
+          changeId: string,
+          error: string,
+        ) => Promise<{ ok: true }>;
+        pullCursor: (stream: string) => Promise<string>;
+        applyPull: (payload: {
+          changes: import("@blackbox/shared").SyncChangeDto[];
+          nextCursor: string;
+          stream: string;
+        }) => Promise<{ ok: true }>;
+        pendingCount: () => Promise<number>;
+        enqueue: (input: unknown) => Promise<{ changeId: string }>;
+        commit: (input: unknown) => Promise<{ changeId: string }>;
+      };
     };
   }
 }

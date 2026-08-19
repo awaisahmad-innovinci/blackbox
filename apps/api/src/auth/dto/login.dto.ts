@@ -1,4 +1,4 @@
-import { IsIn, IsString, MinLength } from "class-validator";
+import { IsIn, IsOptional, IsString, MinLength } from "class-validator";
 import type { AuthClient } from "@blackbox/shared";
 
 export class LoginDto {
@@ -12,4 +12,14 @@ export class LoginDto {
 
   @IsIn(["web", "desktop"])
   client!: AuthClient;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  fingerprint?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  deviceName?: string;
 }

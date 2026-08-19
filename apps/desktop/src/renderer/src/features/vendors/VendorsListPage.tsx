@@ -11,9 +11,11 @@ import {
   resolveDataSourceMode,
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
+import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 
 export function VendorsListPage() {
   const navigate = useNavigate();
+  const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EntityStatus | "">("");
   const [groupId, setGroupId] = useState("");
@@ -42,7 +44,7 @@ export function VendorsListPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +80,7 @@ export function VendorsListPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, groupId]);
+  }, [search, status, groupId, dataVersion]);
 
   return (
     <div className="space-y-6">

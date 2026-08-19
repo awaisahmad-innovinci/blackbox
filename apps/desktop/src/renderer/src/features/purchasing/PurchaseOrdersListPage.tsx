@@ -18,9 +18,11 @@ import {
   resolveDataSourceMode,
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
+import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 
 export function PurchaseOrdersListPage() {
   const navigate = useNavigate();
+  const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PurchaseOrderStatus | "">("");
   const [vendorId, setVendorId] = useState("");
@@ -63,7 +65,7 @@ export function PurchaseOrdersListPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,7 +106,15 @@ export function PurchaseOrdersListPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, vendorId, warehouseId, dateFrom, dateTo]);
+  }, [
+    search,
+    status,
+    vendorId,
+    warehouseId,
+    dateFrom,
+    dateTo,
+    dataVersion,
+  ]);
 
   return (
     <div className="space-y-6">

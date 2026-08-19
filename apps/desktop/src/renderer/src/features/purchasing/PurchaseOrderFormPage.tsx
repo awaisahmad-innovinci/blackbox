@@ -11,6 +11,8 @@ import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
@@ -276,6 +278,58 @@ export function PurchaseOrderFormPage() {
     setError(null);
     let saved;
     try {
+      if (await isDeviceBound()) {
+        const localId = isEdit && id ? id : crypto.randomUUID();
+        const now = new Date().toISOString();
+        saved = {
+          id: localId,
+          poNumber: isEdit ? poNumber : `LOCAL-${localId.slice(0, 8)}`,
+          vendorId: body.vendorId,
+          vendorName: vendors.find((v) => v.id === body.vendorId)?.name ?? "",
+          warehouseId: body.warehouseId,
+          warehouseName:
+            warehouses.find((w) => w.id === body.warehouseId)?.name ?? "",
+          status: submit ? "SUBMITTED" : "DRAFT",
+          orderDate: body.orderDate ?? todayIso(),
+          expectedDate: body.expectedDate ?? null,
+          subtotal,
+          discount: body.discount ?? 0,
+          tax: body.tax ?? 0,
+          otherCharges: body.otherCharges ?? 0,
+          total: grandTotal,
+          notes: body.notes ?? "",
+          items: lines.map((l) => ({
+            id: crypto.randomUUID(),
+            productSkuId: l.productSkuId,
+            vendorSkuId: l.vendorSkuId,
+            productName: l.productName,
+            variantName: l.variantName,
+            sku: l.sku,
+            vendorSkuCode: null,
+            purchaseUnitId: l.purchaseUnitId,
+            purchaseUnitName: l.purchaseUnitName,
+            unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
+            quantity: l.quantity,
+            unitCost: l.unitCost,
+            discount: 0,
+            tax: 0,
+            lineTotal: l.quantity * l.unitCost,
+            minimumOrderQuantity: l.minimumOrderQuantity,
+          })),
+          createdAt: now,
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "purchase_order",
+          entityId: localId,
+          operation: "UPSERT",
+          payload: saved as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setSaving(false);
+        navigate(`/purchase-orders/${localId}`);
+        return;
+      }
       saved = isEdit
         ? await purchaseOrdersApi.update(id!, body)
         : await purchaseOrdersApi.create(body);

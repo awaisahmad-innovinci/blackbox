@@ -45,6 +45,38 @@ export function upsertStockLocal(row: WarehouseStockRow): void {
   });
 }
 
+export function applyStockDeltaLocal(
+  productSkuId: string,
+  warehouseId: string,
+  delta: number,
+): void {
+  const db = getLocalDb();
+  const existing = db
+    .prepare(
+      `select quantity_on_hand as qoh, quantity_reserved as qr
+       from inventory_stock
+       where tenant_id = @tenantId and product_sku_id = @productSkuId
+         and warehouse_id = @warehouseId`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      productSkuId,
+      warehouseId,
+    }) as { qoh: number; qr: number } | undefined;
+  const onHand = Number(existing?.qoh ?? 0) + delta;
+  const reserved = Number(existing?.qr ?? 0);
+  upsertStockLocal({
+    warehouseId,
+    warehouseName: "",
+    productSkuId,
+    sku: "",
+    variantName: "",
+    quantityOnHand: onHand,
+    quantityReserved: reserved,
+    quantityAvailable: onHand - reserved,
+  });
+}
+
 export function upsertStockRowsLocal(rows: WarehouseStockRow[]): void {
   const db = getLocalDb();
   const tx = db.transaction(() => {
