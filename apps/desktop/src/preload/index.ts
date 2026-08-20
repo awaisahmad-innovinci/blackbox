@@ -5,6 +5,7 @@ import type {
   DashboardSummary,
   EntityStatus,
   GoodsReceiptDetail,
+  InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
   PaginatedProducts,
@@ -13,8 +14,14 @@ import type {
   ProductDetail,
   ProductListQuery,
   ProductSkuDetail,
+  ProductSupplierRow,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  ReceivingDraft,
+  SkuDetail,
+  SkuSearchResult,
+  SkuSupplier,
+  StockMovementRow,
   UnitListItem,
   VendorDetail,
   VendorGroup,
@@ -121,6 +128,78 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke(
         "localDb:listWarehouses",
       ) as Promise<WarehouseListItem[]>,
+    listUnits: () =>
+      ipcRenderer.invoke("localDb:listUnits") as Promise<UnitListItem[]>,
+    getProduct: (id: string) =>
+      ipcRenderer.invoke("localDb:getProduct", id) as Promise<ProductDetail | null>,
+    getProductProfile: (id: string) =>
+      ipcRenderer.invoke("localDb:getProductProfile", id) as Promise<{
+        product: ProductDetail;
+        skus: ProductSkuDetail[];
+        suppliers: ProductSupplierRow[];
+        inventory: WarehouseStockRow[];
+        movements: StockMovementRow[];
+      } | null>,
+    getVendor: (id: string) =>
+      ipcRenderer.invoke("localDb:getVendor", id) as Promise<VendorDetail | null>,
+    getVendorProfile: (id: string) =>
+      ipcRenderer.invoke("localDb:getVendorProfile", id) as Promise<{
+        vendor: VendorDetail;
+        skus: VendorSku[];
+      } | null>,
+    listVendorSkus: (vendorId: string, q?: string, warehouseId?: string) =>
+      ipcRenderer.invoke(
+        "localDb:listVendorSkus",
+        vendorId,
+        q,
+        warehouseId,
+      ) as Promise<VendorSku[]>,
+    getSku: (id: string) =>
+      ipcRenderer.invoke("localDb:getSku", id) as Promise<SkuDetail | null>,
+    getSkuProfile: (id: string) =>
+      ipcRenderer.invoke("localDb:getSkuProfile", id) as Promise<{
+        sku: SkuDetail;
+        suppliers: SkuSupplier[];
+        inventory: WarehouseStockRow[];
+      } | null>,
+    searchSkus: (q?: string, warehouseId?: string) =>
+      ipcRenderer.invoke(
+        "localDb:searchSkus",
+        q,
+        warehouseId,
+      ) as Promise<SkuSearchResult[]>,
+    getSkuByBarcode: (barcode: string, warehouseId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getSkuByBarcode",
+        barcode,
+        warehouseId,
+      ) as Promise<SkuSearchResult | null>,
+    getPurchaseOrder: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getPurchaseOrder",
+        id,
+      ) as Promise<PurchaseOrderDetail | null>,
+    getReceivingDraft: (poId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getReceivingDraft",
+        poId,
+      ) as Promise<ReceivingDraft | null>,
+    getGoodsReceipt: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getGoodsReceipt",
+        id,
+      ) as Promise<GoodsReceiptDetail | null>,
+    getInventoryOut: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getInventoryOut",
+        id,
+      ) as Promise<InventoryOutDetail | null>,
+    inventoryInOutReport: (dateFrom: string, dateTo: string) =>
+      ipcRenderer.invoke(
+        "localDb:inventoryInOutReport",
+        dateFrom,
+        dateTo,
+      ) as Promise<InventoryInOutReport>,
   },
   identity: {
     getFingerprint: () =>

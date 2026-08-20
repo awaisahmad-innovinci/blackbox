@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   ProductDetail,
   ProductSkuDetail,
@@ -12,13 +12,18 @@ import { Button } from "@blackbox/ui/button";
 import { BackButton } from "@renderer/app/BackButton";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
+import { loadProductProfile } from "@renderer/lib/local-db/entity-source";
 import { AddProductSkuDialog } from "./AddProductSkuDialog";
 import { AddProductSupplierDialog } from "./AddProductSupplierDialog";
 
 export function ProductProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [product, setProduct] = useState<ProductDetail | null>(null);
+  const location = useLocation();
+  const seeded = (
+    location.state as { product?: ProductDetail } | null
+  )?.product;
+  const [product, setProduct] = useState<ProductDetail | null>(seeded ?? null);
   const [skus, setSkus] = useState<ProductSkuDetail[]>([]);
   const [suppliers, setSuppliers] = useState<ProductSupplierRow[]>([]);
   const [inventory, setInventory] = useState<WarehouseStockRow[]>([]);
@@ -35,20 +40,13 @@ export function ProductProfilePage() {
 
   const reload = useCallback(async () => {
     if (!id) return;
-    const [detail, skuRows, supplierRows, stockRows, movementRows] =
-      await Promise.all([
-        productsApi.get(id),
-        productsApi.listSkus(id),
-        productsApi.listSuppliers(id),
-        productsApi.listInventory(id),
-        productsApi.listMovements(id),
-      ]);
-    setProduct(detail);
-    setSkus(skuRows);
-    setSuppliers(supplierRows);
-    setInventory(stockRows);
-    setMovements(movementRows);
-    const linked = new Set(supplierRows.map((s) => s.productSkuId));
+    const data = await loadProductProfile(id);
+    setProduct(data.product);
+    setSkus(data.skus);
+    setSuppliers(data.suppliers);
+    setInventory(data.inventory);
+    setMovements(data.movements);
+    const linked = new Set(data.suppliers.map((s) => s.productSkuId));
     setNeedsSupplierSkuIds((prev) => prev.filter((skuId) => !linked.has(skuId)));
   }, [id]);
 
@@ -403,6 +401,8 @@ export function ProductProfilePage() {
       <AddProductSkuDialog
         open={skuOpen}
         productId={product.id}
+        productCode={product.productCode}
+        existingSkuCodes={skus.map((s) => s.sku)}
         onClose={() => setSkuOpen(false)}
         onCreated={(row, cacheWarning) => {
           setSkuOpen(false);
@@ -419,7 +419,6 @@ export function ProductProfilePage() {
               ? "SKU saved on server; local cache update failed. Add a supplier to finish setup."
               : "SKU created. Add a supplier to finish setup.",
           );
-          void reload();
         }}
       />
       <AddProductSupplierDialog

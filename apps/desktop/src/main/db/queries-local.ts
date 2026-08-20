@@ -14,6 +14,7 @@ import type {
   PurchaseOrderStatus,
   VendorGroup,
   VendorListItem,
+  UnitListItem,
   VendorListQuery,
   WarehouseListItem,
 } from "@blackbox/shared";
@@ -92,6 +93,19 @@ export function listWarehousesLocal(): WarehouseListItem[] {
        order by name collate nocase`,
     )
     .all(DEMO_STORE_TENANT_ID) as WarehouseListItem[];
+}
+
+export function listUnitsLocal(): UnitListItem[] {
+  const db = getLocalDb();
+  return db
+    .prepare(
+      `select id, name, abbreviation, type, status
+       from units
+       where tenant_id = ?
+         and status = 'active'
+       order by name collate nocase`,
+    )
+    .all(DEMO_STORE_TENANT_ID) as UnitListItem[];
 }
 
 export function listProductsLocal(

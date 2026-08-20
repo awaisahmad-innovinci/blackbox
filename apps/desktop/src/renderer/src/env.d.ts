@@ -6,6 +6,7 @@ import type {
   DashboardSummary,
   EntityStatus,
   GoodsReceiptDetail,
+  InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
   PaginatedProducts,
@@ -14,8 +15,14 @@ import type {
   ProductDetail,
   ProductListQuery,
   ProductSkuDetail,
+  ProductSupplierRow,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  ReceivingDraft,
+  SkuDetail,
+  SkuSearchResult,
+  SkuSupplier,
+  StockMovementRow,
   UnitListItem,
   VendorDetail,
   VendorGroup,
@@ -102,6 +109,47 @@ declare global {
           status?: EntityStatus | "all",
         ) => Promise<VendorGroup[]>;
         listWarehouses: () => Promise<WarehouseListItem[]>;
+        listUnits: () => Promise<UnitListItem[]>;
+        getProduct: (id: string) => Promise<ProductDetail | null>;
+        getProductProfile: (id: string) => Promise<{
+          product: ProductDetail;
+          skus: ProductSkuDetail[];
+          suppliers: ProductSupplierRow[];
+          inventory: WarehouseStockRow[];
+          movements: StockMovementRow[];
+        } | null>;
+        getVendor: (id: string) => Promise<VendorDetail | null>;
+        getVendorProfile: (id: string) => Promise<{
+          vendor: VendorDetail;
+          skus: VendorSku[];
+        } | null>;
+        listVendorSkus: (
+          vendorId: string,
+          q?: string,
+          warehouseId?: string,
+        ) => Promise<VendorSku[]>;
+        getSku: (id: string) => Promise<SkuDetail | null>;
+        getSkuProfile: (id: string) => Promise<{
+          sku: SkuDetail;
+          suppliers: SkuSupplier[];
+          inventory: WarehouseStockRow[];
+        } | null>;
+        searchSkus: (
+          q?: string,
+          warehouseId?: string,
+        ) => Promise<SkuSearchResult[]>;
+        getSkuByBarcode: (
+          barcode: string,
+          warehouseId: string,
+        ) => Promise<SkuSearchResult | null>;
+        getPurchaseOrder: (id: string) => Promise<PurchaseOrderDetail | null>;
+        getReceivingDraft: (poId: string) => Promise<ReceivingDraft | null>;
+        getGoodsReceipt: (id: string) => Promise<GoodsReceiptDetail | null>;
+        getInventoryOut: (id: string) => Promise<InventoryOutDetail | null>;
+        inventoryInOutReport: (
+          dateFrom: string,
+          dateTo: string,
+        ) => Promise<InventoryInOutReport>;
       };
       identity?: {
         getFingerprint: () => Promise<string>;

@@ -422,15 +422,15 @@ export interface ProductSkuDetail {
 
 export interface CreateProductSkuRequest {
   variantName: string;
-  sku: string;
+  sku?: string;
   barcode?: string | null;
   sizeValue?: string | null;
   sizeUnit?: string | null;
-  baseUnitId?: string | null;
-  purchaseUnitId?: string | null;
-  unitsPerPurchaseUnit?: number;
-  costPrice?: number;
-  sellingPrice?: number;
+  baseUnitId: string;
+  purchaseUnitId: string;
+  unitsPerPurchaseUnit: number;
+  costPrice: number;
+  sellingPrice: number;
   reorderLevel?: number;
   minimumStockLevel?: number;
   maximumStockLevel?: number | null;
@@ -438,7 +438,24 @@ export interface CreateProductSkuRequest {
   status?: EntityStatus;
 }
 
-export type UpdateProductSkuRequest = CreateProductSkuRequest;
+export type UpdateProductSkuRequest = CreateProductSkuRequest & { sku: string };
+
+/** Next SKU for a product: `{productCode}-01`, `{productCode}-02`, … */
+export function nextSkuCode(
+  productCode: string,
+  existingSkus: string[],
+): string {
+  const prefix = `${productCode}-`;
+  let max = 0;
+  for (const sku of existingSkus) {
+    if (!sku.startsWith(prefix)) continue;
+    const suffix = sku.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    const n = Number(suffix);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `${prefix}${String(max + 1).padStart(2, "0")}`;
+}
 
 export interface ProductSupplierRow {
   vendorSkuId: string;
@@ -803,6 +820,31 @@ export interface PaginatedInventoryMovements {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface InventoryInOutReportQuery {
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface InventoryInOutReportBucket {
+  items: InventoryMovementListItem[];
+  quantityTotal: number;
+  lineCount: number;
+}
+
+export interface InventoryInOutReportDay {
+  date: string;
+  inboundQty: number;
+  outboundQty: number;
+}
+
+export interface InventoryInOutReport {
+  dateFrom: string;
+  dateTo: string;
+  inbound: InventoryInOutReportBucket;
+  outbound: InventoryInOutReportBucket;
+  byDay: InventoryInOutReportDay[];
 }
 
 export const MASTER_DATA_IMPORT_FILES = [

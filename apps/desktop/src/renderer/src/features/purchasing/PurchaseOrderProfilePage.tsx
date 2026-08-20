@@ -1,35 +1,39 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
+import { loadPurchaseOrder } from "@renderer/lib/local-db/entity-source";
 
 export function PurchaseOrderProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [po, setPo] = useState<PurchaseOrderDetail | null>(null);
+  const location = useLocation();
+  const seeded = (location.state as { po?: PurchaseOrderDetail } | null)?.po;
+  const [po, setPo] = useState<PurchaseOrderDetail | null>(seeded ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
-    const detail = await purchaseOrdersApi.get(id);
+    const detail = await loadPurchaseOrder(id);
     setPo(detail);
+    setError(null);
   }, [id]);
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     void reload().catch((err: unknown) => {
-      if (!cancelled) {
+      if (!cancelled && !seeded) {
         setError(getApiErrorMessage(err, "Failed to load purchase order"));
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [id, reload]);
+  }, [id, reload, seeded]);
 
   async function onSubmit() {
     if (!po) return;

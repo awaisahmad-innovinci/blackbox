@@ -8,7 +8,16 @@ import type {
   VendorDetail,
   VendorGroup,
 } from "@blackbox/shared";
-import { PAYMENT_TERMS, PAYMENT_TERMS_LABELS } from "@blackbox/shared";
+import {
+  PAYMENT_TERMS,
+  PAYMENT_TERMS_LABELS,
+  emailError,
+  liveEmailError,
+  livePersonNameError,
+  livePhone11DigitError,
+  personNameError,
+  phone11DigitError,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -16,6 +25,7 @@ import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { vendorsApi } from "@renderer/lib/api/vendors";
+import { loadVendor } from "@renderer/lib/local-db/entity-source";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 
@@ -92,6 +102,19 @@ function toContactInput(c: ContactForm): VendorContactInput | undefined {
   };
 }
 
+function liveContactErrors(
+  value: ContactForm,
+): Partial<Record<keyof ContactForm, string>> {
+  const next: Partial<Record<keyof ContactForm, string>> = {};
+  const nameLive = livePersonNameError(value.name);
+  if (nameLive) next.name = nameLive;
+  const phoneLive = livePhone11DigitError(value.phone);
+  if (phoneLive) next.phone = phoneLive;
+  const mailLive = liveEmailError(value.email);
+  if (mailLive) next.email = mailLive;
+  return next;
+}
+
 function ContactFields({
   title,
   value,
@@ -105,6 +128,12 @@ function ContactFields({
   required?: boolean;
   errors?: Partial<Record<keyof ContactForm, string>>;
 }) {
+  const live = liveContactErrors(value);
+  const shown = {
+    name: live.name ?? (value.name.trim() ? undefined : errors?.name),
+    phone: live.phone ?? (value.phone.trim() ? undefined : errors?.phone),
+    email: live.email ?? errors?.email,
+  };
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-medium">{title}</h3>
@@ -113,31 +142,40 @@ function ContactFields({
           <Label>Name{required ? " *" : ""}</Label>
           <Input
             value={value.name}
+            aria-invalid={Boolean(shown.name)}
             onChange={(e) => onChange({ ...value, name: e.target.value })}
           />
-          {errors?.name ? (
-            <p className="text-destructive text-xs">{errors.name}</p>
+          {shown.name ? (
+            <p className="text-destructive text-xs">{shown.name}</p>
           ) : null}
         </div>
         <div className="space-y-1.5">
           <Label>Phone{required ? " *" : ""}</Label>
           <Input
             value={value.phone}
+            inputMode="numeric"
+            maxLength={11}
+            aria-invalid={Boolean(shown.phone)}
             onChange={(e) => onChange({ ...value, phone: e.target.value })}
           />
-          {errors?.phone ? (
-            <p className="text-destructive text-xs">{errors.phone}</p>
-          ) : null}
+          {shown.phone ? (
+            <p className="text-destructive text-xs">{shown.phone}</p>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              11 digits, e.g. 03049636186
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label>Email</Label>
           <Input
             type="email"
             value={value.email}
+            aria-invalid={Boolean(shown.email)}
             onChange={(e) => onChange({ ...value, email: e.target.value })}
           />
-          {errors?.email ? (
-            <p className="text-destructive text-xs">{errors.email}</p>
+          {shown.email ? (
+            <p className="text-destructive text-xs">{shown.email}</p>
           ) : null}
         </div>
       </div>
@@ -164,8 +202,7 @@ export function VendorFormPage() {
     if (!id) return;
     let cancelled = false;
     setLoading(true);
-    void vendorsApi
-      .get(id)
+    void loadVendor(id)
       .then((detail) => {
         if (cancelled) return;
         setForm({
@@ -206,30 +243,53 @@ export function VendorFormPage() {
 
   function validate(): boolean {
     const next: Record<string, string> = {};
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!form.name.trim()) next.name = "Vendor name is required";
     if (!form.vendorCode.trim()) next.vendorCode = "Vendor code is required";
-    if (!form.primaryContact.name.trim()) {
-      next["primaryContact.name"] = "Primary contact name is required";
+
+    const requiredContacts = [
+      ["primaryContact", form.primaryContact, "Primary contact"],
+      ["managerContact", form.managerContact, "Manager"],
+    ] as const;
+    for (const [key, contact, label] of requiredContacts) {
+      const nameErr = personNameError(contact.name);
+      if (nameErr) {
+        next[`${key}.name`] =
+          nameErr === "Name is required" ? `${label} name is required` : nameErr;
+      }
+      const phoneErr = phone11DigitError(contact.phone);
+      if (phoneErr) {
+        next[`${key}.phone`] =
+          phoneErr === "Phone number is required"
+            ? `${label} phone is required`
+            : phoneErr;
+      }
     }
-    if (!form.primaryContact.phone.trim()) {
-      next["primaryContact.phone"] = "Primary contact phone is required";
-    }
-    if (!form.managerContact.name.trim()) {
-      next["managerContact.name"] = "Manager name is required";
-    }
-    if (!form.managerContact.phone.trim()) {
-      next["managerContact.phone"] = "Manager phone is required";
-    }
+
     for (const [key, contact] of Object.entries({
       primaryContact: form.primaryContact,
       otherContact: form.otherContact,
       managerContact: form.managerContact,
       salespersonContact: form.salespersonContact,
     })) {
-      if (contact.email.trim() && !emailPattern.test(contact.email.trim())) {
-        next[`${key}.email`] = "Enter a valid email address";
+      const optional = key === "otherContact" || key === "salespersonContact";
+      if (
+        optional &&
+        !contact.name.trim() &&
+        !contact.phone.trim() &&
+        !contact.email.trim()
+      ) {
+        continue;
       }
+      if (optional && contact.name.trim()) {
+        const nameErr = personNameError(contact.name);
+        if (nameErr) next[`${key}.name`] = nameErr;
+      }
+      if (optional && contact.phone.trim()) {
+        const phoneErr = phone11DigitError(contact.phone, { required: false });
+        if (phoneErr) next[`${key}.phone`] = phoneErr;
+      }
+      const mailErr = emailError(contact.email, { required: false });
+      if (mailErr) next[`${key}.email`] = mailErr;
     }
     if (
       form.salesTarget &&
@@ -332,7 +392,9 @@ export function VendorFormPage() {
         });
         void syncNow();
         setSaving(false);
-        navigate(`/vendors/${localId}`);
+        navigate(`/vendors/${localId}`, {
+          state: { vendor: saved, flash: "Vendor created successfully." },
+        });
         return;
       }
       saved = isEdit && id
@@ -357,6 +419,7 @@ export function VendorFormPage() {
       : "Vendor created successfully.";
     navigate(`/vendors/${saved.id}`, {
       state: {
+        vendor: saved,
         flash: cacheWarning
           ? `${success} Local cache update is pending.`
           : success,

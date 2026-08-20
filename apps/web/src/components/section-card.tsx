@@ -61,3 +61,24 @@ export function FormSuccess({ children }: { children: ReactNode }) {
 export function FieldHint({ children }: { children: ReactNode }) {
   return <p className="text-muted-foreground text-xs leading-relaxed">{children}</p>;
 }
+
+export function FieldError({ children }: { children: ReactNode }) {
+  if (!children) return null;
+  return (
+    <p className="text-destructive text-xs" role="alert">
+      {children}
+    </p>
+  );
+}
+
+export function FieldStatus({
+  error,
+  hint,
+}: {
+  error?: string | null;
+  hint?: ReactNode;
+}) {
+  if (error) return <FieldError>{error}</FieldError>;
+  if (hint) return <FieldHint>{hint}</FieldHint>;
+  return null;
+}

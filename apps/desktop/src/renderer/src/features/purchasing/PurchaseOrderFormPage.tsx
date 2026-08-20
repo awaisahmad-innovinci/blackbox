@@ -13,9 +13,7 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
-import { vendorsApi } from "@renderer/lib/api/vendors";
-import { warehousesApi } from "@renderer/lib/api/warehouses";
+import { loadPurchaseOrder, loadVendors, loadVendorSkus, loadWarehouses } from "@renderer/lib/local-db/entity-source";
 import {
   AddPurchaseOrderItemDialog,
   toDraftPoLine,
@@ -24,20 +22,6 @@ import {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function purchaseUnitSize(line: DraftPoLine): number {
-  return line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
-}
-
-function maximumPurchaseQuantity(line: DraftPoLine): number {
-  return line.quantityAvailable / purchaseUnitSize(line);
-}
-
-function exceedsAvailability(line: DraftPoLine): boolean {
-  return (
-    line.quantity * purchaseUnitSize(line) - line.quantityAvailable > 0.000000001
-  );
 }
 
 export function PurchaseOrderFormPage() {
@@ -87,11 +71,7 @@ export function PurchaseOrderFormPage() {
     setScanBusy(true);
     setError(null);
     try {
-      const rows = await vendorSkusApi.listByVendor(
-        vendorId,
-        code,
-        warehouseId,
-      );
+      const rows = await loadVendorSkus(vendorId, code, warehouseId);
       const exact = rows.filter((r) => (r.barcode ?? "").trim() === code);
       if (exact.length === 0) {
         setError("No supplier SKU found for this barcode");
@@ -102,10 +82,6 @@ export function PurchaseOrderFormPage() {
         return;
       }
       const match = exact[0]!;
-      if ((match.quantityAvailable ?? 0) < 1) {
-        setError("This SKU has no available stock in the selected warehouse");
-        return;
-      }
       if (lines.some((l) => l.productSkuId === match.productSkuId)) {
         setError("Already added — update its quantity");
         setBarcode("");
@@ -123,11 +99,10 @@ export function PurchaseOrderFormPage() {
   }
 
   useEffect(() => {
-    void vendorsApi
-      .list({ status: "active", pageSize: 100 })
+    void loadVendors({ status: "active", pageSize: 100 })
       .then((r) => setVendors(r.items))
       .catch(() => undefined);
-    void warehousesApi.list().then((rows) => {
+    void loadWarehouses().then((rows) => {
       setWarehouses(rows);
       if (!isEdit && rows.length === 1) setWarehouseId(rows[0]!.id);
     }).catch(() => undefined);
@@ -137,26 +112,27 @@ export function PurchaseOrderFormPage() {
     if (!id) return;
     let cancelled = false;
     setLoading(true);
-    void purchaseOrdersApi
-      .get(id)
+    void loadPurchaseOrder(id)
       .then(async (po) => {
         if (cancelled) return;
         if (po.status !== "DRAFT") {
           setError("Only DRAFT purchase orders can be edited");
           return;
         }
-        const currentVendorSkus = await vendorSkusApi.listByVendor(
-          po.vendorId,
-          "",
-          po.warehouseId,
-        );
+        const availabilityBySku = new Map<string, number>();
+        try {
+          const currentVendorSkus = await loadVendorSkus(
+            po.vendorId,
+            "",
+            po.warehouseId,
+          );
+          for (const row of currentVendorSkus) {
+            availabilityBySku.set(row.productSkuId, row.quantityAvailable ?? 0);
+          }
+        } catch {
+          /* availability is informational */
+        }
         if (cancelled) return;
-        const availabilityBySku = new Map(
-          currentVendorSkus.map((row) => [
-            row.productSkuId,
-            row.quantityAvailable ?? 0,
-          ]),
-        );
         setPoNumber(po.poNumber);
         setStatus(po.status);
         setVendorId(po.vendorId);
@@ -210,7 +186,6 @@ export function PurchaseOrderFormPage() {
   const otherN = Number(otherCharges) || 0;
   const grandTotal =
     Math.round((subtotal - discountN + taxN + otherN) * 10000) / 10000;
-  const hasAvailabilityError = lines.some(exceedsAvailability);
 
   function buildBody(submit?: boolean): CreatePurchaseOrderRequest | null {
     if (!vendorId) {
@@ -228,12 +203,6 @@ export function PurchaseOrderFormPage() {
     for (const line of lines) {
       if (!(line.quantity > 0)) {
         setError(`Enter a quantity greater than zero for ${line.sku}`);
-        return null;
-      }
-      if (exceedsAvailability(line)) {
-        setError(
-          `Quantity for ${line.sku} cannot exceed ${maximumPurchaseQuantity(line).toLocaleString()} ${line.purchaseUnitName ?? "units"}`,
-        );
         return null;
       }
       if (submit && line.quantity < line.minimumOrderQuantity) {
@@ -327,7 +296,7 @@ export function PurchaseOrderFormPage() {
         });
         void syncNow();
         setSaving(false);
-        navigate(`/purchase-orders/${localId}`);
+        navigate(`/purchase-orders/${localId}`, { state: { po: saved } });
         return;
       }
       saved = isEdit
@@ -345,7 +314,7 @@ export function PurchaseOrderFormPage() {
       /* optional cache */
     }
     setSaving(false);
-    navigate(`/purchase-orders/${saved.id}`);
+    navigate(`/purchase-orders/${saved.id}`, { state: { po: saved } });
   }
 
   if (loading) {
@@ -498,27 +467,12 @@ export function PurchaseOrderFormPage() {
                     />
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    <span>{line.quantityAvailable.toLocaleString()} base</span>
-                    {purchaseUnitSize(line) > 1 ? (
-                      <span className="text-muted-foreground block text-xs">
-                        Max{" "}
-                        {maximumPurchaseQuantity(line).toLocaleString(
-                          undefined,
-                          { maximumFractionDigits: 4 },
-                        )}{" "}
-                        {line.purchaseUnitName ?? "units"}
-                      </span>
-                    ) : null}
+                    {line.quantityAvailable.toLocaleString()} base
                   </td>
                   <td className="px-3 py-2">
                     <Input
-                      className={
-                        exceedsAvailability(line)
-                          ? "border-destructive focus-visible:ring-destructive h-8 w-20"
-                          : "h-8 w-20"
-                      }
+                      className="h-8 w-20"
                       data-sku-qty={line.productSkuId}
-                      aria-invalid={exceedsAvailability(line)}
                       value={String(line.quantity)}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => {
@@ -545,16 +499,6 @@ export function PurchaseOrderFormPage() {
                         );
                       }}
                     />
-                    {exceedsAvailability(line) ? (
-                      <p className="text-destructive mt-1 max-w-40 text-xs">
-                        Must be at most{" "}
-                        {maximumPurchaseQuantity(line).toLocaleString(
-                          undefined,
-                          { maximumFractionDigits: 4 },
-                        )}{" "}
-                        {line.purchaseUnitName ?? "units"}
-                      </p>
-                    ) : null}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {(line.quantity * line.unitCost).toLocaleString()}
@@ -661,14 +605,14 @@ export function PurchaseOrderFormPage() {
         <Button
           type="button"
           variant="outline"
-          disabled={saving || hasAvailabilityError}
+          disabled={saving}
           onClick={() => void persist(false)}
         >
           {saving ? "Saving…" : "Save Draft"}
         </Button>
         <Button
           type="button"
-          disabled={saving || hasAvailabilityError}
+          disabled={saving}
           onClick={() => void persist(true)}
         >
           Submit PO

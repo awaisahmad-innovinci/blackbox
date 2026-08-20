@@ -12,8 +12,10 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { skusApi } from "@renderer/lib/api/skus";
-import { warehousesApi } from "@renderer/lib/api/warehouses";
+import {
+  loadSkuByBarcode,
+  loadWarehouses,
+} from "@renderer/lib/local-db/entity-source";
 import {
   AddInventoryOutItemDialog,
   type DraftOutLine,
@@ -49,8 +51,7 @@ export function InventoryOutPage() {
   const [success, setSuccess] = useState<InventoryOutDetail | null>(null);
 
   useEffect(() => {
-    void warehousesApi
-      .list()
+    void loadWarehouses()
       .then((rows) => {
         setWarehouses(rows);
         if (rows.length === 1) setWarehouseId(rows[0]!.id);
@@ -74,6 +75,13 @@ export function InventoryOutPage() {
     [lines],
   );
   const total = subtotal;
+
+  const canPost = useMemo(
+    () =>
+      lines.length > 0 &&
+      lines.every((l) => l.quantity > 0 && l.quantity <= l.quantityAvailable),
+    [lines],
+  );
 
   function upsertScannedLine(row: {
     id: string;
@@ -130,7 +138,7 @@ export function InventoryOutPage() {
 
     setScanBusy(true);
     try {
-      const row = await skusApi.byBarcode(code, warehouseId);
+      const row = await loadSkuByBarcode(code, warehouseId);
       const err = upsertScannedLine({
         id: row.id,
         productName: row.productName,
@@ -278,7 +286,11 @@ export function InventoryOutPage() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => navigate(`/inventory/out/${success.id}`)}
+              onClick={() =>
+                navigate(`/inventory/out/${success.id}`, {
+                  state: { detail: success },
+                })
+              }
             >
               View detail
             </Button>
@@ -438,10 +450,15 @@ export function InventoryOutPage() {
                     {line.quantityAvailable}
                   </td>
                   <td className="px-4 py-3 tabular-nums">{line.costPrice}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <Input
                       className="h-8 w-24"
                       value={String(line.quantity)}
+                      aria-invalid={
+                        line.quantity <= 0 ||
+                        line.quantity > line.quantityAvailable
+                      }
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
                         const n = Number(e.target.value);
                         setLines((prev) =>
@@ -456,6 +473,11 @@ export function InventoryOutPage() {
                         );
                       }}
                     />
+                    {line.quantity > line.quantityAvailable ? (
+                      <p className="text-destructive mt-1 text-xs">
+                        Quantity must be at most {line.quantityAvailable}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {lineTotal(line).toLocaleString()}
@@ -529,7 +551,7 @@ export function InventoryOutPage() {
         </Button>
         <Button
           type="button"
-          disabled={saving}
+          disabled={saving || !canPost}
           onClick={() => void onConfirm()}
         >
           {saving ? "Posting…" : "Confirm out"}
@@ -541,8 +563,8 @@ export function InventoryOutPage() {
         warehouseId={warehouseId}
         existingSkuIds={existingSkuIds}
         onClose={() => setItemOpen(false)}
-        onAdd={(line) => {
-          setLines((prev) => [...prev, line]);
+        onAddMany={(added) => {
+          setLines((prev) => [...prev, ...added]);
           setItemOpen(false);
         }}
       />

@@ -32,7 +32,7 @@ import {
   Tr,
 } from "@/components/data-table";
 import { ActiveBadge } from "@/components/status-badges";
-import { FieldHint, FormError } from "@/components/section-card";
+import { FieldHint, FieldStatus, FormError } from "@/components/section-card";
 import {
   createUser,
   listRoles,
@@ -41,8 +41,22 @@ import {
   type UserDto,
 } from "@/lib/admin-api";
 import { toCreateUserFacingError } from "@/lib/api-error";
+import {
+  emailError,
+  liveEmailError,
+  livePasswordError,
+  livePersonNameError,
+  liveUsernameError,
+  personNameError,
+  usernameError,
+} from "@blackbox/shared";
 
-const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+const emptyCreate = {
+  fullName: "",
+  username: "",
+  email: "",
+  password: "",
+};
 
 export default function UsersPage() {
   const { hasPermission } = useAuth();
@@ -55,6 +69,8 @@ export default function UsersPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [createDraft, setCreateDraft] = useState(emptyCreate);
+  const [createAttempted, setCreateAttempted] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [success, setSuccess] = useState<string | null>(null);
@@ -108,9 +124,26 @@ export default function UsersPage() {
     );
   }, [users, query]);
 
+  const createNameErr = createAttempted
+    ? personNameError(createDraft.fullName)
+    : livePersonNameError(createDraft.fullName);
+  const createUsernameErr = createAttempted
+    ? usernameError(createDraft.username)
+    : liveUsernameError(createDraft.username);
+  const createEmailErr = createAttempted
+    ? emailError(createDraft.email)
+    : liveEmailError(createDraft.email);
+  const createPasswordErr = createAttempted
+    ? createDraft.password.length < 8
+      ? "Password must be at least 8 characters"
+      : null
+    : livePasswordError(createDraft.password);
+
   function openCreateDialog() {
     setSuccess(null);
     setFormError(null);
+    setCreateDraft(emptyCreate);
+    setCreateAttempted(false);
     setSelectedRoles([]);
     setRolesLoading(roles.length === 0);
     setOpen(true);
@@ -131,6 +164,8 @@ export default function UsersPage() {
     setOpen(false);
     setFormError(null);
     setSelectedRoles([]);
+    setCreateDraft(emptyCreate);
+    setCreateAttempted(false);
     formRef.current?.reset();
     if (restoreFocus) {
       window.setTimeout(() => createButtonRef.current?.focus(), 50);
@@ -142,33 +177,16 @@ export default function UsersPage() {
     if (saving) return;
     setFormError(null);
 
-    const form = e.currentTarget;
-    const data = new FormData(form);
-    const fullName = String(data.get("fullName") ?? "").trim();
-    const email = String(data.get("email") ?? "").trim().toLowerCase();
-    const username = String(data.get("username") ?? "").trim();
-    const password = String(data.get("password") ?? "");
+    const fullName = createDraft.fullName.trim();
+    const email = createDraft.email.trim().toLowerCase();
+    const username = createDraft.username.trim();
+    const password = createDraft.password;
 
-    if (!fullName) {
-      setFormError("Full name is required.");
-      return;
-    }
-    if (!email) {
-      setFormError("Email is required.");
-      return;
-    }
-    if (!username || username.length < 3) {
-      setFormError("Username must be at least 3 characters.");
-      return;
-    }
-    if (!USERNAME_PATTERN.test(username)) {
-      setFormError(
-        "Username may only contain letters, numbers, dots, underscores, and hyphens.",
-      );
-      return;
-    }
-    if (password.length < 8) {
-      setFormError("Password must be at least 8 characters.");
+    setCreateAttempted(true);
+    const nameErr = personNameError(fullName);
+    const mailErr = emailError(email);
+    const userErr = usernameError(username);
+    if (nameErr || mailErr || userErr || password.length < 8) {
       return;
     }
 
@@ -352,6 +370,15 @@ export default function UsersPage() {
                   required
                   autoComplete="name"
                   placeholder="Alex Morgan"
+                  value={createDraft.fullName}
+                  aria-invalid={Boolean(createNameErr)}
+                  onChange={(e) =>
+                    setCreateDraft((d) => ({ ...d, fullName: e.target.value }))
+                  }
+                />
+                <FieldStatus
+                  error={createNameErr}
+                  hint="Letters only, with spaces between words."
                 />
               </div>
               <div className="space-y-2">
@@ -363,13 +390,17 @@ export default function UsersPage() {
                   minLength={3}
                   autoComplete="username"
                   placeholder="alex"
-                  pattern="[a-zA-Z0-9._-]+"
-                  title="Letters, numbers, dots, underscores, and hyphens"
+                  title="Letters, numbers, and special characters. No spaces."
+                  value={createDraft.username}
+                  aria-invalid={Boolean(createUsernameErr)}
+                  onChange={(e) =>
+                    setCreateDraft((d) => ({ ...d, username: e.target.value }))
+                  }
                 />
-                <FieldHint>
-                  Letters, numbers, dots, underscores, and hyphens. Min 3
-                  characters.
-                </FieldHint>
+                <FieldStatus
+                  error={createUsernameErr}
+                  hint="Letters, numbers, and special characters. No spaces. Min 3 characters."
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="create-email">Email</Label>
@@ -380,7 +411,13 @@ export default function UsersPage() {
                   required
                   autoComplete="email"
                   placeholder="alex@business.com"
+                  value={createDraft.email}
+                  aria-invalid={Boolean(createEmailErr)}
+                  onChange={(e) =>
+                    setCreateDraft((d) => ({ ...d, email: e.target.value }))
+                  }
                 />
+                <FieldStatus error={createEmailErr} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="create-password">Password</Label>
@@ -391,11 +428,16 @@ export default function UsersPage() {
                   minLength={8}
                   autoComplete="new-password"
                   placeholder="At least 8 characters"
+                  value={createDraft.password}
+                  aria-invalid={Boolean(createPasswordErr)}
+                  onChange={(e) =>
+                    setCreateDraft((d) => ({ ...d, password: e.target.value }))
+                  }
                 />
-                <FieldHint>
-                  Minimum 8 characters. Share securely — not stored in the
-                  browser after create.
-                </FieldHint>
+                <FieldStatus
+                  error={createPasswordErr}
+                  hint="Minimum 8 characters. Share securely — not stored in the browser after create."
+                />
               </div>
               <div className="space-y-2">
                 <Label>Roles</Label>

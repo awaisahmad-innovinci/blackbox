@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   CreateProductSkuRequest,
   EntityStatus,
   ProductSkuDetail,
   UnitListItem,
 } from "@blackbox/shared";
+import { nextSkuCode } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -17,7 +18,9 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
-import { unitsApi } from "@renderer/lib/api/units";
+import { loadUnits } from "@renderer/lib/local-db/entity-source";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { syncNow } from "@renderer/lib/sync/sync-status";
 
 const emptyForm = {
   variantName: "",
@@ -27,9 +30,9 @@ const emptyForm = {
   sizeUnit: "",
   baseUnitId: "",
   purchaseUnitId: "",
-  unitsPerPurchaseUnit: "1",
-  costPrice: "0",
-  sellingPrice: "0",
+  unitsPerPurchaseUnit: "",
+  costPrice: "",
+  sellingPrice: "",
   reorderLevel: "0",
   minimumStockLevel: "0",
   maximumStockLevel: "",
@@ -37,14 +40,36 @@ const emptyForm = {
   status: "active" as EntityStatus,
 };
 
+function requiredSelect(value: string, label: string): string | null {
+  return value ? null : `${label} is required`;
+}
+
+function requiredPositive(value: string, label: string): string | null {
+  if (!value.trim()) return `${label} is required`;
+  const n = Number(value);
+  if (Number.isNaN(n) || n <= 0) return `${label} must be greater than zero`;
+  return null;
+}
+
+function requiredNonNegative(value: string, label: string): string | null {
+  if (!value.trim()) return `${label} is required`;
+  const n = Number(value);
+  if (Number.isNaN(n) || n < 0) return `${label} must be a non-negative number`;
+  return null;
+}
+
 export function AddProductSkuDialog({
   open,
   productId,
+  productCode,
+  existingSkuCodes,
   onClose,
   onCreated,
 }: {
   open: boolean;
   productId: string;
+  productCode: string;
+  existingSkuCodes: string[];
   onClose: () => void;
   onCreated: (row: ProductSkuDetail, cacheWarning: boolean) => void;
 }) {
@@ -52,15 +77,26 @@ export function AddProductSkuDialog({
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    void unitsApi.list().then(setUnits).catch(() => undefined);
-  }, [open]);
+    setForm({
+      ...emptyForm,
+      sku: nextSkuCode(productCode, existingSkuCodes),
+    });
+    setError(null);
+    setAttempted(false);
+    void loadUnits().then(setUnits).catch(() => undefined);
+  }, [open, productCode, existingSkuCodes]);
 
   function reset() {
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      sku: nextSkuCode(productCode, existingSkuCodes),
+    });
     setError(null);
+    setAttempted(false);
   }
 
   function setField<K extends keyof typeof emptyForm>(
@@ -70,15 +106,48 @@ export function AddProductSkuDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  const fieldErrors = useMemo(
+    () => ({
+      variantName: form.variantName.trim()
+        ? null
+        : attempted
+          ? "Variant is required"
+          : null,
+      baseUnitId: attempted
+        ? requiredSelect(form.baseUnitId, "Base unit")
+        : null,
+      purchaseUnitId: attempted
+        ? requiredSelect(form.purchaseUnitId, "Purchase unit")
+        : null,
+      unitsPerPurchaseUnit:
+        form.unitsPerPurchaseUnit.trim() || attempted
+          ? requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit")
+          : null,
+      costPrice:
+        form.costPrice.trim() || attempted
+          ? requiredNonNegative(form.costPrice, "Cost price")
+          : null,
+      sellingPrice:
+        form.sellingPrice.trim() || attempted
+          ? requiredNonNegative(form.sellingPrice, "Selling price")
+          : null,
+    }),
+    [form, attempted],
+  );
+
+  const canSave =
+    Boolean(form.variantName.trim()) &&
+    Boolean(form.sku.trim()) &&
+    !requiredSelect(form.baseUnitId, "Base unit") &&
+    !requiredSelect(form.purchaseUnitId, "Purchase unit") &&
+    !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
+    !requiredNonNegative(form.costPrice, "Cost price") &&
+    !requiredNonNegative(form.sellingPrice, "Selling price");
+
   async function onSave() {
-    if (!form.variantName.trim()) {
-      setError("Variant name is required");
-      return;
-    }
-    if (!form.sku.trim()) {
-      setError("SKU code is required");
-      return;
-    }
+    setAttempted(true);
+    if (!canSave) return;
+
     const nums = {
       unitsPerPurchaseUnit: Number(form.unitsPerPurchaseUnit),
       costPrice: Number(form.costPrice),
@@ -104,8 +173,8 @@ export function AddProductSkuDialog({
       barcode: form.barcode.trim() || null,
       sizeValue: form.sizeValue.trim() || null,
       sizeUnit: form.sizeUnit.trim() || null,
-      baseUnitId: form.baseUnitId || null,
-      purchaseUnitId: form.purchaseUnitId || null,
+      baseUnitId: form.baseUnitId,
+      purchaseUnitId: form.purchaseUnitId,
       unitsPerPurchaseUnit: nums.unitsPerPurchaseUnit,
       costPrice: nums.costPrice,
       sellingPrice: nums.sellingPrice,
@@ -120,6 +189,43 @@ export function AddProductSkuDialog({
     setError(null);
     let row: ProductSkuDetail;
     try {
+      if (await isDeviceBound()) {
+        const localId = crypto.randomUUID();
+        const baseUnit = units.find((u) => u.id === body.baseUnitId);
+        const purchaseUnit = units.find((u) => u.id === body.purchaseUnitId);
+        row = {
+          id: localId,
+          productId,
+          variantName: body.variantName,
+          sku: body.sku ?? "",
+          barcode: body.barcode ?? null,
+          sizeValue: body.sizeValue ?? null,
+          sizeUnit: body.sizeUnit ?? null,
+          baseUnitId: body.baseUnitId,
+          baseUnitName: baseUnit?.name ?? null,
+          purchaseUnitId: body.purchaseUnitId,
+          purchaseUnitName: purchaseUnit?.name ?? null,
+          unitsPerPurchaseUnit: body.unitsPerPurchaseUnit,
+          costPrice: body.costPrice,
+          sellingPrice: body.sellingPrice,
+          reorderLevel: body.reorderLevel ?? 0,
+          minimumStockLevel: body.minimumStockLevel ?? 0,
+          maximumStockLevel: body.maximumStockLevel ?? null,
+          trackInventory: body.trackInventory ?? true,
+          status: body.status ?? "active",
+        };
+        await commitLocalChange({
+          entityType: "product_sku",
+          entityId: localId,
+          operation: "UPSERT",
+          payload: row as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setSaving(false);
+        reset();
+        onCreated(row, false);
+        return;
+      }
       row = await productsApi.createSku(productId, body);
     } catch (err: unknown) {
       setSaving(false);
@@ -165,15 +271,16 @@ export function AddProductSkuDialog({
             <Input
               value={form.variantName}
               onChange={(e) => setField("variantName", e.target.value)}
+              aria-invalid={Boolean(fieldErrors.variantName)}
               autoFocus
             />
+            {fieldErrors.variantName ? (
+              <p className="text-destructive text-xs">{fieldErrors.variantName}</p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>SKU *</Label>
-            <Input
-              value={form.sku}
-              onChange={(e) => setField("sku", e.target.value)}
-            />
+            <Label>SKU</Label>
+            <Input value={form.sku} readOnly disabled />
           </div>
           <div className="space-y-1.5">
             <Label>Barcode</Label>
@@ -200,10 +307,11 @@ export function AddProductSkuDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Base unit</Label>
+            <Label>Base unit *</Label>
             <select
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               value={form.baseUnitId}
+              aria-invalid={Boolean(fieldErrors.baseUnitId)}
               onChange={(e) => setField("baseUnitId", e.target.value)}
             >
               <option value="">—</option>
@@ -213,12 +321,16 @@ export function AddProductSkuDialog({
                 </option>
               ))}
             </select>
+            {fieldErrors.baseUnitId ? (
+              <p className="text-destructive text-xs">{fieldErrors.baseUnitId}</p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Purchase unit</Label>
+            <Label>Purchase unit *</Label>
             <select
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               value={form.purchaseUnitId}
+              aria-invalid={Boolean(fieldErrors.purchaseUnitId)}
               onChange={(e) => setField("purchaseUnitId", e.target.value)}
             >
               <option value="">—</option>
@@ -228,27 +340,48 @@ export function AddProductSkuDialog({
                 </option>
               ))}
             </select>
+            {fieldErrors.purchaseUnitId ? (
+              <p className="text-destructive text-xs">
+                {fieldErrors.purchaseUnitId}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Units / purchase unit</Label>
+            <Label>Units / purchase unit *</Label>
             <Input
               value={form.unitsPerPurchaseUnit}
+              aria-invalid={Boolean(fieldErrors.unitsPerPurchaseUnit)}
               onChange={(e) => setField("unitsPerPurchaseUnit", e.target.value)}
             />
+            {fieldErrors.unitsPerPurchaseUnit ? (
+              <p className="text-destructive text-xs">
+                {fieldErrors.unitsPerPurchaseUnit}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Cost price</Label>
+            <Label>Cost price *</Label>
             <Input
               value={form.costPrice}
+              aria-invalid={Boolean(fieldErrors.costPrice)}
               onChange={(e) => setField("costPrice", e.target.value)}
             />
+            {fieldErrors.costPrice ? (
+              <p className="text-destructive text-xs">{fieldErrors.costPrice}</p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Selling price</Label>
+            <Label>Selling price *</Label>
             <Input
               value={form.sellingPrice}
+              aria-invalid={Boolean(fieldErrors.sellingPrice)}
               onChange={(e) => setField("sellingPrice", e.target.value)}
             />
+            {fieldErrors.sellingPrice ? (
+              <p className="text-destructive text-xs">
+                {fieldErrors.sellingPrice}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
             <Label>Reorder level</Label>
@@ -307,7 +440,11 @@ export function AddProductSkuDialog({
           >
             Cancel
           </Button>
-          <Button type="button" disabled={saving} onClick={() => void onSave()}>
+          <Button
+            type="button"
+            disabled={saving || !canSave}
+            onClick={() => void onSave()}
+          >
             {saving ? "Saving…" : "Add SKU"}
           </Button>
         </DialogFooter>

@@ -17,6 +17,7 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { skusApi } from "@renderer/lib/api/skus";
+import { loadSkuProfile } from "@renderer/lib/local-db/entity-source";
 import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
 
@@ -49,14 +50,10 @@ export function SkuProfilePage() {
 
   async function reload() {
     if (!id) return;
-    const [detail, vendors, stock] = await Promise.all([
-      skusApi.get(id),
-      skusApi.listVendors(id),
-      skusApi.listInventory(id),
-    ]);
-    setSku(detail);
-    setSuppliers(vendors);
-    setInventory(stock);
+    const data = await loadSkuProfile(id);
+    setSku(data.sku);
+    setSuppliers(data.suppliers);
+    setInventory(data.inventory);
   }
 
   useEffect(() => {
@@ -96,8 +93,36 @@ export function SkuProfilePage() {
     setEditOpen(true);
   }
 
+  const unitsPerPurchaseUnitN = Number(unitsPerPurchaseUnit);
+  const costPriceN = Number(costPrice);
+  const sellingPriceN = Number(sellingPrice);
+  const baseUnitError = baseUnitId ? null : "Base unit is required";
+  const purchaseUnitError = purchaseUnitId ? null : "Purchase unit is required";
+  const unitsPerError =
+    !unitsPerPurchaseUnit.trim() ||
+    Number.isNaN(unitsPerPurchaseUnitN) ||
+    unitsPerPurchaseUnitN <= 0
+      ? "Units / purchase unit must be greater than zero"
+      : null;
+  const costError =
+    !costPrice.trim() || Number.isNaN(costPriceN) || costPriceN < 0
+      ? "Cost price is required"
+      : null;
+  const sellingError =
+    !sellingPrice.trim() || Number.isNaN(sellingPriceN) || sellingPriceN < 0
+      ? "Selling price is required"
+      : null;
+  const canSaveEdit =
+    Boolean(variantName.trim()) &&
+    Boolean(skuCode.trim()) &&
+    !baseUnitError &&
+    !purchaseUnitError &&
+    !unitsPerError &&
+    !costError &&
+    !sellingError;
+
   async function onSaveEdit() {
-    if (!id) return;
+    if (!id || !canSaveEdit) return;
     setSaving(true);
     setFormError(null);
     try {
@@ -107,11 +132,11 @@ export function SkuProfilePage() {
         barcode: barcode.trim() || null,
         sizeValue: sizeValue.trim() || null,
         sizeUnit: sizeUnit.trim() || null,
-        baseUnitId: baseUnitId || null,
-        purchaseUnitId: purchaseUnitId || null,
-        unitsPerPurchaseUnit: Number(unitsPerPurchaseUnit),
-        costPrice: Number(costPrice),
-        sellingPrice: Number(sellingPrice),
+        baseUnitId,
+        purchaseUnitId,
+        unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
+        costPrice: costPriceN,
+        sellingPrice: sellingPriceN,
         reorderLevel: Number(reorderLevel),
         minimumStockLevel: Number(minimumStockLevel),
         maximumStockLevel:
@@ -401,10 +426,11 @@ export function SkuProfilePage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Base unit</Label>
+              <Label>Base unit *</Label>
               <select
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
                 value={baseUnitId}
+                aria-invalid={Boolean(baseUnitError)}
                 onChange={(e) => setBaseUnitId(e.target.value)}
               >
                 <option value="">—</option>
@@ -414,12 +440,16 @@ export function SkuProfilePage() {
                   </option>
                 ))}
               </select>
+              {baseUnitError ? (
+                <p className="text-destructive text-xs">{baseUnitError}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Purchase unit</Label>
+              <Label>Purchase unit *</Label>
               <select
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
                 value={purchaseUnitId}
+                aria-invalid={Boolean(purchaseUnitError)}
                 onChange={(e) => setPurchaseUnitId(e.target.value)}
               >
                 <option value="">—</option>
@@ -429,27 +459,42 @@ export function SkuProfilePage() {
                   </option>
                 ))}
               </select>
+              {purchaseUnitError ? (
+                <p className="text-destructive text-xs">{purchaseUnitError}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Units / purchase</Label>
+              <Label>Units / purchase *</Label>
               <Input
                 value={unitsPerPurchaseUnit}
+                aria-invalid={Boolean(unitsPerError)}
                 onChange={(e) => setUnitsPerPurchaseUnit(e.target.value)}
               />
+              {unitsPerError ? (
+                <p className="text-destructive text-xs">{unitsPerError}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Cost</Label>
+              <Label>Cost *</Label>
               <Input
                 value={costPrice}
+                aria-invalid={Boolean(costError)}
                 onChange={(e) => setCostPrice(e.target.value)}
               />
+              {costError ? (
+                <p className="text-destructive text-xs">{costError}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Selling</Label>
+              <Label>Selling *</Label>
               <Input
                 value={sellingPrice}
+                aria-invalid={Boolean(sellingError)}
                 onChange={(e) => setSellingPrice(e.target.value)}
               />
+              {sellingError ? (
+                <p className="text-destructive text-xs">{sellingError}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label>Reorder</Label>
@@ -492,7 +537,7 @@ export function SkuProfilePage() {
             </Button>
             <Button
               type="button"
-              disabled={saving}
+              disabled={saving || !canSaveEdit}
               onClick={() => void onSaveEdit()}
             >
               {saving ? "Saving…" : "Save"}

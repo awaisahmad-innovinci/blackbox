@@ -64,12 +64,29 @@ import {
   upsertVendorsLocal,
 } from "./db/vendors-local";
 import {
+  getGoodsReceiptLocal,
+  getInventoryOutLocal,
+  getProductLocal,
+  getProductProfileLocal,
+  getPurchaseOrderLocal,
+  getReceivingDraftLocal,
+  getSkuLocal,
+  getSkuProfileLocal,
+  getSkuByBarcodeLocal,
+  searchSkusLocal,
+  listInventoryInOutReportLocal,
+  getVendorLocal,
+  getVendorProfileLocal,
+  listVendorSkusLocal,
+} from "./db/entity-get-local";
+import {
   getDashboardSummaryLocal,
   listBrandsLocal,
   listCategoriesLocal,
   listProductsLocal,
   listPurchaseOrdersLocal,
   listVendorGroupsLocal,
+  listUnitsLocal,
   listVendorsLocal,
   listWarehousesLocal,
 } from "./db/queries-local";
@@ -299,6 +316,64 @@ function registerIpc(): void {
     (_event, status?: EntityStatus | "all") => listVendorGroupsLocal(status),
   );
   ipcMain.handle("localDb:listWarehouses", () => listWarehousesLocal());
+  ipcMain.handle("localDb:listUnits", () => listUnitsLocal());
+  ipcMain.handle("localDb:getProduct", (_event, id: string) =>
+    getProductLocal(id),
+  );
+  ipcMain.handle("localDb:getProductProfile", (_event, id: string) =>
+    getProductProfileLocal(id),
+  );
+  ipcMain.handle("localDb:getVendor", (_event, id: string) =>
+    getVendorLocal(id),
+  );
+  ipcMain.handle("localDb:getVendorProfile", (_event, id: string) =>
+    getVendorProfileLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:listVendorSkus",
+    (
+      _event,
+      vendorId: string,
+      q?: string,
+      warehouseId?: string,
+    ) =>
+      listVendorSkusLocal(vendorId, {
+        q,
+        warehouseId,
+        activeOnly: true,
+      }),
+  );
+  ipcMain.handle("localDb:getSku", (_event, id: string) => getSkuLocal(id));
+  ipcMain.handle("localDb:getSkuProfile", (_event, id: string) =>
+    getSkuProfileLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:searchSkus",
+    (_event, q?: string, warehouseId?: string) =>
+      searchSkusLocal(q, warehouseId),
+  );
+  ipcMain.handle(
+    "localDb:getSkuByBarcode",
+    (_event, barcode: string, warehouseId: string) =>
+      getSkuByBarcodeLocal(barcode, warehouseId),
+  );
+  ipcMain.handle("localDb:getPurchaseOrder", (_event, id: string) =>
+    getPurchaseOrderLocal(id),
+  );
+  ipcMain.handle("localDb:getReceivingDraft", (_event, poId: string) =>
+    getReceivingDraftLocal(poId),
+  );
+  ipcMain.handle("localDb:getGoodsReceipt", (_event, id: string) =>
+    getGoodsReceiptLocal(id),
+  );
+  ipcMain.handle("localDb:getInventoryOut", (_event, id: string) =>
+    getInventoryOutLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:inventoryInOutReport",
+    (_event, dateFrom: string, dateTo: string) =>
+      listInventoryInOutReportLocal(dateFrom, dateTo),
+  );
 
   ipcMain.handle("identity:getFingerprint", () => getOrCreateFingerprint());
   ipcMain.handle("identity:get", () => readIdentity());

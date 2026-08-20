@@ -35,6 +35,7 @@ import { upsertVendorLocal, upsertVendorSkuLocal } from "./vendors-local";
 import { upsertPurchaseOrderLocal } from "./purchase-orders-local";
 import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
+import { getPurchaseOrderLocal } from "./entity-get-local";
 
 export function applyPullBatch(
   changes: SyncChangeDto[],
@@ -215,26 +216,37 @@ export function applyChange(change: SyncChangeDto): void {
     return;
   }
   if (change.entityType === "purchase_order") {
+    const existing = getPurchaseOrderLocal(change.entityId);
+    const items = Array.isArray(p.items)
+      ? (p.items as PurchaseOrderDetail["items"])
+      : (existing?.items ?? []);
     upsertPurchaseOrderLocal({
       id: change.entityId,
-      poNumber: str(p.poNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
-      vendorId: str(p.vendorId),
-      vendorName: str(p.vendorName),
-      warehouseId: str(p.warehouseId),
-      warehouseName: str(p.warehouseName),
-      status: str(p.status, "DRAFT") as PurchaseOrderDetail["status"],
-      orderDate: str(p.orderDate, now.slice(0, 10)),
-      expectedDate: (p.expectedDate as string | null) ?? null,
-      subtotal: Number(p.subtotal ?? 0),
-      discount: Number(p.discount ?? 0),
-      tax: Number(p.tax ?? 0),
-      otherCharges: Number(p.otherCharges ?? 0),
-      total: Number(p.total ?? 0),
-      notes: str(p.notes),
-      items: Array.isArray(p.items)
-        ? (p.items as PurchaseOrderDetail["items"])
-        : [],
-      createdAt: str(p.createdAt, now),
+      poNumber: str(
+        p.poNumber,
+        existing?.poNumber ?? `LOCAL-${change.entityId.slice(0, 8)}`,
+      ),
+      vendorId: str(p.vendorId, existing?.vendorId ?? ""),
+      vendorName: str(p.vendorName, existing?.vendorName ?? ""),
+      warehouseId: str(p.warehouseId, existing?.warehouseId ?? ""),
+      warehouseName: str(p.warehouseName, existing?.warehouseName ?? ""),
+      status: str(
+        p.status,
+        existing?.status ?? "DRAFT",
+      ) as PurchaseOrderDetail["status"],
+      orderDate: str(p.orderDate, existing?.orderDate ?? now.slice(0, 10)),
+      expectedDate:
+        p.expectedDate !== undefined
+          ? ((p.expectedDate as string | null) ?? null)
+          : (existing?.expectedDate ?? null),
+      subtotal: Number(p.subtotal ?? existing?.subtotal ?? 0),
+      discount: Number(p.discount ?? existing?.discount ?? 0),
+      tax: Number(p.tax ?? existing?.tax ?? 0),
+      otherCharges: Number(p.otherCharges ?? existing?.otherCharges ?? 0),
+      total: Number(p.total ?? existing?.total ?? 0),
+      notes: p.notes != null ? str(p.notes) : (existing?.notes ?? ""),
+      items,
+      createdAt: str(p.createdAt, existing?.createdAt ?? now),
       updatedAt: str(p.updatedAt, now),
     });
     return;

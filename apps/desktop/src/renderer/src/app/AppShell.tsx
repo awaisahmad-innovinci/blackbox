@@ -97,6 +97,11 @@ export function AppShell() {
                 <DropdownMenuItem onSelect={() => navigate("/inventory/out")}>
                   Inventory Out
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => navigate("/inventory/reports")}
+                >
+                  In / out report
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <DropdownMenu>

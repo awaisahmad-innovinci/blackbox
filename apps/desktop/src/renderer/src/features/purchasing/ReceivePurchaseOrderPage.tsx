@@ -14,6 +14,7 @@ import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { loadReceivingDraft } from "@renderer/lib/local-db/entity-source";
 import { UpdateVendorSkuPriceDialog } from "./UpdateVendorSkuPriceDialog";
 
 type DraftLine = ReceivingLineDraft & {
@@ -55,8 +56,7 @@ export function ReceivePurchaseOrderPage() {
     if (!id) return;
     let cancelled = false;
     setLoading(true);
-    void goodsReceiptsApi
-      .getReceiving(id)
+    void loadReceivingDraft(id)
       .then((draft) => {
         if (cancelled) return;
         const { items, ...rest } = draft;
@@ -301,7 +301,13 @@ export function ReceivePurchaseOrderPage() {
           </div>
         </dl>
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => navigate(`/goods-receipts/${success.id}`)}>
+          <Button
+            onClick={() =>
+              navigate(`/goods-receipts/${success.id}`, {
+                state: { receipt: success },
+              })
+            }
+          >
             View Receipt
           </Button>
           <Button

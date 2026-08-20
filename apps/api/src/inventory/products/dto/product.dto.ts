@@ -75,9 +75,9 @@ export class CreateProductSkuDto {
   @MinLength(1)
   variantName!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  sku!: string;
+  sku?: string;
 
   @IsOptional()
   @IsString()
@@ -91,33 +91,26 @@ export class CreateProductSkuDto {
   @IsString()
   sizeUnit?: string | null;
 
-  @IsOptional()
-  @ValidateIf((_, v) => v != null && v !== "")
   @IsUUID()
-  baseUnitId?: string | null;
+  baseUnitId!: string;
 
-  @IsOptional()
-  @ValidateIf((_, v) => v != null && v !== "")
   @IsUUID()
-  purchaseUnitId?: string | null;
+  purchaseUnitId!: string;
 
-  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.0001)
+  unitsPerPurchaseUnit!: number;
+
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  unitsPerPurchaseUnit?: number;
+  costPrice!: number;
 
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  costPrice?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  sellingPrice?: number;
+  sellingPrice!: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -147,4 +140,8 @@ export class CreateProductSkuDto {
   status?: (typeof ENTITY_STATUSES)[number];
 }
 
-export class UpdateProductSkuDto extends CreateProductSkuDto {}
+export class UpdateProductSkuDto extends CreateProductSkuDto {
+  @IsString()
+  @MinLength(1)
+  sku!: string;
+}

@@ -11,13 +11,15 @@ import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Skeleton } from "@blackbox/ui/skeleton";
 import { ApiError } from "@renderer/lib/api/client";
-import { brandsApi } from "@renderer/lib/api/brands";
-import { categoriesApi } from "@renderer/lib/api/categories";
 import { productsApi } from "@renderer/lib/api/products";
 import {
   resolveDataSourceMode,
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
+import {
+  loadBrands,
+  loadCategories,
+} from "@renderer/lib/local-db/entity-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 
 export function ProductsListPage() {
@@ -41,13 +43,8 @@ export function ProductsListPage() {
       if (cancelled) return;
       setDataSource(mode);
       try {
-        if (mode === "local" && window.blackbox?.localDb?.listBrands) {
-          setBrands(await window.blackbox.localDb.listBrands());
-          setCategories(await window.blackbox.localDb.listCategories!());
-        } else {
-          setBrands(await brandsApi.list());
-          setCategories(await categoriesApi.list());
-        }
+        setBrands(await loadBrands("active"));
+        setCategories(await loadCategories("active"));
       } catch {
         /* filters optional */
       }

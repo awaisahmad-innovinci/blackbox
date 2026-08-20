@@ -1,33 +1,41 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { InventoryOutDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+import { loadInventoryOut } from "@renderer/lib/local-db/entity-source";
 
 export function InventoryOutDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<InventoryOutDetail | null>(null);
+  const location = useLocation();
+  const seeded = (
+    location.state as { detail?: InventoryOutDetail } | null
+  )?.detail;
+  const [detail, setDetail] = useState<InventoryOutDetail | null>(
+    seeded ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    void inventoryOutApi
-      .get(id)
+    void loadInventoryOut(id)
       .then((row) => {
-        if (!cancelled) setDetail(row);
+        if (!cancelled) {
+          setDetail(row);
+          setError(null);
+        }
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && !seeded) {
           setError(getApiErrorMessage(err, "Failed to load inventory out"));
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, seeded]);
 
   if (error && !detail) {
     return (

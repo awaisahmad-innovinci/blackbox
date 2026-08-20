@@ -5,8 +5,7 @@ import { PAYMENT_TERMS_LABELS } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { BackButton } from "@renderer/app/BackButton";
 import { ApiError } from "@renderer/lib/api/client";
-import { vendorsApi } from "@renderer/lib/api/vendors";
-import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
+import { loadVendorProfile } from "@renderer/lib/local-db/entity-source";
 
 function contactBlock(
   detail: VendorDetail,
@@ -28,8 +27,12 @@ export function VendorProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const flash = (location.state as { flash?: string } | null)?.flash;
-  const [vendor, setVendor] = useState<VendorDetail | null>(null);
+  const flash = (location.state as { flash?: string; vendor?: VendorDetail } | null)
+    ?.flash;
+  const seeded = (
+    location.state as { vendor?: VendorDetail } | null
+  )?.vendor;
+  const [vendor, setVendor] = useState<VendorDetail | null>(seeded ?? null);
   const [skus, setSkus] = useState<VendorSku[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(flash ?? null);
@@ -38,12 +41,9 @@ export function VendorProfilePage() {
     if (!id) return;
     setError(null);
     try {
-      const [v, s] = await Promise.all([
-        vendorsApi.get(id),
-        vendorSkusApi.listByVendor(id),
-      ]);
-      setVendor(v);
-      setSkus(s);
+      const data = await loadVendorProfile(id);
+      setVendor(data.vendor);
+      setSkus(data.skus);
     } catch (err: unknown) {
       setError(err instanceof ApiError ? err.message : "Failed to load vendor");
     }

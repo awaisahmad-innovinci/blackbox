@@ -7,20 +7,32 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Min,
   MinLength,
   ValidateIf,
   ValidateNested,
 } from "class-validator";
-import { ENTITY_STATUSES, PAYMENT_TERMS } from "@blackbox/shared";
+import {
+  ENTITY_STATUSES,
+  PAYMENT_TERMS,
+  PERSON_NAME_MESSAGE,
+  PERSON_NAME_PATTERN,
+  PHONE_11_DIGIT_MESSAGE,
+  PHONE_11_DIGIT_PATTERN,
+} from "@blackbox/shared";
 
 export class VendorContactInputDto {
   @IsOptional()
+  @ValidateIf((_, v) => v != null && String(v).trim() !== "")
   @IsString()
+  @Matches(PERSON_NAME_PATTERN, { message: PERSON_NAME_MESSAGE })
   name?: string | null;
 
   @IsOptional()
+  @ValidateIf((_, v) => v != null && String(v).trim() !== "")
   @IsString()
+  @Matches(PHONE_11_DIGIT_PATTERN, { message: PHONE_11_DIGIT_MESSAGE })
   phone?: string | null;
 
   @IsOptional()
@@ -31,11 +43,11 @@ export class VendorContactInputDto {
 
 export class RequiredVendorContactInputDto {
   @IsString()
-  @MinLength(1, { message: "contact name is required" })
+  @Matches(PERSON_NAME_PATTERN, { message: PERSON_NAME_MESSAGE })
   name!: string;
 
   @IsString()
-  @MinLength(1, { message: "contact phone is required" })
+  @Matches(PHONE_11_DIGIT_PATTERN, { message: PHONE_11_DIGIT_MESSAGE })
   phone!: string;
 
   @IsOptional()

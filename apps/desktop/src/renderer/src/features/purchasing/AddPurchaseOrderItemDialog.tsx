@@ -10,7 +10,7 @@ import {
 } from "@blackbox/ui/dialog";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
+import { loadVendorSkus } from "@renderer/lib/local-db/entity-source";
 
 export type DraftPoLine = {
   productSkuId: string;
@@ -68,8 +68,7 @@ export function AddPurchaseOrderItemDialog({
   useEffect(() => {
     if (!open || !vendorId || !warehouseId) return;
     const t = setTimeout(() => {
-      void vendorSkusApi
-        .listByVendor(vendorId, query, warehouseId)
+      void loadVendorSkus(vendorId, query, warehouseId)
         .then(setResults)
         .catch(() => setResults([]));
     }, 200);
@@ -92,7 +91,6 @@ export function AddPurchaseOrderItemDialog({
     const chosen = results.filter(
       (r) =>
         selectedIds.includes(r.id) &&
-        (r.quantityAvailable ?? 0) >= 1 &&
         !existingSkuIds.includes(r.productSkuId),
     );
     if (chosen.length === 0) return;
@@ -138,14 +136,12 @@ export function AddPurchaseOrderItemDialog({
             ) : (
               results.map((r) => {
                 const added = existingSkuIds.includes(r.productSkuId);
-                const unavailable = (r.quantityAvailable ?? 0) < 1;
-                const disabled = added || unavailable;
                 const checked = selectedIds.includes(r.id);
                 return (
                   <li key={r.id}>
                     <label
                       className={
-                        disabled
+                        added
                           ? "flex cursor-not-allowed items-start gap-3 px-3 py-2 text-sm opacity-60"
                           : "hover:bg-muted/50 flex cursor-pointer items-start gap-3 px-3 py-2 text-sm"
                       }
@@ -154,7 +150,7 @@ export function AddPurchaseOrderItemDialog({
                         type="checkbox"
                         className="mt-1"
                         checked={checked}
-                        disabled={disabled}
+                        disabled={added}
                         onChange={() => toggle(r.id)}
                       />
                       <span className="flex-1">
@@ -162,10 +158,6 @@ export function AddPurchaseOrderItemDialog({
                         {added ? (
                           <span className="text-muted-foreground ml-2 text-xs">
                             Added
-                          </span>
-                        ) : unavailable ? (
-                          <span className="text-destructive ml-2 text-xs">
-                            Unavailable
                           </span>
                         ) : null}
                         <span className="text-muted-foreground block">

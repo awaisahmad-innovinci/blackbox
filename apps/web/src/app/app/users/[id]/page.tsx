@@ -16,7 +16,7 @@ import { LoadingState, PageError } from "@/components/page-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ActiveBadge } from "@/components/status-badges";
 import {
-  FieldHint,
+  FieldStatus,
   FormError,
   FormSuccess,
   SectionCard,
@@ -31,6 +31,15 @@ import {
   type UserDto,
 } from "@/lib/admin-api";
 import { toCreateUserFacingError, toUserFacingError } from "@/lib/api-error";
+import {
+  emailError,
+  liveEmailError,
+  livePasswordError,
+  livePersonNameError,
+  liveUsernameError,
+  personNameError,
+  usernameError,
+} from "@blackbox/shared";
 
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -44,6 +53,24 @@ export default function UserDetailPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [profile, setProfile] = useState({
+    fullName: "",
+    email: "",
+    username: "",
+    password: "",
+  });
+  const [profileAttempted, setProfileAttempted] = useState(false);
+
+  const nameErr = profileAttempted
+    ? personNameError(profile.fullName)
+    : livePersonNameError(profile.fullName);
+  const mailErr = profileAttempted
+    ? emailError(profile.email)
+    : liveEmailError(profile.email);
+  const userErr = profileAttempted
+    ? usernameError(profile.username)
+    : liveUsernameError(profile.username);
+  const passwordErr = livePasswordError(profile.password);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +83,13 @@ export default function UserDetailPage() {
       setUser(u);
       setRoles(r);
       setSelectedRoles(u.roleIds);
+      setProfile({
+        fullName: u.fullName,
+        email: u.email,
+        username: u.username,
+        password: "",
+      });
+      setProfileAttempted(false);
     } catch (err) {
       setError(err);
     } finally {
@@ -70,19 +104,38 @@ export default function UserDetailPage() {
   async function onSaveProfile(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!user) return;
+    setProfileAttempted(true);
+    const fullName = profile.fullName;
+    const email = profile.email;
+    const username = profile.username;
+    const password = profile.password;
+
+    if (
+      personNameError(fullName) ||
+      emailError(email) ||
+      usernameError(username) ||
+      (password && password.length < 8)
+    ) {
+      return;
+    }
+
     setBusy(true);
     setSuccess(null);
     setFormError(null);
-    const form = new FormData(e.currentTarget);
-    const password = String(form.get("password") ?? "");
     try {
       const updated = await updateUser(user.id, {
-        fullName: String(form.get("fullName") ?? ""),
-        email: String(form.get("email") ?? ""),
-        username: String(form.get("username") ?? ""),
+        fullName: fullName.trim(),
+        email: email.trim(),
+        username: username.trim(),
         ...(password ? { password } : {}),
       });
       setUser(updated);
+      setProfile({
+        fullName: updated.fullName,
+        email: updated.email,
+        username: updated.username,
+        password: "",
+      });
       setSuccess("Profile saved.");
     } catch (err) {
       setFormError(toCreateUserFacingError(err));
@@ -161,8 +214,16 @@ export default function UserDetailPage() {
                     <Input
                       id="fullName"
                       name="fullName"
-                      defaultValue={user.fullName}
+                      value={profile.fullName}
                       required
+                      aria-invalid={Boolean(nameErr)}
+                      onChange={(e) =>
+                        setProfile((p) => ({ ...p, fullName: e.target.value }))
+                      }
+                    />
+                    <FieldStatus
+                      error={nameErr}
+                      hint="Letters only, with spaces between words."
                     />
                   </div>
                   <div className="space-y-2">
@@ -171,18 +232,31 @@ export default function UserDetailPage() {
                       id="email"
                       name="email"
                       type="email"
-                      defaultValue={user.email}
+                      value={profile.email}
                       required
+                      aria-invalid={Boolean(mailErr)}
+                      onChange={(e) =>
+                        setProfile((p) => ({ ...p, email: e.target.value }))
+                      }
                     />
+                    <FieldStatus error={mailErr} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
                     <Input
                       id="username"
                       name="username"
-                      defaultValue={user.username}
+                      value={profile.username}
                       required
                       minLength={3}
+                      aria-invalid={Boolean(userErr)}
+                      onChange={(e) =>
+                        setProfile((p) => ({ ...p, username: e.target.value }))
+                      }
+                    />
+                    <FieldStatus
+                      error={userErr}
+                      hint="Letters, numbers, and special characters. No spaces."
                     />
                   </div>
                   <div className="space-y-2">
@@ -192,8 +266,16 @@ export default function UserDetailPage() {
                       name="password"
                       minLength={8}
                       placeholder="Leave blank to keep current"
+                      value={profile.password}
+                      aria-invalid={Boolean(passwordErr)}
+                      onChange={(e) =>
+                        setProfile((p) => ({ ...p, password: e.target.value }))
+                      }
                     />
-                    <FieldHint>Optional. Minimum 8 characters if set.</FieldHint>
+                    <FieldStatus
+                      error={passwordErr}
+                      hint="Optional. Minimum 8 characters if set."
+                    />
                   </div>
                   <Button type="submit" disabled={busy}>
                     {busy ? (

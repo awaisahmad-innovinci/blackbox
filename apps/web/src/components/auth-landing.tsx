@@ -16,9 +16,18 @@ import { Label } from "@blackbox/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@blackbox/ui/tabs";
 import { useAuth } from "@/components/auth-provider";
 import { PasswordInput } from "@/components/password-input";
-import { FormError, FieldHint } from "@/components/section-card";
+import { FieldStatus, FormError } from "@/components/section-card";
 import { toUserFacingError } from "@/lib/api-error";
 import { resolvePostAuthPath } from "@/lib/onboarding";
+import {
+  emailError,
+  liveEmailError,
+  livePasswordError,
+  livePersonNameError,
+  liveUsernameError,
+  personNameError,
+  usernameError,
+} from "@blackbox/shared";
 
 export function AuthLanding() {
   const { login, signup, status, hasPermission } = useAuth();
@@ -26,6 +35,28 @@ export function AuthLanding() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("login");
+  const [signupFields, setSignupFields] = useState({
+    fullName: "",
+    email: "",
+    username: "",
+    password: "",
+  });
+  const [signupAttempted, setSignupAttempted] = useState(false);
+
+  const signupNameErr = signupAttempted
+    ? personNameError(signupFields.fullName)
+    : livePersonNameError(signupFields.fullName);
+  const signupEmailErr = signupAttempted
+    ? emailError(signupFields.email)
+    : liveEmailError(signupFields.email);
+  const signupUsernameErr = signupAttempted
+    ? usernameError(signupFields.username)
+    : liveUsernameError(signupFields.username);
+  const signupPasswordErr = signupAttempted
+    ? signupFields.password.length < 8
+      ? "Password must be at least 8 characters"
+      : null
+    : livePasswordError(signupFields.password);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -75,15 +106,30 @@ export function AuthLanding() {
   async function onSignup(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setSignupAttempted(true);
     const form = new FormData(e.currentTarget);
+    const fullName = signupFields.fullName;
+    const email = signupFields.email;
+    const username = signupFields.username;
+    const password = signupFields.password;
+
+    if (
+      personNameError(fullName) ||
+      emailError(email) ||
+      usernameError(username) ||
+      password.length < 8
+    ) {
+      return;
+    }
+
+    setLoading(true);
     try {
       const authed = await signup({
         businessName: String(form.get("businessName") ?? ""),
-        fullName: String(form.get("fullName") ?? ""),
-        email: String(form.get("email") ?? ""),
-        username: String(form.get("username") ?? ""),
-        password: String(form.get("password") ?? ""),
+        fullName: fullName.trim(),
+        email: email.trim(),
+        username: username.trim(),
+        password,
       });
       const path = await resolvePostAuthPath(
         authed.permissions.includes("tenant.settings.read"),
@@ -253,6 +299,18 @@ export function AuthLanding() {
                         required
                         placeholder="Alex Morgan"
                         autoComplete="name"
+                        value={signupFields.fullName}
+                        aria-invalid={Boolean(signupNameErr)}
+                        onChange={(e) =>
+                          setSignupFields((s) => ({
+                            ...s,
+                            fullName: e.target.value,
+                          }))
+                        }
+                      />
+                      <FieldStatus
+                        error={signupNameErr}
+                        hint="Letters only, with spaces between words."
                       />
                     </div>
                     <div className="space-y-2">
@@ -264,7 +322,16 @@ export function AuthLanding() {
                         required
                         autoComplete="email"
                         placeholder="you@business.com"
+                        value={signupFields.email}
+                        aria-invalid={Boolean(signupEmailErr)}
+                        onChange={(e) =>
+                          setSignupFields((s) => ({
+                            ...s,
+                            email: e.target.value,
+                          }))
+                        }
                       />
+                      <FieldStatus error={signupEmailErr} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-username">Username</Label>
@@ -276,10 +343,19 @@ export function AuthLanding() {
                         minLength={3}
                         autoComplete="username"
                         placeholder="alex"
+                        value={signupFields.username}
+                        aria-invalid={Boolean(signupUsernameErr)}
+                        onChange={(e) =>
+                          setSignupFields((s) => ({
+                            ...s,
+                            username: e.target.value,
+                          }))
+                        }
                       />
-                      <FieldHint>
-                        Letters, numbers, dots, underscores, and hyphens.
-                      </FieldHint>
+                      <FieldStatus
+                        error={signupUsernameErr}
+                        hint="Letters, numbers, and special characters. No spaces. Min 3 characters."
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-password">Password</Label>
@@ -290,8 +366,19 @@ export function AuthLanding() {
                         minLength={8}
                         autoComplete="new-password"
                         placeholder="At least 8 characters"
+                        value={signupFields.password}
+                        aria-invalid={Boolean(signupPasswordErr)}
+                        onChange={(e) =>
+                          setSignupFields((s) => ({
+                            ...s,
+                            password: e.target.value,
+                          }))
+                        }
                       />
-                      <FieldHint>Use at least 8 characters.</FieldHint>
+                      <FieldStatus
+                        error={signupPasswordErr}
+                        hint="Use at least 8 characters."
+                      />
                     </div>
                   </div>
 

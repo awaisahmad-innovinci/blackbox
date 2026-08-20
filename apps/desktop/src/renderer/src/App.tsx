@@ -9,6 +9,7 @@ import { BrandsListPage } from "./features/brands/BrandsListPage";
 import { CategoriesListPage } from "./features/categories/CategoriesListPage";
 import { CategoryFormPage } from "./features/categories/CategoryFormPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { InventoryInOutReportPage } from "./features/inventory/InventoryInOutReportPage";
 import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
 import { InventoryOutPage } from "./features/inventory/InventoryOutPage";
 import { ProductFormPage } from "./features/products/ProductFormPage";
@@ -75,6 +76,10 @@ function AuthenticatedApp() {
             element={<VendorGroupFormPage />}
           />
           <Route path="skus/:id" element={<SkuProfilePage />} />
+          <Route
+            path="inventory/reports"
+            element={<InventoryInOutReportPage />}
+          />
           <Route path="inventory/out" element={<InventoryOutPage />} />
           <Route
             path="inventory/out/:id"

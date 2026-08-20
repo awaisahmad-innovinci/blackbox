@@ -19,7 +19,7 @@ import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { unitsApi } from "@renderer/lib/api/units";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
-import { vendorsApi } from "@renderer/lib/api/vendors";
+import { loadVendors } from "@renderer/lib/local-db/entity-source";
 
 function packagingFromSku(sku: ProductSkuDetail | undefined) {
   return {
@@ -83,8 +83,10 @@ export function AddProductSupplierDialog({
   useEffect(() => {
     if (!open || selectedVendor) return;
     const t = setTimeout(() => {
-      void vendorsApi
-        .list({ search: vendorQuery.trim() || undefined, status: "active" })
+      void loadVendors({
+        search: vendorQuery.trim() || undefined,
+        status: "active",
+      })
         .then((res) => setVendors(res.items))
         .catch(() => setVendors([]));
     }, 200);

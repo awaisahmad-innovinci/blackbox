@@ -10,7 +10,7 @@ import {
 } from "@blackbox/ui/dialog";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { skusApi } from "@renderer/lib/api/skus";
+import { loadSkuSearch } from "@renderer/lib/local-db/entity-source";
 
 export type DraftOutLine = {
   productSkuId: string;
@@ -23,84 +23,72 @@ export type DraftOutLine = {
   costPrice: number;
 };
 
+export function toDraftOutLine(row: SkuSearchResult): DraftOutLine {
+  return {
+    productSkuId: row.id,
+    productName: row.productName,
+    variantName: row.variantName,
+    sku: row.sku,
+    barcode: row.barcode,
+    quantity: 0,
+    quantityAvailable: row.quantityAvailable ?? 0,
+    costPrice: row.costPrice ?? 0,
+  };
+}
+
 export function AddInventoryOutItemDialog({
   open,
   warehouseId,
   existingSkuIds,
   onClose,
-  onAdd,
+  onAddMany,
 }: {
   open: boolean;
   warehouseId: string;
   existingSkuIds: string[];
   onClose: () => void;
-  onAdd: (line: DraftOutLine) => void;
+  onAddMany: (lines: DraftOutLine[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SkuSearchResult[]>([]);
-  const [selected, setSelected] = useState<SkuSearchResult | null>(null);
-  const [quantity, setQuantity] = useState("1");
-  const [error, setError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!open || !warehouseId || selected) return;
+    if (!open || !warehouseId) return;
     const t = setTimeout(() => {
-      void skusApi
-        .search(query, warehouseId)
+      void loadSkuSearch(query, warehouseId)
         .then(setResults)
         .catch(() => setResults([]));
     }, 200);
     return () => clearTimeout(t);
-  }, [query, open, warehouseId, selected]);
+  }, [query, open, warehouseId]);
 
   function reset() {
     setQuery("");
     setResults([]);
-    setSelected(null);
-    setQuantity("1");
-    setError(null);
+    setSelectedIds([]);
   }
 
-  function onSelect(row: SkuSearchResult) {
-    if (existingSkuIds.includes(row.id)) {
-      setError("This SKU is already on the list. Edit the existing line.");
-      return;
-    }
-    const available = row.quantityAvailable ?? 0;
-    if (available <= 0) {
-      setError("No available quantity for this SKU in the selected warehouse.");
-      return;
-    }
-    setSelected(row);
-    setQuantity("1");
-    setError(null);
+  function isUnavailable(row: SkuSearchResult): boolean {
+    return (row.quantityAvailable ?? 0) <= 0;
+  }
+
+  function isDisabled(row: SkuSearchResult): boolean {
+    return existingSkuIds.includes(row.id) || isUnavailable(row);
+  }
+
+  function toggle(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   }
 
   function onConfirm() {
-    if (!selected) {
-      setError("Select an SKU");
-      return;
-    }
-    const qty = Number(quantity);
-    const available = selected.quantityAvailable ?? 0;
-    if (Number.isNaN(qty) || qty <= 0) {
-      setError("Quantity must be greater than zero");
-      return;
-    }
-    if (qty > available) {
-      setError(`Quantity cannot exceed available (${available})`);
-      return;
-    }
-    onAdd({
-      productSkuId: selected.id,
-      productName: selected.productName,
-      variantName: selected.variantName,
-      sku: selected.sku,
-      barcode: selected.barcode,
-      quantity: qty,
-      quantityAvailable: available,
-      costPrice: selected.costPrice ?? 0,
-    });
+    const chosen = results.filter(
+      (r) => selectedIds.includes(r.id) && !isDisabled(r),
+    );
+    if (chosen.length === 0) return;
+    onAddMany(chosen.map(toDraftOutLine));
     reset();
   }
 
@@ -116,84 +104,79 @@ export function AddInventoryOutItemDialog({
     >
       <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add SKU</DialogTitle>
+          <DialogTitle>Add SKUs</DialogTitle>
         </DialogHeader>
 
-        {error ? (
-          <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
-            {error}
-          </div>
-        ) : null}
+        <p className="text-muted-foreground text-sm">
+          Select one or more SKUs with available stock. They are added with
+          quantity 0 — enter quantities in the bill table.
+        </p>
 
-        {!selected ? (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Search product / SKU</Label>
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search…"
-                autoFocus
-              />
-            </div>
-            <ul className="border-border max-h-56 divide-y overflow-y-auto rounded-md border">
-              {results.length === 0 ? (
-                <li className="text-muted-foreground px-3 py-4 text-sm">
-                  No matching SKUs.
-                </li>
-              ) : (
-                results.map((r) => (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Search product / SKU</Label>
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search…"
+              autoFocus
+            />
+          </div>
+          <ul className="border-border max-h-72 divide-y overflow-y-auto rounded-md border">
+            {results.length === 0 ? (
+              <li className="text-muted-foreground px-3 py-4 text-sm">
+                No matching SKUs.
+              </li>
+            ) : (
+              results.map((r) => {
+                const added = existingSkuIds.includes(r.id);
+                const unavailable = isUnavailable(r);
+                const disabled = added || unavailable;
+                const checked = selectedIds.includes(r.id);
+                return (
                   <li key={r.id}>
-                    <button
-                      type="button"
-                      className="hover:bg-muted/50 w-full px-3 py-2 text-left text-sm"
-                      onClick={() => onSelect(r)}
+                    <label
+                      className={
+                        disabled
+                          ? "flex cursor-not-allowed items-start gap-3 px-3 py-2 text-sm opacity-60"
+                          : "hover:bg-muted/50 flex cursor-pointer items-start gap-3 px-3 py-2 text-sm"
+                      }
                     >
-                      <div className="font-medium">{r.productName}</div>
-                      <div className="text-muted-foreground">
-                        {r.variantName || "—"} · {r.sku}
-                      </div>
-                      <div className="text-muted-foreground mt-0.5 tabular-nums">
-                        Available: {(r.quantityAvailable ?? 0).toLocaleString()}{" "}
-                        · Avg cost: {(r.costPrice ?? 0).toLocaleString()}
-                      </div>
-                    </button>
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() => toggle(r.id)}
+                      />
+                      <span className="flex-1">
+                        <span className="font-medium">{r.productName}</span>
+                        {added ? (
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            Added
+                          </span>
+                        ) : unavailable ? (
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            Unavailable
+                          </span>
+                        ) : null}
+                        <span className="text-muted-foreground block">
+                          {r.variantName || "—"} · {r.sku}
+                          {r.barcode ? ` · ${r.barcode}` : ""}
+                        </span>
+                        <span className="text-muted-foreground block tabular-nums">
+                          Available{" "}
+                          {(r.quantityAvailable ?? 0).toLocaleString()} · Avg
+                          cost {(r.costPrice ?? 0).toLocaleString()}
+                        </span>
+                      </span>
+                    </label>
                   </li>
-                ))
-              )}
-            </ul>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="bg-muted/40 rounded-md px-3 py-2 text-sm">
-              <div className="font-medium">
-                {selected.productName} · {selected.variantName || "—"}
-              </div>
-              <div className="text-muted-foreground">{selected.sku}</div>
-              <div className="text-muted-foreground mt-1 tabular-nums">
-                Available:{" "}
-                {(selected.quantityAvailable ?? 0).toLocaleString()} · Avg cost:{" "}
-                {(selected.costPrice ?? 0).toLocaleString()}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Quantity out</Label>
-              <Input
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelected(null)}
-            >
-              Change SKU
-            </Button>
-          </div>
-        )}
+                );
+              })
+            )}
+          </ul>
+        </div>
 
         <DialogFooter>
           <Button
@@ -206,8 +189,14 @@ export function AddInventoryOutItemDialog({
           >
             Cancel
           </Button>
-          <Button type="button" disabled={!selected} onClick={onConfirm}>
-            Add line
+          <Button
+            type="button"
+            disabled={selectedIds.length === 0}
+            onClick={onConfirm}
+          >
+            {selectedIds.length > 1
+              ? `Add ${selectedIds.length} items`
+              : "Add item"}
           </Button>
         </DialogFooter>
       </DialogContent>

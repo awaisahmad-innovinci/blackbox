@@ -17,6 +17,7 @@ import type {
   StockMovementRow,
   WarehouseStockRow,
 } from "@blackbox/shared";
+import { nextSkuCode } from "@blackbox/shared";
 import { In, Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import {
@@ -309,8 +310,19 @@ export class ProductsService {
     dto: CreateProductSkuDto,
   ): Promise<ProductSkuDetail> {
     const tenantId = this.fixedTenant.tenantId;
-    await this.requireProduct(productId);
+    const product = await this.requireProduct(productId);
     await this.assertUnits(tenantId, dto.baseUnitId, dto.purchaseUnitId);
+
+    const existing = await this.skus.find({
+      where: { tenantId, productId },
+      select: { sku: true },
+    });
+    const skuCode =
+      dto.sku?.trim() ||
+      nextSkuCode(
+        product.productCode,
+        existing.map((row) => row.sku),
+      );
 
     try {
       const saved = await this.skus.save(
@@ -318,15 +330,15 @@ export class ProductsService {
           tenantId,
           productId,
           variantName: dto.variantName.trim(),
-          sku: dto.sku.trim(),
+          sku: skuCode,
           barcode: dto.barcode?.trim() || null,
           sizeValue: dto.sizeValue?.trim() || null,
           sizeUnit: dto.sizeUnit?.trim() || null,
-          baseUnitId: dto.baseUnitId || null,
-          purchaseUnitId: dto.purchaseUnitId || null,
-          unitsPerPurchaseUnit: String(dto.unitsPerPurchaseUnit ?? 1),
-          costPrice: String(dto.costPrice ?? 0),
-          sellingPrice: String(dto.sellingPrice ?? 0),
+          baseUnitId: dto.baseUnitId,
+          purchaseUnitId: dto.purchaseUnitId,
+          unitsPerPurchaseUnit: String(dto.unitsPerPurchaseUnit),
+          costPrice: String(dto.costPrice),
+          sellingPrice: String(dto.sellingPrice),
           reorderLevel: String(dto.reorderLevel ?? 0),
           minimumStockLevel: String(dto.minimumStockLevel ?? 0),
           maximumStockLevel:

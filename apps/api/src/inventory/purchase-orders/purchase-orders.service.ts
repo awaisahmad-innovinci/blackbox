@@ -11,9 +11,8 @@ import type {
   PurchaseOrderListItem,
   PurchaseOrderStatus,
 } from "@blackbox/shared";
-import { DataSource, EntityManager, In, Repository } from "typeorm";
+import { DataSource, EntityManager, Repository } from "typeorm";
 import {
-  InventoryStock,
   ProductSku,
   PurchaseOrder,
   PurchaseOrderItem,
@@ -190,7 +189,6 @@ export class PurchaseOrdersService {
         manager,
         tenantId,
         dto.vendorId,
-        dto.warehouseId,
         dto.items,
         enforceMoq,
       );
@@ -266,7 +264,6 @@ export class PurchaseOrdersService {
         manager,
         tenantId,
         dto.vendorId,
-        dto.warehouseId,
         dto.items,
         enforceMoq,
       );
@@ -456,7 +453,6 @@ export class PurchaseOrdersService {
         manager,
         tenantId,
         po.vendorId,
-        po.warehouseId,
         inputs,
         true,
       );
@@ -619,7 +615,6 @@ export class PurchaseOrdersService {
     manager: EntityManager,
     tenantId: string,
     vendorId: string,
-    warehouseId: string,
     items: PurchaseOrderItemInputDto[],
     enforceMoq: boolean,
   ): Promise<{
@@ -649,22 +644,6 @@ export class PurchaseOrdersService {
       lineTotal: string;
     }> = [];
     let subtotal = 0;
-    const stockRows =
-      items.length > 0
-        ? await manager.getRepository(InventoryStock).find({
-            where: {
-              tenantId,
-              warehouseId,
-              productSkuId: In(items.map((item) => item.productSkuId)),
-            },
-          })
-        : [];
-    const availableBySku = new Map(
-      stockRows.map((row) => [
-        row.productSkuId,
-        toNum(row.quantityAvailable),
-      ]),
-    );
 
     for (const item of items) {
       if (seen.has(item.productSkuId)) {
@@ -713,23 +692,7 @@ export class PurchaseOrdersService {
         );
       }
 
-      const quantityAvailable = availableBySku.get(item.productSkuId) ?? 0;
-      if (quantityAvailable < 1) {
-        throw new BadRequestException(
-          `${sku.sku} has no available stock in the selected warehouse`,
-        );
-      }
       const unitsPerPurchaseUnit = toNum(vs.unitsPerPurchaseUnit) || 1;
-      const maximumQuantity = quantityAvailable / unitsPerPurchaseUnit;
-      if (
-        item.quantity * unitsPerPurchaseUnit - quantityAvailable >
-        0.000000001
-      ) {
-        const unitName = vs.purchaseUnit?.name ?? "units";
-        throw new BadRequestException(
-          `Quantity for ${sku.sku} cannot exceed ${round4(maximumQuantity)} ${unitName} (${quantityAvailable} base units available)`,
-        );
-      }
 
       const discount = item.discount ?? 0;
       const tax = item.tax ?? 0;

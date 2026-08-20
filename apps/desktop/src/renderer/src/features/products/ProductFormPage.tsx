@@ -7,9 +7,12 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { brandsApi } from "@renderer/lib/api/brands";
-import { categoriesApi } from "@renderer/lib/api/categories";
 import { productsApi } from "@renderer/lib/api/products";
+import {
+  loadBrands,
+  loadCategories,
+  loadProduct,
+} from "@renderer/lib/local-db/entity-source";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 
@@ -31,12 +34,10 @@ export function ProductFormPage() {
   const [loading, setLoading] = useState(isEdit);
 
   useEffect(() => {
-    void brandsApi
-      .list({ status: "active" })
+    void loadBrands("active")
       .then(setBrands)
       .catch(() => undefined);
-    void categoriesApi
-      .list({ status: "active" })
+    void loadCategories("active")
       .then(setCategories)
       .catch(() => undefined);
   }, []);
@@ -45,8 +46,7 @@ export function ProductFormPage() {
     if (!id) return;
     let cancelled = false;
     setLoading(true);
-    void productsApi
-      .get(id)
+    void loadProduct(id)
       .then((p) => {
         if (cancelled) return;
         setName(p.name);
@@ -124,7 +124,7 @@ export function ProductFormPage() {
         });
         void syncNow();
         setSaving(false);
-        navigate(`/products/${localId}`);
+        navigate(`/products/${localId}`, { state: { product: local } });
         return;
       } catch (err: unknown) {
         setSaving(false);
@@ -170,7 +170,7 @@ export function ProductFormPage() {
             baseEntityVersion: 0,
           });
           setSaving(false);
-          navigate(`/products/${localId}`);
+          navigate(`/products/${localId}`, { state: { product: local } });
           return;
         } catch {
           /* fall through */
@@ -190,7 +190,10 @@ export function ProductFormPage() {
 
     setSaving(false);
     navigate(`/products/${saved.id}`, {
-      state: localCacheWarning ? { cacheWarning: true } : undefined,
+      state: {
+        product: saved,
+        cacheWarning: localCacheWarning ? true : undefined,
+      },
     });
   }
 

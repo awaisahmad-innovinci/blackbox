@@ -1,0 +1,138 @@
+---
+description: Blackbox conventions for this repo — real paths, stack, Nest JWT tenant isolation, class-validator, and desktop sync. Always apply.
+alwaysApply: true
+---
+
+# Blackbox — Cursor rules (this repo)
+
+Follow **what exists in this tree**, not older drafts that used `apps/backend`, `apps/admin-web`, `apps/pos-electron`, Supabase Auth, Zod-everywhere, or RLS middleware.
+
+Longer reference: `docs/architecture.md`, `docs/auth-api.md`, `docs/sync.md`.
+
+## Monorepo layout (Turborepo + pnpm)
+
+```
+blackbox/
+├── apps/
+│   ├── api/          # @blackbox/api — NestJS + TypeORM
+│   ├── web/          # @blackbox/web — Next.js App Router (admin)
+│   └── desktop/      # @blackbox/desktop — Electron + Vite + React
+├── packages/
+│   ├── shared/       # @blackbox/shared — permissions, DTOs, validation helpers
+│   ├── ui/           # @blackbox/ui — shadcn / Radix / Tailwind
+│   ├── eslint-config/
+│   └── typescript-config/
+├── supabase/
+│   └── migrations/   # schema source of truth (plural)
+├── docs/
+├── turbo.json
+├── pnpm-workspace.yaml
+└── package.json
+```
+
+Package scope is always `@blackbox/*`. Workspace deps use `workspace:*`.
+
+**Do not** create `apps/backend`, `apps/admin-web`, `apps/pos-electron`, `packages/design-system`, or `packages/db-typeorm`.
+
+## Stack (see package.json)
+
+- Node.js >= 20, pnpm 9.x, TypeScript 5.8
+- NestJS 11, TypeORM via `@nestjs/typeorm`, `pg`
+- Next.js 15, React 19, Tailwind 4
+- Electron 36 + electron-vite + better-sqlite3
+- UI: shadcn in `packages/ui` only
+- Validation: **class-validator** on Nest DTOs; shared regex helpers in `packages/shared/src/validation.ts`
+- Auth: **custom Nest JWT** (argon2 passwords). Not Supabase Auth, Clerk, Zod-first DTOs, React Query, or Zustand.
+
+## Naming
+
+- Files: `kebab-case.ts`
+- Classes / types: `PascalCase`
+- DB tables/columns: `snake_case`
+- TypeORM fields: `camelCase` mapped with `@Column({ name: "snake_case" })`
+- API paths: `/kebab-case/...` (auth, users, devices, inventory, sync) — not `/inv/...` module prefixes
+- Shared field validators: `PERSON_NAME_PATTERN`, `usernameError()`, etc.
+
+## NestJS (`apps/api`)
+
+- Entry: `apps/api/src/main.ts` (port 4000). Health: `GET /health`.
+- Modules live next to features (`auth/`, `users/`, `roles/`, `devices/`, `tenants/`, `sync/`, `inventory/*`) — not `src/modules/{pos,aud,inv}`.
+- Controllers stay thin. Inject TypeORM repositories into **services**, not controllers.
+- Example inventory module: `apps/api/src/inventory/brands/`.
+- Guards: `JwtAuthGuard` then `PermissionsGuard`. Authorize by **permission keys** from `@blackbox/shared`, never role names (`OWNER`).
+- `@RequirePermissions(...keys)` is AND. Tenant always from JWT, never from the client body/query.
+- DTOs: class-validator (`@IsEmail`, `@Matches` using shared patterns). Shared types in `@blackbox/shared`.
+
+## Data access
+
+```
+NestJS → TypeORM → Supabase PostgreSQL
+```
+
+- Entities: `apps/api/src/db/entities/`
+- Config: `apps/api/src/db/db.module.ts` — `DATABASE_URL`, **`synchronize: false`**
+- Schema: **only** `supabase/migrations/` (SQL). Never TypeORM migrations. Never a second ORM.
+
+## Tenant isolation (current)
+
+Primary enforcement is **app-layer**, not Postgres RLS.
+
+- JWT `tenantId` → request ALS (`RequestTenantInterceptor`) → `FixedTenantContext` / `@CurrentUser()`
+- Every query must filter `tenant_id` from that context
+- RLS is **not** enabled. Do not add RLS policies or `RlsMiddleware` unless the dedicated RLS PR is the task.
+- Unauthenticated inventory fallback to `DEV_TENANT_ID` is legacy; do not expand it.
+
+## Auth (not Supabase Auth)
+
+- Signup/login/refresh/logout in `apps/api/src/auth/`
+- Access JWT: `sub`, `tenantId`, optional `deviceId` (15m); refresh 7d
+- Desktop login (`client: "desktop"` + fingerprint) binds a `devices` row
+- Admin trusts/revokes devices; `/sync/*` requires a trusted device + `sync.use`
+- Web and desktop call the Nest auth API. They do not talk to Supabase Auth.
+
+## Sync (desktop offline-first)
+
+- Cloud is the only hub. Protocol: `POST /sync/push`, `GET /sync/pull`, status, full-resync-complete
+- Local SQLite per bound device; outbox + applied log + cursors
+- Local writes: IPC `window.blackbox.sync.commit` (renderer → main)
+- Renderer **may** call the HTTP API (auth, incremental sync). Do not invent “all HTTP only from main.”
+- Auto-sync: trusted session only; backoff up to 5 minutes; queued changes are not dropped
+- Docs: `docs/sync.md`
+
+## Shared UI
+
+- Add shadcn components only in `packages/ui` (`pnpm dlx shadcn@latest add <name> -c packages/ui`)
+- Apps import `@blackbox/ui/button`, etc. Do not fork components into web/desktop
+- No `next/image` or `next/link` inside `packages/ui`
+
+## Web (`apps/web`)
+
+- Next App Router under `apps/web/src/app/` (admin at `/app`, not `(dashboard)/`)
+- Example: `apps/web/src/app/app/users/`
+- Session + permission gates in existing auth components; fetch via `apps/web/src/lib/` helpers
+- Field validation: shared helpers, live errors under the field (`aria-invalid`)
+
+## Desktop (`apps/desktop`)
+
+```
+apps/desktop/src/main/      # Electron main, SQLite
+apps/desktop/src/preload/   # contextBridge → window.blackbox
+apps/desktop/src/renderer/  # Vite + React + react-router-dom
+```
+
+- Example UI: `apps/desktop/src/renderer/src/features/`
+- Package: `pnpm --filter @blackbox/desktop package`
+
+## Commands
+
+```bash
+pnpm dev:api        # API :4000
+pnpm dev:web        # web :3000
+pnpm dev:desktop
+pnpm typecheck && pnpm lint
+```
+
+## Git
+
+- Do not rename apps to match old drafts
+- Do not add RLS, Zod DTOs, React Query, or Supabase Auth unless explicitly asked

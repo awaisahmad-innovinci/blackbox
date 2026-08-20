@@ -153,11 +153,11 @@ export class SkusService {
     sku.barcode = dto.barcode?.trim() || null;
     sku.sizeValue = dto.sizeValue?.trim() || null;
     sku.sizeUnit = dto.sizeUnit?.trim() || null;
-    sku.baseUnitId = dto.baseUnitId || null;
-    sku.purchaseUnitId = dto.purchaseUnitId || null;
-    sku.unitsPerPurchaseUnit = String(dto.unitsPerPurchaseUnit ?? 1);
-    sku.costPrice = String(dto.costPrice ?? 0);
-    sku.sellingPrice = String(dto.sellingPrice ?? 0);
+    sku.baseUnitId = dto.baseUnitId;
+    sku.purchaseUnitId = dto.purchaseUnitId;
+    sku.unitsPerPurchaseUnit = String(dto.unitsPerPurchaseUnit);
+    sku.costPrice = String(dto.costPrice);
+    sku.sellingPrice = String(dto.sellingPrice);
     sku.reorderLevel = String(dto.reorderLevel ?? 0);
     sku.minimumStockLevel = String(dto.minimumStockLevel ?? 0);
     sku.maximumStockLevel =

@@ -1,33 +1,41 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { GoodsReceiptDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
+import { loadGoodsReceipt } from "@renderer/lib/local-db/entity-source";
 
 export function GoodsReceiptProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [receipt, setReceipt] = useState<GoodsReceiptDetail | null>(null);
+  const location = useLocation();
+  const seeded = (
+    location.state as { receipt?: GoodsReceiptDetail } | null
+  )?.receipt;
+  const [receipt, setReceipt] = useState<GoodsReceiptDetail | null>(
+    seeded ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    void goodsReceiptsApi
-      .get(id)
+    void loadGoodsReceipt(id)
       .then((detail) => {
-        if (!cancelled) setReceipt(detail);
+        if (!cancelled) {
+          setReceipt(detail);
+          setError(null);
+        }
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && !seeded) {
           setError(getApiErrorMessage(err, "Failed to load receipt"));
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, seeded]);
 
   if (error && !receipt) {
     return (

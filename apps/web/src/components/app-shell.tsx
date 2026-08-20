@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   PanelLeftClose,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@blackbox/ui/button";
 import { Separator } from "@blackbox/ui/separator";
@@ -48,6 +49,12 @@ const NAV: {
     label: "Devices",
     permission: "devices.read",
     icon: MonitorSmartphone,
+  },
+  {
+    href: "/app/inventory/reports",
+    label: "Inventory report",
+    permission: null,
+    icon: BarChart3,
   },
   {
     href: "/app/settings",
