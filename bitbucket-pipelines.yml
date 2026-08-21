@@ -1,0 +1,14 @@
+image: alpine/git:latest
+
+pipelines:
+  default:
+    - step:
+        name: Sync Mirror to GitHub
+        clone:
+          enabled: false # Speeds up execution since we make a bare clone manually
+        script:
+          # 1. Bare clone your Bitbucket repo into the pipeline environment
+          - git clone --bare git@bitbucket.org:innovincitech/blackbox.git
+          - cd blackbox.git
+          # 2. Mirror push all tags, branches, and commit histories to GitHub
+          - git push --mirror git@github.com:awaisahmad-innovinci/blackbox.git
