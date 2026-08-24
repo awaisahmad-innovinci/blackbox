@@ -4,6 +4,7 @@
   "private": true,
   "description": "Blackbox desktop POS",
   "author": "Innovinci Tech",
+  "desktopName": "Blackbox",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev ",

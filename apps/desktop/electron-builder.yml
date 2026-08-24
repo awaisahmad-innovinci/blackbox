@@ -14,7 +14,6 @@ win:
   target:
     - nsis
 linux:
-  desktopName: Blackbox
   syncDesktopName: true
   category: Office
   maintainer: innovincitech
