@@ -1,4 +1,4 @@
-# Blackbox
+# Blackbox ( staging )
 
 pnpm + Turborepo monorepo with Next.js (web), Electron + Vite + React (desktop), NestJS (api), and a shared `@blackbox/ui` design system.
 
