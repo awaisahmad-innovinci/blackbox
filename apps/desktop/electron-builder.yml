@@ -13,5 +13,8 @@ win:
   target:
     - nsis
 linux:
+  category: Office
+  maintainer: innovincitech
   target:
     - AppImage
+    - deb

@@ -9,6 +9,7 @@
     "build": "turbo run build",
     "build:web": "pnpm --filter @blackbox/web build",
     "build:desktop": "pnpm --filter @blackbox/desktop build",
+    "package:desktop": "pnpm --filter @blackbox/desktop package",
     "build:api": "pnpm --filter @blackbox/api build",
     "start:web": "pnpm --filter @blackbox/web start",
     "start:api": "pnpm --filter @blackbox/api start:prod",

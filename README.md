@@ -22,9 +22,29 @@ Build / start:
 ```bash
 pnpm build:web
 pnpm build:desktop
+pnpm package:desktop
 pnpm build:api
 pnpm start:web
 pnpm start:api
+```
+
+## Desktop releases (CI)
+
+Pushes to `staging` (synced from Bitbucket via `bitbucket-pipelines.yml`) trigger [`.github/workflows/build-desktop.yml`](.github/workflows/build-desktop.yml). GitHub Actions builds in parallel:
+
+| Runner | Artifacts |
+|--------|-----------|
+| `ubuntu-latest` | `.AppImage`, `.deb` |
+| `windows-latest` | `.exe` (NSIS installer) |
+
+Download from GitHub → **Actions** → latest **Build Electron App** run → **Artifacts** (`electron-build-ubuntu-latest`, `electron-build-windows-latest`).
+
+**One-time setup:** add repo secret `VITE_API_URL` (Railway API base URL, no trailing slash). Also add that URL to API `CORS_ORIGINS` on Railway.
+
+Local packaging (same output as CI, under `apps/desktop/release/`):
+
+```bash
+VITE_API_URL=https://your-api.example.com pnpm package:desktop
 ```
 
 ## Apps
