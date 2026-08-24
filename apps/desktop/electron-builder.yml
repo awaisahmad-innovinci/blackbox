@@ -16,10 +16,9 @@ win:
   target:
     - nsis
 linux:
-  packageName: blackbox
-  syncDesktopName: true
   category: Office
-  maintainer: Innovinci Tech <admin@innovincitech.com>
   target:
     - AppImage
     - deb
+deb:
+  packageName: blackbox
