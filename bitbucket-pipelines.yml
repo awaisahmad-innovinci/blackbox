@@ -3,7 +3,7 @@ image: alpine/git:latest
 pipelines:
   default:
     - step:
-        name: Sync Mirror to GitHub
+        name: Sync Current Branch to GitHub
         script:
-          # 1. Push everything from the current cloned directory directly to GitHub
-          - git push --mirror git@github.com:awaisahmad-innovinci/blackbox.git
+          # Pushes ONLY the branch that triggered this pipeline
+          - git push git@github.com:awaisahmad-innovinci/blackbox.git HEAD:refs/heads/$BITBUCKET_BRANCH
