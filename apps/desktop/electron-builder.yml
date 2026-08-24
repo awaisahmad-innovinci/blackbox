@@ -1,6 +1,8 @@
 appId: com.blackbox.desktop
 productName: Blackbox
 executableName: blackbox
+# THIS LINE FIXES THE ISSUE by overriding the file name to avoid slashes
+artifactName: ${executableName}-${version}-${os}-${arch}.${ext}
 directories:
   output: release
 files:
