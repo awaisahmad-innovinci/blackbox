@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "description": "Blackbox desktop POS",
-  "author": "Innovinci Tech",
+  "author": "Innovinci Tech <admin@innovincitech.com>",
+  "homepage": "https://innovincitech.com/",
   "desktopName": "Blackbox",
   "main": "./out/main/index.js",
   "scripts": {

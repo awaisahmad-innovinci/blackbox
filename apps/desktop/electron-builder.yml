@@ -6,6 +6,8 @@ directories:
 files:
   - out/**/*
   - package.json
+asarUnpack:
+  - "**/*.node"
 mac:
   target:
     - dmg
@@ -14,9 +16,10 @@ win:
   target:
     - nsis
 linux:
+  packageName: blackbox
   syncDesktopName: true
   category: Office
-  maintainer: innovincitech
+  maintainer: Innovinci Tech <admin@innovincitech.com>
   target:
     - AppImage
     - deb
