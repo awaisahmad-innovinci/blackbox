@@ -2,12 +2,14 @@
   "name": "@blackbox/desktop",
   "version": "0.0.0",
   "private": true,
+  "description": "Blackbox desktop POS",
+  "author": "Innovinci Tech",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev ",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder",
+    "package": "electron-vite build && electron-builder --publish never",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "clean": "rm -rf out dist .turbo"
