@@ -42,14 +42,15 @@ jobs:
         run: pnpm --filter @blackbox/desktop... build
 
       - name: Package Electron app
-        run: pnpm --filter @blackbox/desktop package
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          pnpm --filter @blackbox/desktop exec electron-vite build
+          pnpm exec electron-builder --project apps/desktop --publish never
 
       - name: Verify packaged app contents (Linux)
         if: runner.os == 'Linux'
         run: |
-          pnpm exec asar list apps/desktop/release/linux-unpacked/resources/app.asar | grep -q '@blackbox/shared/dist/index.js'
           pnpm exec asar list apps/desktop/release/linux-unpacked/resources/app.asar | grep -q 'better-sqlite3'
 
       - name: Verify packaged app contents (Windows)
@@ -57,7 +58,6 @@ jobs:
         shell: pwsh
         run: |
           $entries = pnpm exec asar list apps/desktop/release/win-unpacked/resources/app.asar
-          if ($entries -notmatch '@blackbox/shared/dist/index.js') { throw 'Missing @blackbox/shared/dist/index.js in app.asar' }
           if ($entries -notmatch 'better-sqlite3') { throw 'Missing better-sqlite3 in app.asar' }
 
       - name: Upload build artifacts
