@@ -1,6 +1,8 @@
 appId: com.blackbox.desktop
 productName: Blackbox
 executableName: blackbox
+extraMetadata:
+  name: blackbox-desktop
 # Fix: Hardcode 'blackbox' to avoid invalid macros and the slash issue
 artifactName: blackbox-${version}-${os}-${arch}.${ext}
 directories:

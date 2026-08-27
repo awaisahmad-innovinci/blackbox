@@ -38,10 +38,27 @@ jobs:
           npm_config_msvs_version: "2022"
         run: pnpm install --frozen-lockfile --filter @blackbox/desktop...
 
+      - name: Build workspace dependencies
+        run: pnpm --filter @blackbox/desktop... build
+
       - name: Package Electron app
         run: pnpm --filter @blackbox/desktop package
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Verify packaged app contents (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pnpm exec asar list apps/desktop/release/linux-unpacked/resources/app.asar | grep -q '@blackbox/shared/dist/index.js'
+          pnpm exec asar list apps/desktop/release/linux-unpacked/resources/app.asar | grep -q 'better-sqlite3'
+
+      - name: Verify packaged app contents (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $entries = pnpm exec asar list apps/desktop/release/win-unpacked/resources/app.asar
+          if ($entries -notmatch '@blackbox/shared/dist/index.js') { throw 'Missing @blackbox/shared/dist/index.js in app.asar' }
+          if ($entries -notmatch 'better-sqlite3') { throw 'Missing better-sqlite3 in app.asar' }
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
