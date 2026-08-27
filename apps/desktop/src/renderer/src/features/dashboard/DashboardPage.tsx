@@ -324,23 +324,23 @@ export function DashboardPage() {
                 {localDbStatus.path} · {localDbStatus.migrationsApplied}{" "}
                 migrations applied
               </p> */}
-              {/* <p className="text-muted-foreground mt-1 text-xs">
+              <p className="text-muted-foreground mt-1 text-xs">
                 {lastSyncedAt
                   ? `Last synced: ${formatSyncedAt(lastSyncedAt)}`
                   : "Not synced yet — pull cloud data into the local database."}
-              </p> */}
+              </p>
               {syncing && syncProgress ? (
                 <p className="mt-2 text-xs font-medium">{syncProgress.message}</p>
               ) : null}
             </div>
-            {/* <Button
+            <Button
               type="button"
               size="sm"
               disabled={syncing}
               onClick={() => void onSync()}
             >
               {syncing ? "Syncing…" : "Sync"}
-            </Button> */}
+            </Button>
           </div>
         </div>
       ) : (
