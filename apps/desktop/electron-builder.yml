@@ -1,10 +1,22 @@
 appId: com.blackbox.desktop
 productName: Blackbox
+executableName: blackbox
+extraMetadata:
+  name: blackbox-desktop
+# Fix: Hardcode 'blackbox' to avoid invalid macros and the slash issue
+artifactName: blackbox-${version}-${os}-${arch}.${ext}
 directories:
   output: release
 files:
   - out/**/*
   - package.json
+  - from: ../../node_modules/better-sqlite3
+    to: node_modules/better-sqlite3
+    filter:
+      - "**/*"
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+  - "**/*.node"
 mac:
   target:
     - dmg
@@ -13,5 +25,9 @@ win:
   target:
     - nsis
 linux:
+  category: Office
   target:
     - AppImage
+    - deb
+deb:
+  packageName: blackbox

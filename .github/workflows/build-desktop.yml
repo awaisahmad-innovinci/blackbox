@@ -1,0 +1,73 @@
+name: Build Electron App (Windows & Linux)
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.14.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install native build tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3
+
+      - name: Install dependencies
+        env:
+          npm_config_msvs_version: "2022"
+        run: pnpm install --frozen-lockfile --filter @blackbox/desktop...
+
+      - name: Build workspace dependencies
+        run: pnpm --filter @blackbox/desktop... build
+
+      - name: Package Electron app
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          pnpm --filter @blackbox/desktop exec electron-vite build
+          pnpm exec electron-builder --project apps/desktop --publish never
+
+      - name: Verify packaged app contents (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ASAR="apps/desktop/release/linux-unpacked/resources/app.asar"
+          UNPACKED="apps/desktop/release/linux-unpacked/resources/app.asar.unpacked"
+          pnpm exec asar list "$ASAR" | grep -q 'better-sqlite3' || \
+            test -d "$UNPACKED/node_modules/better-sqlite3"
+
+      - name: Verify packaged app contents (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $asar = pnpm exec asar list apps/desktop/release/win-unpacked/resources/app.asar
+          $unpacked = "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/better-sqlite3"
+          $hasAsar = $asar -match 'better-sqlite3'
+          $hasUnpacked = Test-Path $unpacked
+          if (-not $hasAsar -and -not $hasUnpacked) { throw 'Missing better-sqlite3 in packaged app' }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-build-${{ matrix.os }}
+          path: apps/desktop/release/
