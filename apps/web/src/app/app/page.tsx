@@ -9,6 +9,7 @@ import {
   Settings,
   KeyRound,
   ArrowRight,
+  Warehouse,
 } from "lucide-react";
 import type { Permission } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -64,6 +65,13 @@ const QUICK: {
     description: "Review trusted desktops",
     permission: "devices.read",
     icon: MonitorSmartphone,
+  },
+  {
+    href: "/app/warehouses",
+    label: "Warehouses",
+    description: "Create and deactivate locations",
+    permission: "warehouses.write",
+    icon: Warehouse,
   },
   {
     href: "/app/settings",

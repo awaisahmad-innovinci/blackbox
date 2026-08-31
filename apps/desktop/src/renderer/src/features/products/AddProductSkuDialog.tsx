@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   CreateProductSkuRequest,
   EntityStatus,
@@ -20,6 +20,7 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
 import { loadUnits } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 const emptyForm = {
@@ -78,6 +79,7 @@ export function AddProductSkuDialog({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempted, setAttempted] = useState(false);
+  const barcodeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +91,18 @@ export function AddProductSkuDialog({
     setAttempted(false);
     void loadUnits().then(setUnits).catch(() => undefined);
   }, [open, productCode, existingSkuCodes]);
+
+  useBarcodeScanCapture(
+    open,
+    (code) => {
+      setField("barcode", code);
+      requestAnimationFrame(() => {
+        barcodeRef.current?.focus();
+        barcodeRef.current?.select();
+      });
+    },
+    barcodeRef.current,
+  );
 
   function reset() {
     setForm({
@@ -285,9 +299,12 @@ export function AddProductSkuDialog({
           <div className="space-y-1.5">
             <Label>Barcode</Label>
             <Input
+              ref={barcodeRef}
               value={form.barcode}
               onChange={(e) => setField("barcode", e.target.value)}
               placeholder="Scan or type barcode"
+              data-enter-submit=""
+              autoComplete="off"
             />
           </div>
           <div className="space-y-1.5">

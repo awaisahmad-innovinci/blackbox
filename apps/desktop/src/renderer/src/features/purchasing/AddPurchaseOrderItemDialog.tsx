@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { VendorSku } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -46,6 +46,10 @@ export function toDraftPoLine(row: VendorSku): DraftPoLine {
   };
 }
 
+function isUnavailable(row: VendorSku): boolean {
+  return (row.quantityAvailable ?? 0) <= 0;
+}
+
 export function AddPurchaseOrderItemDialog({
   open,
   vendorId,
@@ -64,6 +68,7 @@ export function AddPurchaseOrderItemDialog({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<VendorSku[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open || !vendorId || !warehouseId) return;
@@ -74,6 +79,33 @@ export function AddPurchaseOrderItemDialog({
     }, 200);
     return () => clearTimeout(t);
   }, [query, open, vendorId, warehouseId]);
+
+  function isDisabled(row: VendorSku): boolean {
+    return existingSkuIds.includes(row.productSkuId) || isUnavailable(row);
+  }
+
+  const selectableIds = useMemo(
+    () =>
+      results
+        .filter(
+          (r) =>
+            !existingSkuIds.includes(r.productSkuId) &&
+            (r.quantityAvailable ?? 0) > 0,
+        )
+        .map((r) => r.id),
+    [results, existingSkuIds],
+  );
+
+  const allSelected =
+    selectableIds.length > 0 &&
+    selectableIds.every((id) => selectedIds.includes(id));
+  const someSelected = selectableIds.some((id) => selectedIds.includes(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected && !allSelected;
+    }
+  }, [someSelected, allSelected]);
 
   function reset() {
     setQuery("");
@@ -87,11 +119,17 @@ export function AddPurchaseOrderItemDialog({
     );
   }
 
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !selectableIds.includes(id)));
+      return;
+    }
+    setSelectedIds((prev) => [...new Set([...prev, ...selectableIds])]);
+  }
+
   function onConfirm() {
     const chosen = results.filter(
-      (r) =>
-        selectedIds.includes(r.id) &&
-        !existingSkuIds.includes(r.productSkuId),
+      (r) => selectedIds.includes(r.id) && !isDisabled(r),
     );
     if (chosen.length === 0) return;
     onAddMany(chosen.map(toDraftPoLine));
@@ -114,8 +152,8 @@ export function AddPurchaseOrderItemDialog({
         </DialogHeader>
 
         <p className="text-muted-foreground text-sm">
-          Select one or more SKUs. They are added with quantity 0 — enter
-          quantities in the order items table.
+          Select one or more SKUs with available stock. They are added with
+          quantity 0 — enter quantities in the order items table.
         </p>
 
         <div className="space-y-3">
@@ -134,47 +172,77 @@ export function AddPurchaseOrderItemDialog({
                 No matching SKUs for this vendor.
               </li>
             ) : (
-              results.map((r) => {
-                const added = existingSkuIds.includes(r.productSkuId);
-                const checked = selectedIds.includes(r.id);
-                return (
-                  <li key={r.id}>
-                    <label
-                      className={
-                        added
-                          ? "flex cursor-not-allowed items-start gap-3 px-3 py-2 text-sm opacity-60"
-                          : "hover:bg-muted/50 flex cursor-pointer items-start gap-3 px-3 py-2 text-sm"
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        className="mt-1"
-                        checked={checked}
-                        disabled={added}
-                        onChange={() => toggle(r.id)}
-                      />
-                      <span className="flex-1">
-                        <span className="font-medium">{r.productName}</span>
-                        {added ? (
-                          <span className="text-muted-foreground ml-2 text-xs">
-                            Added
+              <>
+                <li>
+                  <label
+                    className={
+                      selectableIds.length === 0
+                        ? "flex cursor-not-allowed items-center gap-3 px-3 py-2 text-sm opacity-60"
+                        : "hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2 text-sm"
+                    }
+                  >
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={allSelected}
+                      disabled={selectableIds.length === 0}
+                      onChange={toggleSelectAll}
+                    />
+                    <span className="font-medium">Select all</span>
+                    <span className="text-muted-foreground text-xs">
+                      {selectableIds.length} with stock
+                    </span>
+                  </label>
+                </li>
+                {results.map((r) => {
+                  const added = existingSkuIds.includes(r.productSkuId);
+                  const unavailable = isUnavailable(r);
+                  const disabled = added || unavailable;
+                  const checked = selectedIds.includes(r.id);
+                  return (
+                    <li key={r.id}>
+                      <label
+                        className={
+                          disabled
+                            ? "flex cursor-not-allowed items-start gap-3 px-3 py-2 text-sm opacity-60"
+                            : "hover:bg-muted/50 flex cursor-pointer items-start gap-3 px-3 py-2 text-sm"
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => toggle(r.id)}
+                        />
+                        <span className="flex-1">
+                          <span className="font-medium">{r.productName}</span>
+                          {added ? (
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              Added
+                            </span>
+                          ) : unavailable ? (
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              Unavailable
+                            </span>
+                          ) : null}
+                          <span className="text-muted-foreground block">
+                            {r.variantName || "—"} · {r.sku}
+                            {r.barcode ? ` · ${r.barcode}` : ""}
                           </span>
-                        ) : null}
-                        <span className="text-muted-foreground block">
-                          {r.variantName || "—"} · {r.sku}
-                          {r.barcode ? ` · ${r.barcode}` : ""}
+                          <span className="text-muted-foreground block tabular-nums">
+                            Cost {r.purchasePrice.toLocaleString()} ·{" "}
+                            {r.purchaseUnitName || "—"} · MOQ{" "}
+                            {r.minimumOrderQuantity} · Available{" "}
+                            {(r.quantityAvailable ?? 0).toLocaleString()}
+                          </span>
                         </span>
-                        <span className="text-muted-foreground block tabular-nums">
-                          Cost {r.purchasePrice.toLocaleString()} ·{" "}
-                          {r.purchaseUnitName || "—"} · MOQ{" "}
-                          {r.minimumOrderQuantity} · Available{" "}
-                          {(r.quantityAvailable ?? 0).toLocaleString()}
-                        </span>
-                      </span>
-                    </label>
-                  </li>
-                );
-              })
+                      </label>
+                    </li>
+                  );
+                })}
+              </>
             )}
           </ul>
         </div>

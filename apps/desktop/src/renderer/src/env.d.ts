@@ -108,7 +108,10 @@ declare global {
         listVendorGroups: (
           status?: EntityStatus | "all",
         ) => Promise<VendorGroup[]>;
-        listWarehouses: () => Promise<WarehouseListItem[]>;
+        listWarehouses: (
+          status?: EntityStatus | "all",
+        ) => Promise<WarehouseListItem[]>;
+        getWarehouse: (id: string) => Promise<WarehouseListItem | null>;
         listUnits: () => Promise<UnitListItem[]>;
         getProduct: (id: string) => Promise<ProductDetail | null>;
         getProductProfile: (id: string) => Promise<{
@@ -129,6 +132,13 @@ declare global {
           warehouseId?: string,
         ) => Promise<VendorSku[]>;
         getSku: (id: string) => Promise<SkuDetail | null>;
+        getVendorSku: (id: string) => Promise<VendorSku | null>;
+        applyPurchaseAvgCost: (
+          productSkuId: string,
+          inventoryDelta: number,
+          receivingUnitCost: number,
+          unitsPerPurchaseUnit: number,
+        ) => Promise<{ sku: SkuDetail; avgCost: number } | null>;
         getSkuProfile: (id: string) => Promise<{
           sku: SkuDetail;
           suppliers: SkuSupplier[];

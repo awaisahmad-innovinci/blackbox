@@ -91,6 +91,7 @@ export function ImportMasterDataDialog({
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<MasterDataImportError[]>([]);
   const [result, setResult] = useState<MasterDataImportResult | null>(null);
+  const [succeeded, setSucceeded] = useState(false);
 
   const checklist = useMemo(() => {
     const present = new Set(
@@ -121,6 +122,7 @@ export function ImportMasterDataDialog({
     setMessage(null);
     setErrors([]);
     setResult(null);
+    setSucceeded(false);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -133,6 +135,7 @@ export function ImportMasterDataDialog({
   function onSelect(list: FileList | null) {
     setErrors([]);
     setResult(null);
+    setSucceeded(false);
     const { selection: next, message: hint } = classify(
       list ? Array.from(list) : [],
     );
@@ -146,6 +149,7 @@ export function ImportMasterDataDialog({
     setMessage("Uploading and validating master data…");
     setErrors([]);
     setResult(null);
+    setSucceeded(false);
     try {
       const imported = await inventoryImportsApi.uploadMasterData(
         selection.kind === "zip" ? selection.file : selection.files,
@@ -154,8 +158,10 @@ export function ImportMasterDataDialog({
       setMessage("Cloud import complete. Syncing the local database…");
       try {
         await onImported(imported);
-        setMessage("Import and local Sync completed successfully.");
+        setMessage("File successfully uploaded.");
+        setSucceeded(true);
       } catch (syncError: unknown) {
+        setSucceeded(false);
         setMessage(
           `Cloud import succeeded, but local Sync failed. Use the Dashboard Sync button to retry. ${
             syncError instanceof Error ? syncError.message : ""
@@ -260,7 +266,9 @@ export function ImportMasterDataDialog({
               className={
                 errors.length > 0
                   ? "border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
-                  : "border-border bg-muted/40 rounded-lg border px-4 py-3 text-sm"
+                  : succeeded
+                    ? "rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200"
+                    : "border-border bg-muted/40 rounded-lg border px-4 py-3 text-sm"
               }
             >
               {message}

@@ -53,6 +53,7 @@ export class VendorSkusService {
       .where("vs.tenant_id = :tenantId", { tenantId })
       .andWhere("vs.vendor_id = :vendorId", { vendorId })
       .andWhere("vs.status = :status", { status: "active" })
+      .andWhere("sku.status = :skuStatus", { skuStatus: "active" })
       .orderBy("product.name", "ASC")
       .addOrderBy("sku.variant_name", "ASC");
 

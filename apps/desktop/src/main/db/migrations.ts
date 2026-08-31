@@ -583,6 +583,38 @@ create table if not exists local_sync_state (
 );
 `,
   },
+  {
+    id: "009_gr_item_discount_percent",
+    sql: `-- column add applied in after()`,
+    after: (db) => {
+      const itemCols = (
+        db.prepare("pragma table_info(goods_receipt_items)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!itemCols.includes("discount_percent")) {
+        db.exec(
+          `alter table goods_receipt_items add column discount_percent real not null default 0`,
+        );
+      }
+    },
+  },
+  {
+    id: "010_gr_item_bonus_quantity",
+    sql: `-- column add applied in after()`,
+    after: (db) => {
+      const itemCols = (
+        db.prepare("pragma table_info(goods_receipt_items)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!itemCols.includes("bonus_quantity")) {
+        db.exec(
+          `alter table goods_receipt_items add column bonus_quantity real not null default 0`,
+        );
+      }
+    },
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

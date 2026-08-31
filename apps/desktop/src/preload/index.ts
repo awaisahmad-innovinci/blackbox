@@ -124,10 +124,15 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listVendorGroups",
         status,
       ) as Promise<VendorGroup[]>,
-    listWarehouses: () =>
+    listWarehouses: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke(
         "localDb:listWarehouses",
+        status,
       ) as Promise<WarehouseListItem[]>,
+    getWarehouse: (id: string) =>
+      ipcRenderer.invoke("localDb:getWarehouse", id) as Promise<
+        WarehouseListItem | null
+      >,
     listUnits: () =>
       ipcRenderer.invoke("localDb:listUnits") as Promise<UnitListItem[]>,
     getProduct: (id: string) =>
@@ -156,6 +161,21 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<VendorSku[]>,
     getSku: (id: string) =>
       ipcRenderer.invoke("localDb:getSku", id) as Promise<SkuDetail | null>,
+    getVendorSku: (id: string) =>
+      ipcRenderer.invoke("localDb:getVendorSku", id) as Promise<VendorSku | null>,
+    applyPurchaseAvgCost: (
+      productSkuId: string,
+      inventoryDelta: number,
+      receivingUnitCost: number,
+      unitsPerPurchaseUnit: number,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:applyPurchaseAvgCost",
+        productSkuId,
+        inventoryDelta,
+        receivingUnitCost,
+        unitsPerPurchaseUnit,
+      ) as Promise<{ sku: SkuDetail; avgCost: number } | null>,
     getSkuProfile: (id: string) =>
       ipcRenderer.invoke("localDb:getSkuProfile", id) as Promise<{
         sku: SkuDetail;

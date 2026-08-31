@@ -13,6 +13,7 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
 import { loadPurchaseOrder, loadVendors, loadVendorSkus, loadWarehouses } from "@renderer/lib/local-db/entity-source";
 import {
   AddPurchaseOrderItemDialog,
@@ -60,9 +61,9 @@ export function PurchaseOrderFormPage() {
     });
   }
 
-  async function onBarcodeEnter() {
-    const code = barcode.trim();
-    if (!code || scanBusy) return;
+  async function addSkuFromBarcode(code: string) {
+    const trimmed = code.trim();
+    if (!trimmed || scanBusy) return;
     if (!vendorId || !warehouseId) {
       setError("Select vendor and warehouse first");
       return;
@@ -71,8 +72,8 @@ export function PurchaseOrderFormPage() {
     setScanBusy(true);
     setError(null);
     try {
-      const rows = await loadVendorSkus(vendorId, code, warehouseId);
-      const exact = rows.filter((r) => (r.barcode ?? "").trim() === code);
+      const rows = await loadVendorSkus(vendorId, trimmed, warehouseId);
+      const exact = rows.filter((r) => (r.barcode ?? "").trim() === trimmed);
       if (exact.length === 0) {
         setError("No supplier SKU found for this barcode");
         return;
@@ -97,6 +98,15 @@ export function PurchaseOrderFormPage() {
       setScanBusy(false);
     }
   }
+
+  useBarcodeScanCapture(
+    Boolean(vendorId && warehouseId && !itemOpen),
+    (code) => {
+      setBarcode(code);
+      void addSkuFromBarcode(code);
+    },
+    barcodeRef.current,
+  );
 
   useEffect(() => {
     void loadVendors({ status: "active", pageSize: 100 })
@@ -534,7 +544,7 @@ export function PurchaseOrderFormPage() {
                         if (e.key !== "Enter") return;
                         e.preventDefault();
                         e.stopPropagation();
-                        void onBarcodeEnter();
+                        void addSkuFromBarcode(barcode);
                       }}
                     />
                   </td>

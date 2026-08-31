@@ -2,8 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   GoodsReceiptDetail,
+  PurchaseOrderDetail,
   ReceivingDraft,
   ReceivingLineDraft,
+  VendorSku,
+} from "@blackbox/shared";
+import {
+  landedUnitByQuantity,
+  lineTotalAfterDiscount,
+  roundMoney4,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
@@ -12,15 +19,134 @@ import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
+import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { loadReceivingDraft } from "@renderer/lib/local-db/entity-source";
+import {
+  loadPurchaseOrder,
+  loadReceivingDraft,
+} from "@renderer/lib/local-db/entity-source";
 import { UpdateVendorSkuPriceDialog } from "./UpdateVendorSkuPriceDialog";
 
 type DraftLine = ReceivingLineDraft & {
   receiveQuantity: number;
+  bonusQuantity: number;
   receivingUnitCost: number;
+  discountPercent: number;
+  originalPoUnitCost: number;
+  originalSellingPrice: number;
 };
+
+function costChanged(line: DraftLine): boolean {
+  return line.receivingUnitCost !== line.originalPoUnitCost;
+}
+
+function saleChanged(line: DraftLine): boolean {
+  return line.currentSellingPrice !== line.originalSellingPrice;
+}
+
+function pricesChanged(line: DraftLine): boolean {
+  return costChanged(line) || saleChanged(line);
+}
+
+async function buildReceivedPurchaseOrderPayload(
+  id: string,
+  header: Omit<ReceivingDraft, "items">,
+  lines: DraftLine[],
+): Promise<Record<string, unknown>> {
+  const headerOnly = {
+    id,
+    poNumber: header.poNumber,
+    vendorId: header.vendorId,
+    vendorName: header.vendorName,
+    warehouseId: header.warehouseId,
+    warehouseName: header.warehouseName,
+    status: "RECEIVED" as const,
+  };
+  try {
+    const po = await loadPurchaseOrder(id);
+    const items = po.items.map((item) => {
+      const line = lines.find((l) => l.purchaseOrderItemId === item.id);
+      if (!line) return item;
+      const unitCost = line.receivingUnitCost;
+      const lineTotal = roundMoney4(
+        item.quantity * unitCost - item.discount + item.tax,
+      );
+      return { ...item, unitCost, lineTotal };
+    });
+    const subtotal = roundMoney4(
+      items.reduce((sum, item) => sum + item.lineTotal, 0),
+    );
+    const total = roundMoney4(
+      subtotal - po.discount + po.tax + po.otherCharges,
+    );
+    const updated: PurchaseOrderDetail = {
+      ...po,
+      status: "RECEIVED",
+      items,
+      subtotal,
+      total,
+    };
+    return updated as unknown as Record<string, unknown>;
+  } catch {
+    return headerOnly;
+  }
+}
+
+async function persistReceivePriceChangesLocal(
+  header: Omit<ReceivingDraft, "items">,
+  lines: DraftLine[],
+  skuIdsWithProductUpsert: Set<string>,
+): Promise<void> {
+  for (const line of lines) {
+    if (line.vendorSkuId && costChanged(line)) {
+      const existing = await window.blackbox?.localDb?.getVendorSku(
+        line.vendorSkuId,
+      );
+      const row: VendorSku = {
+        id: line.vendorSkuId,
+        vendorId: header.vendorId,
+        productSkuId: line.productSkuId,
+        vendorSkuCode: line.vendorSkuCode,
+        purchasePrice: line.receivingUnitCost,
+        purchaseUnitId: line.purchaseUnitId,
+        purchaseUnitName: line.purchaseUnitName,
+        unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+        minimumOrderQuantity: existing?.minimumOrderQuantity ?? 1,
+        leadTimeDays: existing?.leadTimeDays ?? 0,
+        isPreferred: existing?.isPreferred ?? false,
+        status: existing?.status ?? "active",
+        notes: existing?.notes ?? "",
+        productName: existing?.productName || line.productName,
+        variantName: existing?.variantName || line.variantName,
+        sku: existing?.sku || line.sku,
+        barcode: existing?.barcode ?? null,
+      };
+      await commitLocalChange({
+        entityType: "vendor_sku",
+        entityId: line.vendorSkuId,
+        operation: "UPSERT",
+        payload: { ...existing, ...row } as unknown as Record<string, unknown>,
+      });
+    }
+    if (
+      saleChanged(line) &&
+      !skuIdsWithProductUpsert.has(line.productSkuId)
+    ) {
+      const sku = await window.blackbox?.localDb?.getSku(line.productSkuId);
+      if (!sku) continue;
+      await commitLocalChange({
+        entityType: "product_sku",
+        entityId: line.productSkuId,
+        operation: "UPSERT",
+        payload: {
+          ...sku,
+          sellingPrice: line.currentSellingPrice,
+        },
+      });
+    }
+  }
+}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -50,7 +176,11 @@ export function ReceivePurchaseOrderPage() {
     currentPrice: number;
     currentSellingPrice: number;
     purchaseOrderItemId: string;
+    purchaseUnitName: string | null;
+    unitsPerPurchaseUnit: number;
   } | null>(null);
+
+  useBarcodeScanCapture(Boolean(header && !loading && !success), () => {}, null);
 
   useEffect(() => {
     if (!id) return;
@@ -65,7 +195,11 @@ export function ReceivePurchaseOrderPage() {
           items.map((item) => ({
             ...item,
             receiveQuantity: 0,
+            bonusQuantity: 0,
             receivingUnitCost: item.poUnitCost,
+            discountPercent: 0,
+            originalPoUnitCost: item.poUnitCost,
+            originalSellingPrice: item.currentSellingPrice,
           })),
         );
       })
@@ -86,7 +220,13 @@ export function ReceivePurchaseOrderPage() {
     () =>
       Math.round(
         lines.reduce(
-          (sum, l) => sum + l.receiveQuantity * l.receivingUnitCost,
+          (sum, l) =>
+            sum +
+            lineTotalAfterDiscount(
+              l.receiveQuantity,
+              l.receivingUnitCost,
+              l.discountPercent,
+            ),
           0,
         ) * 10000,
       ) / 10000,
@@ -102,7 +242,9 @@ export function ReceivePurchaseOrderPage() {
 
   function updateLine(
     purchaseOrderItemId: string,
-    patch: Pick<DraftLine, "receiveQuantity">,
+    patch: Partial<
+      Pick<DraftLine, "receiveQuantity" | "bonusQuantity" | "discountPercent">
+    >,
   ) {
     setLines((prev) =>
       prev.map((l) =>
@@ -124,8 +266,16 @@ export function ReceivePurchaseOrderPage() {
         );
         return;
       }
+      if (line.bonusQuantity < 0) {
+        setError("Bonus / sample quantity must be >= 0");
+        return;
+      }
       if (line.receivingUnitCost < 0) {
         setError("Receiving unit cost must be >= 0");
+        return;
+      }
+      if (line.discountPercent < 0 || line.discountPercent > 100) {
+        setError("Line discount % must be between 0 and 100");
         return;
       }
     }
@@ -177,9 +327,15 @@ export function ReceivePurchaseOrderPage() {
             unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
             orderedQuantity: l.orderedQuantity,
             receivedQuantity: l.receiveQuantity,
+            bonusQuantity: l.bonusQuantity,
             poUnitCost: l.poUnitCost,
             receivingUnitCost: l.receivingUnitCost,
-            lineTotal: l.receiveQuantity * l.receivingUnitCost,
+            discountPercent: l.discountPercent,
+            lineTotal: lineTotalAfterDiscount(
+              l.receiveQuantity,
+              l.receivingUnitCost,
+              l.discountPercent,
+            ),
           })),
           createdAt: now,
           updatedAt: now,
@@ -190,26 +346,60 @@ export function ReceivePurchaseOrderPage() {
           operation: "UPSERT",
           payload: receipt as unknown as Record<string, unknown>,
         });
+        const poPayload = await buildReceivedPurchaseOrderPayload(
+          id,
+          header,
+          lines,
+        );
         await commitLocalChange({
           entityType: "purchase_order",
           entityId: id,
           operation: "UPSERT",
-          payload: {
-            id,
-            poNumber: header.poNumber,
-            vendorId: header.vendorId,
-            vendorName: header.vendorName,
-            warehouseId: header.warehouseId,
-            warehouseName: header.warehouseName,
-            status: "RECEIVED",
-          },
+          payload: poPayload,
         });
+        const totalReceivedQty = lines.reduce(
+          (sum, l) => sum + (l.receiveQuantity > 0 ? l.receiveQuantity : 0),
+          0,
+        );
+        const skuIdsWithProductUpsert = new Set<string>();
         for (const line of lines) {
-          if (!(line.receiveQuantity > 0)) continue;
+          const unitsPer =
+            line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
+          const billedDelta = line.receiveQuantity * unitsPer;
+          const stockDelta =
+            (line.receiveQuantity + line.bonusQuantity) * unitsPer;
+          if (!(stockDelta > 0)) continue;
           const movementId = crypto.randomUUID();
-          const delta =
-            line.receiveQuantity *
-            (line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1);
+          if (billedDelta > 0) {
+            const netUnit = landedUnitByQuantity(
+              line.receiveQuantity,
+              line.receivingUnitCost,
+              line.discountPercent,
+              totalReceivedQty,
+              discountAmount,
+              taxN,
+              otherN,
+            );
+            const avg = await window.blackbox?.localDb?.applyPurchaseAvgCost(
+              line.productSkuId,
+              billedDelta,
+              netUnit,
+              line.unitsPerPurchaseUnit,
+            );
+            if (avg) {
+              await commitLocalChange({
+                entityType: "product_sku",
+                entityId: line.productSkuId,
+                operation: "UPSERT",
+                payload: {
+                  ...avg.sku,
+                  costPrice: avg.avgCost,
+                  sellingPrice: line.currentSellingPrice,
+                },
+              });
+              skuIdsWithProductUpsert.add(line.productSkuId);
+            }
+          }
           await commitLocalChange({
             entityType: "inventory_movement",
             entityId: movementId,
@@ -222,8 +412,8 @@ export function ReceivePurchaseOrderPage() {
               warehouseId: header.warehouseId,
               warehouseName: header.warehouseName,
               movementType: "PURCHASE_RECEIPT",
-              quantity: delta,
-              delta,
+              quantity: stockDelta,
+              delta: stockDelta,
               referenceType: "goods_receipt",
               referenceId: localId,
               reason: `Receipt ${receipt.receiptNumber}`,
@@ -231,9 +421,21 @@ export function ReceivePurchaseOrderPage() {
             },
           });
         }
+        await persistReceivePriceChangesLocal(header, lines, skuIdsWithProductUpsert);
         void syncNow();
         setSuccess(receipt);
         return;
+      }
+      for (const line of lines) {
+        if (!line.vendorSkuId || !pricesChanged(line)) continue;
+        await purchaseOrdersApi.updateItemPrice(
+          id,
+          line.purchaseOrderItemId,
+          {
+            unitCost: line.receivingUnitCost,
+            sellingPrice: line.currentSellingPrice,
+          },
+        );
       }
       const receipt = await goodsReceiptsApi.createReceipt(id, {
         receiptDate,
@@ -245,7 +447,9 @@ export function ReceivePurchaseOrderPage() {
         items: lines.map((l) => ({
           purchaseOrderItemId: l.purchaseOrderItemId,
           receivedQuantity: l.receiveQuantity,
+          bonusQuantity: l.bonusQuantity,
           receivingUnitCost: l.receivingUnitCost,
+          discountPercent: l.discountPercent,
         })),
       });
 
@@ -394,7 +598,9 @@ export function ReceivePurchaseOrderPage() {
                 <th className="px-3 py-2 font-medium">SKU</th>
                 <th className="px-3 py-2 font-medium">Ordered</th>
                 <th className="px-3 py-2 font-medium">Receive qty</th>
+                <th className="px-3 py-2 font-medium">Bonus / Sample</th>
                 <th className="px-3 py-2 font-medium">PO price</th>
+                <th className="px-3 py-2 font-medium">Discount %</th>
                 <th className="px-3 py-2 font-medium">Total</th>
                 <th className="px-3 py-2 font-medium" />
               </tr>
@@ -429,12 +635,42 @@ export function ReceivePurchaseOrderPage() {
                         }}
                       />
                     </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        className="h-8 w-24"
+                        value={String(line.bonusQuantity)}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          updateLine(line.purchaseOrderItemId, {
+                            bonusQuantity: Number.isNaN(n)
+                              ? line.bonusQuantity
+                              : n,
+                          });
+                        }}
+                      />
+                    </td>
                     <td className="px-3 py-2 tabular-nums">
                       {line.receivingUnitCost.toLocaleString()}
                     </td>
+                    <td className="px-3 py-2">
+                      <Input
+                        className="h-8 w-20"
+                        value={String(line.discountPercent)}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          updateLine(line.purchaseOrderItemId, {
+                            discountPercent: Number.isNaN(n)
+                              ? line.discountPercent
+                              : n,
+                          });
+                        }}
+                      />
+                    </td>
                     <td className="px-3 py-2 tabular-nums">
-                      {(
-                        line.receiveQuantity * line.receivingUnitCost
+                      {lineTotalAfterDiscount(
+                        line.receiveQuantity,
+                        line.receivingUnitCost,
+                        line.discountPercent,
                       ).toLocaleString()}
                     </td>
                     <td className="px-3 py-2">
@@ -449,6 +685,8 @@ export function ReceivePurchaseOrderPage() {
                               currentPrice: line.receivingUnitCost,
                               currentSellingPrice: line.currentSellingPrice,
                               purchaseOrderItemId: line.purchaseOrderItemId,
+                              purchaseUnitName: line.purchaseUnitName,
+                              unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
                             })
                           }
                         >
@@ -537,11 +775,11 @@ export function ReceivePurchaseOrderPage() {
       {priceEdit ? (
         <UpdateVendorSkuPriceDialog
           open
-          purchaseOrderId={header.purchaseOrderId}
-          purchaseOrderItemId={priceEdit.purchaseOrderItemId}
           productLabel={priceEdit.productLabel}
           currentPrice={priceEdit.currentPrice}
           currentSellingPrice={priceEdit.currentSellingPrice}
+          purchaseUnitName={priceEdit.purchaseUnitName}
+          unitsPerPurchaseUnit={priceEdit.unitsPerPurchaseUnit}
           onClose={() => setPriceEdit(null)}
           onSaved={(newPrice, newSellingPrice) => {
             setLines((prev) =>

@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
   ValidateNested,
 } from "class-validator";
@@ -20,10 +21,23 @@ export class CreateGoodsReceiptItemDto {
   @Min(0)
   receivedQuantity!: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  bonusQuantity?: number;
+
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   receivingUnitCost!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  discountPercent?: number;
 }
 
 export class CreateGoodsReceiptDto {

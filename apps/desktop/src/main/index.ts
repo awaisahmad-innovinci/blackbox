@@ -47,7 +47,10 @@ import {
   upsertPurchaseOrderLocal,
   upsertPurchaseOrdersLocal,
 } from "./db/purchase-orders-local";
-import { upsertStockRowsLocal } from "./db/stock-local";
+import {
+  applyPurchaseAvgCostLocal,
+  upsertStockRowsLocal,
+} from "./db/stock-local";
 import { upsertWarehousesLocal } from "./db/warehouses-local";
 import { getSyncMeta, setSyncMeta } from "./db/sync-meta";
 import {
@@ -73,6 +76,7 @@ import {
   getSkuLocal,
   getSkuProfileLocal,
   getSkuByBarcodeLocal,
+  getVendorSkuLocal,
   searchSkusLocal,
   listInventoryInOutReportLocal,
   getVendorLocal,
@@ -88,6 +92,7 @@ import {
   listVendorGroupsLocal,
   listUnitsLocal,
   listVendorsLocal,
+  getWarehouseLocal,
   listWarehousesLocal,
 } from "./db/queries-local";
 import {
@@ -315,7 +320,13 @@ function registerIpc(): void {
     "localDb:listVendorGroups",
     (_event, status?: EntityStatus | "all") => listVendorGroupsLocal(status),
   );
-  ipcMain.handle("localDb:listWarehouses", () => listWarehousesLocal());
+  ipcMain.handle(
+    "localDb:listWarehouses",
+    (_event, status?: EntityStatus | "all") => listWarehousesLocal(status),
+  );
+  ipcMain.handle("localDb:getWarehouse", (_event, id: string) =>
+    getWarehouseLocal(id),
+  );
   ipcMain.handle("localDb:listUnits", () => listUnitsLocal());
   ipcMain.handle("localDb:getProduct", (_event, id: string) =>
     getProductLocal(id),
@@ -344,6 +355,25 @@ function registerIpc(): void {
       }),
   );
   ipcMain.handle("localDb:getSku", (_event, id: string) => getSkuLocal(id));
+  ipcMain.handle("localDb:getVendorSku", (_event, id: string) =>
+    getVendorSkuLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:applyPurchaseAvgCost",
+    (
+      _event,
+      productSkuId: string,
+      inventoryDelta: number,
+      receivingUnitCost: number,
+      unitsPerPurchaseUnit: number,
+    ) =>
+      applyPurchaseAvgCostLocal(
+        productSkuId,
+        inventoryDelta,
+        receivingUnitCost,
+        unitsPerPurchaseUnit,
+      ),
+  );
   ipcMain.handle("localDb:getSkuProfile", (_event, id: string) =>
     getSkuProfileLocal(id),
   );

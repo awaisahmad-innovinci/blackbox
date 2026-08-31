@@ -173,3 +173,51 @@ export function trustDevice(id: string) {
 export function revokeDevice(id: string) {
   return apiJson<DeviceDto>(`/devices/${id}/revoke`, "POST");
 }
+
+export type WarehouseDto = {
+  id: string;
+  name: string;
+  code: string;
+  location: string | null;
+  status: "active" | "inactive";
+};
+
+export function listWarehouses(query?: {
+  status?: "active" | "inactive" | "all";
+  q?: string;
+}) {
+  const params = new URLSearchParams();
+  if (query?.status) params.set("status", query.status);
+  if (query?.q?.trim()) params.set("q", query.q.trim());
+  const s = params.toString();
+  return apiFetch<WarehouseDto[]>(`/warehouses${s ? `?${s}` : ""}`);
+}
+
+export function getWarehouse(id: string) {
+  return apiFetch<WarehouseDto>(`/warehouses/${id}`);
+}
+
+export function createWarehouse(body: {
+  name: string;
+  code: string;
+  location?: string | null;
+  status?: "active" | "inactive";
+}) {
+  return apiJson<WarehouseDto>("/warehouses", "POST", body);
+}
+
+export function updateWarehouse(
+  id: string,
+  body: {
+    name: string;
+    code: string;
+    location?: string | null;
+    status?: "active" | "inactive";
+  },
+) {
+  return apiJson<WarehouseDto>(`/warehouses/${id}`, "PATCH", body);
+}
+
+export function deactivateWarehouse(id: string) {
+  return apiJson<WarehouseDto>(`/warehouses/${id}/deactivate`, "POST");
+}

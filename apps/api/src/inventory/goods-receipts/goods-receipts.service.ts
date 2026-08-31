@@ -13,6 +13,12 @@ import type {
   ReceivingDraft,
   ReceivingLineDraft,
 } from "@blackbox/shared";
+import {
+  landedUnitByQuantity,
+  lineTotalAfterDiscount,
+  roundMoney4,
+  weightedAvgUnitCost,
+} from "@blackbox/shared";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import {
   GoodsReceipt,
@@ -35,9 +41,7 @@ function toNum(value: string | null | undefined): number {
   return Number(value);
 }
 
-function round4(n: number): number {
-  return Math.round(n * 10000) / 10000;
-}
+const round4 = roundMoney4;
 
 @Injectable()
 export class GoodsReceiptsService {
@@ -293,10 +297,14 @@ export class GoodsReceiptsService {
         unitsPerPurchaseUnit: string;
         orderedQuantity: string;
         receivedQuantity: string;
+        bonusQuantity: string;
         poUnitCost: string;
         receivingUnitCost: string;
+        discountPercent: string;
         lineTotal: string;
-        inventoryDelta: number;
+        billedDelta: number;
+        stockDelta: number;
+        avgNetUnit: number;
       }> = [];
 
       for (const item of dto.items) {
@@ -316,13 +324,28 @@ export class GoodsReceiptsService {
         if (item.receivingUnitCost < 0) {
           throw new BadRequestException("Receiving unit cost must be >= 0");
         }
+        const bonusQuantity = item.bonusQuantity ?? 0;
+        if (bonusQuantity < 0) {
+          throw new BadRequestException("Bonus quantity must be >= 0");
+        }
+        const discountPercent = item.discountPercent ?? 0;
+        if (discountPercent < 0 || discountPercent > 100) {
+          throw new BadRequestException(
+            "Line discount % must be between 0 and 100",
+          );
+        }
 
         const unitsPer = toNum(poLine.unitsPerPurchaseUnit) || 1;
-        const lineTotal = round4(
-          item.receivedQuantity * item.receivingUnitCost,
+        const lineTotal = lineTotalAfterDiscount(
+          item.receivedQuantity,
+          item.receivingUnitCost,
+          discountPercent,
         );
         subtotal = round4(subtotal + lineTotal);
-        const inventoryDelta = round4(item.receivedQuantity * unitsPer);
+        const billedDelta = round4(item.receivedQuantity * unitsPer);
+        const stockDelta = round4(
+          (item.receivedQuantity + bonusQuantity) * unitsPer,
+        );
 
         builtLines.push({
           purchaseOrderItemId: poLine.id,
@@ -332,10 +355,14 @@ export class GoodsReceiptsService {
           unitsPerPurchaseUnit: String(unitsPer),
           orderedQuantity: String(ordered),
           receivedQuantity: String(item.receivedQuantity),
+          bonusQuantity: String(bonusQuantity),
           poUnitCost: String(toNum(poLine.unitCost)),
           receivingUnitCost: String(item.receivingUnitCost),
+          discountPercent: String(discountPercent),
           lineTotal: String(lineTotal),
-          inventoryDelta,
+          billedDelta,
+          stockDelta,
+          avgNetUnit: 0,
         });
       }
 
@@ -350,18 +377,21 @@ export class GoodsReceiptsService {
           "Discount cannot be greater than subtotal",
         );
       }
-      const rate = subtotal > 0 ? Math.min(discount / subtotal, 1) : 0;
+      const totalReceivedQty = builtLines.reduce(
+        (sum, line) => sum + toNum(line.receivedQuantity),
+        0,
+      );
 
       for (const line of builtLines) {
-        const qty = toNum(line.receivedQuantity);
-        const grossTotal = toNum(line.lineTotal);
-        const netTotal = round4(grossTotal * (1 - rate));
-        const netUnit =
-          qty > 0
-            ? round4(netTotal / qty)
-            : round4(toNum(line.receivingUnitCost) * (1 - rate));
-        line.receivingUnitCost = String(netUnit);
-        line.lineTotal = String(netTotal);
+        line.avgNetUnit = landedUnitByQuantity(
+          toNum(line.receivedQuantity),
+          toNum(line.receivingUnitCost),
+          toNum(line.discountPercent),
+          totalReceivedQty,
+          discount,
+          tax,
+          otherCharges,
+        );
       }
 
       const total = round4(subtotal - discount + tax + otherCharges);
@@ -402,13 +432,15 @@ export class GoodsReceiptsService {
             unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
             orderedQuantity: line.orderedQuantity,
             receivedQuantity: line.receivedQuantity,
+            bonusQuantity: line.bonusQuantity,
             poUnitCost: line.poUnitCost,
             receivingUnitCost: line.receivingUnitCost,
+            discountPercent: line.discountPercent,
             lineTotal: line.lineTotal,
           }),
         );
 
-        if (line.inventoryDelta > 0) {
+        if (line.stockDelta > 0) {
           const productSkuRepo = manager.getRepository(ProductSku);
           const productSku = await productSkuRepo.findOne({
             where: { id: line.productSkuId, tenantId },
@@ -431,26 +463,17 @@ export class GoodsReceiptsService {
           );
           const oldCost = toNum(productSku.costPrice);
           const unitsPer = toNum(line.unitsPerPurchaseUnit) || 1;
-          const newQty = line.inventoryDelta;
-          const netUnitCost = toNum(line.receivingUnitCost);
-          const newCost = round4(netUnitCost / unitsPer);
-          const avgCost =
-            oldQty <= 0
-              ? newCost
-              : round4((oldQty * oldCost + newQty * newCost) / (oldQty + newQty));
-          productSku.costPrice = String(avgCost);
-          await productSkuRepo.save(productSku);
-
-          if (line.vendorSkuId) {
-            const vendorSkuRepo = manager.getRepository(VendorSku);
-            const vendorSku = await vendorSkuRepo.findOne({
-              where: { id: line.vendorSkuId, tenantId },
-              lock: { mode: "pessimistic_write" },
-            });
-            if (vendorSku) {
-              vendorSku.purchasePrice = String(netUnitCost);
-              await vendorSkuRepo.save(vendorSku);
-            }
+          if (line.billedDelta > 0) {
+            const netUnitCost = line.avgNetUnit;
+            const newCost = round4(netUnitCost / unitsPer);
+            const avgCost = weightedAvgUnitCost(
+              oldQty,
+              oldCost,
+              line.billedDelta,
+              newCost,
+            );
+            productSku.costPrice = String(avgCost);
+            await productSkuRepo.save(productSku);
           }
 
           await manager.getRepository(InventoryMovement).save(
@@ -459,7 +482,7 @@ export class GoodsReceiptsService {
               productSkuId: line.productSkuId,
               warehouseId: po.warehouseId,
               movementType: "PURCHASE_RECEIPT",
-              quantity: String(line.inventoryDelta),
+              quantity: String(line.stockDelta),
               referenceType: "goods_receipt",
               referenceId: receipt.id,
               reason: `Receipt ${receiptNumber}`,
@@ -477,7 +500,7 @@ export class GoodsReceiptsService {
               quantityAvailable: "0",
             });
           }
-          const onHand = round4(toNum(stock.quantityOnHand) + line.inventoryDelta);
+          const onHand = round4(toNum(stock.quantityOnHand) + line.stockDelta);
           const reserved = toNum(stock.quantityReserved);
           stock.quantityOnHand = String(onHand);
           stock.quantityAvailable = String(round4(onHand - reserved));
@@ -535,8 +558,10 @@ export class GoodsReceiptsService {
       unitsPerPurchaseUnit: toNum(l.unitsPerPurchaseUnit),
       orderedQuantity: toNum(l.orderedQuantity),
       receivedQuantity: toNum(l.receivedQuantity),
+      bonusQuantity: toNum(l.bonusQuantity),
       poUnitCost: toNum(l.poUnitCost),
       receivingUnitCost: toNum(l.receivingUnitCost),
+      discountPercent: toNum(l.discountPercent),
       lineTotal: toNum(l.lineTotal),
     }));
 

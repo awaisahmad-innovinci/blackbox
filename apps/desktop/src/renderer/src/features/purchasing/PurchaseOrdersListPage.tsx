@@ -13,7 +13,7 @@ import { Skeleton } from "@blackbox/ui/skeleton";
 import { ApiError } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { vendorsApi } from "@renderer/lib/api/vendors";
-import { warehousesApi } from "@renderer/lib/api/warehouses";
+import { loadWarehouses } from "@renderer/lib/local-db/entity-source";
 import {
   resolveDataSourceMode,
   type DataSourceMode,
@@ -49,14 +49,14 @@ export function PurchaseOrdersListPage() {
             pageSize: 100,
           });
           setVendors(vendorsRes.items);
-          setWarehouses(await window.blackbox.localDb.listWarehouses!());
+          setWarehouses(await loadWarehouses("all"));
         } else {
           const vendorsRes = await vendorsApi.list({
             status: "active",
             pageSize: 100,
           });
           setVendors(vendorsRes.items);
-          setWarehouses(await warehousesApi.list());
+          setWarehouses(await loadWarehouses("all"));
         }
       } catch {
         /* filters optional */

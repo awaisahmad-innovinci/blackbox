@@ -369,9 +369,11 @@ export class PurchaseOrdersService {
 
       const nextPrice = round4(unitCost);
       const nextSelling = round4(sellingPrice);
-      if (nextPrice >= nextSelling) {
+      const unitsPer = toNum(line.unitsPerPurchaseUnit) || 1;
+      const pieceCost = round4(nextPrice / unitsPer);
+      if (pieceCost > 0 && pieceCost >= nextSelling) {
         throw new BadRequestException(
-          "Cost price must be less than sale price",
+          "Cost per piece must be less than sale price",
         );
       }
 

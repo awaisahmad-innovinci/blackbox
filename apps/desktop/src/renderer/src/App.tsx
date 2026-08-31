@@ -1,6 +1,5 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
-import { PlaceholderPage } from "./app/PlaceholderPage";
 import { SignInPage } from "./features/auth/SignInPage";
 import { SessionProvider } from "./lib/session/session-context";
 import { useSession } from "./lib/session/context";
@@ -26,6 +25,8 @@ import { VendorGroupsListPage } from "./features/vendor-groups/VendorGroupsListP
 import { VendorFormPage } from "./features/vendors/VendorFormPage";
 import { VendorProfilePage } from "./features/vendors/VendorProfilePage";
 import { VendorsListPage } from "./features/vendors/VendorsListPage";
+import { WarehouseFormPage } from "./features/warehouses/WarehouseFormPage";
+import { WarehousesListPage } from "./features/warehouses/WarehousesListPage";
 
 export default function App() {
   return (
@@ -110,10 +111,9 @@ function AuthenticatedApp() {
             path="purchasing"
             element={<Navigate to="/purchase-orders" replace />}
           />
-          <Route
-            path="warehouses"
-            element={<PlaceholderPage title="Warehouses" />}
-          />
+          <Route path="warehouses" element={<WarehousesListPage />} />
+          <Route path="warehouses/new" element={<WarehouseFormPage />} />
+          <Route path="warehouses/:id/edit" element={<WarehouseFormPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

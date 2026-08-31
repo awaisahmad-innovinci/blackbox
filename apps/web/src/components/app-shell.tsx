@@ -15,6 +15,7 @@ import {
   Menu,
   PanelLeftClose,
   BarChart3,
+  Warehouse,
 } from "lucide-react";
 import { Button } from "@blackbox/ui/button";
 import { Separator } from "@blackbox/ui/separator";
@@ -27,6 +28,7 @@ import {
 } from "@blackbox/ui/sheet";
 import { cn } from "@blackbox/ui/lib/utils";
 import { useAuth } from "@/components/auth-provider";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getCurrentTenant } from "@/lib/admin-api";
 
 const NAV: {
@@ -49,6 +51,12 @@ const NAV: {
     label: "Devices",
     permission: "devices.read",
     icon: MonitorSmartphone,
+  },
+  {
+    href: "/app/warehouses",
+    label: "Warehouses",
+    permission: "warehouses.write",
+    icon: Warehouse,
   },
   {
     href: "/app/inventory/reports",
@@ -160,6 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -250,7 +259,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           fullName={user.fullName}
           email={user.email}
           loggingOut={loggingOut}
-          onLogout={() => void onLogout()}
+          onLogout={() => setLogoutOpen(true)}
         />
       </aside>
 
@@ -278,7 +287,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   fullName={user.fullName}
                   email={user.email}
                   loggingOut={loggingOut}
-                  onLogout={() => void onLogout()}
+                  onLogout={() => setLogoutOpen(true)}
                 />
               </div>
             </SheetContent>
@@ -296,6 +305,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
       </div>
+
+      <ConfirmDialog
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        title="Are you sure you want to logout?"
+        description="Are you sure you want to logout?"
+        confirmLabel="Yes"
+        cancelLabel="Cancel"
+        loading={loggingOut}
+        onConfirm={onLogout}
+      />
     </div>
   );
 }
