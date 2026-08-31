@@ -61,12 +61,12 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       `insert into goods_receipt_items (
         id, tenant_id, goods_receipt_id, purchase_order_item_id, product_sku_id,
         vendor_sku_id, purchase_unit_id, units_per_purchase_unit, ordered_quantity,
-        received_quantity, po_unit_cost, receiving_unit_cost, line_total,
+        received_quantity, bonus_quantity, po_unit_cost, receiving_unit_cost, discount_percent, line_total,
         created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @goodsReceiptId, @purchaseOrderItemId, @productSkuId,
         @vendorSkuId, @purchaseUnitId, @unitsPerPurchaseUnit, @orderedQuantity,
-        @receivedQuantity, @poUnitCost, @receivingUnitCost, @lineTotal,
+        @receivedQuantity, @bonusQuantity, @poUnitCost, @receivingUnitCost, @discountPercent, @lineTotal,
         @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )`,
     );
@@ -83,8 +83,10 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
         unitsPerPurchaseUnit: item.unitsPerPurchaseUnit,
         orderedQuantity: item.orderedQuantity,
         receivedQuantity: item.receivedQuantity,
+        bonusQuantity: item.bonusQuantity ?? 0,
         poUnitCost: item.poUnitCost,
         receivingUnitCost: item.receivingUnitCost,
+        discountPercent: item.discountPercent ?? 0,
         lineTotal: item.lineTotal,
         createdAt: detail.updatedAt,
         updatedAt: detail.updatedAt,

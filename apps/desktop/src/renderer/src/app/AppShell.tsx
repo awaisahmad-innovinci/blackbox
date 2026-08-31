@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
 import { handleEnterToNextField } from "@blackbox/ui/lib/form-keyboard";
@@ -10,6 +11,7 @@ import {
 } from "@blackbox/ui/dropdown-menu";
 import { useSession } from "@renderer/lib/session/context";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
+import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 
 const NAV = [
   { to: "/", label: "Dashboard", end: true },
@@ -29,6 +31,8 @@ export function AppShell() {
   const location = useLocation();
   const { user, offline, deviceState, signOut } = useSession();
   const sync = useSyncStatus();
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const vendorsActive =
     location.pathname.startsWith("/vendors") ||
     location.pathname.startsWith("/vendor-groups");
@@ -194,7 +198,7 @@ export function AppShell() {
                 <DropdownMenuItem onSelect={() => void syncNow()}>
                   Sync now
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void signOut()}>
+                <DropdownMenuItem onSelect={() => setLogoutOpen(true)}>
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -224,6 +228,25 @@ export function AppShell() {
       >
         <Outlet />
       </main>
+
+      <ConfirmDialog
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        title="Are you sure you want to logout?"
+        description="Are you sure you want to logout?"
+        confirmLabel="Yes"
+        cancelLabel="Cancel"
+        loading={loggingOut}
+        onConfirm={async () => {
+          setLoggingOut(true);
+          try {
+            await signOut();
+          } finally {
+            setLoggingOut(false);
+            setLogoutOpen(false);
+          }
+        }}
+      />
     </div>
   );
 }

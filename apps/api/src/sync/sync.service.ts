@@ -8,7 +8,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import {
   SYNC_PULL_BATCH_SIZE,
   SYNC_STREAMS,
+  landedUnitByQuantity,
+  roundMoney4,
   streamForEntity,
+  weightedAvgUnitCost,
   type SyncChangeDto,
   type SyncEntityType,
   type SyncPushItemResult,
@@ -799,6 +802,7 @@ export class SyncService {
     const existing = await manager.findOne(GoodsReceipt, {
       where: { id: entityId, tenantId },
     });
+    const isNewPost = !existing || existing.status === "DRAFT";
     const row =
       existing ?? manager.create(GoodsReceipt, { id: entityId, tenantId });
     Object.assign(row, {
@@ -821,12 +825,15 @@ export class SyncService {
     });
     if (!row.purchaseOrderId) throw new Error("purchase order not found");
     await manager.save(row);
-    if (Array.isArray(p.items)) {
+    const items = Array.isArray(p.items)
+      ? (p.items as Array<Record<string, unknown>>)
+      : [];
+    if (items.length > 0) {
       await manager.delete(GoodsReceiptItem, {
         goodsReceiptId: entityId,
         tenantId,
       });
-      for (const item of p.items as Array<Record<string, unknown>>) {
+      for (const item of items) {
         await manager.save(
           manager.create(GoodsReceiptItem, {
             id: String(item.id ?? randomUUID()),
@@ -839,11 +846,106 @@ export class SyncService {
             unitsPerPurchaseUnit: String(item.unitsPerPurchaseUnit ?? 1),
             orderedQuantity: String(item.orderedQuantity ?? 0),
             receivedQuantity: String(item.receivedQuantity ?? 0),
+            bonusQuantity: String(item.bonusQuantity ?? 0),
             poUnitCost: String(item.poUnitCost ?? 0),
             receivingUnitCost: String(item.receivingUnitCost ?? 0),
+            discountPercent: String(item.discountPercent ?? 0),
             lineTotal: String(item.lineTotal ?? 0),
           }),
         );
+      }
+    }
+    if (isNewPost && row.status === "POSTED" && items.length > 0) {
+      await this.applyReceiptAvgCost(manager, tenantId, entityId, items, {
+        headerDiscount: Number(row.discount ?? 0),
+        tax: Number(row.tax ?? 0),
+        otherCharges: Number(row.otherCharges ?? 0),
+      });
+    }
+  }
+
+  /** Updates SKU avg cost and vendor last price. Stock stays on inventory_movement. */
+  private async applyReceiptAvgCost(
+    manager: EntityManager,
+    tenantId: string,
+    receiptId: string,
+    items: Array<Record<string, unknown>>,
+    voucher: { headerDiscount: number; tax: number; otherCharges: number },
+  ): Promise<void> {
+    const totalReceivedQty = items.reduce((sum, item) => {
+      const qty = Number(item.receivedQuantity ?? 0);
+      return sum + (qty > 0 ? qty : 0);
+    }, 0);
+    const running = new Map<
+      string,
+      { qty: number; cost: number }
+    >();
+    for (const item of items) {
+      const productSkuId = String(item.productSkuId ?? "");
+      if (!productSkuId) continue;
+      const unitsPer = Number(item.unitsPerPurchaseUnit ?? 1) || 1;
+      const received = Number(item.receivedQuantity ?? 0);
+      const bonus = Number(item.bonusQuantity ?? 0);
+      const billedDelta = roundMoney4(received * unitsPer);
+      const stockDelta = roundMoney4((received + bonus) * unitsPer);
+      if (stockDelta <= 0) continue;
+
+      let state = running.get(productSkuId);
+      if (!state) {
+        const productSku = await manager.findOne(ProductSku, {
+          where: { id: productSkuId, tenantId },
+        });
+        if (!productSku) continue;
+        const allStock = await manager.find(InventoryStock, {
+          where: { tenantId, productSkuId },
+        });
+        const currentOnHand = roundMoney4(
+          allStock.reduce((sum, row) => sum + Number(row.quantityOnHand ?? 0), 0),
+        );
+        const appliedMoves = await manager.find(InventoryMovement, {
+          where: {
+            tenantId,
+            productSkuId,
+            referenceType: "goods_receipt",
+            referenceId: receiptId,
+          },
+        });
+        const appliedQty = roundMoney4(
+          appliedMoves.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0),
+        );
+        state = {
+          qty: roundMoney4(currentOnHand - appliedQty),
+          cost: Number(productSku.costPrice ?? 0),
+        };
+        running.set(productSkuId, state);
+      }
+
+      if (billedDelta > 0) {
+        const netUnitCost = landedUnitByQuantity(
+          received,
+          Number(item.receivingUnitCost ?? 0),
+          Number(item.discountPercent ?? 0),
+          totalReceivedQty,
+          voucher.headerDiscount,
+          voucher.tax,
+          voucher.otherCharges,
+        );
+        const newCost = roundMoney4(netUnitCost / unitsPer);
+        state.cost = weightedAvgUnitCost(
+          state.qty,
+          state.cost,
+          billedDelta,
+          newCost,
+        );
+      }
+      state.qty = roundMoney4(state.qty + stockDelta);
+
+      const productSku = await manager.findOne(ProductSku, {
+        where: { id: productSkuId, tenantId },
+      });
+      if (productSku) {
+        productSku.costPrice = String(state.cost);
+        await manager.save(productSku);
       }
     }
   }

@@ -1,6 +1,11 @@
-import type { WarehouseStockRow } from "@blackbox/shared";
-import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import type { SkuDetail, WarehouseStockRow } from "@blackbox/shared";
+import {
+  DEMO_STORE_TENANT_ID,
+  roundMoney4,
+  weightedAvgUnitCost,
+} from "@blackbox/shared";
 import { getLocalDb } from "./index";
+import { getSkuLocal } from "./entity-get-local";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -43,6 +48,41 @@ export function upsertStockLocal(row: WarehouseStockRow): void {
     updatedAt: ts,
     serverUpdatedAt: ts,
   });
+}
+
+export function totalOnHandLocal(productSkuId: string): number {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select coalesce(sum(quantity_on_hand), 0) as qty
+       from inventory_stock
+       where tenant_id = @tenantId and product_sku_id = @productSkuId`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      productSkuId,
+    }) as { qty: number } | undefined;
+  return Number(row?.qty ?? 0);
+}
+
+export function applyPurchaseAvgCostLocal(
+  productSkuId: string,
+  inventoryDelta: number,
+  receivingUnitCost: number,
+  unitsPerPurchaseUnit: number,
+): { sku: SkuDetail; avgCost: number } | null {
+  const sku = getSkuLocal(productSkuId);
+  if (!sku) return null;
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  const newCost = roundMoney4(receivingUnitCost / unitsPer);
+  const oldQty = totalOnHandLocal(productSkuId);
+  const avgCost = weightedAvgUnitCost(
+    oldQty,
+    sku.costPrice,
+    inventoryDelta,
+    newCost,
+  );
+  return { sku, avgCost };
 }
 
 export function applyStockDeltaLocal(

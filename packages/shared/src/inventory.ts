@@ -457,6 +457,83 @@ export function nextSkuCode(
   return `${prefix}${String(max + 1).padStart(2, "0")}`;
 }
 
+export function roundMoney4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
+/** Weighted average unit cost after a purchase receipt (base-unit qty and cost). */
+export function weightedAvgUnitCost(
+  oldQty: number,
+  oldCost: number,
+  newQty: number,
+  newCost: number,
+): number {
+  if (oldQty <= 0) return roundMoney4(newCost);
+  return roundMoney4((oldQty * oldCost + newQty * newCost) / (oldQty + newQty));
+}
+
+export function clampDiscountPercent(value: number): number {
+  if (!Number.isFinite(value) || value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+}
+
+/** Line total after a percent discount on qty × unit cost. */
+export function lineTotalAfterDiscount(
+  qty: number,
+  unitCost: number,
+  discountPercent: number,
+): number {
+  const pct = clampDiscountPercent(discountPercent);
+  return roundMoney4(qty * unitCost * (1 - pct / 100));
+}
+
+/** Net purchase-unit cost after line % and a header discount rate (0–1). */
+export function netUnitAfterDiscounts(
+  qty: number,
+  unitCost: number,
+  discountPercent: number,
+  headerRate: number,
+): number {
+  const rate = Number.isFinite(headerRate)
+    ? Math.min(Math.max(headerRate, 0), 1)
+    : 0;
+  const lineNet = lineTotalAfterDiscount(qty, unitCost, discountPercent);
+  const afterHeader = roundMoney4(lineNet * (1 - rate));
+  if (qty > 0) return roundMoney4(afterHeader / qty);
+  const pct = clampDiscountPercent(discountPercent);
+  return roundMoney4(unitCost * (1 - pct / 100) * (1 - rate));
+}
+
+/**
+ * Landed purchase-unit cost: line % first, then voucher discount/tax/other
+ * spread equally across every received purchase unit.
+ */
+export function landedUnitByQuantity(
+  qty: number,
+  unitCost: number,
+  discountPercent: number,
+  totalReceivedQty: number,
+  headerDiscountAmount: number,
+  tax: number,
+  otherCharges: number,
+): number {
+  const lineNet = lineTotalAfterDiscount(qty, unitCost, discountPercent);
+  const lineUnit = qty > 0 ? lineNet / qty : 0;
+  const totalQty =
+    Number.isFinite(totalReceivedQty) && totalReceivedQty > 0
+      ? totalReceivedQty
+      : 0;
+  const perPiece =
+    totalQty > 0
+      ? (Number(tax || 0) +
+          Number(otherCharges || 0) -
+          Number(headerDiscountAmount || 0)) /
+        totalQty
+      : 0;
+  return Math.max(0, roundMoney4(lineUnit + perPiece));
+}
+
 export interface ProductSupplierRow {
   vendorSkuId: string;
   productSkuId: string;
@@ -502,6 +579,15 @@ export interface WarehouseListItem {
   location: string | null;
   status: EntityStatus;
 }
+
+export interface CreateWarehouseRequest {
+  name: string;
+  code: string;
+  location?: string | null;
+  status?: EntityStatus;
+}
+
+export type UpdateWarehouseRequest = CreateWarehouseRequest;
 
 export interface PurchaseOrderItemRow {
   id: string;
@@ -635,7 +721,9 @@ export interface ReceivingDraft {
 export interface CreateGoodsReceiptItemRequest {
   purchaseOrderItemId: string;
   receivedQuantity: number;
+  bonusQuantity?: number;
   receivingUnitCost: number;
+  discountPercent?: number;
 }
 
 export interface CreateGoodsReceiptRequest {
@@ -662,8 +750,10 @@ export interface GoodsReceiptItemRow {
   unitsPerPurchaseUnit: number;
   orderedQuantity: number;
   receivedQuantity: number;
+  bonusQuantity: number;
   poUnitCost: number;
   receivingUnitCost: number;
+  discountPercent: number;
   lineTotal: number;
 }
 

@@ -157,14 +157,22 @@ export async function loadVendors(
   return vendorsApi.list(query);
 }
 
-export async function loadWarehouses(): Promise<WarehouseListItem[]> {
+export async function loadWarehouses(
+  status: EntityStatus | "all" = "active",
+): Promise<WarehouseListItem[]> {
   try {
-    const local = await window.blackbox?.localDb?.listWarehouses?.();
+    const local = await window.blackbox?.localDb?.listWarehouses?.(status);
     if (local) return local;
   } catch {
     /* fall through to API */
   }
-  return warehousesApi.list();
+  return warehousesApi.list({ status });
+}
+
+export async function loadWarehouse(id: string): Promise<WarehouseListItem> {
+  const local = await window.blackbox?.localDb?.getWarehouse?.(id);
+  if (local) return local;
+  return warehousesApi.get(id);
 }
 
 export async function loadBrands(

@@ -466,6 +466,7 @@ export function listVendorSkusLocal(
        where vs.vendor_id = @vendorId
          and vs.tenant_id = @tenantId
          and (@activeOnly = 0 or vs.status = 'active')
+         and (@activeOnly = 0 or s.status = 'active')
          and (
            @q = ''
            or lower(p.name) like '%' || @q || '%'
@@ -511,6 +512,57 @@ export function getVendorProfileLocal(id: string): VendorProfileLocal | null {
   const vendor = getVendorLocal(id);
   if (!vendor) return null;
   return { vendor, skus: listVendorSkusLocal(id) };
+}
+
+export function getVendorSkuLocal(id: string): VendorSku | null {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select
+         vs.id,
+         vs.vendor_id as vendorId,
+         vs.product_sku_id as productSkuId,
+         vs.vendor_sku_code as vendorSkuCode,
+         vs.purchase_price as purchasePrice,
+         vs.purchase_unit_id as purchaseUnitId,
+         pu.name as purchaseUnitName,
+         vs.units_per_purchase_unit as unitsPerPurchaseUnit,
+         vs.minimum_order_quantity as minimumOrderQuantity,
+         vs.lead_time_days as leadTimeDays,
+         vs.is_preferred as isPreferred,
+         vs.status,
+         coalesce(vs.notes, '') as notes,
+         p.name as productName,
+         s.variant_name as variantName,
+         s.sku,
+         s.barcode
+       from vendor_skus vs
+       inner join product_skus s on s.id = vs.product_sku_id
+       inner join products p on p.id = s.product_id
+       left join units pu on pu.id = vs.purchase_unit_id
+       where vs.id = ? and vs.tenant_id = ?`,
+    )
+    .get(id, DEMO_STORE_TENANT_ID) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    vendorId: String(row.vendorId),
+    productSkuId: String(row.productSkuId),
+    vendorSkuCode: (row.vendorSkuCode as string | null) ?? null,
+    purchasePrice: num(row.purchasePrice),
+    purchaseUnitId: (row.purchaseUnitId as string | null) ?? null,
+    purchaseUnitName: (row.purchaseUnitName as string | null) ?? null,
+    unitsPerPurchaseUnit: num(row.unitsPerPurchaseUnit, 1),
+    minimumOrderQuantity: num(row.minimumOrderQuantity),
+    leadTimeDays: num(row.leadTimeDays),
+    isPreferred: Boolean(row.isPreferred),
+    status: row.status as EntityStatus,
+    notes: String(row.notes ?? ""),
+    productName: String(row.productName ?? ""),
+    variantName: String(row.variantName ?? ""),
+    sku: String(row.sku),
+    barcode: (row.barcode as string | null) ?? null,
+  };
 }
 
 export function getSkuLocal(id: string): SkuDetail | null {
@@ -1055,8 +1107,10 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
          i.units_per_purchase_unit as unitsPerPurchaseUnit,
          i.ordered_quantity as orderedQuantity,
          i.received_quantity as receivedQuantity,
+         i.bonus_quantity as bonusQuantity,
          i.po_unit_cost as poUnitCost,
          i.receiving_unit_cost as receivingUnitCost,
+         i.discount_percent as discountPercent,
          i.line_total as lineTotal
        from goods_receipt_items i
        left join product_skus s on s.id = i.product_sku_id
@@ -1100,8 +1154,10 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
       unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1),
       orderedQuantity: num(r.orderedQuantity),
       receivedQuantity: num(r.receivedQuantity),
+      bonusQuantity: num(r.bonusQuantity),
       poUnitCost: num(r.poUnitCost),
       receivingUnitCost: num(r.receivingUnitCost),
+      discountPercent: num(r.discountPercent),
       lineTotal: num(r.lineTotal),
     })),
     createdAt: String(row.createdAt),

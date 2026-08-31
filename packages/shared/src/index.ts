@@ -170,6 +170,8 @@ export type {
   WarehouseStockRow,
   StockMovementRow,
   WarehouseListItem,
+  CreateWarehouseRequest,
+  UpdateWarehouseRequest,
   PurchaseOrderItemRow,
   PurchaseOrderListItem,
   PurchaseOrderDetail,
@@ -243,7 +245,16 @@ export const UNIT_TYPES = unitTypesList;
 export const INVENTORY_MOVEMENT_TYPES = inventoryMovementTypesList;
 export const PURCHASE_ORDER_STATUSES = purchaseOrderStatusesList;
 export const GOODS_RECEIPT_STATUSES = goodsReceiptStatusesList;
-export { MASTER_DATA_IMPORT_FILES, nextSkuCode } from "./inventory";
+export {
+  MASTER_DATA_IMPORT_FILES,
+  nextSkuCode,
+  roundMoney4,
+  weightedAvgUnitCost,
+  clampDiscountPercent,
+  lineTotalAfterDiscount,
+  netUnitAfterDiscounts,
+  landedUnitByQuantity,
+} from "./inventory";
 export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
 export const PAYMENT_TERMS = paymentTermsList;
 export const PAYMENT_TERMS_LABELS = paymentTermsLabels;

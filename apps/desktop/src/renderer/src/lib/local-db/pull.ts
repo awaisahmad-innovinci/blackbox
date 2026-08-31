@@ -113,7 +113,7 @@ export async function runFullPull(
         brandsApi.list({ status: "all" }),
         categoriesApi.list({ status: "all" }),
         vendorGroupsApi.list({ status: "all" }),
-        warehousesApi.list(),
+        warehousesApi.list({ status: "all" }),
       ]);
     await localDb.upsertUnits(units);
     report("reference", 1, 5, "Units saved");

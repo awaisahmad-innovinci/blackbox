@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@blackbox/ui/button";
+import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { useSession, type DeviceState } from "@renderer/lib/session/context";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 
@@ -21,6 +22,8 @@ export function DeviceSessionCard() {
   const sync = useSyncStatus();
   const [checking, setChecking] = useState(false);
   const [identity, setIdentity] = useState<string | null>(null);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     void window.blackbox?.identity?.get().then((row) => {
@@ -84,12 +87,31 @@ export function DeviceSessionCard() {
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() => void signOut()}
+            onClick={() => setLogoutOpen(true)}
           >
             Sign out
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        title="Are you sure you want to logout?"
+        description="Are you sure you want to logout?"
+        confirmLabel="Yes"
+        cancelLabel="Cancel"
+        loading={loggingOut}
+        onConfirm={async () => {
+          setLoggingOut(true);
+          try {
+            await signOut();
+          } finally {
+            setLoggingOut(false);
+            setLogoutOpen(false);
+          }
+        }}
+      />
     </div>
   );
 }

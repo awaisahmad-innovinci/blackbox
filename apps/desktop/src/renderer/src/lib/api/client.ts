@@ -27,7 +27,7 @@ export function getApiErrorMessage(
 ): string {
   if (error instanceof ApiError) {
     if (error.status === 401) {
-      return "Your session expired. Sign in again to continue.";
+      return "Invalid username or password.";
     }
     if (error.status === 403) return error.message;
     if (error.status === 409) return error.message;

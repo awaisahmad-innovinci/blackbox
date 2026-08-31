@@ -67,6 +67,15 @@ export class GoodsReceiptItem {
   receivedQuantity!: string;
 
   @Column({
+    name: "bonus_quantity",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  bonusQuantity!: string;
+
+  @Column({
     name: "po_unit_cost",
     type: "numeric",
     precision: 14,
@@ -83,6 +92,15 @@ export class GoodsReceiptItem {
     default: 0,
   })
   receivingUnitCost!: string;
+
+  @Column({
+    name: "discount_percent",
+    type: "numeric",
+    precision: 8,
+    scale: 4,
+    default: 0,
+  })
+  discountPercent!: string;
 
   @Column({
     name: "line_total",

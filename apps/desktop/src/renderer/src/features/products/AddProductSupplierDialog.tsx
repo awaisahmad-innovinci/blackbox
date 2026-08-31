@@ -20,6 +20,8 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { unitsApi } from "@renderer/lib/api/units";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { loadVendors } from "@renderer/lib/local-db/entity-source";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { syncNow } from "@renderer/lib/sync/sync-status";
 
 function packagingFromSku(sku: ProductSkuDetail | undefined) {
   return {
@@ -145,10 +147,46 @@ export function AddProductSupplierDialog({
       return;
     }
 
+    const sku = skus.find((s) => s.id === productSkuId);
+    const purchaseUnit = units.find((u) => u.id === purchaseUnitId);
+
     setSaving(true);
     setError(null);
     let row: VendorSku;
     try {
+      if (await isDeviceBound()) {
+        const localId = crypto.randomUUID();
+        row = {
+          id: localId,
+          vendorId: selectedVendor.id,
+          productSkuId,
+          vendorSkuCode: null,
+          purchasePrice: price,
+          purchaseUnitId: purchaseUnitId || null,
+          purchaseUnitName: purchaseUnit?.name ?? null,
+          unitsPerPurchaseUnit: unitsPerUnit,
+          minimumOrderQuantity,
+          leadTimeDays: leadTime,
+          isPreferred,
+          status: "active",
+          notes: notes.trim(),
+          productName: sku?.variantName || sku?.sku || "",
+          variantName: sku?.variantName ?? "",
+          sku: sku?.sku ?? "",
+          barcode: sku?.barcode ?? null,
+        };
+        await commitLocalChange({
+          entityType: "vendor_sku",
+          entityId: localId,
+          operation: "UPSERT",
+          payload: row as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setSaving(false);
+        reset();
+        onCreated(row, false);
+        return;
+      }
       row = await vendorSkusApi.create({
         vendorId: selectedVendor.id,
         productSkuId,

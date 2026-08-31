@@ -40,3 +40,8 @@ supabase/.temp
 # Misc
 *.local
 .cache
+
+
+#pipeline
+.github
+apps/desktop/electron-builder.yml

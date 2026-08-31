@@ -83,16 +83,36 @@ export function listVendorGroupsLocal(
     ) as VendorGroup[];
 }
 
-export function listWarehousesLocal(): WarehouseListItem[] {
+export function listWarehousesLocal(
+  status?: EntityStatus | "all",
+): WarehouseListItem[] {
   const db = getLocalDb();
   return db
     .prepare(
       `select id, name, code, location, status
        from warehouses
        where tenant_id = ?
+         and (? = 'all' or status = ?)
        order by name collate nocase`,
     )
-    .all(DEMO_STORE_TENANT_ID) as WarehouseListItem[];
+    .all(
+      DEMO_STORE_TENANT_ID,
+      status ?? "all",
+      status === "all" || status === undefined ? "" : status,
+    ) as WarehouseListItem[];
+}
+
+export function getWarehouseLocal(id: string): WarehouseListItem | null {
+  const db = getLocalDb();
+  return (
+    (db
+      .prepare(
+        `select id, name, code, location, status
+         from warehouses
+         where id = ? and tenant_id = ?`,
+      )
+      .get(id, DEMO_STORE_TENANT_ID) as WarehouseListItem | undefined) ?? null
+  );
 }
 
 export function listUnitsLocal(): UnitListItem[] {

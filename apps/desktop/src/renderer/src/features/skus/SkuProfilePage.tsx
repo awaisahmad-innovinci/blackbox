@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type {
+  EntityStatus,
+  ProductSkuDetail,
   SkuDetail,
   SkuSupplier,
   WarehouseStockRow,
@@ -18,8 +20,41 @@ import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { skusApi } from "@renderer/lib/api/skus";
 import { loadSkuProfile } from "@renderer/lib/local-db/entity-source";
+import {
+  commitLocalChange,
+  isDeviceBound,
+} from "@renderer/lib/local-db/local-write";
 import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
+import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+
+function toProductSkuRow(
+  sku: SkuDetail,
+  status: EntityStatus,
+): ProductSkuDetail {
+  return {
+    id: sku.id,
+    productId: sku.productId,
+    variantName: sku.variantName,
+    sku: sku.sku,
+    barcode: sku.barcode,
+    sizeValue: sku.sizeValue,
+    sizeUnit: sku.sizeUnit,
+    baseUnitId: sku.baseUnitId,
+    baseUnitName: sku.baseUnitName,
+    purchaseUnitId: sku.purchaseUnitId,
+    purchaseUnitName: sku.purchaseUnitName,
+    unitsPerPurchaseUnit: sku.unitsPerPurchaseUnit,
+    costPrice: sku.costPrice,
+    sellingPrice: sku.sellingPrice,
+    reorderLevel: sku.reorderLevel,
+    minimumStockLevel: sku.minimumStockLevel,
+    maximumStockLevel: sku.maximumStockLevel,
+    trackInventory: sku.trackInventory,
+    status,
+  };
+}
 
 export function SkuProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -47,6 +82,20 @@ export function SkuProfilePage() {
   const [minimumStockLevel, setMinimumStockLevel] = useState("0");
   const [maximumStockLevel, setMaximumStockLevel] = useState("");
   const [trackInventory, setTrackInventory] = useState(true);
+  const [status, setStatus] = useState<EntityStatus>("active");
+  const barcodeRef = useRef<HTMLInputElement>(null);
+
+  useBarcodeScanCapture(
+    editOpen,
+    (code) => {
+      setBarcode(code);
+      requestAnimationFrame(() => {
+        barcodeRef.current?.focus();
+        barcodeRef.current?.select();
+      });
+    },
+    barcodeRef.current,
+  );
 
   async function reload() {
     if (!id) return;
@@ -88,6 +137,7 @@ export function SkuProfilePage() {
       sku.maximumStockLevel == null ? "" : String(sku.maximumStockLevel),
     );
     setTrackInventory(sku.trackInventory);
+    setStatus(sku.status);
     setFormError(null);
     void unitsApi.list().then(setUnits).catch(() => undefined);
     setEditOpen(true);
@@ -122,52 +172,70 @@ export function SkuProfilePage() {
     !sellingError;
 
   async function onSaveEdit() {
-    if (!id || !canSaveEdit) return;
+    if (!id || !sku || !canSaveEdit) return;
     setSaving(true);
     setFormError(null);
+    const next: SkuDetail = {
+      ...sku,
+      variantName: variantName.trim(),
+      sku: skuCode.trim(),
+      barcode: barcode.trim() || null,
+      sizeValue: sizeValue.trim() || null,
+      sizeUnit: sizeUnit.trim() || null,
+      baseUnitId,
+      baseUnitName:
+        units.find((u) => u.id === baseUnitId)?.name ?? sku.baseUnitName,
+      purchaseUnitId,
+      purchaseUnitName:
+        units.find((u) => u.id === purchaseUnitId)?.name ??
+        sku.purchaseUnitName,
+      unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
+      costPrice: costPriceN,
+      sellingPrice: sellingPriceN,
+      reorderLevel: Number(reorderLevel),
+      minimumStockLevel: Number(minimumStockLevel),
+      maximumStockLevel:
+        maximumStockLevel.trim() === "" ? null : Number(maximumStockLevel),
+      trackInventory,
+      status,
+    };
     try {
+      if (await isDeviceBound()) {
+        await commitLocalChange({
+          entityType: "product_sku",
+          entityId: id,
+          operation: status === "inactive" ? "DELETE" : "UPSERT",
+          payload: toProductSkuRow(next, status) as unknown as Record<
+            string,
+            unknown
+          >,
+        });
+        void syncNow();
+        setSku(next);
+        setEditOpen(false);
+        return;
+      }
       const updated = await skusApi.update(id, {
-        variantName: variantName.trim(),
-        sku: skuCode.trim(),
-        barcode: barcode.trim() || null,
-        sizeValue: sizeValue.trim() || null,
-        sizeUnit: sizeUnit.trim() || null,
+        variantName: next.variantName,
+        sku: next.sku,
+        barcode: next.barcode,
+        sizeValue: next.sizeValue,
+        sizeUnit: next.sizeUnit,
         baseUnitId,
         purchaseUnitId,
         unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
         costPrice: costPriceN,
         sellingPrice: sellingPriceN,
-        reorderLevel: Number(reorderLevel),
-        minimumStockLevel: Number(minimumStockLevel),
-        maximumStockLevel:
-          maximumStockLevel.trim() === ""
-            ? null
-            : Number(maximumStockLevel),
+        reorderLevel: next.reorderLevel,
+        minimumStockLevel: next.minimumStockLevel,
+        maximumStockLevel: next.maximumStockLevel,
         trackInventory,
-        status: sku?.status,
+        status,
       });
       try {
-        await window.blackbox?.localDb?.upsertProductSku({
-          id: updated.id,
-          productId: updated.productId,
-          variantName: updated.variantName,
-          sku: updated.sku,
-          barcode: updated.barcode,
-          sizeValue: updated.sizeValue,
-          sizeUnit: updated.sizeUnit,
-          baseUnitId: updated.baseUnitId,
-          baseUnitName: updated.baseUnitName,
-          purchaseUnitId: updated.purchaseUnitId,
-          purchaseUnitName: updated.purchaseUnitName,
-          unitsPerPurchaseUnit: updated.unitsPerPurchaseUnit,
-          costPrice: updated.costPrice,
-          sellingPrice: updated.sellingPrice,
-          reorderLevel: updated.reorderLevel,
-          minimumStockLevel: updated.minimumStockLevel,
-          maximumStockLevel: updated.maximumStockLevel,
-          trackInventory: updated.trackInventory,
-          status: updated.status,
-        });
+        await window.blackbox?.localDb?.upsertProductSku(
+          toProductSkuRow(updated, updated.status),
+        );
       } catch {
         /* optional cache */
       }
@@ -184,8 +252,27 @@ export function SkuProfilePage() {
     if (!id || !sku) return;
     if (!window.confirm(`Deactivate SKU ${sku.sku}?`)) return;
     try {
+      if (await isDeviceBound()) {
+        const row = toProductSkuRow(sku, "inactive");
+        await commitLocalChange({
+          entityType: "product_sku",
+          entityId: id,
+          operation: "DELETE",
+          payload: row as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setSku({ ...sku, status: "inactive" });
+        return;
+      }
       const updated = await skusApi.deactivate(id);
-      setSku(updated);
+      try {
+        await window.blackbox?.localDb?.upsertProductSku(
+          toProductSkuRow(updated, "inactive"),
+        );
+      } catch {
+        /* optional cache */
+      }
+      setSku({ ...updated, status: "inactive" });
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to deactivate"));
     }
@@ -406,9 +493,12 @@ export function SkuProfilePage() {
             <div className="space-y-1.5">
               <Label>Barcode</Label>
               <Input
+                ref={barcodeRef}
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="Scan or type barcode"
+                data-enter-submit=""
+                autoComplete="off"
               />
             </div>
             <div className="space-y-1.5">
@@ -516,6 +606,18 @@ export function SkuProfilePage() {
                 value={maximumStockLevel}
                 onChange={(e) => setMaximumStockLevel(e.target.value)}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sku-status">Status</Label>
+              <select
+                id="sku-status"
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as EntityStatus)}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
             </div>
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
               <input

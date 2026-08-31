@@ -114,8 +114,10 @@ export function GoodsReceiptProfilePage() {
                 <th className="px-4 py-3 font-medium">SKU</th>
                 <th className="px-4 py-3 font-medium">Ordered</th>
                 <th className="px-4 py-3 font-medium">Received</th>
+                <th className="px-4 py-3 font-medium">Bonus / Sample</th>
                 <th className="px-4 py-3 font-medium">PO cost</th>
                 <th className="px-4 py-3 font-medium">Recv cost</th>
+                <th className="px-4 py-3 font-medium">Discount %</th>
                 <th className="px-4 py-3 font-medium">Total</th>
               </tr>
             </thead>
@@ -143,10 +145,16 @@ export function GoodsReceiptProfilePage() {
                     {item.receivedQuantity}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
+                    {(item.bonusQuantity ?? 0).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">
                     {item.poUnitCost.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {item.receivingUnitCost.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {item.discountPercent.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {item.lineTotal.toLocaleString()}
