@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { GoodsReceiptDetail } from "@blackbox/shared";
+import { formatStoredDateTime } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { loadGoodsReceipt } from "@renderer/lib/local-db/entity-source";
 
@@ -53,7 +56,7 @@ export function GoodsReceiptProfilePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <PrintDocument>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -69,9 +72,12 @@ export function GoodsReceiptProfilePage() {
             </Link>
           </p>
         </div>
-        <Button variant="ghost" onClick={() => navigate("/purchase-orders")}>
-          Back
-        </Button>
+        <div className="no-print flex flex-wrap gap-2">
+          <PrintButton />
+          <Button variant="ghost" onClick={() => navigate("/goods-receipts")}>
+            Back
+          </Button>
+        </div>
       </div>
 
       <section className="space-y-3">
@@ -88,9 +94,7 @@ export function GoodsReceiptProfilePage() {
           <div>
             <dt className="text-muted-foreground">Received at</dt>
             <dd className="font-medium">
-              {receipt.receivedAt
-                ? new Date(receipt.receivedAt).toLocaleString()
-                : "—"}
+              {formatStoredDateTime(receipt.receivedAt)}
             </dd>
           </div>
           <div>
@@ -189,11 +193,19 @@ export function GoodsReceiptProfilePage() {
             {receipt.otherCharges.toLocaleString()}
           </span>
         </div>
+        {receipt.returnCredit > 0 ? (
+          <div className="flex justify-between gap-6">
+            <span className="text-muted-foreground">Return credit</span>
+            <span className="tabular-nums">
+              −{receipt.returnCredit.toLocaleString()}
+            </span>
+          </div>
+        ) : null}
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Grand total</span>
           <span className="tabular-nums">{receipt.total.toLocaleString()}</span>
         </div>
       </section>
-    </div>
+    </PrintDocument>
   );
 }

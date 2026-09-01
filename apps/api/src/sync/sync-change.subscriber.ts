@@ -20,6 +20,7 @@ import {
   Unit,
   Vendor,
   VendorGroup,
+  VendorReturn,
   VendorSku,
   Warehouse,
 } from "../db/entities";
@@ -39,6 +40,7 @@ const ENTITY_TYPES = new Map<EntityTarget<object>, SyncEntityType>([
   [PurchaseOrder, "purchase_order"],
   [GoodsReceipt, "goods_receipt"],
   [InventoryOut, "inventory_out"],
+  [VendorReturn, "vendor_return"],
   [InventoryMovement, "inventory_movement"],
 ]);
 

@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
   EntityStatus,
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   WarehouseStockRow,
@@ -128,6 +129,44 @@ export class SkusService {
       barcode: sku.barcode,
       quantityAvailable: stock ? toNum(stock.quantityAvailable) : 0,
       costPrice: toNum(sku.costPrice),
+    };
+  }
+
+  async lookupByBarcode(barcode: string): Promise<SkuBarcodeLookupResult> {
+    const tenantId = this.fixedTenant.tenantId;
+    const code = barcode.trim();
+    if (!code) {
+      throw new BadRequestException("Barcode is required");
+    }
+
+    const sku = await this.skus.findOne({
+      where: { tenantId, barcode: code },
+      relations: { product: true, baseUnit: true, purchaseUnit: true },
+    });
+    if (!sku) throw new NotFoundException("SKU not found for barcode");
+
+    return {
+      id: sku.id,
+      productId: sku.productId,
+      productName: sku.product.name,
+      productStatus: sku.product.status as EntityStatus,
+      variantName: sku.variantName,
+      sku: sku.sku,
+      barcode: sku.barcode,
+      sizeValue: sku.sizeValue,
+      sizeUnit: sku.sizeUnit,
+      baseUnitId: sku.baseUnitId,
+      baseUnitName: sku.baseUnit?.name ?? null,
+      purchaseUnitId: sku.purchaseUnitId,
+      purchaseUnitName: sku.purchaseUnit?.name ?? null,
+      unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
+      costPrice: toNum(sku.costPrice),
+      sellingPrice: toNum(sku.sellingPrice),
+      reorderLevel: toNum(sku.reorderLevel),
+      minimumStockLevel: toNum(sku.minimumStockLevel),
+      maximumStockLevel: toNumOrNull(sku.maximumStockLevel),
+      trackInventory: sku.trackInventory,
+      status: sku.status as EntityStatus,
     };
   }
 

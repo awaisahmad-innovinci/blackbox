@@ -2,30 +2,35 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   GoodsReceiptDetail,
+  GoodsReceiptReturnAdjustment,
+  PendingVendorReturnLine,
   PurchaseOrderDetail,
   ReceivingDraft,
   ReceivingLineDraft,
+  VendorReturnSettlement,
   VendorSku,
 } from "@blackbox/shared";
 import {
+  buildReceivedAtIso,
   landedUnitByQuantity,
   lineTotalAfterDiscount,
   roundMoney4,
+  VENDOR_RETURN_REASON_LABELS,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
-import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import {
-  loadPurchaseOrder,
-  loadReceivingDraft,
-} from "@renderer/lib/local-db/entity-source";
+import { loadPendingVendorReturns, loadPurchaseOrder, loadReceivingDraft, loadVendorReturn } from "@renderer/lib/local-db/entity-source";
+import { allocateReceiptNumber } from "@renderer/lib/document-numbers";
+import { useSession } from "@renderer/lib/session/context";
 import { UpdateVendorSkuPriceDialog } from "./UpdateVendorSkuPriceDialog";
 
 type DraftLine = ReceivingLineDraft & {
@@ -148,6 +153,111 @@ async function persistReceivePriceChangesLocal(
   }
 }
 
+type ReturnSettlementChoice = "" | VendorReturnSettlement;
+
+function buildReturnAdjustments(
+  pending: PendingVendorReturnLine[],
+  settlements: Record<string, ReturnSettlementChoice>,
+): GoodsReceiptReturnAdjustment[] {
+  return pending
+    .map((line) => {
+      const settlement = settlements[line.vendorReturnItemId] ?? "";
+      if (settlement !== "CASHBACK" && settlement !== "REPLACE") return null;
+      return {
+        vendorReturnItemId: line.vendorReturnItemId,
+        settlement,
+      };
+    })
+    .filter((row): row is GoodsReceiptReturnAdjustment => row != null);
+}
+
+async function persistReturnSettlementsLocal(
+  receiptId: string,
+  receiptNumber: string,
+  warehouseId: string,
+  warehouseName: string,
+  pending: PendingVendorReturnLine[],
+  settlements: Record<string, ReturnSettlementChoice>,
+  now: string,
+): Promise<void> {
+  const touchedReturnIds = new Set<string>();
+
+  for (const line of pending) {
+    const choice = settlements[line.vendorReturnItemId] ?? "";
+    if (choice !== "CASHBACK" && choice !== "REPLACE") continue;
+    touchedReturnIds.add(line.vendorReturnId);
+
+    if (choice !== "REPLACE") continue;
+    const unitsPer =
+      line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
+    const stockDelta = line.quantity * unitsPer;
+    if (!(stockDelta > 0)) continue;
+    const movementId = crypto.randomUUID();
+    const avg = await window.blackbox?.localDb?.applyPurchaseAvgCost(
+      line.productSkuId,
+      stockDelta,
+      line.unitCost,
+      line.unitsPerPurchaseUnit,
+    );
+    if (avg) {
+      await commitLocalChange({
+        entityType: "product_sku",
+        entityId: line.productSkuId,
+        operation: "UPSERT",
+        payload: {
+          ...avg.sku,
+          costPrice: avg.avgCost,
+        },
+      });
+    }
+    await commitLocalChange({
+      entityType: "inventory_movement",
+      entityId: movementId,
+      operation: "EVENT",
+      payload: {
+        id: movementId,
+        productSkuId: line.productSkuId,
+        sku: line.sku,
+        variantName: line.variantName,
+        warehouseId,
+        warehouseName,
+        movementType: "PURCHASE_RECEIPT",
+        quantity: stockDelta,
+        delta: stockDelta,
+        referenceType: "goods_receipt",
+        referenceId: receiptId,
+        reason: `Replace ${receiptNumber}`,
+        createdAt: now,
+      },
+    });
+  }
+
+  for (const returnId of touchedReturnIds) {
+    const detail = await loadVendorReturn(returnId);
+    const updatedItems = detail.items.map((item) => {
+      const choice = settlements[item.id] ?? "";
+      if (choice !== "CASHBACK" && choice !== "REPLACE") return item;
+      return {
+        ...item,
+        settlement: choice,
+        goodsReceiptId: receiptId,
+      };
+    });
+    const allSettled = updatedItems.every((item) => item.settlement != null);
+    await commitLocalChange({
+      entityType: "vendor_return",
+      entityId: returnId,
+      operation: "UPSERT",
+      payload: {
+        ...detail,
+        items: updatedItems,
+        status: allSettled ? "SETTLED" : detail.status,
+        updatedAt: now,
+      } as unknown as Record<string, unknown>,
+    });
+  }
+}
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -155,6 +265,7 @@ function todayIso(): string {
 export function ReceivePurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useSession();
 
   const [header, setHeader] = useState<Omit<ReceivingDraft, "items"> | null>(
     null,
@@ -180,7 +291,12 @@ export function ReceivePurchaseOrderPage() {
     unitsPerPurchaseUnit: number;
   } | null>(null);
 
-  useBarcodeScanCapture(Boolean(header && !loading && !success), () => {}, null);
+  const [pendingReturns, setPendingReturns] = useState<
+    PendingVendorReturnLine[]
+  >([]);
+  const [returnSettlements, setReturnSettlements] = useState<
+    Record<string, ReturnSettlementChoice>
+  >({});
 
   useEffect(() => {
     if (!id) return;
@@ -216,6 +332,24 @@ export function ReceivePurchaseOrderPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!header?.vendorId) {
+      setPendingReturns([]);
+      return;
+    }
+    let cancelled = false;
+    void loadPendingVendorReturns(header.vendorId)
+      .then((rows) => {
+        if (!cancelled) setPendingReturns(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setPendingReturns([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [header?.vendorId]);
+
   const subtotal = useMemo(
     () =>
       Math.round(
@@ -237,8 +371,26 @@ export function ReceivePurchaseOrderPage() {
     Math.round(((subtotal * discountPct) / 100) * 10000) / 10000;
   const taxN = Number(tax) || 0;
   const otherN = Number(otherCharges) || 0;
-  const grandTotal =
-    Math.round((subtotal - discountAmount + taxN + otherN) * 10000) / 10000;
+  const returnCredit = useMemo(
+    () =>
+      roundMoney4(
+        pendingReturns.reduce((sum, line) => {
+          if (returnSettlements[line.vendorReturnItemId] !== "CASHBACK") {
+            return sum;
+          }
+          return sum + line.lineTotal;
+        }, 0),
+      ),
+    [pendingReturns, returnSettlements],
+  );
+  const grandTotal = Math.max(
+    0,
+    roundMoney4(subtotal - discountAmount + taxN + otherN - returnCredit),
+  );
+  const returnAdjustments = useMemo(
+    () => buildReturnAdjustments(pendingReturns, returnSettlements),
+    [pendingReturns, returnSettlements],
+  );
 
   function updateLine(
     purchaseOrderItemId: string,
@@ -285,7 +437,7 @@ export function ReceivePurchaseOrderPage() {
     }
 
     const ok = window.confirm(
-      `Confirm Receiving Voucher?\n\nPO: ${header.poNumber}\nVendor: ${header.vendorName}\nWarehouse: ${header.warehouseName}\nItems: ${lines.length}\nDiscount: ${discountPct}% (${discountAmount.toLocaleString()})\nTotal: ${grandTotal.toLocaleString()}`,
+      `Confirm Receiving Voucher?\n\nPO: ${header.poNumber}\nVendor: ${header.vendorName}\nWarehouse: ${header.warehouseName}\nItems: ${lines.length}\nDiscount: ${discountPct}% (${discountAmount.toLocaleString()})\nReturn credit: ${returnCredit.toLocaleString()}\nTotal: ${grandTotal.toLocaleString()}`,
     );
     if (!ok) return;
 
@@ -295,9 +447,10 @@ export function ReceivePurchaseOrderPage() {
       if (await isDeviceBound()) {
         const localId = crypto.randomUUID();
         const now = new Date().toISOString();
+        const receiptNumber = await allocateReceiptNumber(user?.tenantName ?? "");
         const receipt: GoodsReceiptDetail = {
           id: localId,
-          receiptNumber: `LOCAL-${localId.slice(0, 8)}`,
+          receiptNumber,
           purchaseOrderId: id,
           poNumber: header.poNumber,
           vendorId: header.vendorId,
@@ -305,12 +458,13 @@ export function ReceivePurchaseOrderPage() {
           warehouseId: header.warehouseId,
           warehouseName: header.warehouseName,
           status: "POSTED",
-          receivedAt: receiptDate,
+          receivedAt: buildReceivedAtIso(receiptDate),
           voucherNumber: voucherNumber.trim() || null,
           subtotal,
           discount: discountAmount,
           tax: taxN,
           otherCharges: otherN,
+          returnCredit,
           total: grandTotal,
           notes: notes.trim(),
           items: lines.map((l) => ({
@@ -344,7 +498,10 @@ export function ReceivePurchaseOrderPage() {
           entityType: "goods_receipt",
           entityId: localId,
           operation: "UPSERT",
-          payload: receipt as unknown as Record<string, unknown>,
+          payload: {
+            ...(receipt as unknown as Record<string, unknown>),
+            returnAdjustments,
+          },
         });
         const poPayload = await buildReceivedPurchaseOrderPayload(
           id,
@@ -422,6 +579,15 @@ export function ReceivePurchaseOrderPage() {
           });
         }
         await persistReceivePriceChangesLocal(header, lines, skuIdsWithProductUpsert);
+        await persistReturnSettlementsLocal(
+          localId,
+          receipt.receiptNumber,
+          header.warehouseId,
+          header.warehouseName,
+          pendingReturns,
+          returnSettlements,
+          now,
+        );
         void syncNow();
         setSuccess(receipt);
         return;
@@ -444,6 +610,8 @@ export function ReceivePurchaseOrderPage() {
         discount: discountAmount,
         tax: taxN,
         otherCharges: otherN,
+        returnAdjustments:
+          returnAdjustments.length > 0 ? returnAdjustments : undefined,
         items: lines.map((l) => ({
           purchaseOrderItemId: l.purchaseOrderItemId,
           receivedQuantity: l.receiveQuantity,
@@ -475,16 +643,22 @@ export function ReceivePurchaseOrderPage() {
 
   if (success) {
     return (
-      <div className="mx-auto max-w-xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Receiving Voucher Created
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Inventory has been updated for the selected warehouse.
-          </p>
-        </div>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+      <PrintDocument>
+        <div className="mx-auto max-w-xl space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Receiving Voucher Created
+              </h1>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Inventory has been updated for the selected warehouse.
+              </p>
+            </div>
+            <div className="no-print">
+              <PrintButton />
+            </div>
+          </div>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted-foreground">Receipt</dt>
             <dd className="font-medium">{success.receiptNumber}</dd>
@@ -503,8 +677,16 @@ export function ReceivePurchaseOrderPage() {
               {success.total.toLocaleString()}
             </dd>
           </div>
+          {success.returnCredit > 0 ? (
+            <div>
+              <dt className="text-muted-foreground">Return credit</dt>
+              <dd className="font-medium tabular-nums">
+                {success.returnCredit.toLocaleString()}
+              </dd>
+            </div>
+          ) : null}
         </dl>
-        <div className="flex flex-wrap gap-3">
+        <div className="no-print flex flex-wrap gap-3">
           <Button
             onClick={() =>
               navigate(`/goods-receipts/${success.id}`, {
@@ -521,7 +703,8 @@ export function ReceivePurchaseOrderPage() {
             Back to Purchase Orders
           </Button>
         </div>
-      </div>
+        </div>
+      </PrintDocument>
     );
   }
 
@@ -587,6 +770,81 @@ export function ReceivePurchaseOrderPage() {
           />
         </div>
       </section>
+
+      {pendingReturns.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-medium">Pending returns</h2>
+            <p className="text-muted-foreground text-sm">
+              Open vendor returns for {header.vendorName}. Choose how to settle
+              each line on this receipt.
+            </p>
+          </div>
+          <div className="border-border overflow-x-auto rounded-lg border">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Return</th>
+                  <th className="px-3 py-2 font-medium">Product</th>
+                  <th className="px-3 py-2 font-medium">Reason</th>
+                  <th className="px-3 py-2 font-medium">Qty</th>
+                  <th className="px-3 py-2 font-medium">Purchase cost</th>
+                  <th className="px-3 py-2 font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">Settlement</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingReturns.map((line) => (
+                  <tr
+                    key={line.vendorReturnItemId}
+                    className="border-border border-t"
+                  >
+                    <td className="px-3 py-2">{line.returnNumber}</td>
+                    <td className="px-3 py-2">
+                      {line.productName}
+                      <div className="text-muted-foreground text-xs">
+                        {line.sku}
+                        {line.variantName ? ` · ${line.variantName}` : ""}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      {VENDOR_RETURN_REASON_LABELS[line.reason]}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {line.quantity} {line.purchaseUnitName || ""}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {line.unitCost.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {line.lineTotal.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        className="border-input bg-background h-8 min-w-[8rem] rounded-md border px-2 text-sm"
+                        value={
+                          returnSettlements[line.vendorReturnItemId] ?? ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value as ReturnSettlementChoice;
+                          setReturnSettlements((prev) => ({
+                            ...prev,
+                            [line.vendorReturnItemId]: value,
+                          }));
+                        }}
+                      >
+                        <option value="">Skip</option>
+                        <option value="CASHBACK">Cashback</option>
+                        <option value="REPLACE">Replace</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Items</h2>
@@ -739,6 +997,14 @@ export function ReceivePurchaseOrderPage() {
             onChange={(e) => setOtherCharges(e.target.value)}
           />
         </div>
+        {returnCredit > 0 ? (
+          <div className="flex justify-between gap-6">
+            <span className="text-muted-foreground">Return credit</span>
+            <span className="tabular-nums text-green-700 dark:text-green-400">
+              −{returnCredit.toLocaleString()}
+            </span>
+          </div>
+        ) : null}
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Grand total</span>
           <span className="tabular-nums">{grandTotal.toLocaleString()}</span>

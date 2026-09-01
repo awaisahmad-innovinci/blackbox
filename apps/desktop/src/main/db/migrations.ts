@@ -615,6 +615,64 @@ create table if not exists local_sync_state (
       }
     },
   },
+  {
+    id: "011_vendor_returns",
+    sql: `
+create table if not exists vendor_returns (
+  id text primary key,
+  tenant_id text not null,
+  return_number text not null,
+  vendor_id text not null,
+  warehouse_id text not null,
+  return_date text not null,
+  notes text not null default '',
+  status text not null default 'OPEN',
+  subtotal real not null default 0,
+  total real not null default 0,
+  created_at text not null default (datetime('now')),
+  updated_at text not null default (datetime('now')),
+  sync_status text not null default 'pending',
+  server_updated_at text
+);
+create index if not exists vendor_returns_tenant_id_idx on vendor_returns (tenant_id);
+create index if not exists vendor_returns_vendor_id_idx on vendor_returns (vendor_id);
+create index if not exists vendor_returns_warehouse_id_idx on vendor_returns (warehouse_id);
+
+create table if not exists vendor_return_items (
+  id text primary key,
+  tenant_id text not null,
+  vendor_return_id text not null,
+  product_sku_id text not null,
+  vendor_sku_id text,
+  purchase_unit_id text,
+  units_per_purchase_unit real not null default 1,
+  quantity real not null,
+  unit_cost real not null default 0,
+  reason text not null,
+  settlement text,
+  goods_receipt_id text,
+  created_at text not null default (datetime('now')),
+  updated_at text not null default (datetime('now')),
+  sync_status text not null default 'pending',
+  server_updated_at text
+);
+create index if not exists vendor_return_items_tenant_id_idx on vendor_return_items (tenant_id);
+create index if not exists vendor_return_items_return_id_idx on vendor_return_items (vendor_return_id);
+create index if not exists vendor_return_items_product_sku_id_idx on vendor_return_items (product_sku_id);
+`,
+    after: (db) => {
+      const cols = (
+        db.prepare("pragma table_info(goods_receipts)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!cols.includes("return_credit")) {
+        db.exec(
+          `alter table goods_receipts add column return_credit real not null default 0`,
+        );
+      }
+    },
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

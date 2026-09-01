@@ -17,6 +17,7 @@ import type {
   PurchaseOrderStatus,
   ReceivingDraft,
   ReceivingLineDraft,
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
@@ -24,6 +25,10 @@ import type {
   VendorContact,
   VendorContactType,
   VendorDetail,
+  VendorReturnDetail,
+  VendorReturnReason,
+  VendorReturnSettlement,
+  VendorReturnStatus,
   VendorSku,
   WarehouseStockRow,
 } from "@blackbox/shared";
@@ -801,6 +806,54 @@ export function getSkuByBarcodeLocal(
   return mapSkuSearchRow(row, warehouseId);
 }
 
+export function lookupSkuByBarcodeLocal(
+  barcode: string,
+): SkuBarcodeLookupResult | null {
+  const code = barcode.trim();
+  if (!code) return null;
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select
+         s.id,
+         s.product_id as productId,
+         p.name as productName,
+         p.status as productStatus,
+         s.variant_name as variantName,
+         s.sku,
+         s.barcode,
+         s.size_value as sizeValue,
+         s.size_unit as sizeUnit,
+         s.base_unit_id as baseUnitId,
+         bu.name as baseUnitName,
+         s.purchase_unit_id as purchaseUnitId,
+         pu.name as purchaseUnitName,
+         s.units_per_purchase_unit as unitsPerPurchaseUnit,
+         s.cost_price as costPrice,
+         s.selling_price as sellingPrice,
+         s.reorder_level as reorderLevel,
+         s.minimum_stock_level as minimumStockLevel,
+         s.maximum_stock_level as maximumStockLevel,
+         s.track_inventory as trackInventory,
+         s.status
+       from product_skus s
+       inner join products p on p.id = s.product_id
+       left join units bu on bu.id = s.base_unit_id
+       left join units pu on pu.id = s.purchase_unit_id
+       where s.tenant_id = ?
+         and s.barcode = ?
+       limit 1`,
+    )
+    .get(DEMO_STORE_TENANT_ID, code) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  const detail = mapProductSkuRow(row);
+  return {
+    ...detail,
+    productName: String(row.productName ?? ""),
+    productStatus: row.productStatus as EntityStatus,
+  };
+}
+
 function eachInclusiveDate(dateFrom: string, dateTo: string): string[] {
   const days: string[] = [];
   const cur = new Date(`${dateFrom}T00:00:00.000Z`);
@@ -1078,6 +1131,7 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
          gr.discount,
          gr.tax,
          gr.other_charges as otherCharges,
+         coalesce(gr.return_credit, 0) as returnCredit,
          gr.total,
          coalesce(gr.notes, '') as notes,
          gr.created_at as createdAt,
@@ -1138,6 +1192,7 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
     discount: num(row.discount),
     tax: num(row.tax),
     otherCharges: num(row.otherCharges),
+    returnCredit: num(row.returnCredit),
     total: num(row.total),
     notes: String(row.notes ?? ""),
     items: items.map((r) => ({
@@ -1232,6 +1287,98 @@ export function getInventoryOutLocal(id: string): InventoryOutDetail | null {
         quantity,
         unitCost,
         lineTotal: Math.round(quantity * unitCost * 10000) / 10000,
+      };
+    }),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  };
+}
+
+export function getVendorReturnLocal(id: string): VendorReturnDetail | null {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select
+         vr.id,
+         vr.return_number as returnNumber,
+         vr.vendor_id as vendorId,
+         coalesce(v.name, '') as vendorName,
+         vr.warehouse_id as warehouseId,
+         coalesce(w.name, '') as warehouseName,
+         vr.return_date as returnDate,
+         coalesce(vr.notes, '') as notes,
+         vr.status,
+         vr.subtotal,
+         vr.total,
+         vr.created_at as createdAt,
+         vr.updated_at as updatedAt
+       from vendor_returns vr
+       left join vendors v on v.id = vr.vendor_id
+       left join warehouses w on w.id = vr.warehouse_id
+       where vr.id = ? and vr.tenant_id = ?`,
+    )
+    .get(id, DEMO_STORE_TENANT_ID) as Record<string, unknown> | undefined;
+  if (!row) return null;
+
+  const items = db
+    .prepare(
+      `select
+         i.id,
+         i.product_sku_id as productSkuId,
+         i.vendor_sku_id as vendorSkuId,
+         coalesce(p.name, '') as productName,
+         coalesce(s.variant_name, '') as variantName,
+         coalesce(s.sku, '') as sku,
+         s.barcode,
+         i.purchase_unit_id as purchaseUnitId,
+         pu.name as purchaseUnitName,
+         i.units_per_purchase_unit as unitsPerPurchaseUnit,
+         i.quantity,
+         i.unit_cost as unitCost,
+         i.reason,
+         i.settlement,
+         i.goods_receipt_id as goodsReceiptId
+       from vendor_return_items i
+       left join product_skus s on s.id = i.product_sku_id
+       left join products p on p.id = s.product_id
+       left join units pu on pu.id = i.purchase_unit_id
+       where i.vendor_return_id = ? and i.tenant_id = ?
+       order by i.created_at, i.id`,
+    )
+    .all(id, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
+
+  return {
+    id: String(row.id),
+    returnNumber: String(row.returnNumber),
+    vendorId: String(row.vendorId),
+    vendorName: String(row.vendorName ?? ""),
+    warehouseId: String(row.warehouseId),
+    warehouseName: String(row.warehouseName ?? ""),
+    returnDate: String(row.returnDate),
+    notes: String(row.notes ?? ""),
+    status: row.status as VendorReturnStatus,
+    subtotal: num(row.subtotal),
+    total: num(row.total),
+    items: items.map((r) => {
+      const quantity = num(r.quantity);
+      const unitCost = num(r.unitCost);
+      return {
+        id: String(r.id),
+        productSkuId: String(r.productSkuId),
+        vendorSkuId: (r.vendorSkuId as string | null) ?? null,
+        productName: String(r.productName ?? ""),
+        variantName: String(r.variantName ?? ""),
+        sku: String(r.sku ?? ""),
+        barcode: (r.barcode as string | null) ?? null,
+        purchaseUnitId: (r.purchaseUnitId as string | null) ?? null,
+        purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
+        unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1) || 1,
+        quantity,
+        unitCost,
+        lineTotal: Math.round(quantity * unitCost * 10000) / 10000,
+        reason: r.reason as VendorReturnReason,
+        settlement: (r.settlement as VendorReturnSettlement | null) ?? null,
+        goodsReceiptId: (r.goodsReceiptId as string | null) ?? null,
       };
     }),
     createdAt: String(row.createdAt),

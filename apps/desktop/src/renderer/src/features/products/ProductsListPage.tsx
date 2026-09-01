@@ -21,6 +21,12 @@ import {
   loadCategories,
 } from "@renderer/lib/local-db/entity-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  ListPagination,
+  useResetPageOnFilterChange,
+} from "@renderer/components/list-pagination";
 
 export function ProductsListPage() {
   const navigate = useNavigate();
@@ -32,9 +38,18 @@ export function ProductsListPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<ProductListItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
+
+  useBarcodeScanTarget({
+    kind: "search",
+    enabled: true,
+    onScan: setSearch,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +69,14 @@ export function ProductsListPage() {
     };
   }, [dataVersion]);
 
+  useResetPageOnFilterChange(setPage, [
+    search,
+    status,
+    brandId,
+    categoryId,
+    dataVersion,
+  ]);
+
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
@@ -69,12 +92,17 @@ export function ProductsListPage() {
             status: status || undefined,
             brandId: brandId || undefined,
             categoryId: categoryId || undefined,
+            page,
+            pageSize,
           };
           const res =
             mode === "local" && window.blackbox?.localDb?.listProducts
               ? await window.blackbox.localDb.listProducts(query)
               : await productsApi.list(query);
-          if (!cancelled) setItems(res.items);
+          if (!cancelled) {
+            setItems(res.items);
+            setTotal(res.total);
+          }
         } catch (err: unknown) {
           if (cancelled) return;
           setError(
@@ -89,7 +117,7 @@ export function ProductsListPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, brandId, categoryId, dataVersion]);
+  }, [search, status, brandId, categoryId, dataVersion, page, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -215,6 +243,17 @@ export function ProductsListPage() {
           </tbody>
         </table>
       </div>
+
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

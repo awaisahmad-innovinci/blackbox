@@ -61,9 +61,11 @@ export class CreateVendorDto {
   @MinLength(1)
   name!: string;
 
+  @IsOptional()
+  @ValidateIf((_, v) => v != null && String(v).trim() !== "")
   @IsString()
   @MinLength(1)
-  vendorCode!: string;
+  vendorCode?: string;
 
   @IsOptional()
   @ValidateIf((_, v) => v != null && v !== "")

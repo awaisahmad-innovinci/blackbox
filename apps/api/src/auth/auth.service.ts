@@ -268,7 +268,7 @@ export class AuthService {
       await manager.save(stored);
 
       return {
-        user: this.toAuthUser(user, userPermissions),
+        user: this.toAuthUser(user, userPermissions, tenant.name),
         tokens: {
           accessToken,
           refreshToken: newRefreshToken,
@@ -295,12 +295,16 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedException("Invalid session");
     }
+    const tenant = await this.tenants.findOne({ where: { id: user.tenantId } });
+    if (!tenant?.isActive) {
+      throw new UnauthorizedException("Invalid session");
+    }
     const userPermissions =
       await this.permissionsService.getPermissionsForUser(
         user.id,
         user.tenantId,
       );
-    return this.toAuthUser(user, userPermissions);
+    return this.toAuthUser(user, userPermissions, tenant.name);
   }
 
   /**
@@ -327,6 +331,7 @@ export class AuthService {
     user: User,
     deviceId: string | null = null,
   ): Promise<AuthResponse> {
+    const tenant = await this.tenants.findOne({ where: { id: user.tenantId } });
     const userPermissions =
       await this.permissionsService.getPermissionsForUser(
         user.id,
@@ -403,7 +408,7 @@ export class AuthService {
     });
 
     return {
-      user: this.toAuthUser(user, userPermissions),
+      user: this.toAuthUser(user, userPermissions, tenant?.name),
       tokens: {
         accessToken,
         refreshToken,
@@ -462,10 +467,15 @@ export class AuthService {
     return device.id;
   }
 
-  private toAuthUser(user: User, perms: Permission[]): AuthUser {
+  private toAuthUser(
+    user: User,
+    perms: Permission[],
+    tenantName?: string,
+  ): AuthUser {
     return {
       id: user.id,
       tenantId: user.tenantId,
+      tenantName: tenantName?.trim() || undefined,
       email: user.email,
       username: user.username,
       fullName: user.fullName,

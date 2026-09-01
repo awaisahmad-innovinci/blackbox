@@ -12,6 +12,7 @@ import type {
   UnitListItem,
   VendorDetail,
   VendorGroup,
+  VendorReturnDetail,
 } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
@@ -35,6 +36,7 @@ import { upsertVendorLocal, upsertVendorSkuLocal } from "./vendors-local";
 import { upsertPurchaseOrderLocal } from "./purchase-orders-local";
 import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
+import { upsertVendorReturnLocal } from "./vendor-returns-local";
 import { getPurchaseOrderLocal } from "./entity-get-local";
 
 export function applyPullBatch(
@@ -268,6 +270,7 @@ export function applyChange(change: SyncChangeDto): void {
       discount: Number(p.discount ?? 0),
       tax: Number(p.tax ?? 0),
       otherCharges: Number(p.otherCharges ?? 0),
+      returnCredit: Number(p.returnCredit ?? 0),
       total: Number(p.total ?? 0),
       notes: str(p.notes),
       items: Array.isArray(p.items)
@@ -298,12 +301,34 @@ export function applyChange(change: SyncChangeDto): void {
     });
     return;
   }
+  if (change.entityType === "vendor_return") {
+    upsertVendorReturnLocal({
+      id: change.entityId,
+      returnNumber: str(p.returnNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
+      vendorId: str(p.vendorId),
+      vendorName: str(p.vendorName),
+      warehouseId: str(p.warehouseId),
+      warehouseName: str(p.warehouseName),
+      returnDate: str(p.returnDate, now.slice(0, 10)),
+      notes: str(p.notes),
+      status: str(p.status, "OPEN") as VendorReturnDetail["status"],
+      subtotal: Number(p.subtotal ?? 0),
+      total: Number(p.total ?? 0),
+      items: Array.isArray(p.items)
+        ? (p.items as VendorReturnDetail["items"])
+        : [],
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+    return;
+  }
   if (change.entityType === "inventory_movement") {
     const qty = Number(p.quantity ?? 0);
     const signed =
       p.delta != null
         ? Number(p.delta)
-        : String(p.movementType) === "INVENTORY_OUT"
+        : String(p.movementType) === "INVENTORY_OUT" ||
+            String(p.movementType) === "RETURN"
           ? -qty
           : qty;
     upsertInventoryMovementLocal({

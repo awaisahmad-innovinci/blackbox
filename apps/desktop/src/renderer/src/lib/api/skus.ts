@@ -1,5 +1,6 @@
 import type {
   CreateProductSkuRequest,
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
@@ -22,6 +23,12 @@ export const skusApi = {
       warehouseId,
     });
     return apiFetch<SkuSearchResult>(`/skus/by-barcode?${params.toString()}`);
+  },
+  lookupByBarcode(barcode: string): Promise<SkuBarcodeLookupResult> {
+    const params = new URLSearchParams({ barcode: barcode.trim() });
+    return apiFetch<SkuBarcodeLookupResult>(
+      `/skus/exists-by-barcode?${params.toString()}`,
+    );
   },
   get(id: string): Promise<SkuDetail> {
     return apiFetch<SkuDetail>(`/skus/${id}`);

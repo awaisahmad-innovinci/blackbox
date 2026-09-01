@@ -9,6 +9,8 @@ import {
   PurchaseOrder,
   PurchaseOrderItem,
   Vendor,
+  VendorReturn,
+  VendorReturnItem,
   VendorSku,
   Warehouse,
 } from "../../db/entities";
@@ -28,6 +30,8 @@ import { GoodsReceiptsService } from "./goods-receipts.service";
       InventoryStock,
       InventoryMovement,
       ProductSku,
+      VendorReturn,
+      VendorReturnItem,
     ]),
   ],
   controllers: [GoodsReceiptsController],

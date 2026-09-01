@@ -6,6 +6,8 @@ import type {
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { loadInventoryInOutReport } from "@renderer/lib/local-db/entity-source";
 
@@ -73,19 +75,30 @@ export function InventoryInOutReportPage() {
   }, [range.dateFrom, range.dateTo]);
 
   const data = report ?? emptyReport(range.dateFrom, range.dateTo);
+  const rangeLabel =
+    range.dateFrom === range.dateTo
+      ? range.dateFrom
+      : `${range.dateFrom} – ${range.dateTo}`;
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Inventory in / out
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Receipts (in) and inventory out for a day or a full month.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Inventory in / out
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Receipts (in) and inventory out for a day or a full month.
+          </p>
+        </div>
+        {!loading ? (
+          <div className="no-print">
+            <PrintButton />
+          </div>
+        ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="no-print flex flex-wrap items-end gap-4">
         <div className="flex gap-2">
           <Button
             type="button"
@@ -140,16 +153,23 @@ export function InventoryInOutReportPage() {
 
       {loading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
-      ) : mode === "month" ? (
-        <MonthTable
-          report={data}
-          onOpenDay={(date) => {
-            setDay(date);
-            setMode("day");
-          }}
-        />
       ) : (
-        <DayTables report={data} />
+        <PrintDocument>
+          <p className="text-muted-foreground text-sm print:text-black">
+            Period: {rangeLabel}
+          </p>
+          {mode === "month" ? (
+            <MonthTable
+              report={data}
+              onOpenDay={(date) => {
+                setDay(date);
+                setMode("day");
+              }}
+            />
+          ) : (
+            <DayTables report={data} />
+          )}
+        </PrintDocument>
       )}
     </div>
   );

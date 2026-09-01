@@ -29,6 +29,8 @@ import { GoodsReceipt } from "./goods-receipt.entity";
 import { GoodsReceiptItem } from "./goods-receipt-item.entity";
 import { InventoryOut } from "./inventory-out.entity";
 import { InventoryOutItem } from "./inventory-out-item.entity";
+import { VendorReturn } from "./vendor-return.entity";
+import { VendorReturnItem } from "./vendor-return-item.entity";
 
 export const entities = [
   Tenant,
@@ -62,6 +64,8 @@ export const entities = [
   GoodsReceiptItem,
   InventoryOut,
   InventoryOutItem,
+  VendorReturn,
+  VendorReturnItem,
 ] as const;
 
 export {
@@ -96,4 +100,6 @@ export {
   GoodsReceiptItem,
   InventoryOut,
   InventoryOutItem,
+  VendorReturn,
+  VendorReturnItem,
 };

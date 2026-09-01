@@ -12,6 +12,13 @@ import {
 } from "@renderer/lib/local-db/data-source";
 import { useSession } from "@renderer/lib/session/context";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  ListPagination,
+  paginateClientSlice,
+  useResetPageOnFilterChange,
+} from "@renderer/components/list-pagination";
 
 export function WarehousesListPage() {
   const navigate = useNavigate();
@@ -21,9 +28,19 @@ export function WarehousesListPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EntityStatus | "all">("all");
   const [items, setItems] = useState<WarehouseListItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useBarcodeScanTarget({
+    kind: "search",
+    enabled: true,
+    onScan: setSearch,
+  });
+
+  useResetPageOnFilterChange(setPage, [search, status, dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +86,8 @@ export function WarehousesListPage() {
       clearTimeout(t);
     };
   }, [search, status, dataVersion]);
+
+  const { slice: pageItems, total } = paginateClientSlice(items, page, pageSize);
 
   return (
     <div className="space-y-6">
@@ -147,7 +166,7 @@ export function WarehousesListPage() {
               </tr>
             ) : null}
             {!loading
-              ? items.map((row) => (
+              ? pageItems.map((row) => (
                   <tr
                     key={row.id}
                     className="border-border hover:bg-muted/30 border-t"
@@ -173,6 +192,17 @@ export function WarehousesListPage() {
           </tbody>
         </table>
       </div>
+
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

@@ -61,6 +61,11 @@ import {
   INVENTORY_MOVEMENT_TYPES as inventoryMovementTypesList,
   PURCHASE_ORDER_STATUSES as purchaseOrderStatusesList,
   GOODS_RECEIPT_STATUSES as goodsReceiptStatusesList,
+  VENDOR_RETURN_STATUSES as vendorReturnStatusesList,
+  VENDOR_RETURN_REASONS as vendorReturnReasonsList,
+  VENDOR_RETURN_REASON_LABELS as vendorReturnReasonLabels,
+  VENDOR_RETURN_SETTLEMENTS as vendorReturnSettlementsList,
+  VENDOR_RETURN_SETTLEMENT_LABELS as vendorReturnSettlementLabels,
   VENDOR_CONTACT_TYPES as vendorContactTypesList,
   PAYMENT_TERMS as paymentTermsList,
   PAYMENT_TERMS_LABELS as paymentTermsLabels,
@@ -147,6 +152,7 @@ export type {
   CreateVendorSkuRequest,
   UpdateVendorSkuRequest,
   SkuSearchResult,
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSupplier,
   UnitListItem,
@@ -198,6 +204,18 @@ export type {
   InventoryOutListItem,
   InventoryOutListQuery,
   PaginatedInventoryOuts,
+  VendorReturnStatus,
+  VendorReturnReason,
+  VendorReturnSettlement,
+  CreateVendorReturnItemRequest,
+  CreateVendorReturnRequest,
+  VendorReturnItemRow,
+  VendorReturnDetail,
+  VendorReturnListItem,
+  VendorReturnListQuery,
+  PaginatedVendorReturns,
+  PendingVendorReturnLine,
+  GoodsReceiptReturnAdjustment,
   InventoryMovementListItem,
   InventoryMovementListQuery,
   PaginatedInventoryMovements,
@@ -245,6 +263,23 @@ export const UNIT_TYPES = unitTypesList;
 export const INVENTORY_MOVEMENT_TYPES = inventoryMovementTypesList;
 export const PURCHASE_ORDER_STATUSES = purchaseOrderStatusesList;
 export const GOODS_RECEIPT_STATUSES = goodsReceiptStatusesList;
+export const VENDOR_RETURN_STATUSES = vendorReturnStatusesList;
+export const VENDOR_RETURN_REASONS = vendorReturnReasonsList;
+export const VENDOR_RETURN_REASON_LABELS = vendorReturnReasonLabels;
+export const VENDOR_RETURN_SETTLEMENTS = vendorReturnSettlementsList;
+export const VENDOR_RETURN_SETTLEMENT_LABELS = vendorReturnSettlementLabels;
+export {
+  businessInitials,
+  productNameSlug,
+  nextSequentialCode,
+  vendorCodePrefix,
+  poNumberPrefix,
+  receiptNumberPrefix,
+  nextVendorCode,
+  nextPoNumber,
+  nextReceiptNumber,
+  nextSkuCodeForProduct,
+} from "./document-numbers";
 export {
   MASTER_DATA_IMPORT_FILES,
   nextSkuCode,
@@ -280,3 +315,5 @@ export const liveUsernameError = checkLiveUsernameError;
 export const liveEmailError = checkLiveEmailError;
 export const livePhone11DigitError = checkLivePhone11DigitError;
 export const livePasswordError = checkLivePasswordError;
+
+export { buildReceivedAtIso, formatStoredDateTime } from "./datetime";

@@ -5,6 +5,7 @@ import { CategoriesModule } from "./categories/categories.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { GoodsReceiptsModule } from "./goods-receipts/goods-receipts.module";
 import { InventoryOutModule } from "./inventory-out/inventory-out.module";
+import { VendorReturnsModule } from "./vendor-returns/vendor-returns.module";
 import { MasterDataImportModule } from "./imports/master-data-import.module";
 import { InventoryMovementsModule } from "./movements/inventory-movements.module";
 import { ProductsModule } from "./products/products.module";
@@ -25,6 +26,7 @@ import { WarehousesModule } from "./warehouses/warehouses.module";
     GoodsReceiptsModule,
     MasterDataImportModule,
     InventoryOutModule,
+    VendorReturnsModule,
     InventoryMovementsModule,
     WarehousesModule,
     VendorsModule,

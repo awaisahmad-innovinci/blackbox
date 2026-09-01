@@ -6,11 +6,13 @@ import type {
   DashboardSummary,
   EntityStatus,
   GoodsReceiptDetail,
+  GoodsReceiptListQuery,
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
   PaginatedProducts,
   PaginatedPurchaseOrders,
+  PaginatedGoodsReceipts,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -19,6 +21,7 @@ import type {
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
   ReceivingDraft,
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
@@ -27,6 +30,10 @@ import type {
   VendorDetail,
   VendorGroup,
   VendorListQuery,
+  VendorReturnDetail,
+  VendorReturnListQuery,
+  PaginatedVendorReturns,
+  PendingVendorReturnLine,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -92,6 +99,12 @@ declare global {
         upsertInventoryOuts: (
           rows: InventoryOutDetail[],
         ) => Promise<{ ok: true }>;
+        upsertVendorReturn: (
+          detail: VendorReturnDetail,
+        ) => Promise<{ ok: true }>;
+        upsertVendorReturns: (
+          rows: VendorReturnDetail[],
+        ) => Promise<{ ok: true }>;
         upsertInventoryMovements: (
           rows: InventoryMovementListItem[],
         ) => Promise<{ ok: true }>;
@@ -102,6 +115,11 @@ declare global {
         listPurchaseOrders: (
           query?: PurchaseOrderListQuery,
         ) => Promise<PaginatedPurchaseOrders>;
+        listGoodsReceipts: (
+          query?: GoodsReceiptListQuery,
+        ) => Promise<PaginatedGoodsReceipts>;
+        listPoNumbers: () => Promise<string[]>;
+        listReceiptNumbers: () => Promise<string[]>;
         getDashboardSummary: () => Promise<DashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         listCategories: (status?: EntityStatus | "all") => Promise<Category[]>;
@@ -152,10 +170,24 @@ declare global {
           barcode: string,
           warehouseId: string,
         ) => Promise<SkuSearchResult | null>;
+        lookupSkuByBarcode: (
+          barcode: string,
+        ) => Promise<SkuBarcodeLookupResult | null>;
         getPurchaseOrder: (id: string) => Promise<PurchaseOrderDetail | null>;
         getReceivingDraft: (poId: string) => Promise<ReceivingDraft | null>;
         getGoodsReceipt: (id: string) => Promise<GoodsReceiptDetail | null>;
         getInventoryOut: (id: string) => Promise<InventoryOutDetail | null>;
+        listVendorReturns: (
+          query?: VendorReturnListQuery,
+        ) => Promise<PaginatedVendorReturns>;
+        getVendorReturn: (id: string) => Promise<VendorReturnDetail | null>;
+        listPendingVendorReturns: (
+          vendorId: string,
+        ) => Promise<PendingVendorReturnLine[]>;
+        lastPurchaseCost: (
+          vendorId: string,
+          productSkuId: string,
+        ) => Promise<number>;
         inventoryInOutReport: (
           dateFrom: string,
           dateTo: string,

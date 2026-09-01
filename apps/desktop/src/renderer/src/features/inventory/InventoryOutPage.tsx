@@ -8,6 +8,8 @@ import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -20,6 +22,7 @@ import {
   AddInventoryOutItemDialog,
   type DraftOutLine,
 } from "./AddInventoryOutItemDialog";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -127,9 +130,9 @@ export function InventoryOutPage() {
     return null;
   }
 
-  async function onBarcodeEnter() {
+  async function onBarcodeEnter(scannedCode?: string) {
     setError(null);
-    const code = barcode.trim();
+    const code = (scannedCode ?? barcode).trim();
     if (!warehouseId) {
       setError("Select a warehouse first");
       return;
@@ -160,6 +163,15 @@ export function InventoryOutPage() {
       requestAnimationFrame(() => barcodeRef.current?.focus());
     }
   }
+
+  useBarcodeScanTarget({
+    kind: "barcode",
+    enabled: Boolean(warehouseId && !itemOpen && !success),
+    onScan: setBarcode,
+    onComplete: (code) => {
+      void onBarcodeEnter(code);
+    },
+  });
 
   async function onConfirm() {
     setError(null);
@@ -273,7 +285,7 @@ export function InventoryOutPage() {
 
   if (success) {
     return (
-      <div className="space-y-8">
+      <PrintDocument>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -283,7 +295,8 @@ export function InventoryOutPage() {
               Inventory out posted · {success.status}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="no-print flex gap-2">
+            <PrintButton />
             <Button
               variant="outline"
               onClick={() =>
@@ -335,7 +348,7 @@ export function InventoryOutPage() {
           subtotal={success.subtotal}
           total={success.total}
         />
-      </div>
+      </PrintDocument>
     );
   }
 

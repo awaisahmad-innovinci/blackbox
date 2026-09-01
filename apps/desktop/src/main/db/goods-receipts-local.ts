@@ -9,11 +9,11 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       `insert into goods_receipts (
         id, tenant_id, receipt_number, purchase_order_id, vendor_id, warehouse_id,
         status, received_at, voucher_number, subtotal, discount, tax, other_charges,
-        total, notes, created_at, updated_at, sync_status, server_updated_at
+        return_credit, total, notes, created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @receiptNumber, @purchaseOrderId, @vendorId, @warehouseId,
         @status, @receivedAt, @voucherNumber, @subtotal, @discount, @tax, @otherCharges,
-        @total, @notes, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+        @returnCredit, @total, @notes, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )
       on conflict(id) do update set
         receipt_number = excluded.receipt_number,
@@ -27,6 +27,7 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
         discount = excluded.discount,
         tax = excluded.tax,
         other_charges = excluded.other_charges,
+        return_credit = excluded.return_credit,
         total = excluded.total,
         notes = excluded.notes,
         updated_at = excluded.updated_at,
@@ -46,6 +47,7 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       discount: detail.discount,
       tax: detail.tax,
       otherCharges: detail.otherCharges,
+      returnCredit: detail.returnCredit ?? 0,
       total: detail.total,
       notes: detail.notes,
       createdAt: detail.createdAt,

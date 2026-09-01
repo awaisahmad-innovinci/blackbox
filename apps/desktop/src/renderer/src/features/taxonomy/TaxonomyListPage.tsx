@@ -7,6 +7,13 @@ import { Skeleton } from "@blackbox/ui/skeleton";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import type { DataSourceMode } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  ListPagination,
+  paginateClientSlice,
+  useResetPageOnFilterChange,
+} from "@renderer/components/list-pagination";
 
 export type TaxonomyRow = {
   id: string;
@@ -38,9 +45,19 @@ export function TaxonomyListPage({
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EntityStatus | "all">("all");
   const [items, setItems] = useState<TaxonomyRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useBarcodeScanTarget({
+    kind: "search",
+    enabled: true,
+    onScan: setSearch,
+  });
+
+  useResetPageOnFilterChange(setPage, [search, status, dataVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +87,8 @@ export function TaxonomyListPage({
       clearTimeout(t);
     };
   }, [search, status, load, title, dataVersion]);
+
+  const { slice: pageItems, total } = paginateClientSlice(items, page, pageSize);
 
   return (
     <div className="space-y-6">
@@ -141,7 +160,7 @@ export function TaxonomyListPage({
               </tr>
             ) : null}
             {!loading
-              ? items.map((row) => (
+              ? pageItems.map((row) => (
                   <tr
                     key={row.id}
                     className="border-border hover:bg-muted/30 border-t"
@@ -164,6 +183,17 @@ export function TaxonomyListPage({
           </tbody>
         </table>
       </div>
+
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

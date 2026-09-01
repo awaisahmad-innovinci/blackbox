@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsDateString,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,6 +12,7 @@ import {
   Min,
   ValidateNested,
 } from "class-validator";
+import { VENDOR_RETURN_SETTLEMENTS } from "@blackbox/shared";
 
 export class CreateGoodsReceiptItemDto {
   @IsUUID()
@@ -76,4 +78,18 @@ export class CreateGoodsReceiptDto {
   @ValidateNested({ each: true })
   @Type(() => CreateGoodsReceiptItemDto)
   items!: CreateGoodsReceiptItemDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GoodsReceiptReturnAdjustmentDto)
+  returnAdjustments?: GoodsReceiptReturnAdjustmentDto[];
+}
+
+export class GoodsReceiptReturnAdjustmentDto {
+  @IsUUID()
+  vendorReturnItemId!: string;
+
+  @IsIn(VENDOR_RETURN_SETTLEMENTS)
+  settlement!: (typeof VENDOR_RETURN_SETTLEMENTS)[number];
 }

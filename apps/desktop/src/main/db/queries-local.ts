@@ -6,6 +6,10 @@ import type {
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedVendors,
+  GoodsReceiptListItem,
+  GoodsReceiptListQuery,
+  GoodsReceiptStatus,
+  PaginatedGoodsReceipts,
   ProductListItem,
   ProductListQuery,
   ProductType,
@@ -16,6 +20,10 @@ import type {
   VendorListItem,
   UnitListItem,
   VendorListQuery,
+  VendorReturnListItem,
+  VendorReturnListQuery,
+  VendorReturnStatus,
+  PaginatedVendorReturns,
   WarehouseListItem,
 } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
@@ -511,4 +519,335 @@ export function getDashboardSummaryLocal(): DashboardSummary {
     pendingPurchaseOrders,
     recentReceipts,
   };
+}
+
+export function listGoodsReceiptsLocal(
+  query: GoodsReceiptListQuery = {},
+): PaginatedGoodsReceipts {
+  const db = getLocalDb();
+  const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
+  const search = query.search?.trim().toLowerCase() ?? "";
+  const status = query.status ?? "";
+  const vendorId = query.vendorId ?? "";
+  const warehouseId = query.warehouseId ?? "";
+  const dateFrom = query.dateFrom ?? "";
+  const dateTo = query.dateTo ?? "";
+
+  const where = `
+    gr.tenant_id = @tenantId
+    and (@status = '' or gr.status = @status)
+    and (@vendorId = '' or gr.vendor_id = @vendorId)
+    and (@warehouseId = '' or gr.warehouse_id = @warehouseId)
+    and (@dateFrom = '' or gr.received_at >= @dateFrom)
+    and (@dateTo = '' or gr.received_at <= @dateTo)
+    and (
+      @search = ''
+      or lower(gr.receipt_number) like '%' || @search || '%'
+      or lower(coalesce(po.po_number, '')) like '%' || @search || '%'
+      or lower(coalesce(v.name, '')) like '%' || @search || '%'
+    )
+  `;
+
+  const params = {
+    tenantId: DEMO_STORE_TENANT_ID,
+    status,
+    vendorId,
+    warehouseId,
+    dateFrom,
+    dateTo,
+    search,
+    limit: pageSize,
+    offset,
+  };
+
+  const total = (
+    db
+      .prepare(
+        `select count(*) as cnt
+         from goods_receipts gr
+         left join purchase_orders po on po.id = gr.purchase_order_id
+         left join vendors v on v.id = gr.vendor_id
+         where ${where}`,
+      )
+      .get(params) as { cnt: number }
+  ).cnt;
+
+  const rows = db
+    .prepare(
+      `select
+         gr.id,
+         gr.receipt_number as receiptNumber,
+         gr.purchase_order_id as purchaseOrderId,
+         coalesce(po.po_number, '—') as poNumber,
+         gr.vendor_id as vendorId,
+         v.name as vendorName,
+         gr.warehouse_id as warehouseId,
+         coalesce(w.name, '—') as warehouseName,
+         gr.status,
+         gr.received_at as receivedAt,
+         gr.total,
+         (
+           select count(*) from goods_receipt_items i
+           where i.goods_receipt_id = gr.id and i.tenant_id = gr.tenant_id
+         ) as itemCount
+       from goods_receipts gr
+       left join purchase_orders po on po.id = gr.purchase_order_id
+       left join vendors v on v.id = gr.vendor_id
+       left join warehouses w on w.id = gr.warehouse_id
+       where ${where}
+       order by gr.received_at desc, gr.created_at desc
+       limit @limit offset @offset`,
+    )
+    .all(params) as Array<{
+    id: string;
+    receiptNumber: string;
+    purchaseOrderId: string;
+    poNumber: string;
+    vendorId: string | null;
+    vendorName: string | null;
+    warehouseId: string;
+    warehouseName: string;
+    status: string;
+    receivedAt: string | null;
+    total: number;
+    itemCount: number;
+  }>;
+
+  return {
+    items: rows.map((r) => ({
+      id: r.id,
+      receiptNumber: r.receiptNumber,
+      purchaseOrderId: r.purchaseOrderId,
+      poNumber: r.poNumber,
+      vendorId: r.vendorId,
+      vendorName: r.vendorName,
+      warehouseId: r.warehouseId,
+      warehouseName: r.warehouseName,
+      status: r.status as GoodsReceiptStatus,
+      receivedAt: r.receivedAt,
+      total: Number(r.total),
+      itemCount: Number(r.itemCount),
+    })) as GoodsReceiptListItem[],
+    total,
+    page,
+    pageSize,
+  };
+}
+
+export function listVendorReturnsLocal(
+  query: VendorReturnListQuery = {},
+): PaginatedVendorReturns {
+  const db = getLocalDb();
+  const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
+  const search = query.search?.trim().toLowerCase() ?? "";
+  const status = query.status ?? "";
+  const vendorId = query.vendorId ?? "";
+  const warehouseId = query.warehouseId ?? "";
+  const dateFrom = query.dateFrom ?? "";
+  const dateTo = query.dateTo ?? "";
+
+  const where = `
+    vr.tenant_id = @tenantId
+    and (@status = '' or vr.status = @status)
+    and (@vendorId = '' or vr.vendor_id = @vendorId)
+    and (@warehouseId = '' or vr.warehouse_id = @warehouseId)
+    and (@dateFrom = '' or vr.return_date >= @dateFrom)
+    and (@dateTo = '' or vr.return_date <= @dateTo)
+    and (
+      @search = ''
+      or lower(vr.return_number) like '%' || @search || '%'
+      or exists (
+        select 1 from vendors v
+        where v.id = vr.vendor_id and lower(v.name) like '%' || @search || '%'
+      )
+    )
+  `;
+
+  const params = {
+    tenantId: DEMO_STORE_TENANT_ID,
+    status,
+    vendorId,
+    warehouseId,
+    dateFrom,
+    dateTo,
+    search,
+    limit: pageSize,
+    offset,
+  };
+
+  const total = (
+    db
+      .prepare(`select count(*) as cnt from vendor_returns vr where ${where}`)
+      .get(params) as { cnt: number }
+  ).cnt;
+
+  const rows = db
+    .prepare(
+      `select
+         vr.id,
+         vr.return_number as returnNumber,
+         vr.vendor_id as vendorId,
+         coalesce(v.name, '—') as vendorName,
+         vr.warehouse_id as warehouseId,
+         coalesce(w.name, '—') as warehouseName,
+         vr.return_date as returnDate,
+         vr.status,
+         vr.total,
+         (
+           select count(*) from vendor_return_items i
+           where i.vendor_return_id = vr.id and i.tenant_id = vr.tenant_id
+         ) as itemCount
+       from vendor_returns vr
+       left join vendors v on v.id = vr.vendor_id
+       left join warehouses w on w.id = vr.warehouse_id
+       where ${where}
+       order by vr.return_date desc, vr.created_at desc
+       limit @limit offset @offset`,
+    )
+    .all(params) as Array<{
+    id: string;
+    returnNumber: string;
+    vendorId: string;
+    vendorName: string;
+    warehouseId: string;
+    warehouseName: string;
+    returnDate: string;
+    status: string;
+    total: number;
+    itemCount: number;
+  }>;
+
+  return {
+    items: rows.map((r) => ({
+      ...r,
+      status: r.status as VendorReturnStatus,
+      total: Number(r.total),
+      itemCount: Number(r.itemCount),
+    })) as VendorReturnListItem[],
+    total,
+    page,
+    pageSize,
+  };
+}
+
+export function listPendingVendorReturnsLocal(
+  vendorId: string,
+): import("@blackbox/shared").PendingVendorReturnLine[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select
+         i.id as vendorReturnItemId,
+         i.vendor_return_id as vendorReturnId,
+         vr.return_number as returnNumber,
+         i.product_sku_id as productSkuId,
+         i.vendor_sku_id as vendorSkuId,
+         coalesce(p.name, '—') as productName,
+         coalesce(s.variant_name, '') as variantName,
+         coalesce(s.sku, '—') as sku,
+         i.reason,
+         i.quantity,
+         i.unit_cost as unitCost,
+         pu.name as purchaseUnitName,
+         i.units_per_purchase_unit as unitsPerPurchaseUnit
+       from vendor_return_items i
+       inner join vendor_returns vr on vr.id = i.vendor_return_id
+       left join product_skus s on s.id = i.product_sku_id
+       left join products p on p.id = s.product_id
+       left join units pu on pu.id = i.purchase_unit_id
+       where i.tenant_id = ?
+         and vr.vendor_id = ?
+         and i.settlement is null
+       order by i.created_at, i.id`,
+    )
+    .all(DEMO_STORE_TENANT_ID, vendorId) as Array<Record<string, unknown>>;
+
+  return rows.map((r) => {
+    const quantity = Number(r.quantity ?? 0);
+    const unitCost = Number(r.unitCost ?? 0);
+    return {
+      vendorReturnItemId: String(r.vendorReturnItemId),
+      vendorReturnId: String(r.vendorReturnId),
+      returnNumber: String(r.returnNumber),
+      productSkuId: String(r.productSkuId),
+      vendorSkuId: (r.vendorSkuId as string | null) ?? null,
+      productName: String(r.productName ?? "—"),
+      variantName: String(r.variantName ?? ""),
+      sku: String(r.sku ?? "—"),
+      reason: r.reason as import("@blackbox/shared").VendorReturnReason,
+      quantity,
+      unitCost,
+      lineTotal: Math.round(quantity * unitCost * 10000) / 10000,
+      purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
+      unitsPerPurchaseUnit: Number(r.unitsPerPurchaseUnit ?? 1) || 1,
+    };
+  });
+}
+
+export function lastPurchaseCostLocal(
+  vendorId: string,
+  productSkuId: string,
+): number {
+  const db = getLocalDb();
+  const fromGr = db
+    .prepare(
+      `select i.receiving_unit_cost as unitCost
+       from goods_receipt_items i
+       inner join goods_receipts g on g.id = i.goods_receipt_id
+       where i.tenant_id = ? and i.product_sku_id = ? and g.vendor_id = ?
+         and g.status = 'POSTED'
+       order by g.received_at desc, i.created_at desc
+       limit 1`,
+    )
+    .get(DEMO_STORE_TENANT_ID, productSkuId, vendorId) as
+    | { unitCost: number }
+    | undefined;
+  if (fromGr) return Number(fromGr.unitCost ?? 0);
+
+  const fromPo = db
+    .prepare(
+      `select i.unit_cost as unitCost
+       from purchase_order_items i
+       inner join purchase_orders po on po.id = i.purchase_order_id
+       where i.tenant_id = ? and i.product_sku_id = ? and po.vendor_id = ?
+       order by po.updated_at desc
+       limit 1`,
+    )
+    .get(DEMO_STORE_TENANT_ID, productSkuId, vendorId) as
+    | { unitCost: number }
+    | undefined;
+  if (fromPo) return Number(fromPo.unitCost ?? 0);
+
+  const fromVs = db
+    .prepare(
+      `select purchase_price as unitCost
+       from vendor_skus
+       where tenant_id = ? and vendor_id = ? and product_sku_id = ?
+         and status = 'active'
+       limit 1`,
+    )
+    .get(DEMO_STORE_TENANT_ID, vendorId, productSkuId) as
+    | { unitCost: number }
+    | undefined;
+  return Number(fromVs?.unitCost ?? 0);
+}
+
+export function listPoNumbersLocal(): string[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select po_number as poNumber from purchase_orders where tenant_id = @tenantId`,
+    )
+    .all({ tenantId: DEMO_STORE_TENANT_ID }) as Array<{ poNumber: string }>;
+  return rows.map((r) => String(r.poNumber));
+}
+
+export function listReceiptNumbersLocal(): string[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select receipt_number as receiptNumber from goods_receipts where tenant_id = @tenantId`,
+    )
+    .all({ tenantId: DEMO_STORE_TENANT_ID }) as Array<{ receiptNumber: string }>;
+  return rows.map((r) => String(r.receiptNumber));
 }

@@ -17,7 +17,7 @@ import type {
   StockMovementRow,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { nextSkuCode } from "@blackbox/shared";
+import { nextSkuCodeForProduct } from "@blackbox/shared";
 import { In, Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import {
@@ -319,8 +319,8 @@ export class ProductsService {
     });
     const skuCode =
       dto.sku?.trim() ||
-      nextSkuCode(
-        product.productCode,
+      nextSkuCodeForProduct(
+        product.name,
         existing.map((row) => row.sku),
       );
 

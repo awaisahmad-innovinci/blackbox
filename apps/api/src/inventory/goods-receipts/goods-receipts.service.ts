@@ -14,12 +14,14 @@ import type {
   ReceivingLineDraft,
 } from "@blackbox/shared";
 import {
+  buildReceivedAtIso,
   landedUnitByQuantity,
   lineTotalAfterDiscount,
   roundMoney4,
   weightedAvgUnitCost,
 } from "@blackbox/shared";
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
+import { allocateReceiptNumber } from "../common/allocate-document-number";
 import {
   GoodsReceipt,
   GoodsReceiptItem,
@@ -29,6 +31,8 @@ import {
   PurchaseOrder,
   PurchaseOrderItem,
   Vendor,
+  VendorReturn,
+  VendorReturnItem,
   VendorSku,
   Warehouse,
 } from "../../db/entities";
@@ -394,12 +398,20 @@ export class GoodsReceiptsService {
         );
       }
 
-      const total = round4(subtotal - discount + tax + otherCharges);
+      const adjustments = dto.returnAdjustments ?? [];
+      const returnCredit = await this.computeReturnCredit(
+        manager,
+        tenantId,
+        po.vendorId,
+        adjustments,
+      );
+      const total = Math.max(
+        0,
+        round4(subtotal - discount + tax + otherCharges - returnCredit),
+      );
 
-      const receiptNumber = await this.nextReceiptNumber(manager, tenantId);
-      const receivedAt = dto.receiptDate
-        ? new Date(`${dto.receiptDate}T12:00:00.000Z`)
-        : new Date();
+      const receiptNumber = await allocateReceiptNumber(manager, tenantId);
+      const receivedAt = new Date(buildReceivedAtIso(dto.receiptDate));
 
       const receipt = await manager.getRepository(GoodsReceipt).save(
         manager.getRepository(GoodsReceipt).create({
@@ -415,6 +427,7 @@ export class GoodsReceiptsService {
           discount: String(discount),
           tax: String(tax),
           otherCharges: String(otherCharges),
+          returnCredit: String(returnCredit),
           total: String(total),
           notes: dto.notes?.trim() ?? "",
         }),
@@ -508,6 +521,16 @@ export class GoodsReceiptsService {
         }
       }
 
+      await this.applyReturnAdjustments(
+        manager,
+        tenantId,
+        po.vendorId,
+        po.warehouseId,
+        receipt.id,
+        receiptNumber,
+        adjustments,
+      );
+
       po.status = "RECEIVED";
       await manager.getRepository(PurchaseOrder).save(po);
 
@@ -581,6 +604,7 @@ export class GoodsReceiptsService {
       discount: toNum(receipt.discount),
       tax: toNum(receipt.tax),
       otherCharges: toNum(receipt.otherCharges),
+      returnCredit: toNum(receipt.returnCredit),
       total: toNum(receipt.total),
       notes: receipt.notes,
       items,
@@ -603,27 +627,159 @@ export class GoodsReceiptsService {
     }
   }
 
-  private async nextReceiptNumber(
+  private async computeReturnCredit(
     manager: EntityManager,
     tenantId: string,
-  ): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `GRN-${year}-`;
-    const latest = await manager
-      .getRepository(GoodsReceipt)
-      .createQueryBuilder("gr")
-      .where("gr.tenant_id = :tenantId", { tenantId })
-      .andWhere("gr.receipt_number LIKE :prefix", { prefix: `${prefix}%` })
-      .orderBy("gr.receipt_number", "DESC")
-      .setLock("pessimistic_write")
-      .getOne();
-
-    let seq = 1;
-    if (latest?.receiptNumber) {
-      const part = latest.receiptNumber.slice(prefix.length);
-      const n = Number(part);
-      if (!Number.isNaN(n)) seq = n + 1;
+    vendorId: string,
+    adjustments: Array<{ vendorReturnItemId: string; settlement: string }>,
+  ): Promise<number> {
+    let credit = 0;
+    const seen = new Set<string>();
+    for (const adj of adjustments) {
+      if (adj.settlement !== "CASHBACK") continue;
+      if (seen.has(adj.vendorReturnItemId)) {
+        throw new BadRequestException("Duplicate return adjustment");
+      }
+      seen.add(adj.vendorReturnItemId);
+      const line = await this.requireOpenReturnLine(
+        manager,
+        tenantId,
+        vendorId,
+        adj.vendorReturnItemId,
+      );
+      credit = round4(credit + toNum(line.quantity) * toNum(line.unitCost));
     }
-    return `${prefix}${String(seq).padStart(6, "0")}`;
+    return credit;
+  }
+
+  private async applyReturnAdjustments(
+    manager: EntityManager,
+    tenantId: string,
+    vendorId: string,
+    warehouseId: string,
+    receiptId: string,
+    receiptNumber: string,
+    adjustments: Array<{ vendorReturnItemId: string; settlement: string }>,
+  ): Promise<void> {
+    const touchedReturns = new Set<string>();
+    const seen = new Set<string>();
+    for (const adj of adjustments) {
+      if (adj.settlement !== "CASHBACK" && adj.settlement !== "REPLACE") {
+        throw new BadRequestException("Invalid return settlement");
+      }
+      if (seen.has(adj.vendorReturnItemId)) {
+        throw new BadRequestException("Duplicate return adjustment");
+      }
+      seen.add(adj.vendorReturnItemId);
+      const line = await this.requireOpenReturnLine(
+        manager,
+        tenantId,
+        vendorId,
+        adj.vendorReturnItemId,
+      );
+      line.settlement = adj.settlement;
+      line.goodsReceiptId = receiptId;
+      await manager.getRepository(VendorReturnItem).save(line);
+      touchedReturns.add(line.vendorReturnId);
+
+      if (adj.settlement === "REPLACE") {
+        const unitsPer = toNum(line.unitsPerPurchaseUnit) || 1;
+        const stockDelta = round4(toNum(line.quantity) * unitsPer);
+        if (stockDelta > 0) {
+          const productSkuRepo = manager.getRepository(ProductSku);
+          const productSku = await productSkuRepo.findOne({
+            where: { id: line.productSkuId, tenantId },
+            lock: { mode: "pessimistic_write" },
+          });
+          if (productSku) {
+            const stockRepo = manager.getRepository(InventoryStock);
+            const allStock = await stockRepo.find({
+              where: { tenantId, productSkuId: line.productSkuId },
+              lock: { mode: "pessimistic_write" },
+            });
+            const oldQty = round4(
+              allStock.reduce((sum, row) => sum + toNum(row.quantityOnHand), 0),
+            );
+            const newCost = round4(toNum(line.unitCost) / unitsPer);
+            productSku.costPrice = String(
+              weightedAvgUnitCost(
+                oldQty,
+                toNum(productSku.costPrice),
+                stockDelta,
+                newCost,
+              ),
+            );
+            await productSkuRepo.save(productSku);
+
+            await manager.getRepository(InventoryMovement).save(
+              manager.getRepository(InventoryMovement).create({
+                tenantId,
+                productSkuId: line.productSkuId,
+                warehouseId,
+                movementType: "PURCHASE_RECEIPT",
+                quantity: String(stockDelta),
+                referenceType: "goods_receipt",
+                referenceId: receiptId,
+                reason: `Replace ${receiptNumber}`,
+              }),
+            );
+
+            let stock = allStock.find((row) => row.warehouseId === warehouseId);
+            if (!stock) {
+              stock = stockRepo.create({
+                tenantId,
+                productSkuId: line.productSkuId,
+                warehouseId,
+                quantityOnHand: "0",
+                quantityReserved: "0",
+                quantityAvailable: "0",
+              });
+            }
+            const onHand = round4(toNum(stock.quantityOnHand) + stockDelta);
+            const reserved = toNum(stock.quantityReserved);
+            stock.quantityOnHand = String(onHand);
+            stock.quantityAvailable = String(round4(onHand - reserved));
+            await stockRepo.save(stock);
+          }
+        }
+      }
+    }
+
+    for (const returnId of touchedReturns) {
+      const remaining = await manager.getRepository(VendorReturnItem).count({
+        where: { tenantId, vendorReturnId: returnId, settlement: IsNull() },
+      });
+      if (remaining === 0) {
+        await manager.getRepository(VendorReturn).update(
+          { id: returnId, tenantId },
+          { status: "SETTLED" },
+        );
+      }
+    }
+  }
+
+  private async requireOpenReturnLine(
+    manager: EntityManager,
+    tenantId: string,
+    vendorId: string,
+    itemId: string,
+  ): Promise<VendorReturnItem> {
+    const line = await manager.getRepository(VendorReturnItem).findOne({
+      where: { id: itemId, tenantId },
+      relations: { vendorReturn: true },
+      lock: { mode: "pessimistic_write" },
+    });
+    if (!line) {
+      throw new BadRequestException("Vendor return line not found");
+    }
+    if (line.settlement) {
+      throw new BadRequestException("Vendor return line is already settled");
+    }
+    if (line.vendorReturn?.vendorId !== vendorId) {
+      throw new BadRequestException(
+        "Return does not belong to this purchase order vendor",
+      );
+    }
+    return line;
   }
 }

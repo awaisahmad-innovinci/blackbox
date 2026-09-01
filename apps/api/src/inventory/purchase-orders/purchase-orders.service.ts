@@ -12,6 +12,7 @@ import type {
   PurchaseOrderStatus,
 } from "@blackbox/shared";
 import { DataSource, EntityManager, Repository } from "typeorm";
+import { allocatePoNumber } from "../common/allocate-document-number";
 import {
   ProductSku,
   PurchaseOrder,
@@ -197,7 +198,7 @@ export class PurchaseOrdersService {
         throw new BadRequestException("Purchase order must have at least one item");
       }
 
-      const poNumber = await this.nextPoNumber(manager, tenantId);
+      const poNumber = await allocatePoNumber(manager, tenantId);
       const headerDiscount = dto.discount ?? 0;
       const headerTax = dto.tax ?? 0;
       const otherCharges = dto.otherCharges ?? 0;
@@ -563,30 +564,6 @@ export class PurchaseOrdersService {
       createdAt: po.createdAt.toISOString(),
       updatedAt: po.updatedAt.toISOString(),
     };
-  }
-
-  private async nextPoNumber(
-    manager: EntityManager,
-    tenantId: string,
-  ): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `PO-${year}-`;
-    const latest = await manager
-      .getRepository(PurchaseOrder)
-      .createQueryBuilder("po")
-      .where("po.tenant_id = :tenantId", { tenantId })
-      .andWhere("po.po_number LIKE :prefix", { prefix: `${prefix}%` })
-      .orderBy("po.po_number", "DESC")
-      .setLock("pessimistic_write")
-      .getOne();
-
-    let seq = 1;
-    if (latest?.poNumber) {
-      const part = latest.poNumber.slice(prefix.length);
-      const n = Number(part);
-      if (!Number.isNaN(n)) seq = n + 1;
-    }
-    return `${prefix}${String(seq).padStart(6, "0")}`;
   }
 
   private async assertVendorWarehouse(

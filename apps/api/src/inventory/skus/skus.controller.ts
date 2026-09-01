@@ -9,6 +9,7 @@ import {
   Query,
 } from "@nestjs/common";
 import type {
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
@@ -37,6 +38,11 @@ class ByBarcodeQueryDto {
   warehouseId!: string;
 }
 
+class ExistsByBarcodeQueryDto {
+  @IsString()
+  barcode!: string;
+}
+
 @Controller("skus")
 export class SkusController {
   constructor(
@@ -47,6 +53,13 @@ export class SkusController {
   @Get()
   search(@Query() query: SearchSkusQueryDto): Promise<SkuSearchResult[]> {
     return this.skus.search(query.q, query.warehouseId);
+  }
+
+  @Get("exists-by-barcode")
+  lookupByBarcode(
+    @Query() query: ExistsByBarcodeQueryDto,
+  ): Promise<SkuBarcodeLookupResult> {
+    return this.skus.lookupByBarcode(query.barcode);
   }
 
   @Get("by-barcode")

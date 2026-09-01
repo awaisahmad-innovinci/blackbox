@@ -401,7 +401,7 @@ export function ProductProfilePage() {
       <AddProductSkuDialog
         open={skuOpen}
         productId={product.id}
-        productCode={product.productCode}
+        productName={product.name}
         existingSkuCodes={skus.map((s) => s.sku)}
         onClose={() => setSkuOpen(false)}
         onCreated={(row, cacheWarning) => {
