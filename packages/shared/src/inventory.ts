@@ -21,6 +21,35 @@ export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 export const INVENTORY_OUT_STATUSES = ["POSTED", "CANCELLED"] as const;
 export type InventoryOutStatus = (typeof INVENTORY_OUT_STATUSES)[number];
 
+export const VENDOR_RETURN_STATUSES = ["OPEN", "SETTLED"] as const;
+export type VendorReturnStatus = (typeof VENDOR_RETURN_STATUSES)[number];
+
+export const VENDOR_RETURN_REASONS = [
+  "EXPIRED",
+  "BROKEN",
+  "DAMAGED",
+  "OTHER",
+] as const;
+export type VendorReturnReason = (typeof VENDOR_RETURN_REASONS)[number];
+
+export const VENDOR_RETURN_REASON_LABELS: Record<VendorReturnReason, string> = {
+  EXPIRED: "Expired",
+  BROKEN: "Broken",
+  DAMAGED: "Damaged",
+  OTHER: "Other",
+};
+
+export const VENDOR_RETURN_SETTLEMENTS = ["CASHBACK", "REPLACE"] as const;
+export type VendorReturnSettlement = (typeof VENDOR_RETURN_SETTLEMENTS)[number];
+
+export const VENDOR_RETURN_SETTLEMENT_LABELS: Record<
+  VendorReturnSettlement,
+  string
+> = {
+  CASHBACK: "Cashback",
+  REPLACE: "Replace",
+};
+
 export const PURCHASE_ORDER_STATUSES = [
   "DRAFT",
   "SUBMITTED",
@@ -167,7 +196,7 @@ export interface VendorDetail {
 
 export interface CreateVendorRequest {
   name: string;
-  vendorCode: string;
+  vendorCode?: string;
   groupId?: string | null;
   status?: EntityStatus;
   primaryContact: RequiredVendorContactInput;
@@ -261,6 +290,31 @@ export interface SkuSearchResult {
   quantityAvailable?: number;
   /** Present when search includes warehouseId. */
   costPrice?: number;
+}
+
+/** Tenant-wide barcode lookup for duplicate detection (any SKU/product status). */
+export interface SkuBarcodeLookupResult {
+  id: string;
+  productId: string;
+  productName: string;
+  productStatus: EntityStatus;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  sizeValue: string | null;
+  sizeUnit: string | null;
+  baseUnitId: string | null;
+  baseUnitName: string | null;
+  purchaseUnitId: string | null;
+  purchaseUnitName: string | null;
+  unitsPerPurchaseUnit: number;
+  costPrice: number;
+  sellingPrice: number;
+  reorderLevel: number;
+  minimumStockLevel: number;
+  maximumStockLevel: number | null;
+  trackInventory: boolean;
+  status: EntityStatus;
 }
 
 export interface SkuDetail {
@@ -726,6 +780,11 @@ export interface CreateGoodsReceiptItemRequest {
   discountPercent?: number;
 }
 
+export interface GoodsReceiptReturnAdjustment {
+  vendorReturnItemId: string;
+  settlement: VendorReturnSettlement;
+}
+
 export interface CreateGoodsReceiptRequest {
   receiptDate?: string;
   voucherNumber?: string | null;
@@ -734,6 +793,7 @@ export interface CreateGoodsReceiptRequest {
   tax?: number;
   otherCharges?: number;
   items: CreateGoodsReceiptItemRequest[];
+  returnAdjustments?: GoodsReceiptReturnAdjustment[];
 }
 
 export interface GoodsReceiptItemRow {
@@ -773,6 +833,7 @@ export interface GoodsReceiptDetail {
   discount: number;
   tax: number;
   otherCharges: number;
+  returnCredit: number;
   total: number;
   notes: string;
   items: GoodsReceiptItemRow[];
@@ -880,6 +941,106 @@ export interface PaginatedInventoryOuts {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface CreateVendorReturnItemRequest {
+  productSkuId: string;
+  vendorSkuId?: string | null;
+  quantity: number;
+  unitCost: number;
+  reason: VendorReturnReason;
+}
+
+export interface CreateVendorReturnRequest {
+  vendorId: string;
+  warehouseId: string;
+  returnDate?: string;
+  notes?: string;
+  items: CreateVendorReturnItemRequest[];
+}
+
+export interface VendorReturnItemRow {
+  id: string;
+  productSkuId: string;
+  vendorSkuId: string | null;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  purchaseUnitId: string | null;
+  purchaseUnitName: string | null;
+  unitsPerPurchaseUnit: number;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+  reason: VendorReturnReason;
+  settlement: VendorReturnSettlement | null;
+  goodsReceiptId: string | null;
+}
+
+export interface VendorReturnDetail {
+  id: string;
+  returnNumber: string;
+  vendorId: string;
+  vendorName: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  notes: string;
+  status: VendorReturnStatus;
+  subtotal: number;
+  total: number;
+  items: VendorReturnItemRow[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorReturnListItem {
+  id: string;
+  returnNumber: string;
+  vendorId: string;
+  vendorName: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  status: VendorReturnStatus;
+  total: number;
+  itemCount: number;
+}
+
+export interface VendorReturnListQuery {
+  search?: string;
+  vendorId?: string;
+  warehouseId?: string;
+  status?: VendorReturnStatus;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedVendorReturns {
+  items: VendorReturnListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface PendingVendorReturnLine {
+  vendorReturnItemId: string;
+  vendorReturnId: string;
+  returnNumber: string;
+  productSkuId: string;
+  vendorSkuId: string | null;
+  productName: string;
+  variantName: string;
+  sku: string;
+  reason: VendorReturnReason;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+  purchaseUnitName: string | null;
+  unitsPerPurchaseUnit: number;
 }
 
 export interface InventoryMovementListItem {

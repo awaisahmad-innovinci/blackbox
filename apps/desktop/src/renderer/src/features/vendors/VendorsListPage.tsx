@@ -12,6 +12,12 @@ import {
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  ListPagination,
+  useResetPageOnFilterChange,
+} from "@renderer/components/list-pagination";
 
 export function VendorsListPage() {
   const navigate = useNavigate();
@@ -21,9 +27,18 @@ export function VendorsListPage() {
   const [groupId, setGroupId] = useState("");
   const [groups, setGroups] = useState<VendorGroup[]>([]);
   const [items, setItems] = useState<VendorListItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
+
+  useBarcodeScanTarget({
+    kind: "search",
+    enabled: true,
+    onScan: setSearch,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +61,8 @@ export function VendorsListPage() {
     };
   }, [dataVersion]);
 
+  useResetPageOnFilterChange(setPage, [search, status, groupId, dataVersion]);
+
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
@@ -60,12 +77,17 @@ export function VendorsListPage() {
             search: search.trim() || undefined,
             status: status || undefined,
             groupId: groupId || undefined,
+            page,
+            pageSize,
           };
           const res =
             mode === "local" && window.blackbox?.localDb?.listVendors
               ? await window.blackbox.localDb.listVendors(query)
               : await vendorsApi.list(query);
-          if (!cancelled) setItems(res.items);
+          if (!cancelled) {
+            setItems(res.items);
+            setTotal(res.total);
+          }
         } catch (err: unknown) {
           if (cancelled) return;
           setError(
@@ -80,7 +102,7 @@ export function VendorsListPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, status, groupId, dataVersion]);
+  }, [search, status, groupId, dataVersion, page, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -199,6 +221,17 @@ export function VendorsListPage() {
           </tbody>
         </table>
       </div>
+
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

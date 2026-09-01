@@ -2,6 +2,7 @@ import type {
   GoodsReceiptDetail,
   InventoryMovementListItem,
   InventoryOutDetail,
+  VendorReturnDetail,
   ProductDetail,
   ProductSkuDetail,
   PurchaseOrderDetail,
@@ -15,6 +16,7 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryMovementsApi } from "@renderer/lib/api/inventory-movements";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { productsApi } from "@renderer/lib/api/products";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { skusApi } from "@renderer/lib/api/skus";
@@ -34,6 +36,7 @@ export type SyncPhase =
   | "stock"
   | "goodsReceipts"
   | "inventoryOut"
+  | "vendorReturns"
   | "movements"
   | "done";
 
@@ -362,6 +365,42 @@ export async function runFullPull(
     throw new SyncPullError(
       "inventoryOut",
       getApiErrorMessage(err, "Failed to sync inventory out"),
+    );
+  }
+
+  try {
+    const returnList = await paginateAll((page, pageSize) =>
+      vendorReturnsApi.list({ page, pageSize }),
+    );
+    report(
+      "vendorReturns",
+      0,
+      Math.max(returnList.length, 1),
+      "Syncing vendor returns…",
+    );
+    const details: VendorReturnDetail[] = [];
+    for (let i = 0; i < returnList.length; i += 1) {
+      const detail = await vendorReturnsApi.get(returnList[i]!.id);
+      details.push(detail);
+      report(
+        "vendorReturns",
+        i + 1,
+        returnList.length,
+        `Syncing vendor returns… ${i + 1}/${returnList.length}`,
+      );
+      if (details.length >= 20) {
+        await localDb.upsertVendorReturns?.(details.splice(0, details.length));
+      }
+    }
+    if (details.length > 0) await localDb.upsertVendorReturns?.(details);
+    if (returnList.length === 0) {
+      report("vendorReturns", 1, 1, "No vendor returns to sync");
+    }
+  } catch (err: unknown) {
+    if (err instanceof SyncPullError) throw err;
+    throw new SyncPullError(
+      "vendorReturns",
+      getApiErrorMessage(err, "Failed to sync vendor returns"),
     );
   }
 

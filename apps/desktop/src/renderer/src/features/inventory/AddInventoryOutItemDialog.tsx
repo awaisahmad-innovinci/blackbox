@@ -11,6 +11,7 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { loadSkuSearch } from "@renderer/lib/local-db/entity-source";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 
 export type DraftOutLine = {
   productSkuId: string;
@@ -52,6 +53,13 @@ export function AddInventoryOutItemDialog({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SkuSearchResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useBarcodeScanTarget({
+    kind: "search",
+    layer: "dialog",
+    enabled: open,
+    onScan: setQuery,
+  });
 
   useEffect(() => {
     if (!open || !warehouseId) return;

@@ -25,6 +25,7 @@ import {
 } from "../../db/entities";
 import { isUniqueViolation } from "../../common/db-errors";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { allocateVendorCode } from "../common/allocate-document-number";
 import {
   CreateVendorDto,
   ListVendorsQueryDto,
@@ -163,16 +164,19 @@ export class VendorsService {
   async create(dto: CreateVendorDto): Promise<VendorDetail> {
     const tenantId = this.fixedTenant.tenantId;
     this.assertRequiredContacts(dto);
-    await this.assertUniqueCode(tenantId, dto.vendorCode);
     if (dto.groupId) await this.assertGroup(tenantId, dto.groupId);
 
     let saved: string;
     try {
       saved = await this.dataSource.transaction(async (manager) => {
+        const vendorCode =
+          dto.vendorCode?.trim() ||
+          (await allocateVendorCode(manager, tenantId));
+        await this.assertUniqueCode(tenantId, vendorCode);
         const vendor = manager.create(Vendor, {
           tenantId,
           name: dto.name.trim(),
-          vendorCode: dto.vendorCode.trim(),
+          vendorCode,
           groupId: dto.groupId ?? null,
           status: dto.status ?? "active",
           address: dto.address?.trim() || null,
@@ -208,15 +212,16 @@ export class VendorsService {
     const existing = await this.vendors.findOne({ where: { id, tenantId } });
     if (!existing) throw new NotFoundException("Vendor not found");
 
-    if (dto.vendorCode.trim() !== existing.vendorCode) {
-      await this.assertUniqueCode(tenantId, dto.vendorCode, id);
+    const vendorCode = dto.vendorCode?.trim() || existing.vendorCode;
+    if (vendorCode !== existing.vendorCode) {
+      await this.assertUniqueCode(tenantId, vendorCode, id);
     }
     if (dto.groupId) await this.assertGroup(tenantId, dto.groupId);
 
     try {
       await this.dataSource.transaction(async (manager) => {
         existing.name = dto.name.trim();
-        existing.vendorCode = dto.vendorCode.trim();
+        existing.vendorCode = vendorCode;
         existing.groupId = dto.groupId ?? null;
         existing.status = dto.status ?? existing.status;
         existing.address = dto.address?.trim() || null;

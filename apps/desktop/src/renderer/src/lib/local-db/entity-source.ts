@@ -1,5 +1,6 @@
 import type {
   GoodsReceiptDetail,
+  GoodsReceiptListQuery,
   InventoryInOutReport,
   InventoryOutDetail,
   PaginatedVendors,
@@ -8,6 +9,7 @@ import type {
   ProductSupplierRow,
   PurchaseOrderDetail,
   ReceivingDraft,
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
@@ -18,6 +20,11 @@ import type {
   UnitListItem,
   VendorDetail,
   VendorListQuery,
+  VendorReturnDetail,
+  VendorReturnListQuery,
+  PaginatedVendorReturns,
+  PaginatedGoodsReceipts,
+  PendingVendorReturnLine,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -33,8 +40,10 @@ import { categoriesApi } from "@renderer/lib/api/categories";
 import { skusApi } from "@renderer/lib/api/skus";
 import { unitsApi } from "@renderer/lib/api/units";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
+import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
+import { resolveDataSourceMode } from "@renderer/lib/local-db/data-source";
 
 export type ProductProfileData = {
   product: ProductDetail;
@@ -139,10 +148,70 @@ export async function loadGoodsReceipt(id: string): Promise<GoodsReceiptDetail> 
   return goodsReceiptsApi.get(id);
 }
 
+export async function loadGoodsReceipts(
+  query: GoodsReceiptListQuery = {},
+): Promise<PaginatedGoodsReceipts> {
+  const mode = await resolveDataSourceMode();
+  if (mode === "local" && window.blackbox?.localDb?.listGoodsReceipts) {
+    return window.blackbox.localDb.listGoodsReceipts(query);
+  }
+  return goodsReceiptsApi.list(query);
+}
+
 export async function loadInventoryOut(id: string): Promise<InventoryOutDetail> {
   const local = await window.blackbox?.localDb?.getInventoryOut(id);
   if (local) return local;
   return inventoryOutApi.get(id);
+}
+
+export async function loadVendorReturns(
+  query: VendorReturnListQuery = {},
+): Promise<PaginatedVendorReturns> {
+  try {
+    const local = await window.blackbox?.localDb?.listVendorReturns?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return vendorReturnsApi.list(query);
+}
+
+export async function loadVendorReturn(
+  id: string,
+): Promise<VendorReturnDetail> {
+  const local = await window.blackbox?.localDb?.getVendorReturn(id);
+  if (local) return local;
+  return vendorReturnsApi.get(id);
+}
+
+export async function loadPendingVendorReturns(
+  vendorId: string,
+): Promise<PendingVendorReturnLine[]> {
+  try {
+    const local =
+      await window.blackbox?.localDb?.listPendingVendorReturns?.(vendorId);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return vendorReturnsApi.pending(vendorId);
+}
+
+export async function loadLastPurchaseCost(
+  vendorId: string,
+  productSkuId: string,
+): Promise<number> {
+  try {
+    const local = await window.blackbox?.localDb?.lastPurchaseCost?.(
+      vendorId,
+      productSkuId,
+    );
+    if (local != null) return local;
+  } catch {
+    /* fall through */
+  }
+  const remote = await vendorReturnsApi.lastPurchaseCost(vendorId, productSkuId);
+  return remote.unitCost;
 }
 
 export async function loadVendors(
@@ -254,6 +323,25 @@ export async function loadSkuByBarcode(
     /* fall through to API */
   }
   return skusApi.byBarcode(barcode, warehouseId);
+}
+
+export async function lookupSkuByBarcode(
+  barcode: string,
+): Promise<SkuBarcodeLookupResult | null> {
+  const code = barcode.trim();
+  if (!code) return null;
+  try {
+    const local = await window.blackbox?.localDb?.lookupSkuByBarcode?.(code);
+    if (local) return local;
+  } catch {
+    /* fall through to API */
+  }
+  try {
+    return await skusApi.lookupByBarcode(code);
+  } catch (error: unknown) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function loadInventoryInOutReport(

@@ -69,6 +69,15 @@ export class GoodsReceipt {
   })
   otherCharges!: string;
 
+  @Column({
+    name: "return_credit",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  returnCredit!: string;
+
   @Column({ type: "numeric", precision: 14, scale: 4, default: 0 })
   total!: string;
 

@@ -6,6 +6,7 @@ import type {
   Category,
   EntityStatus,
   GoodsReceiptDetail,
+  GoodsReceiptListQuery,
   InventoryMovementListItem,
   InventoryOutDetail,
   ProductDetail,
@@ -17,6 +18,8 @@ import type {
   VendorDetail,
   VendorGroup,
   VendorListQuery,
+  VendorReturnDetail,
+  VendorReturnListQuery,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -36,6 +39,10 @@ import {
   upsertInventoryOutLocal,
   upsertInventoryOutsLocal,
 } from "./db/inventory-out-local";
+import {
+  upsertVendorReturnLocal,
+  upsertVendorReturnsLocal,
+} from "./db/vendor-returns-local";
 import { upsertInventoryMovementsLocal } from "./db/movements-local";
 import {
   upsertProductLocal,
@@ -69,6 +76,7 @@ import {
 import {
   getGoodsReceiptLocal,
   getInventoryOutLocal,
+  getVendorReturnLocal,
   getProductLocal,
   getProductProfileLocal,
   getPurchaseOrderLocal,
@@ -76,6 +84,7 @@ import {
   getSkuLocal,
   getSkuProfileLocal,
   getSkuByBarcodeLocal,
+  lookupSkuByBarcodeLocal,
   getVendorSkuLocal,
   searchSkusLocal,
   listInventoryInOutReportLocal,
@@ -89,11 +98,17 @@ import {
   listCategoriesLocal,
   listProductsLocal,
   listPurchaseOrdersLocal,
+  listGoodsReceiptsLocal,
+  listPoNumbersLocal,
+  listReceiptNumbersLocal,
   listVendorGroupsLocal,
   listUnitsLocal,
   listVendorsLocal,
   getWarehouseLocal,
   listWarehousesLocal,
+  listVendorReturnsLocal,
+  listPendingVendorReturnsLocal,
+  lastPurchaseCostLocal,
 } from "./db/queries-local";
 import {
   getOrCreateFingerprint,
@@ -285,6 +300,20 @@ function registerIpc(): void {
     },
   );
   ipcMain.handle(
+    "localDb:upsertVendorReturn",
+    (_event, detail: VendorReturnDetail) => {
+      upsertVendorReturnLocal(detail);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:upsertVendorReturns",
+    (_event, rows: VendorReturnDetail[]) => {
+      upsertVendorReturnsLocal(rows);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
     "localDb:upsertInventoryMovements",
     (_event, rows: InventoryMovementListItem[]) => {
       upsertInventoryMovementsLocal(rows);
@@ -304,6 +333,15 @@ function registerIpc(): void {
     "localDb:listPurchaseOrders",
     (_event, query: PurchaseOrderListQuery = {}) =>
       listPurchaseOrdersLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listGoodsReceipts",
+    (_event, query: GoodsReceiptListQuery = {}) =>
+      listGoodsReceiptsLocal(query),
+  );
+  ipcMain.handle("localDb:listPoNumbers", () => listPoNumbersLocal());
+  ipcMain.handle("localDb:listReceiptNumbers", () =>
+    listReceiptNumbersLocal(),
   );
   ipcMain.handle("localDb:getDashboardSummary", () =>
     getDashboardSummaryLocal(),
@@ -387,6 +425,9 @@ function registerIpc(): void {
     (_event, barcode: string, warehouseId: string) =>
       getSkuByBarcodeLocal(barcode, warehouseId),
   );
+  ipcMain.handle("localDb:lookupSkuByBarcode", (_event, barcode: string) =>
+    lookupSkuByBarcodeLocal(barcode),
+  );
   ipcMain.handle("localDb:getPurchaseOrder", (_event, id: string) =>
     getPurchaseOrderLocal(id),
   );
@@ -398,6 +439,22 @@ function registerIpc(): void {
   );
   ipcMain.handle("localDb:getInventoryOut", (_event, id: string) =>
     getInventoryOutLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:listVendorReturns",
+    (_event, query?: VendorReturnListQuery) => listVendorReturnsLocal(query),
+  );
+  ipcMain.handle("localDb:getVendorReturn", (_event, id: string) =>
+    getVendorReturnLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:listPendingVendorReturns",
+    (_event, vendorId: string) => listPendingVendorReturnsLocal(vendorId),
+  );
+  ipcMain.handle(
+    "localDb:lastPurchaseCost",
+    (_event, vendorId: string, productSkuId: string) =>
+      lastPurchaseCostLocal(vendorId, productSkuId),
   );
   ipcMain.handle(
     "localDb:inventoryInOutReport",

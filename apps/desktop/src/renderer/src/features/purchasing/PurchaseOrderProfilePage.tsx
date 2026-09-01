@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { loadPurchaseOrder } from "@renderer/lib/local-db/entity-source";
@@ -99,62 +101,64 @@ export function PurchaseOrderProfilePage() {
   const canCancel = po.status === "DRAFT" || po.status === "SUBMITTED";
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {po.poNumber}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {po.status.replaceAll("_", " ")} · {po.orderDate}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canEdit ? (
-            <Button
-              variant="outline"
-              onClick={() => navigate(`/purchase-orders/${po.id}/edit`)}
-            >
-              Edit
-            </Button>
-          ) : null}
-          {canSubmit ? (
-            <Button disabled={busy} onClick={() => void onSubmit()}>
-              Submit PO
-            </Button>
-          ) : null}
-          {canReceive ? (
-            <Button
-              onClick={() => navigate(`/purchase-orders/${po.id}/receive`)}
-            >
-              Receive Stock
-            </Button>
-          ) : null}
-          {canCancel ? (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void onCancel()}
-            >
-              Cancel PO
-            </Button>
-          ) : null}
-          <Button variant="ghost" onClick={() => navigate("/purchase-orders")}>
-            Back
-          </Button>
-        </div>
-      </div>
-
+    <>
       {error ? (
         <div
           role="alert"
-          className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
+          className="border-destructive/40 bg-destructive/5 text-destructive no-print mb-4 rounded-lg border px-4 py-3 text-sm"
         >
           {error}
         </div>
       ) : null}
 
-      <section className="space-y-3">
+      <PrintDocument>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {po.poNumber}
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {po.status.replaceAll("_", " ")} · {po.orderDate}
+            </p>
+          </div>
+          <div className="no-print flex flex-wrap gap-2">
+            <PrintButton />
+            {canEdit ? (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/purchase-orders/${po.id}/edit`)}
+              >
+                Edit
+              </Button>
+            ) : null}
+            {canSubmit ? (
+              <Button disabled={busy} onClick={() => void onSubmit()}>
+                Submit PO
+              </Button>
+            ) : null}
+            {canReceive ? (
+              <Button
+                onClick={() => navigate(`/purchase-orders/${po.id}/receive`)}
+              >
+                Receive Stock
+              </Button>
+            ) : null}
+            {canCancel ? (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void onCancel()}
+              >
+                Cancel PO
+              </Button>
+            ) : null}
+            <Button variant="ghost" onClick={() => navigate("/purchase-orders")}>
+              Back
+            </Button>
+          </div>
+        </div>
+
+        <section className="space-y-3">
         <h2 className="text-lg font-medium">Overview</h2>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
@@ -270,6 +274,7 @@ export function PurchaseOrderProfilePage() {
           <span className="tabular-nums">{po.total.toLocaleString()}</span>
         </div>
       </section>
-    </div>
+      </PrintDocument>
+    </>
   );
 }

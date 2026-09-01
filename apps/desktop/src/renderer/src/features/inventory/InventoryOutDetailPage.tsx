@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { InventoryOutDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { loadInventoryOut } from "@renderer/lib/local-db/entity-source";
 
@@ -53,7 +55,7 @@ export function InventoryOutDetailPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <PrintDocument>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -63,9 +65,12 @@ export function InventoryOutDetailPage() {
             {detail.status} · Inventory out
           </p>
         </div>
-        <Button variant="ghost" onClick={() => navigate("/inventory/out")}>
-          Back
-        </Button>
+        <div className="no-print flex flex-wrap gap-2">
+          <PrintButton />
+          <Button variant="ghost" onClick={() => navigate("/inventory/out")}>
+            Back
+          </Button>
+        </div>
       </div>
 
       <section className="space-y-3">
@@ -138,6 +143,6 @@ export function InventoryOutDetailPage() {
           </div>
         </section>
       </section>
-    </div>
+    </PrintDocument>
   );
 }

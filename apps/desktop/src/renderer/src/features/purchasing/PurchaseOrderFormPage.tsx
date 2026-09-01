@@ -13,8 +13,10 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { loadPurchaseOrder, loadVendors, loadVendorSkus, loadWarehouses } from "@renderer/lib/local-db/entity-source";
+import { allocatePoNumber } from "@renderer/lib/document-numbers";
+import { useSession } from "@renderer/lib/session/context";
 import {
   AddPurchaseOrderItemDialog,
   toDraftPoLine,
@@ -33,6 +35,7 @@ export function PurchaseOrderFormPage() {
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [poNumber, setPoNumber] = useState("Assigned on save");
+  const { user } = useSession();
   const [status, setStatus] = useState("DRAFT");
   const [vendorId, setVendorId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
@@ -99,14 +102,14 @@ export function PurchaseOrderFormPage() {
     }
   }
 
-  useBarcodeScanCapture(
-    Boolean(vendorId && warehouseId && !itemOpen),
-    (code) => {
-      setBarcode(code);
+  useBarcodeScanTarget({
+    kind: "barcode",
+    enabled: Boolean(vendorId && warehouseId && !itemOpen),
+    onScan: setBarcode,
+    onComplete: (code) => {
       void addSkuFromBarcode(code);
     },
-    barcodeRef.current,
-  );
+  });
 
   useEffect(() => {
     void loadVendors({ status: "active", pageSize: 100 })
@@ -117,6 +120,13 @@ export function PurchaseOrderFormPage() {
       if (!isEdit && rows.length === 1) setWarehouseId(rows[0]!.id);
     }).catch(() => undefined);
   }, [isEdit]);
+
+  useEffect(() => {
+    if (isEdit) return;
+    const tenantName = user?.tenantName?.trim() ?? "";
+    if (!tenantName) return;
+    void allocatePoNumber(tenantName).then(setPoNumber);
+  }, [isEdit, user?.tenantName]);
 
   useEffect(() => {
     if (!id) return;
@@ -260,9 +270,12 @@ export function PurchaseOrderFormPage() {
       if (await isDeviceBound()) {
         const localId = isEdit && id ? id : crypto.randomUUID();
         const now = new Date().toISOString();
+        const assignedPoNumber = isEdit
+          ? poNumber
+          : await allocatePoNumber(user?.tenantName ?? "");
         saved = {
           id: localId,
-          poNumber: isEdit ? poNumber : `LOCAL-${localId.slice(0, 8)}`,
+          poNumber: assignedPoNumber,
           vendorId: body.vendorId,
           vendorName: vendors.find((v) => v.id === body.vendorId)?.name ?? "",
           warehouseId: body.warehouseId,

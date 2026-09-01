@@ -20,7 +20,7 @@ import {
   type SyncStatusResponse,
   type SyncStream,
 } from "@blackbox/shared";
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
 import { randomUUID } from "node:crypto";
 import { getRequestTenant, requestTenantAls } from "../common/request-tenant";
 import type { TenantContext } from "../common/tenant-context";
@@ -46,6 +46,8 @@ import {
   Vendor,
   VendorContact,
   VendorGroup,
+  VendorReturn,
+  VendorReturnItem,
   VendorSku,
   Warehouse,
 } from "../db/entities";
@@ -479,7 +481,8 @@ export class SyncService {
       const signed =
         change.payload.delta != null
           ? Number(change.payload.delta)
-          : String(change.payload.movementType) === "INVENTORY_OUT"
+          : String(change.payload.movementType) === "INVENTORY_OUT" ||
+              String(change.payload.movementType) === "RETURN"
             ? -qty
             : qty;
       const skuId = String(change.payload.productSkuId ?? "");
@@ -701,6 +704,10 @@ export class SyncService {
         await this.upsertInventoryOut(manager, tenantId, change.entityId, p);
         break;
       }
+      case "vendor_return": {
+        await this.upsertVendorReturn(manager, tenantId, change.entityId, p);
+        break;
+      }
       default:
         break;
     }
@@ -733,6 +740,14 @@ export class SyncService {
         where: { id: entityId, tenantId },
       });
       if (row && row.status === "POSTED") {
+        return { status: row.status };
+      }
+    }
+    if (entityType === "vendor_return") {
+      const row = await manager.findOne(VendorReturn, {
+        where: { id: entityId, tenantId },
+      });
+      if (row && row.status === "SETTLED") {
         return { status: row.status };
       }
     }
@@ -820,6 +835,7 @@ export class SyncService {
       discount: String(p.discount ?? row.discount ?? 0),
       tax: String(p.tax ?? row.tax ?? 0),
       otherCharges: String(p.otherCharges ?? row.otherCharges ?? 0),
+      returnCredit: String(p.returnCredit ?? row.returnCredit ?? 0),
       total: String(p.total ?? row.total ?? 0),
       notes: String(p.notes ?? row.notes ?? ""),
     });
@@ -861,6 +877,46 @@ export class SyncService {
         tax: Number(row.tax ?? 0),
         otherCharges: Number(row.otherCharges ?? 0),
       });
+    }
+    if (Array.isArray(p.returnAdjustments)) {
+      await this.settleReturnAdjustments(
+        manager,
+        tenantId,
+        entityId,
+        p.returnAdjustments as Array<Record<string, unknown>>,
+      );
+    }
+  }
+
+  private async settleReturnAdjustments(
+    manager: EntityManager,
+    tenantId: string,
+    receiptId: string,
+    adjustments: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    const touched = new Set<string>();
+    for (const adj of adjustments) {
+      const itemId = String(adj.vendorReturnItemId ?? "");
+      const settlement = String(adj.settlement ?? "");
+      if (!itemId || (settlement !== "CASHBACK" && settlement !== "REPLACE")) {
+        continue;
+      }
+      const line = await manager.findOne(VendorReturnItem, {
+        where: { id: itemId, tenantId },
+      });
+      if (!line || line.settlement) continue;
+      line.settlement = settlement;
+      line.goodsReceiptId = receiptId;
+      await manager.save(line);
+      touched.add(line.vendorReturnId);
+    }
+    for (const returnId of touched) {
+      const open = await manager.count(VendorReturnItem, {
+        where: { tenantId, vendorReturnId: returnId, settlement: IsNull() },
+      });
+      if (open === 0) {
+        await manager.update(VendorReturn, { id: returnId, tenantId }, { status: "SETTLED" });
+      }
     }
   }
 
@@ -946,6 +1002,60 @@ export class SyncService {
       if (productSku) {
         productSku.costPrice = String(state.cost);
         await manager.save(productSku);
+      }
+    }
+  }
+
+  private async upsertVendorReturn(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await manager.findOne(VendorReturn, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ?? manager.create(VendorReturn, { id: entityId, tenantId });
+    Object.assign(row, {
+      returnNumber: String(
+        p.returnNumber ?? row.returnNumber ?? `SYNC-${entityId.slice(0, 8)}`,
+      ),
+      vendorId: String(p.vendorId ?? row.vendorId ?? ""),
+      warehouseId: String(p.warehouseId ?? row.warehouseId ?? ""),
+      returnDate: String(
+        p.returnDate ?? row.returnDate ?? new Date().toISOString().slice(0, 10),
+      ),
+      notes: String(p.notes ?? row.notes ?? ""),
+      status: String(p.status ?? row.status ?? "OPEN"),
+      subtotal: String(p.subtotal ?? row.subtotal ?? 0),
+      total: String(p.total ?? row.total ?? 0),
+    });
+    if (!row.vendorId) throw new Error("vendor not found");
+    if (!row.warehouseId) throw new Error("warehouse not found");
+    await manager.save(row);
+    if (Array.isArray(p.items)) {
+      await manager.delete(VendorReturnItem, {
+        vendorReturnId: entityId,
+        tenantId,
+      });
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        await manager.save(
+          manager.create(VendorReturnItem, {
+            id: String(item.id ?? randomUUID()),
+            tenantId,
+            vendorReturnId: entityId,
+            productSkuId: String(item.productSkuId ?? ""),
+            vendorSkuId: (item.vendorSkuId as string | null) ?? null,
+            purchaseUnitId: (item.purchaseUnitId as string | null) ?? null,
+            unitsPerPurchaseUnit: String(item.unitsPerPurchaseUnit ?? 1),
+            quantity: String(item.quantity ?? 0),
+            unitCost: String(item.unitCost ?? 0),
+            reason: String(item.reason ?? "OTHER"),
+            settlement: (item.settlement as string | null) ?? null,
+            goodsReceiptId: (item.goodsReceiptId as string | null) ?? null,
+          }),
+        );
       }
     }
   }

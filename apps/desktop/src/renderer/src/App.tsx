@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { SignInPage } from "./features/auth/SignInPage";
+import { BarcodeScanProvider } from "./lib/barcode-scan";
 import { SessionProvider } from "./lib/session/session-context";
 import { useSession } from "./lib/session/context";
 import { BrandFormPage } from "./features/brands/BrandFormPage";
@@ -11,10 +12,14 @@ import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { InventoryInOutReportPage } from "./features/inventory/InventoryInOutReportPage";
 import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
 import { InventoryOutPage } from "./features/inventory/InventoryOutPage";
+import { VendorReturnDetailPage } from "./features/inventory/VendorReturnDetailPage";
+import { VendorReturnFormPage } from "./features/inventory/VendorReturnFormPage";
+import { VendorReturnsListPage } from "./features/inventory/VendorReturnsListPage";
 import { ProductFormPage } from "./features/products/ProductFormPage";
 import { ProductProfilePage } from "./features/products/ProductProfilePage";
 import { ProductsListPage } from "./features/products/ProductsListPage";
 import { GoodsReceiptProfilePage } from "./features/purchasing/GoodsReceiptProfilePage";
+import { GoodsReceiptsListPage } from "./features/purchasing/GoodsReceiptsListPage";
 import { PurchaseOrderFormPage } from "./features/purchasing/PurchaseOrderFormPage";
 import { PurchaseOrderProfilePage } from "./features/purchasing/PurchaseOrderProfilePage";
 import { PurchaseOrdersListPage } from "./features/purchasing/PurchaseOrdersListPage";
@@ -52,9 +57,10 @@ function AuthenticatedApp() {
   }
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route element={<AppShell />}>
+    <BarcodeScanProvider>
+      <HashRouter>
+        <Routes>
+          <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
           <Route path="products" element={<ProductsListPage />} />
           <Route path="products/new" element={<ProductFormPage />} />
@@ -86,6 +92,15 @@ function AuthenticatedApp() {
             path="inventory/out/:id"
             element={<InventoryOutDetailPage />}
           />
+          <Route path="inventory/returns" element={<VendorReturnsListPage />} />
+          <Route
+            path="inventory/returns/new"
+            element={<VendorReturnFormPage />}
+          />
+          <Route
+            path="inventory/returns/:id"
+            element={<VendorReturnDetailPage />}
+          />
           <Route path="purchase-orders" element={<PurchaseOrdersListPage />} />
           <Route
             path="purchase-orders/new"
@@ -103,6 +118,7 @@ function AuthenticatedApp() {
             path="purchase-orders/:id/receive"
             element={<ReceivePurchaseOrderPage />}
           />
+          <Route path="goods-receipts" element={<GoodsReceiptsListPage />} />
           <Route
             path="goods-receipts/:id"
             element={<GoodsReceiptProfilePage />}
@@ -115,8 +131,9 @@ function AuthenticatedApp() {
           <Route path="warehouses/new" element={<WarehouseFormPage />} />
           <Route path="warehouses/:id/edit" element={<WarehouseFormPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </HashRouter>
+          </Route>
+        </Routes>
+      </HashRouter>
+    </BarcodeScanProvider>
   );
 }

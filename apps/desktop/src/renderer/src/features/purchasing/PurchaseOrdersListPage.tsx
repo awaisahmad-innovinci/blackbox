@@ -19,6 +19,12 @@ import {
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  ListPagination,
+  useResetPageOnFilterChange,
+} from "@renderer/components/list-pagination";
 
 export function PurchaseOrdersListPage() {
   const navigate = useNavigate();
@@ -32,9 +38,18 @@ export function PurchaseOrdersListPage() {
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [items, setItems] = useState<PurchaseOrderListItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
+
+  useBarcodeScanTarget({
+    kind: "search",
+    enabled: true,
+    onScan: setSearch,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +82,16 @@ export function PurchaseOrdersListPage() {
     };
   }, [dataVersion]);
 
+  useResetPageOnFilterChange(setPage, [
+    search,
+    status,
+    vendorId,
+    warehouseId,
+    dateFrom,
+    dateTo,
+    dataVersion,
+  ]);
+
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
@@ -84,12 +109,17 @@ export function PurchaseOrdersListPage() {
             warehouseId: warehouseId || undefined,
             dateFrom: dateFrom || undefined,
             dateTo: dateTo || undefined,
+            page,
+            pageSize,
           };
           const res =
             mode === "local" && window.blackbox?.localDb?.listPurchaseOrders
               ? await window.blackbox.localDb.listPurchaseOrders(query)
               : await purchaseOrdersApi.list(query);
-          if (!cancelled) setItems(res.items);
+          if (!cancelled) {
+            setItems(res.items);
+            setTotal(res.total);
+          }
         } catch (err: unknown) {
           if (cancelled) return;
           setError(
@@ -114,6 +144,8 @@ export function PurchaseOrdersListPage() {
     dateFrom,
     dateTo,
     dataVersion,
+    page,
+    pageSize,
   ]);
 
   return (
@@ -259,6 +291,17 @@ export function PurchaseOrdersListPage() {
           </tbody>
         </table>
       </div>
+
+      <ListPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

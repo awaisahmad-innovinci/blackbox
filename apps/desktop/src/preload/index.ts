@@ -5,11 +5,13 @@ import type {
   DashboardSummary,
   EntityStatus,
   GoodsReceiptDetail,
+  GoodsReceiptListQuery,
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
   PaginatedProducts,
   PaginatedPurchaseOrders,
+  PaginatedGoodsReceipts,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -18,6 +20,7 @@ import type {
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
   ReceivingDraft,
+  SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
@@ -26,6 +29,10 @@ import type {
   VendorDetail,
   VendorGroup,
   VendorListQuery,
+  VendorReturnDetail,
+  VendorReturnListQuery,
+  PaginatedVendorReturns,
+  PendingVendorReturnLine,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -97,6 +104,10 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:upsertInventoryOut", detail) as Promise<Ok>,
     upsertInventoryOuts: (rows: InventoryOutDetail[]) =>
       ipcRenderer.invoke("localDb:upsertInventoryOuts", rows) as Promise<Ok>,
+    upsertVendorReturn: (detail: VendorReturnDetail) =>
+      ipcRenderer.invoke("localDb:upsertVendorReturn", detail) as Promise<Ok>,
+    upsertVendorReturns: (rows: VendorReturnDetail[]) =>
+      ipcRenderer.invoke("localDb:upsertVendorReturns", rows) as Promise<Ok>,
     upsertInventoryMovements: (rows: InventoryMovementListItem[]) =>
       ipcRenderer.invoke(
         "localDb:upsertInventoryMovements",
@@ -111,6 +122,15 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listPurchaseOrders",
         query,
       ) as Promise<PaginatedPurchaseOrders>,
+    listGoodsReceipts: (query?: GoodsReceiptListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listGoodsReceipts",
+        query,
+      ) as Promise<PaginatedGoodsReceipts>,
+    listPoNumbers: () =>
+      ipcRenderer.invoke("localDb:listPoNumbers") as Promise<string[]>,
+    listReceiptNumbers: () =>
+      ipcRenderer.invoke("localDb:listReceiptNumbers") as Promise<string[]>,
     getDashboardSummary: () =>
       ipcRenderer.invoke(
         "localDb:getDashboardSummary",
@@ -194,6 +214,11 @@ contextBridge.exposeInMainWorld("blackbox", {
         barcode,
         warehouseId,
       ) as Promise<SkuSearchResult | null>,
+    lookupSkuByBarcode: (barcode: string) =>
+      ipcRenderer.invoke(
+        "localDb:lookupSkuByBarcode",
+        barcode,
+      ) as Promise<SkuBarcodeLookupResult | null>,
     getPurchaseOrder: (id: string) =>
       ipcRenderer.invoke(
         "localDb:getPurchaseOrder",
@@ -214,6 +239,27 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getInventoryOut",
         id,
       ) as Promise<InventoryOutDetail | null>,
+    listVendorReturns: (query?: VendorReturnListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listVendorReturns",
+        query,
+      ) as Promise<PaginatedVendorReturns>,
+    getVendorReturn: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getVendorReturn",
+        id,
+      ) as Promise<VendorReturnDetail | null>,
+    listPendingVendorReturns: (vendorId: string) =>
+      ipcRenderer.invoke(
+        "localDb:listPendingVendorReturns",
+        vendorId,
+      ) as Promise<PendingVendorReturnLine[]>,
+    lastPurchaseCost: (vendorId: string, productSkuId: string) =>
+      ipcRenderer.invoke(
+        "localDb:lastPurchaseCost",
+        vendorId,
+        productSkuId,
+      ) as Promise<number>,
     inventoryInOutReport: (dateFrom: string, dateTo: string) =>
       ipcRenderer.invoke(
         "localDb:inventoryInOutReport",

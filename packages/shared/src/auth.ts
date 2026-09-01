@@ -6,6 +6,8 @@ export type AuthClient = "web" | "desktop";
 export interface AuthUser {
   id: string;
   tenantId: string;
+  /** Store / business display name (tenant.name). */
+  tenantName?: string;
   email: string;
   username: string;
   fullName: string;

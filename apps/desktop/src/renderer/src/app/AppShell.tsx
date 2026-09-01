@@ -44,7 +44,8 @@ export function AppShell() {
     location.pathname.startsWith("/categories");
   const purchasingActive =
     location.pathname.startsWith("/purchase-orders") ||
-    location.pathname.startsWith("/purchasing");
+    location.pathname.startsWith("/purchasing") ||
+    location.pathname.startsWith("/goods-receipts");
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
@@ -102,6 +103,11 @@ export function AppShell() {
                   Inventory Out
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  onSelect={() => navigate("/inventory/returns")}
+                >
+                  Vendor Returns
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onSelect={() => navigate("/inventory/reports")}
                 >
                   In / out report
@@ -130,6 +136,9 @@ export function AppShell() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => navigate("/purchase-orders")}>
                   Purchase Orders
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate("/goods-receipts")}>
+                  Purchase Vouchers
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -28,6 +28,8 @@ import { vendorsApi } from "@renderer/lib/api/vendors";
 import { loadVendor } from "@renderer/lib/local-db/entity-source";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { allocateVendorCode } from "@renderer/lib/document-numbers";
+import { useSession } from "@renderer/lib/session/context";
 
 type ContactForm = {
   name: string;
@@ -187,6 +189,7 @@ export function VendorFormPage() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const { user } = useSession();
   const [groups, setGroups] = useState<VendorGroup[]>([]);
   const [form, setForm] = useState<FormState>(blankForm);
   const [loading, setLoading] = useState(isEdit);
@@ -197,6 +200,15 @@ export function VendorFormPage() {
   useEffect(() => {
     void vendorGroupsApi.list().then(setGroups).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (isEdit) return;
+    const tenantName = user?.tenantName?.trim() ?? "";
+    if (!tenantName) return;
+    void allocateVendorCode(tenantName).then((code) => {
+      setForm((prev) => ({ ...prev, vendorCode: code }));
+    });
+  }, [isEdit, user?.tenantName]);
 
   useEffect(() => {
     if (!id) return;
@@ -244,7 +256,9 @@ export function VendorFormPage() {
   function validate(): boolean {
     const next: Record<string, string> = {};
     if (!form.name.trim()) next.name = "Vendor name is required";
-    if (!form.vendorCode.trim()) next.vendorCode = "Vendor code is required";
+    if (!isEdit && !form.vendorCode.trim()) {
+      next.vendorCode = "Vendor code is being assigned…";
+    }
 
     const requiredContacts = [
       ["primaryContact", form.primaryContact, "Primary contact"],
@@ -311,9 +325,13 @@ export function VendorFormPage() {
     if (!validate()) return;
     setSaving(true);
     setError(null);
+    let vendorCode = form.vendorCode.trim();
+    if (!vendorCode && !isEdit) {
+      vendorCode = await allocateVendorCode(user?.tenantName ?? "");
+    }
     const body: CreateVendorRequest = {
       name: form.name.trim(),
-      vendorCode: form.vendorCode.trim(),
+      ...(isEdit || vendorCode ? { vendorCode } : {}),
       groupId: form.groupId || null,
       status: form.status,
       primaryContact: {
@@ -366,7 +384,7 @@ export function VendorFormPage() {
         saved = {
           id: localId,
           name: body.name,
-          vendorCode: body.vendorCode,
+          vendorCode,
           groupId: body.groupId ?? null,
           groupName: groups.find((g) => g.id === body.groupId)?.name ?? null,
           status: body.status ?? "active",
@@ -466,11 +484,22 @@ export function VendorFormPage() {
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Vendor Code *</Label>
+            <Label>Vendor Code</Label>
             <Input
               value={form.vendorCode}
-              onChange={(e) => setForm({ ...form, vendorCode: e.target.value })}
+              readOnly={!isEdit}
+              disabled={!isEdit}
+              onChange={(e) =>
+                isEdit
+                  ? setForm({ ...form, vendorCode: e.target.value })
+                  : undefined
+              }
             />
+            {!isEdit ? (
+              <p className="text-muted-foreground text-xs">
+                Assigned automatically from your business name.
+              </p>
+            ) : null}
             {fieldErrors.vendorCode ? (
               <p className="text-destructive text-xs">{fieldErrors.vendorCode}</p>
             ) : null}

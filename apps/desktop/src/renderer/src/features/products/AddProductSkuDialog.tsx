@@ -3,9 +3,10 @@ import type {
   CreateProductSkuRequest,
   EntityStatus,
   ProductSkuDetail,
+  SkuBarcodeLookupResult,
   UnitListItem,
 } from "@blackbox/shared";
-import { nextSkuCode } from "@blackbox/shared";
+import { nextSkuCodeForProduct } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -18,9 +19,9 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
-import { loadUnits } from "@renderer/lib/local-db/entity-source";
+import { loadUnits, lookupSkuByBarcode } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 const emptyForm = {
@@ -59,17 +60,54 @@ function requiredNonNegative(value: string, label: string): string | null {
   return null;
 }
 
+function formFromLookup(row: SkuBarcodeLookupResult): typeof emptyForm {
+  return {
+    variantName: row.variantName,
+    sku: row.sku,
+    barcode: row.barcode ?? "",
+    sizeValue: row.sizeValue ?? "",
+    sizeUnit: row.sizeUnit ?? "",
+    baseUnitId: row.baseUnitId ?? "",
+    purchaseUnitId: row.purchaseUnitId ?? "",
+    unitsPerPurchaseUnit: String(row.unitsPerPurchaseUnit),
+    costPrice: String(row.costPrice),
+    sellingPrice: String(row.sellingPrice),
+    reorderLevel: String(row.reorderLevel),
+    minimumStockLevel: String(row.minimumStockLevel),
+    maximumStockLevel:
+      row.maximumStockLevel == null ? "" : String(row.maximumStockLevel),
+    trackInventory: row.trackInventory,
+    status: row.status,
+  };
+}
+
+function duplicateBarcodeMessage(row: SkuBarcodeLookupResult): string {
+  const base = `This barcode already exists on ${row.productName} (${row.sku})`;
+  const skuInactive = row.status === "inactive";
+  const productInactive = row.productStatus === "inactive";
+  if (skuInactive && productInactive) {
+    return `${base}, but the SKU and product are inactive.`;
+  }
+  if (skuInactive) {
+    return `${base}, but the SKU is inactive.`;
+  }
+  if (productInactive) {
+    return `${base}, but the product is inactive.`;
+  }
+  return `${base}.`;
+}
+
 export function AddProductSkuDialog({
   open,
   productId,
-  productCode,
+  productName,
   existingSkuCodes,
   onClose,
   onCreated,
 }: {
   open: boolean;
   productId: string;
-  productCode: string;
+  productName: string;
   existingSkuCodes: string[];
   onClose: () => void;
   onCreated: (row: ProductSkuDetail, cacheWarning: boolean) => void;
@@ -77,6 +115,12 @@ export function AddProductSkuDialog({
   const [units, setUnits] = useState<UnitListItem[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const [duplicateLookup, setDuplicateLookup] =
+    useState<SkuBarcodeLookupResult | null>(null);
+  const [duplicateMessage, setDuplicateMessage] = useState<string | null>(
+    null,
+  );
+  const [barcodeChecking, setBarcodeChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
@@ -85,31 +129,66 @@ export function AddProductSkuDialog({
     if (!open) return;
     setForm({
       ...emptyForm,
-      sku: nextSkuCode(productCode, existingSkuCodes),
+      sku: nextSkuCodeForProduct(productName, existingSkuCodes),
     });
     setError(null);
+    setDuplicateLookup(null);
+    setDuplicateMessage(null);
     setAttempted(false);
     void loadUnits().then(setUnits).catch(() => undefined);
-  }, [open, productCode, existingSkuCodes]);
+  }, [open, productName, existingSkuCodes]);
 
-  useBarcodeScanCapture(
-    open,
-    (code) => {
-      setField("barcode", code);
+  async function applyBarcode(code: string) {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      setDuplicateLookup(null);
+      setDuplicateMessage(null);
+      return;
+    }
+
+    setBarcodeChecking(true);
+    setError(null);
+    try {
+      const match = await lookupSkuByBarcode(trimmed);
+      if (match) {
+        setForm(formFromLookup(match));
+        setDuplicateLookup(match);
+        setDuplicateMessage(duplicateBarcodeMessage(match));
+      } else {
+        setDuplicateLookup(null);
+        setDuplicateMessage(null);
+        setForm((prev) => ({ ...prev, barcode: trimmed }));
+      }
+    } catch (err: unknown) {
+      setDuplicateLookup(null);
+      setDuplicateMessage(null);
+      setError(getApiErrorMessage(err, "Barcode lookup failed"));
+    } finally {
+      setBarcodeChecking(false);
       requestAnimationFrame(() => {
         barcodeRef.current?.focus();
         barcodeRef.current?.select();
       });
+    }
+  }
+
+  useBarcodeScanTarget({
+    kind: "barcode",
+    layer: "dialog",
+    enabled: open,
+    onScan: (code) => {
+      void applyBarcode(code);
     },
-    barcodeRef.current,
-  );
+  });
 
   function reset() {
     setForm({
       ...emptyForm,
-      sku: nextSkuCode(productCode, existingSkuCodes),
+      sku: nextSkuCodeForProduct(productName, existingSkuCodes),
     });
     setError(null);
+    setDuplicateLookup(null);
+    setDuplicateMessage(null);
     setAttempted(false);
   }
 
@@ -156,7 +235,9 @@ export function AddProductSkuDialog({
     !requiredSelect(form.purchaseUnitId, "Purchase unit") &&
     !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
     !requiredNonNegative(form.costPrice, "Cost price") &&
-    !requiredNonNegative(form.sellingPrice, "Selling price");
+    !requiredNonNegative(form.sellingPrice, "Selling price") &&
+    !duplicateLookup &&
+    !barcodeChecking;
 
   async function onSave() {
     setAttempted(true);
@@ -201,6 +282,22 @@ export function AddProductSkuDialog({
 
     setSaving(true);
     setError(null);
+    if (body.barcode) {
+      try {
+        const dup = await lookupSkuByBarcode(body.barcode);
+        if (dup) {
+          setForm(formFromLookup(dup));
+          setDuplicateLookup(dup);
+          setDuplicateMessage(duplicateBarcodeMessage(dup));
+          setSaving(false);
+          return;
+        }
+      } catch (err: unknown) {
+        setSaving(false);
+        setError(getApiErrorMessage(err, "Barcode lookup failed"));
+        return;
+      }
+    }
     let row: ProductSkuDetail;
     try {
       if (await isDeviceBound()) {
@@ -273,6 +370,12 @@ export function AddProductSkuDialog({
           <DialogTitle>Add SKU</DialogTitle>
         </DialogHeader>
 
+        {duplicateMessage ? (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-950 dark:text-amber-200">
+            {duplicateMessage}
+          </div>
+        ) : null}
+
         {error ? (
           <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
             {error}
@@ -301,11 +404,22 @@ export function AddProductSkuDialog({
             <Input
               ref={barcodeRef}
               value={form.barcode}
-              onChange={(e) => setField("barcode", e.target.value)}
+              onChange={(e) => {
+                setField("barcode", e.target.value);
+                if (duplicateLookup) {
+                  setDuplicateLookup(null);
+                  setDuplicateMessage(null);
+                }
+              }}
+              onBlur={() => void applyBarcode(form.barcode)}
               placeholder="Scan or type barcode"
               data-enter-submit=""
               autoComplete="off"
+              disabled={barcodeChecking}
             />
+            {barcodeChecking ? (
+              <p className="text-muted-foreground text-xs">Checking barcode…</p>
+            ) : null}
           </div>
           <div className="space-y-1.5">
             <Label>Size value</Label>

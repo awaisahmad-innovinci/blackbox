@@ -11,6 +11,7 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { loadVendorSkus } from "@renderer/lib/local-db/entity-source";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 
 export type DraftPoLine = {
   productSkuId: string;
@@ -46,8 +47,8 @@ export function toDraftPoLine(row: VendorSku): DraftPoLine {
   };
 }
 
-function isUnavailable(row: VendorSku): boolean {
-  return (row.quantityAvailable ?? 0) <= 0;
+function isDisabled(row: VendorSku, existingSkuIds: string[]): boolean {
+  return existingSkuIds.includes(row.productSkuId);
 }
 
 export function AddPurchaseOrderItemDialog({
@@ -70,6 +71,13 @@ export function AddPurchaseOrderItemDialog({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
+  useBarcodeScanTarget({
+    kind: "search",
+    layer: "dialog",
+    enabled: open,
+    onScan: setQuery,
+  });
+
   useEffect(() => {
     if (!open || !vendorId || !warehouseId) return;
     const t = setTimeout(() => {
@@ -80,18 +88,14 @@ export function AddPurchaseOrderItemDialog({
     return () => clearTimeout(t);
   }, [query, open, vendorId, warehouseId]);
 
-  function isDisabled(row: VendorSku): boolean {
-    return existingSkuIds.includes(row.productSkuId) || isUnavailable(row);
+  function rowDisabled(row: VendorSku): boolean {
+    return isDisabled(row, existingSkuIds);
   }
 
   const selectableIds = useMemo(
     () =>
       results
-        .filter(
-          (r) =>
-            !existingSkuIds.includes(r.productSkuId) &&
-            (r.quantityAvailable ?? 0) > 0,
-        )
+        .filter((r) => !existingSkuIds.includes(r.productSkuId))
         .map((r) => r.id),
     [results, existingSkuIds],
   );
@@ -129,7 +133,7 @@ export function AddPurchaseOrderItemDialog({
 
   function onConfirm() {
     const chosen = results.filter(
-      (r) => selectedIds.includes(r.id) && !isDisabled(r),
+      (r) => selectedIds.includes(r.id) && !rowDisabled(r),
     );
     if (chosen.length === 0) return;
     onAddMany(chosen.map(toDraftPoLine));
@@ -152,7 +156,7 @@ export function AddPurchaseOrderItemDialog({
         </DialogHeader>
 
         <p className="text-muted-foreground text-sm">
-          Select one or more SKUs with available stock. They are added with
+          Select one or more SKUs supplied by this vendor. They are added with
           quantity 0 — enter quantities in the order items table.
         </p>
 
@@ -191,14 +195,13 @@ export function AddPurchaseOrderItemDialog({
                     />
                     <span className="font-medium">Select all</span>
                     <span className="text-muted-foreground text-xs">
-                      {selectableIds.length} with stock
+                      {selectableIds.length} SKUs
                     </span>
                   </label>
                 </li>
                 {results.map((r) => {
                   const added = existingSkuIds.includes(r.productSkuId);
-                  const unavailable = isUnavailable(r);
-                  const disabled = added || unavailable;
+                  const disabled = rowDisabled(r);
                   const checked = selectedIds.includes(r.id);
                   return (
                     <li key={r.id}>
@@ -221,10 +224,6 @@ export function AddPurchaseOrderItemDialog({
                           {added ? (
                             <span className="text-muted-foreground ml-2 text-xs">
                               Added
-                            </span>
-                          ) : unavailable ? (
-                            <span className="text-muted-foreground ml-2 text-xs">
-                              Unavailable
                             </span>
                           ) : null}
                           <span className="text-muted-foreground block">

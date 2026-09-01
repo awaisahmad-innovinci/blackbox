@@ -26,7 +26,7 @@ import {
 } from "@renderer/lib/local-db/local-write";
 import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
-import { useBarcodeScanCapture } from "@renderer/lib/barcode-scan";
+import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 function toProductSkuRow(
@@ -85,17 +85,18 @@ export function SkuProfilePage() {
   const [status, setStatus] = useState<EntityStatus>("active");
   const barcodeRef = useRef<HTMLInputElement>(null);
 
-  useBarcodeScanCapture(
-    editOpen,
-    (code) => {
+  useBarcodeScanTarget({
+    kind: "barcode",
+    layer: "dialog",
+    enabled: editOpen,
+    onScan: (code) => {
       setBarcode(code);
       requestAnimationFrame(() => {
         barcodeRef.current?.focus();
         barcodeRef.current?.select();
       });
     },
-    barcodeRef.current,
-  );
+  });
 
   async function reload() {
     if (!id) return;
