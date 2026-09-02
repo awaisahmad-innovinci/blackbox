@@ -14,9 +14,9 @@ export function friendlyMessage(status: number, fallback?: string): string {
     case 400:
       return fallback ?? "Invalid request. Check your input and try again.";
     case 401:
-      return "Invalid username or password.";
+      return fallback ?? "Invalid username or password.";
     case 403:
-      return "You do not have permission to perform this action.";
+      return fallback ?? "You do not have permission to perform this action.";
     case 404:
       return "The requested resource was not found.";
     case 409:

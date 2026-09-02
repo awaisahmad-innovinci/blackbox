@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SyncEntityType, SyncOperation, SyncStream } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
+import { bumpLocalEntityVersion, getLocalEntityVersion } from "./entity-versions-local";
 
 export type OutboxRow = {
   changeId: string;
@@ -27,6 +28,10 @@ export function enqueueOutbox(input: {
   }
   const changeId = randomUUID();
   const db = getLocalDb();
+  const baseVersion =
+    input.baseEntityVersion !== undefined
+      ? input.baseEntityVersion
+      : getLocalEntityVersion(input.entityType, input.entityId);
   db.prepare(
     `insert into local_sync_outbox (
       change_id, tenant_id, origin_device_id, stream, entity_type, entity_id,
@@ -44,7 +49,7 @@ export function enqueueOutbox(input: {
     entityId: input.entityId,
     operation: input.operation,
     payload: JSON.stringify(input.payload),
-    baseVersion: input.baseEntityVersion ?? 0,
+    baseVersion,
   });
   return changeId;
 }
@@ -84,14 +89,31 @@ export function markOutboxAcked(changeId: string, seq?: string): void {
   const run = db.transaction(() => {
     const row = db
       .prepare(
-        `select stream from local_sync_outbox where change_id = @changeId`,
+        `select stream, entity_type as entityType, entity_id as entityId,
+                operation, base_entity_version as baseEntityVersion
+         from local_sync_outbox where change_id = @changeId`,
       )
-      .get({ changeId }) as { stream: string } | undefined;
+      .get({ changeId }) as
+      | {
+          stream: string;
+          entityType: string;
+          entityId: string;
+          operation: string;
+          baseEntityVersion: number;
+        }
+      | undefined;
     db.prepare(
       `update local_sync_outbox
        set status = 'acked', acked_at = datetime('now'), cloud_seq = @seq, last_error = null
        where change_id = @changeId`,
     ).run({ changeId, seq: seq ?? null });
+    if (row && row.operation !== "EVENT") {
+      bumpLocalEntityVersion(
+        row.entityType,
+        row.entityId,
+        row.baseEntityVersion,
+      );
+    }
     if (seq && row) {
       recordApplied(changeId, Number(seq), row.stream);
     }

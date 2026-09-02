@@ -55,6 +55,20 @@ export interface LogoutRequest {
   refreshToken: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
 /**
  * Minimal JWT access payload claims.
  * `iat` / `exp` are set by the JWT library via expiresIn.

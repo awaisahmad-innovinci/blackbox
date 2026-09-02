@@ -67,8 +67,9 @@ export class VendorsService {
       .leftJoin("v.group", "g")
       .where("v.tenant_id = :tenantId", { tenantId });
 
-    if (query.status) {
-      qb.andWhere("v.status = :status", { status: query.status });
+    const status = query.status ?? "active";
+    if (status !== "all") {
+      qb.andWhere("v.status = :status", { status });
     }
     if (query.groupId) {
       qb.andWhere("v.group_id = :groupId", { groupId: query.groupId });

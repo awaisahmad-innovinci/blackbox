@@ -54,6 +54,7 @@ export default function DeviceDetailPage() {
 
   async function onTrust() {
     if (!device) return;
+    const wasRevoked = device.status === "revoked";
     setBusy(true);
     setSuccess(null);
     setFormError(null);
@@ -61,7 +62,11 @@ export default function DeviceDetailPage() {
       const updated = await trustDevice(device.id);
       setDevice(updated);
       setTrustConfirmOpen(false);
-      setSuccess("Device trusted. Desktop sync is now allowed.");
+      setSuccess(
+        wasRevoked
+          ? "Device trusted again. The desktop can sync after the user signs in."
+          : "Device trusted. Desktop sync is now allowed.",
+      );
     } catch (err) {
       setFormError(toUserFacingError(err));
     } finally {
@@ -147,16 +152,23 @@ export default function DeviceDetailPage() {
               </dl>
             </SectionCard>
 
-            {hasPermission("devices.manage") && device.status === "pending" ? (
+            {hasPermission("devices.manage") &&
+            (device.status === "pending" || device.status === "revoked") ? (
               <SectionCard
-                title="Trust device"
-                description="Allow this desktop to push and pull incremental sync."
+                title={
+                  device.status === "revoked" ? "Trust again" : "Trust device"
+                }
+                description={
+                  device.status === "revoked"
+                    ? "Restore trusted access so this desktop can sync again after the user signs in."
+                    : "Allow this desktop to push and pull incremental sync."
+                }
               >
                 <Button
                   disabled={busy}
                   onClick={() => setTrustConfirmOpen(true)}
                 >
-                  Trust device
+                  {device.status === "revoked" ? "Trust again" : "Trust device"}
                 </Button>
               </SectionCard>
             ) : null}
@@ -182,9 +194,19 @@ export default function DeviceDetailPage() {
       <ConfirmDialog
         open={trustConfirmOpen}
         onOpenChange={setTrustConfirmOpen}
-        title="Trust this device?"
-        description="The desktop can push and pull sync for this tenant once trusted."
-        confirmLabel="Trust device"
+        title={
+          device?.status === "revoked"
+            ? "Trust this device again?"
+            : "Trust this device?"
+        }
+        description={
+          device?.status === "revoked"
+            ? "Sync will resume once the desktop user signs in again."
+            : "The desktop can push and pull sync for this tenant once trusted."
+        }
+        confirmLabel={
+          device?.status === "revoked" ? "Trust again" : "Trust device"
+        }
         loading={busy}
         onConfirm={onTrust}
       />
@@ -193,7 +215,7 @@ export default function DeviceDetailPage() {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Revoke device?"
-        description="This device will lose trusted access and must be re-enrolled from the desktop app."
+        description="This device will lose trusted access. An owner can trust it again from this page."
         confirmLabel="Revoke device"
         destructive
         loading={busy}

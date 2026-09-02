@@ -121,6 +121,10 @@ export function deactivateUser(id: string) {
   return apiJson<UserDto>(`/users/${id}/deactivate`, "POST");
 }
 
+export function activateUser(id: string) {
+  return apiJson<UserDto>(`/users/${id}/activate`, "POST");
+}
+
 export function replaceUserRoles(id: string, roleIds: string[]) {
   return apiJson<UserDto>(`/users/${id}/roles`, "PUT", { roleIds });
 }

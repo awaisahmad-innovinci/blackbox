@@ -64,6 +64,15 @@ export class UsersController {
     return this.usersService.deactivate(user.tenantId, id);
   }
 
+  @Post(":id/activate")
+  @RequirePermissions("users.deactivate")
+  activate(
+    @CurrentUser() user: TenantContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.activate(user.tenantId, id);
+  }
+
   @Put(":id/roles")
   @RequirePermissions("users.write")
   replaceRoles(

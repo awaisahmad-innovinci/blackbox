@@ -31,6 +31,7 @@ import { InventoryOut } from "./inventory-out.entity";
 import { InventoryOutItem } from "./inventory-out-item.entity";
 import { VendorReturn } from "./vendor-return.entity";
 import { VendorReturnItem } from "./vendor-return-item.entity";
+import { PasswordResetCode } from "./password-reset-code.entity";
 
 export const entities = [
   Tenant,
@@ -66,6 +67,7 @@ export const entities = [
   InventoryOutItem,
   VendorReturn,
   VendorReturnItem,
+  PasswordResetCode,
 ] as const;
 
 export {
@@ -102,4 +104,5 @@ export {
   InventoryOutItem,
   VendorReturn,
   VendorReturnItem,
+  PasswordResetCode,
 };

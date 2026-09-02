@@ -137,13 +137,21 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<DashboardSummary>,
     listBrands: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke("localDb:listBrands", status) as Promise<Brand[]>,
+    getBrand: (id: string) =>
+      ipcRenderer.invoke("localDb:getBrand", id) as Promise<Brand | null>,
     listCategories: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke("localDb:listCategories", status) as Promise<Category[]>,
+    getCategory: (id: string) =>
+      ipcRenderer.invoke("localDb:getCategory", id) as Promise<Category | null>,
     listVendorGroups: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke(
         "localDb:listVendorGroups",
         status,
       ) as Promise<VendorGroup[]>,
+    getVendorGroup: (id: string) =>
+      ipcRenderer.invoke("localDb:getVendorGroup", id) as Promise<
+        VendorGroup | null
+      >,
     listWarehouses: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke(
         "localDb:listWarehouses",

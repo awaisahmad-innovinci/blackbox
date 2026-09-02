@@ -10,14 +10,20 @@ import type { AuthResponse, AuthUser } from "@blackbox/shared";
 import type { TenantContext } from "../common/tenant-context";
 import { CurrentUser } from "../common/current-user.decorator";
 import { AuthService } from "./auth.service";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { LogoutDto, RefreshDto } from "./dto/refresh.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { SignupTenantDto } from "./dto/signup-tenant.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
+import { PasswordResetService } from "./password-reset.service";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordReset: PasswordResetService,
+  ) {}
 
   @Post("signup-tenant")
   signupTenant(@Body() dto: SignupTenantDto): Promise<AuthResponse> {
@@ -40,6 +46,20 @@ export class AuthController {
   @HttpCode(200)
   logout(@Body() dto: LogoutDto): Promise<{ success: true }> {
     return this.authService.logout(dto.refreshToken);
+  }
+
+  @Post("forgot-password")
+  @HttpCode(200)
+  forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    return this.passwordReset.forgotPassword(dto);
+  }
+
+  @Post("reset-password")
+  @HttpCode(200)
+  resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
+    return this.passwordReset.resetPassword(dto);
   }
 
   @Get("me")

@@ -17,6 +17,8 @@ NestJS AuthModule → TypeORM → Supabase PostgreSQL
 | POST | `/auth/login` | public (`identifier` + `password` + `client`) |
 | POST | `/auth/refresh` | public (`refreshToken`) |
 | POST | `/auth/logout` | public (`refreshToken`) |
+| POST | `/auth/forgot-password` | public (`email`) |
+| POST | `/auth/reset-password` | public (`email`, `code`, `newPassword`) |
 | GET | `/auth/me` | Bearer access JWT |
 | GET | `/devices/me` | Bearer access JWT + `desktop.access` |
 
@@ -36,7 +38,9 @@ Duplicate tenant-scoped email/username → `409 Conflict`.
 - `identifier`: email if it contains `@`, otherwise username.
 - Email/username are **tenant-scoped** and the request has **no** `tenant_id`. If the identifier matches **0 or multiple** users across tenants, respond with the same generic **`401 Invalid credentials`**.
 - `client` (`web` | `desktop`) is behavior-only — **not** an authorization mechanism.
-- Verify active user + active tenant + Argon2 password.
+- Resolve user → verify Argon2 password → **`401 Invalid credentials`** if the user is missing or the password is wrong (same message for both, so existence is not leaked).
+- If the password is correct but the user is **deactivated** (`is_active = false`), respond with **`403`** and message **`This account has been deactivated by an administrator.`**
+- Then verify the tenant is active; inactive tenant → **`401 Invalid credentials`**.
 
 ### JWT access token
 
@@ -51,6 +55,24 @@ Hash lookup → reject expired/revoked → verify user/tenant active → rotate 
 ### Logout (`POST /auth/logout`)
 
 Revoke matching refresh token by hash; idempotent `{ success: true }`.
+
+### Forgot password (`POST /auth/forgot-password`)
+
+Owner self-service password reset (web sign-in page). Body: `{ "email": "owner@example.com" }`.
+
+- Always responds **`200`** with a generic message: **`If an account exists for this email, we sent a verification code.`** (does not reveal whether the email exists).
+- Sends a **6-digit OTP** only when the email matches **exactly one** active user with the **OWNER** role on an active tenant.
+- OTP is stored as **SHA-256 hash** in `password_reset_codes` (default TTL **10 minutes** via `PASSWORD_RESET_OTP_TTL_SECONDS`).
+- Rate limit: **3 requests per user per hour**.
+- Email via **[Resend](https://resend.com)** when `RESEND_API_KEY` is set; in development without a key, the OTP is logged to the API console.
+
+### Reset password (`POST /auth/reset-password`)
+
+Body: `{ "email", "code", "newPassword" }` (`newPassword` min 8 chars, `code` 6 digits).
+
+- Verifies OTP for the same OWNER lookup as forgot-password.
+- On success: updates `users.password_hash`, marks the code used, **revokes all refresh tokens** for that user.
+- Invalid or expired code → **`400`** with **`Invalid or expired verification code`**.
 
 ## Who creates credentials
 
@@ -103,6 +125,7 @@ against the local SQLite database; queued changes push after the next successful
 | `refresh_tokens` | SHA-256 hash of each refresh token, rotation chain | `token_hash`, `user_id`, `device_id`, `expires_at`, `revoked_at`, `replaced_by` |
 | `devices` | Registered machines and their trust state | `id`, `tenant_id`, `fingerprint`, `status`, `trusted_at`, `revoked_at`, `needs_full_resync` |
 | `device_users` | Which users may work offline on a device | `device_id`, `user_id`, `offline_enabled`, `offline_expires_at`, `last_online_at` |
+| `password_reset_codes` | Hashed owner forgot-password OTPs | `user_id`, `code_hash`, `expires_at`, `used_at` |
 
 Passwords live only in `users.password_hash`; refresh tokens only as hashes in `refresh_tokens`.
 Access tokens are never stored server-side — they are verified from their signature and claims.

@@ -35,7 +35,9 @@ export async function commitLocalChange(input: {
     entityId: input.entityId,
     operation: input.operation,
     payload: input.payload,
-    baseEntityVersion: input.baseEntityVersion ?? 0,
+    ...(input.baseEntityVersion !== undefined
+      ? { baseEntityVersion: input.baseEntityVersion }
+      : {}),
   });
   return result.changeId;
 }

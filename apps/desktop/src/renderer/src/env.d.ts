@@ -122,10 +122,13 @@ declare global {
         listReceiptNumbers: () => Promise<string[]>;
         getDashboardSummary: () => Promise<DashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
+        getBrand: (id: string) => Promise<Brand | null>;
         listCategories: (status?: EntityStatus | "all") => Promise<Category[]>;
+        getCategory: (id: string) => Promise<Category | null>;
         listVendorGroups: (
           status?: EntityStatus | "all",
         ) => Promise<VendorGroup[]>;
+        getVendorGroup: (id: string) => Promise<VendorGroup | null>;
         listWarehouses: (
           status?: EntityStatus | "all",
         ) => Promise<WarehouseListItem[]>;

@@ -139,6 +139,36 @@ export function TaxonomyFormPage({
     }
   }
 
+  async function onActivate() {
+    if (!id) return;
+    setError(null);
+    setSaving(true);
+    try {
+      const body = {
+        name: name.trim(),
+        description: description.trim(),
+        status: "active" as const,
+      };
+      if (syncEntityType && (await isDeviceBound())) {
+        await commitLocalChange({
+          entityType: syncEntityType,
+          entityId: id,
+          operation: "UPSERT",
+          payload: { id, ...body },
+        });
+        void syncNow();
+        navigate(basePath);
+        return;
+      }
+      await update(id, body);
+      navigate(basePath);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, `Failed to activate ${entityLabel}`));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
@@ -224,6 +254,16 @@ export function TaxonomyFormPage({
             onClick={() => void onDeactivate()}
           >
             Deactivate
+          </Button>
+        ) : null}
+        {isEdit && status === "inactive" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={saving}
+            onClick={() => void onActivate()}
+          >
+            Activate
           </Button>
         ) : null}
       </div>

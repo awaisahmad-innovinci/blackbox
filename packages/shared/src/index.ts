@@ -84,6 +84,9 @@ export type {
   LoginRequest,
   RefreshRequest,
   LogoutRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  MessageResponse,
   JwtPayload,
 } from "./auth";
 export type {

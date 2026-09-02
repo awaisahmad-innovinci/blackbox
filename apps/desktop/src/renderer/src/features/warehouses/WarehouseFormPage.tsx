@@ -129,6 +129,37 @@ export function WarehouseFormPage() {
     }
   }
 
+  async function onActivate() {
+    if (!id || !canWrite) return;
+    setError(null);
+    setSaving(true);
+    try {
+      const body = {
+        name: name.trim(),
+        code: code.trim(),
+        location: location.trim() || null,
+        status: "active" as const,
+      };
+      if (await isDeviceBound()) {
+        await commitLocalChange({
+          entityType: "warehouse",
+          entityId: id,
+          operation: "UPSERT",
+          payload: { id, ...body },
+        });
+        void syncNow();
+        navigate("/warehouses");
+        return;
+      }
+      await warehousesApi.update(id, body);
+      navigate("/warehouses");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to activate warehouse"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
@@ -245,6 +276,16 @@ export function WarehouseFormPage() {
             onClick={() => void onDeactivate()}
           >
             Deactivate
+          </Button>
+        ) : null}
+        {canWrite && isEdit && status === "inactive" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={saving}
+            onClick={() => void onActivate()}
+          >
+            Activate
           </Button>
         ) : null}
       </div>

@@ -60,27 +60,6 @@ function requiredNonNegative(value: string, label: string): string | null {
   return null;
 }
 
-function formFromLookup(row: SkuBarcodeLookupResult): typeof emptyForm {
-  return {
-    variantName: row.variantName,
-    sku: row.sku,
-    barcode: row.barcode ?? "",
-    sizeValue: row.sizeValue ?? "",
-    sizeUnit: row.sizeUnit ?? "",
-    baseUnitId: row.baseUnitId ?? "",
-    purchaseUnitId: row.purchaseUnitId ?? "",
-    unitsPerPurchaseUnit: String(row.unitsPerPurchaseUnit),
-    costPrice: String(row.costPrice),
-    sellingPrice: String(row.sellingPrice),
-    reorderLevel: String(row.reorderLevel),
-    minimumStockLevel: String(row.minimumStockLevel),
-    maximumStockLevel:
-      row.maximumStockLevel == null ? "" : String(row.maximumStockLevel),
-    trackInventory: row.trackInventory,
-    status: row.status,
-  };
-}
-
 function duplicateBarcodeMessage(row: SkuBarcodeLookupResult): string {
   const base = `This barcode already exists on ${row.productName} (${row.sku})`;
   const skuInactive = row.status === "inactive";
@@ -124,6 +103,11 @@ export function AddProductSkuDialog({
   const [saving, setSaving] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
+  const barcodeValueRef = useRef("");
+
+  useEffect(() => {
+    barcodeValueRef.current = form.barcode;
+  }, [form.barcode]);
 
   useEffect(() => {
     if (!open) return;
@@ -138,7 +122,10 @@ export function AddProductSkuDialog({
     void loadUnits().then(setUnits).catch(() => undefined);
   }, [open, productName, existingSkuCodes]);
 
-  async function applyBarcode(code: string) {
+  async function applyBarcode(
+    code: string,
+    options: { focusAfter?: boolean } = {},
+  ) {
     const trimmed = code.trim();
     if (!trimmed) {
       setDuplicateLookup(null);
@@ -150,14 +137,13 @@ export function AddProductSkuDialog({
     setError(null);
     try {
       const match = await lookupSkuByBarcode(trimmed);
+      setForm((prev) => ({ ...prev, barcode: trimmed }));
       if (match) {
-        setForm(formFromLookup(match));
         setDuplicateLookup(match);
         setDuplicateMessage(duplicateBarcodeMessage(match));
       } else {
         setDuplicateLookup(null);
         setDuplicateMessage(null);
-        setForm((prev) => ({ ...prev, barcode: trimmed }));
       }
     } catch (err: unknown) {
       setDuplicateLookup(null);
@@ -165,10 +151,12 @@ export function AddProductSkuDialog({
       setError(getApiErrorMessage(err, "Barcode lookup failed"));
     } finally {
       setBarcodeChecking(false);
-      requestAnimationFrame(() => {
-        barcodeRef.current?.focus();
-        barcodeRef.current?.select();
-      });
+      if (options.focusAfter) {
+        requestAnimationFrame(() => {
+          barcodeRef.current?.focus();
+          barcodeRef.current?.select();
+        });
+      }
     }
   }
 
@@ -177,7 +165,14 @@ export function AddProductSkuDialog({
     layer: "dialog",
     enabled: open,
     onScan: (code) => {
-      void applyBarcode(code);
+      const trimmed = code.trim();
+      barcodeValueRef.current = trimmed;
+      setForm((prev) => ({ ...prev, barcode: trimmed }));
+      if (duplicateLookup) {
+        setDuplicateLookup(null);
+        setDuplicateMessage(null);
+      }
+      void applyBarcode(trimmed, { focusAfter: true });
     },
   });
 
@@ -286,7 +281,6 @@ export function AddProductSkuDialog({
       try {
         const dup = await lookupSkuByBarcode(body.barcode);
         if (dup) {
-          setForm(formFromLookup(dup));
           setDuplicateLookup(dup);
           setDuplicateMessage(duplicateBarcodeMessage(dup));
           setSaving(false);
@@ -406,16 +400,16 @@ export function AddProductSkuDialog({
               value={form.barcode}
               onChange={(e) => {
                 setField("barcode", e.target.value);
+                barcodeValueRef.current = e.target.value;
                 if (duplicateLookup) {
                   setDuplicateLookup(null);
                   setDuplicateMessage(null);
                 }
               }}
-              onBlur={() => void applyBarcode(form.barcode)}
+              onBlur={() => void applyBarcode(barcodeValueRef.current)}
               placeholder="Scan or type barcode"
               data-enter-submit=""
               autoComplete="off"
-              disabled={barcodeChecking}
             />
             {barcodeChecking ? (
               <p className="text-muted-foreground text-xs">Checking barcode…</p>

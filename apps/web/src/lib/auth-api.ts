@@ -1,7 +1,10 @@
 import type {
   AuthResponse,
   AuthUser,
+  ForgotPasswordRequest,
   LoginRequest,
+  MessageResponse,
+  ResetPasswordRequest,
   SignupTenantRequest,
 } from "@blackbox/shared";
 import { apiFetch, apiJson, clearClientSession, setSessionFromAuthResponse } from "./api-client";
@@ -56,4 +59,26 @@ export async function logoutRequest(): Promise<void> {
   } finally {
     clearClientSession();
   }
+}
+
+export async function forgotPasswordRequest(
+  payload: ForgotPasswordRequest,
+): Promise<MessageResponse> {
+  return apiJson<MessageResponse>(
+    "/auth/forgot-password",
+    "POST",
+    payload,
+    { skipAuth: true },
+  );
+}
+
+export async function resetPasswordRequest(
+  payload: ResetPasswordRequest,
+): Promise<MessageResponse> {
+  return apiJson<MessageResponse>(
+    "/auth/reset-password",
+    "POST",
+    payload,
+    { skipAuth: true },
+  );
 }
