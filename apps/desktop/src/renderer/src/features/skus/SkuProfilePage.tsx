@@ -279,6 +279,60 @@ export function SkuProfilePage() {
     }
   }
 
+  async function onActivate() {
+    if (!id || !sku) return;
+    const { baseUnitId, purchaseUnitId } = sku;
+    if (!baseUnitId || !purchaseUnitId) {
+      setError("Cannot activate SKU without base and purchase units.");
+      return;
+    }
+    if (!window.confirm(`Activate SKU ${sku.sku}?`)) return;
+    try {
+      const active = { ...sku, status: "active" as const };
+      if (await isDeviceBound()) {
+        await commitLocalChange({
+          entityType: "product_sku",
+          entityId: id,
+          operation: "UPSERT",
+          payload: toProductSkuRow(active, "active") as unknown as Record<
+            string,
+            unknown
+          >,
+        });
+        void syncNow();
+        setSku(active);
+        return;
+      }
+      const updated = await skusApi.update(id, {
+        variantName: active.variantName,
+        sku: active.sku,
+        barcode: active.barcode,
+        sizeValue: active.sizeValue,
+        sizeUnit: active.sizeUnit,
+        baseUnitId,
+        purchaseUnitId,
+        unitsPerPurchaseUnit: active.unitsPerPurchaseUnit,
+        costPrice: active.costPrice,
+        sellingPrice: active.sellingPrice,
+        reorderLevel: active.reorderLevel,
+        minimumStockLevel: active.minimumStockLevel,
+        maximumStockLevel: active.maximumStockLevel,
+        trackInventory: active.trackInventory,
+        status: "active",
+      });
+      try {
+        await window.blackbox?.localDb?.upsertProductSku(
+          toProductSkuRow(updated, updated.status),
+        );
+      } catch {
+        /* optional cache */
+      }
+      setSku(updated);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to activate"));
+    }
+  }
+
   if (error && !sku) {
     return (
       <div
@@ -320,13 +374,15 @@ export function SkuProfilePage() {
           <Button variant="outline" onClick={openEdit}>
             Edit
           </Button>
-          <Button
-            variant="outline"
-            disabled={sku.status === "inactive"}
-            onClick={() => void onDeactivate()}
-          >
-            Deactivate
-          </Button>
+          {sku.status === "active" ? (
+            <Button variant="outline" onClick={() => void onDeactivate()}>
+              Deactivate
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => void onActivate()}>
+              Activate
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => navigate(-1)}>
             Back
           </Button>

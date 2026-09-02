@@ -149,8 +149,8 @@ export class ListVendorsQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsIn(ENTITY_STATUSES)
-  status?: (typeof ENTITY_STATUSES)[number];
+  @IsIn([...ENTITY_STATUSES, "all"])
+  status?: (typeof ENTITY_STATUSES)[number] | "all";
 
   @IsOptional()
   @IsUUID()

@@ -53,6 +53,18 @@ export function listBrandsLocal(status?: EntityStatus | "all"): Brand[] {
   return rows;
 }
 
+export function getBrandLocal(id: string): Brand | null {
+  const db = getLocalDb();
+  return (
+    (db
+      .prepare(
+        `select id, name, description, status
+         from brands where id = ? and tenant_id = ?`,
+      )
+      .get(id, DEMO_STORE_TENANT_ID) as Brand | undefined) ?? null
+  );
+}
+
 export function listCategoriesLocal(
   status?: EntityStatus | "all",
 ): Category[] {
@@ -72,6 +84,18 @@ export function listCategoriesLocal(
     ) as Category[];
 }
 
+export function getCategoryLocal(id: string): Category | null {
+  const db = getLocalDb();
+  return (
+    (db
+      .prepare(
+        `select id, name, description, status
+         from categories where id = ? and tenant_id = ?`,
+      )
+      .get(id, DEMO_STORE_TENANT_ID) as Category | undefined) ?? null
+  );
+}
+
 export function listVendorGroupsLocal(
   status?: EntityStatus | "all",
 ): VendorGroup[] {
@@ -89,6 +113,18 @@ export function listVendorGroupsLocal(
       status ?? "active",
       status === "all" ? "" : (status ?? "active"),
     ) as VendorGroup[];
+}
+
+export function getVendorGroupLocal(id: string): VendorGroup | null {
+  const db = getLocalDb();
+  return (
+    (db
+      .prepare(
+        `select id, name, description, status
+         from vendor_groups where id = ? and tenant_id = ?`,
+      )
+      .get(id, DEMO_STORE_TENANT_ID) as VendorGroup | undefined) ?? null
+  );
 }
 
 export function listWarehousesLocal(
@@ -266,12 +302,13 @@ export function listVendorsLocal(
   const db = getLocalDb();
   const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
   const search = query.search?.trim().toLowerCase() ?? "";
-  const status = query.status ?? "";
+  const status = query.status ?? "active";
+  const statusBind = status === "all" ? "" : status;
   const groupId = query.groupId ?? "";
 
   const where = `
     v.tenant_id = @tenantId
-    and (@status = '' or v.status = @status)
+    and (@status = 'all' or v.status = @statusBind)
     and (@groupId = '' or v.group_id = @groupId)
     and (
       @search = ''
@@ -284,6 +321,7 @@ export function listVendorsLocal(
   const params = {
     tenantId: DEMO_STORE_TENANT_ID,
     status,
+    statusBind,
     groupId,
     search,
     limit: pageSize,

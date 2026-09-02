@@ -158,6 +158,19 @@ export class UsersService {
     return toUserResponse(user, roleIds);
   }
 
+  async activate(tenantId: string, userId: string): Promise<UserResponse> {
+    const user = await this.findTenantUser(tenantId, userId);
+    if (user.isActive) {
+      const roleIds = await this.roleIdsForUser(tenantId, user.id);
+      return toUserResponse(user, roleIds);
+    }
+    user.isActive = true;
+    user.deactivatedAt = null;
+    await this.users.save(user);
+    const roleIds = await this.roleIdsForUser(tenantId, user.id);
+    return toUserResponse(user, roleIds);
+  }
+
   async replaceRoles(
     tenantId: string,
     userId: string,

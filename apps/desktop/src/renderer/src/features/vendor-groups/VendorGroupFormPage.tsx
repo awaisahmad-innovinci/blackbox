@@ -1,9 +1,14 @@
 import { useCallback } from "react";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
+import { loadTaxonomyOne } from "@renderer/lib/local-db/taxonomy-source";
 import { TaxonomyFormPage } from "../taxonomy/TaxonomyFormPage";
 
 export function VendorGroupFormPage() {
-  const loadOne = useCallback((id: string) => vendorGroupsApi.get(id), []);
+  const loadOne = useCallback(
+    (id: string) =>
+      loadTaxonomyOne("vendor_group", id, (rowId) => vendorGroupsApi.get(rowId)),
+    [],
+  );
   const create = useCallback(
     (body: Parameters<typeof vendorGroupsApi.create>[0]) =>
       vendorGroupsApi.create(body),

@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { backfillLocalEntityVersions } from "./entity-versions-local";
 
 /**
  * Local SQLite schema for offline inventory (Phase A foundation).
@@ -671,6 +672,20 @@ create index if not exists vendor_return_items_product_sku_id_idx on vendor_retu
           `alter table goods_receipts add column return_credit real not null default 0`,
         );
       }
+    },
+  },
+  {
+    id: "012_local_entity_versions",
+    sql: `
+create table if not exists local_entity_versions (
+  entity_type text not null,
+  entity_id text not null,
+  entity_version integer not null default 0,
+  primary key (entity_type, entity_id)
+);
+`,
+    after: (db) => {
+      backfillLocalEntityVersions(db);
     },
   },
 ];

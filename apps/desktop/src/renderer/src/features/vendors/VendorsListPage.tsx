@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import type { EntityStatus, VendorGroup, VendorListItem } from "@blackbox/shared";
+import type { EntityStatus, VendorGroup, VendorListItem, VendorListQuery } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Skeleton } from "@blackbox/ui/skeleton";
@@ -73,9 +73,9 @@ export function VendorsListPage() {
           const mode = await resolveDataSourceMode();
           if (cancelled) return;
           setDataSource(mode);
-          const query = {
+          const query: VendorListQuery = {
             search: search.trim() || undefined,
-            status: status || undefined,
+            status: status || "all",
             groupId: groupId || undefined,
             page,
             pageSize,

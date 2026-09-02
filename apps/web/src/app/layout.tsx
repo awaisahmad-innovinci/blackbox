@@ -1,19 +1,6 @@
 import { AuthProvider } from "@/components/auth-provider";
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Outfit } from "next/font/google";
 import "./globals.css";
-
-const sans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const display = Outfit({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Blackbox",
@@ -27,7 +14,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable}`}>
+    <html
+      lang="en"
+      style={
+        {
+          "--font-sans":
+            'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+          "--font-display":
+            'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+        } as React.CSSProperties
+      }
+    >
       <body className="min-h-screen font-sans antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>

@@ -22,6 +22,7 @@ import {
   SectionCard,
 } from "@/components/section-card";
 import {
+  activateUser,
   deactivateUser,
   getUser,
   listRoles,
@@ -53,6 +54,7 @@ export default function UserDetailPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [activateConfirmOpen, setActivateConfirmOpen] = useState(false);
   const [profile, setProfile] = useState({
     fullName: "",
     email: "",
@@ -171,6 +173,23 @@ export default function UserDetailPage() {
       setUser(updated);
       setConfirmOpen(false);
       setSuccess("User deactivated.");
+    } catch (err) {
+      setFormError(toUserFacingError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onActivate() {
+    if (!user) return;
+    setBusy(true);
+    setSuccess(null);
+    setFormError(null);
+    try {
+      const updated = await activateUser(user.id);
+      setUser(updated);
+      setActivateConfirmOpen(false);
+      setSuccess("User activated.");
     } catch (err) {
       setFormError(toUserFacingError(err));
     } finally {
@@ -337,10 +356,21 @@ export default function UserDetailPage() {
               </SectionCard>
             ) : null}
 
+            {hasPermission("users.deactivate") && !user.isActive ? (
+              <SectionCard
+                title="Activate user"
+                description="Restore sign-in access for this workspace member."
+              >
+                <Button disabled={busy} onClick={() => setActivateConfirmOpen(true)}>
+                  Activate user
+                </Button>
+              </SectionCard>
+            ) : null}
+
             {hasPermission("users.deactivate") && user.isActive ? (
               <SectionCard
                 title="Danger zone"
-                description="Deactivating prevents this user from signing in."
+                description="Deactivating prevents this user from signing in. An owner can activate them again from this page."
               >
                 <Button
                   variant="destructive"
@@ -356,10 +386,20 @@ export default function UserDetailPage() {
       </div>
 
       <ConfirmDialog
+        open={activateConfirmOpen}
+        onOpenChange={setActivateConfirmOpen}
+        title="Activate user?"
+        description="This user will be able to sign in to this workspace again."
+        confirmLabel="Activate user"
+        loading={busy}
+        onConfirm={onActivate}
+      />
+
+      <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Deactivate user?"
-        description="This user will no longer be able to sign in to this workspace."
+        description="This user will no longer be able to sign in. An owner can activate them again from this page."
         confirmLabel="Deactivate user"
         destructive
         loading={busy}

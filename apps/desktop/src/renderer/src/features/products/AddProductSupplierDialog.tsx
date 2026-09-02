@@ -89,7 +89,9 @@ export function AddProductSupplierDialog({
         search: vendorQuery.trim() || undefined,
         status: "active",
       })
-        .then((res) => setVendors(res.items))
+        .then((res) =>
+          setVendors(res.items.filter((v) => v.status === "active")),
+        )
         .catch(() => setVendors([]));
     }, 200);
     return () => clearTimeout(t);

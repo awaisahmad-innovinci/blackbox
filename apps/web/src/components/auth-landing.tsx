@@ -18,6 +18,10 @@ import { useAuth } from "@/components/auth-provider";
 import { PasswordInput } from "@/components/password-input";
 import { FieldStatus, FormError } from "@/components/section-card";
 import { toUserFacingError } from "@/lib/api-error";
+import {
+  forgotPasswordRequest,
+  resetPasswordRequest,
+} from "@/lib/auth-api";
 import { resolvePostAuthPath } from "@/lib/onboarding";
 import {
   emailError,
@@ -42,6 +46,32 @@ export function AuthLanding() {
     password: "",
   });
   const [signupAttempted, setSignupAttempted] = useState(false);
+  const [forgotStep, setForgotStep] = useState<"request" | "reset" | null>(
+    null,
+  );
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotCode, setForgotCode] = useState("");
+  const [forgotPassword, setForgotPassword] = useState("");
+  const [forgotConfirm, setForgotConfirm] = useState("");
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotAttempted, setForgotAttempted] = useState(false);
+
+  const forgotEmailErr = forgotAttempted
+    ? emailError(forgotEmail)
+    : liveEmailError(forgotEmail);
+  const forgotPasswordErr = forgotAttempted
+    ? forgotPassword.length < 8
+      ? "Password must be at least 8 characters"
+      : null
+    : livePasswordError(forgotPassword);
+  const forgotCodeErr =
+    forgotAttempted && !/^\d{6}$/.test(forgotCode.trim())
+      ? "Enter the 6-digit code from your email"
+      : null;
+  const forgotConfirmErr =
+    forgotAttempted && forgotPassword !== forgotConfirm
+      ? "Passwords do not match"
+      : null;
 
   const signupNameErr = signupAttempted
     ? personNameError(signupFields.fullName)
@@ -96,6 +126,61 @@ export function AuthLanding() {
         authed.permissions.includes("tenant.settings.read"),
       );
       router.push(path);
+    } catch (err) {
+      setError(toUserFacingError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onForgotRequest(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setForgotMessage(null);
+    setForgotAttempted(true);
+    if (emailError(forgotEmail)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await forgotPasswordRequest({ email: forgotEmail.trim() });
+      setForgotMessage(res.message);
+      setForgotStep("reset");
+      setForgotAttempted(false);
+    } catch (err) {
+      setError(toUserFacingError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onForgotReset(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setForgotAttempted(true);
+    if (
+      emailError(forgotEmail) ||
+      !/^\d{6}$/.test(forgotCode.trim()) ||
+      forgotPassword.length < 8 ||
+      forgotPassword !== forgotConfirm
+    ) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await resetPasswordRequest({
+        email: forgotEmail.trim(),
+        code: forgotCode.trim(),
+        newPassword: forgotPassword,
+      });
+      setForgotMessage(res.message);
+      setForgotStep(null);
+      setForgotEmail("");
+      setForgotCode("");
+      setForgotPassword("");
+      setForgotConfirm("");
+      setForgotAttempted(false);
+      setTab("login");
     } catch (err) {
       setError(toUserFacingError(err));
     } finally {
@@ -211,6 +296,9 @@ export function AuthLanding() {
               onValueChange={(value) => {
                 setTab(value);
                 setError(null);
+                setForgotStep(null);
+                setForgotMessage(null);
+                setForgotAttempted(false);
               }}
             >
               <TabsList className="grid w-full grid-cols-2">
@@ -219,54 +307,210 @@ export function AuthLanding() {
               </TabsList>
 
               <TabsContent value="login" className="mt-5">
-                <form className="space-y-4" onSubmit={(e) => void onLogin(e)}>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-identifier">Email or username</Label>
-                    <Input
-                      id="login-identifier"
-                      name="identifier"
-                      type="text"
-                      required
-                      autoComplete="username"
-                      placeholder="you@business.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <PasswordInput
-                      id="login-password"
-                      name="password"
-                      required
-                      minLength={8}
-                      autoComplete="current-password"
-                      placeholder="Enter your password"
-                    />
-                  </div>
-                  <FormError>{error}</FormError>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Signing in…
-                      </>
-                    ) : (
-                      "Sign in"
-                    )}
-                  </Button>
-                  <p className="text-muted-foreground text-center text-sm">
-                    Don&apos;t have an account?{" "}
+                {forgotStep === "request" ? (
+                  <form
+                    className="space-y-4"
+                    onSubmit={(e) => void onForgotRequest(e)}
+                  >
+                    <p className="text-muted-foreground text-sm">
+                      Enter the owner email for your workspace. We&apos;ll send
+                      a 6-digit verification code.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-email">Email</Label>
+                      <Input
+                        id="forgot-email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        placeholder="you@business.com"
+                        value={forgotEmail}
+                        aria-invalid={Boolean(forgotEmailErr)}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                      />
+                      <FieldStatus error={forgotEmailErr} />
+                    </div>
+                    {forgotMessage ? (
+                      <p className="text-muted-foreground text-sm">
+                        {forgotMessage}
+                      </p>
+                    ) : null}
+                    <FormError>{error}</FormError>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          Sending…
+                        </>
+                      ) : (
+                        "Send code"
+                      )}
+                    </Button>
                     <button
                       type="button"
-                      className="text-foreground font-medium underline-offset-4 hover:underline"
+                      className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
                       onClick={() => {
-                        setTab("signup");
+                        setForgotStep(null);
+                        setForgotMessage(null);
                         setError(null);
+                        setForgotAttempted(false);
                       }}
                     >
-                      Create workspace
+                      Back to sign in
                     </button>
-                  </p>
-                </form>
+                  </form>
+                ) : forgotStep === "reset" ? (
+                  <form
+                    className="space-y-4"
+                    onSubmit={(e) => void onForgotReset(e)}
+                  >
+                    <p className="text-muted-foreground text-sm">
+                      {forgotMessage ??
+                        "Enter the code from your email and choose a new password."}
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-reset-email">Email</Label>
+                      <Input
+                        id="forgot-reset-email"
+                        type="email"
+                        required
+                        value={forgotEmail}
+                        aria-invalid={Boolean(forgotEmailErr)}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                      />
+                      <FieldStatus error={forgotEmailErr} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-code">Verification code</Label>
+                      <Input
+                        id="forgot-code"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="123456"
+                        maxLength={6}
+                        value={forgotCode}
+                        aria-invalid={Boolean(forgotCodeErr)}
+                        onChange={(e) =>
+                          setForgotCode(e.target.value.replace(/\D/g, ""))
+                        }
+                      />
+                      <FieldStatus error={forgotCodeErr} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-new-password">New password</Label>
+                      <PasswordInput
+                        id="forgot-new-password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        value={forgotPassword}
+                        aria-invalid={Boolean(forgotPasswordErr)}
+                        onChange={(e) => setForgotPassword(e.target.value)}
+                      />
+                      <FieldStatus error={forgotPasswordErr} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-confirm-password">
+                        Confirm password
+                      </Label>
+                      <PasswordInput
+                        id="forgot-confirm-password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        value={forgotConfirm}
+                        aria-invalid={Boolean(forgotConfirmErr)}
+                        onChange={(e) => setForgotConfirm(e.target.value)}
+                      />
+                      <FieldStatus error={forgotConfirmErr} />
+                    </div>
+                    <FormError>{error}</FormError>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          Updating…
+                        </>
+                      ) : (
+                        "Reset password"
+                      )}
+                    </Button>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
+                      onClick={() => {
+                        setForgotStep("request");
+                        setError(null);
+                        setForgotAttempted(false);
+                      }}
+                    >
+                      Resend code
+                    </button>
+                  </form>
+                ) : (
+                  <form className="space-y-4" onSubmit={(e) => void onLogin(e)}>
+                    <div className="space-y-2">
+                      <Label htmlFor="login-identifier">Email or username</Label>
+                      <Input
+                        id="login-identifier"
+                        name="identifier"
+                        type="text"
+                        required
+                        autoComplete="username"
+                        placeholder="you@business.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label htmlFor="login-password">Password</Label>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+                          onClick={() => {
+                            setForgotStep("request");
+                            setForgotMessage(null);
+                            setError(null);
+                            setForgotAttempted(false);
+                          }}
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                      <PasswordInput
+                        id="login-password"
+                        name="password"
+                        required
+                        minLength={8}
+                        autoComplete="current-password"
+                        placeholder="Enter your password"
+                      />
+                    </div>
+                    <FormError>{error}</FormError>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          Signing in…
+                        </>
+                      ) : (
+                        "Sign in"
+                      )}
+                    </Button>
+                    <p className="text-muted-foreground text-center text-sm">
+                      Don&apos;t have an account?{" "}
+                      <button
+                        type="button"
+                        className="text-foreground font-medium underline-offset-4 hover:underline"
+                        onClick={() => {
+                          setTab("signup");
+                          setError(null);
+                        }}
+                      >
+                        Create workspace
+                      </button>
+                    </p>
+                  </form>
+                )}
               </TabsContent>
 
               <TabsContent value="signup" className="mt-5">

@@ -10,6 +10,7 @@ import { loadVendors } from "@renderer/lib/local-db/entity-source";
 async function existingVendorCodes(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listVendors?.({
+      status: "all",
       pageSize: 500,
     });
     if (local?.items.length) {
@@ -18,7 +19,7 @@ async function existingVendorCodes(): Promise<string[]> {
   } catch {
     /* fall through */
   }
-  const remote = await loadVendors({ pageSize: 500 });
+  const remote = await loadVendors({ status: "all", pageSize: 500 });
   return remote.items.map((v) => v.vendorCode);
 }
 

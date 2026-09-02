@@ -82,6 +82,36 @@ export function ProductProfilePage() {
     }
   }
 
+  async function onActivate() {
+    if (!id || !product) return;
+    if (!product.brandId || !product.categoryId) {
+      setError("Cannot activate product without brand and category.");
+      return;
+    }
+    if (!window.confirm(`Activate ${product.name}?`)) return;
+    setBusy(true);
+    try {
+      const updated = await productsApi.update(id, {
+        name: product.name,
+        brandId: product.brandId,
+        categoryId: product.categoryId,
+        productType: product.productType,
+        description: product.description,
+        status: "active",
+      });
+      setProduct(updated);
+      try {
+        await window.blackbox?.localDb?.upsertProduct(updated);
+      } catch {
+        setNotice("Saved on server; local cache update failed.");
+      }
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to activate"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error && !product) {
     return (
       <div
@@ -129,13 +159,23 @@ export function ProductProfilePage() {
             Edit
           </Button>
           <Button onClick={() => setSkuOpen(true)}>+ Add SKU</Button>
-          <Button
-            variant="outline"
-            disabled={busy || product.status === "inactive"}
-            onClick={() => void onDeactivate()}
-          >
-            Deactivate
-          </Button>
+          {product.status === "active" ? (
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => void onDeactivate()}
+            >
+              Deactivate
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => void onActivate()}
+            >
+              Activate
+            </Button>
+          )}
         </div>
       </div>
 

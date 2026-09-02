@@ -95,13 +95,16 @@ import {
 import {
   getDashboardSummaryLocal,
   listBrandsLocal,
+  getBrandLocal,
   listCategoriesLocal,
+  getCategoryLocal,
   listProductsLocal,
   listPurchaseOrdersLocal,
   listGoodsReceiptsLocal,
   listPoNumbersLocal,
   listReceiptNumbersLocal,
   listVendorGroupsLocal,
+  getVendorGroupLocal,
   listUnitsLocal,
   listVendorsLocal,
   getWarehouseLocal,
@@ -350,13 +353,20 @@ function registerIpc(): void {
     "localDb:listBrands",
     (_event, status?: EntityStatus | "all") => listBrandsLocal(status),
   );
+  ipcMain.handle("localDb:getBrand", (_event, id: string) => getBrandLocal(id));
   ipcMain.handle(
     "localDb:listCategories",
     (_event, status?: EntityStatus | "all") => listCategoriesLocal(status),
   );
+  ipcMain.handle("localDb:getCategory", (_event, id: string) =>
+    getCategoryLocal(id),
+  );
   ipcMain.handle(
     "localDb:listVendorGroups",
     (_event, status?: EntityStatus | "all") => listVendorGroupsLocal(status),
+  );
+  ipcMain.handle("localDb:getVendorGroup", (_event, id: string) =>
+    getVendorGroupLocal(id),
   );
   ipcMain.handle(
     "localDb:listWarehouses",

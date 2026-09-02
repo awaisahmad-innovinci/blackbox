@@ -217,13 +217,14 @@ export async function loadLastPurchaseCost(
 export async function loadVendors(
   query: VendorListQuery = {},
 ): Promise<PaginatedVendors> {
+  const q: VendorListQuery = { status: "active", ...query };
   try {
-    const local = await window.blackbox?.localDb?.listVendors?.(query);
+    const local = await window.blackbox?.localDb?.listVendors?.(q);
     if (local) return local;
   } catch {
     /* fall through to API */
   }
-  return vendorsApi.list(query);
+  return vendorsApi.list(q);
 }
 
 export async function loadWarehouses(

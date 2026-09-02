@@ -172,17 +172,23 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.findUserByIdentifier(dto.identifier);
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException("Invalid credentials");
-    }
-
-    const tenant = await this.tenants.findOne({ where: { id: user.tenantId } });
-    if (!tenant?.isActive) {
+    if (!user) {
       throw new UnauthorizedException("Invalid credentials");
     }
 
     const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) {
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException(
+        "This account has been deactivated by an administrator.",
+      );
+    }
+
+    const tenant = await this.tenants.findOne({ where: { id: user.tenantId } });
+    if (!tenant?.isActive) {
       throw new UnauthorizedException("Invalid credentials");
     }
 

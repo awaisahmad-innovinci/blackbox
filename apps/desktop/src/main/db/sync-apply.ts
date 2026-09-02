@@ -38,6 +38,10 @@ import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
 import { upsertVendorReturnLocal } from "./vendor-returns-local";
 import { getPurchaseOrderLocal } from "./entity-get-local";
+import {
+  getLocalEntityVersion,
+  setLocalEntityVersion,
+} from "./entity-versions-local";
 
 export function applyPullBatch(
   changes: SyncChangeDto[],
@@ -50,10 +54,24 @@ export function applyPullBatch(
     for (const change of changes) {
       if (wasApplied(change.changeId)) continue;
       if (identity && change.originDeviceId === identity.deviceId) {
+        if (change.operation !== "EVENT" && change.entityVersion > 0) {
+          setLocalEntityVersion(
+            change.entityType,
+            change.entityId,
+            change.entityVersion,
+          );
+        }
         recordApplied(change.changeId, Number(change.seq), change.stream);
         continue;
       }
       applyChange(change);
+      if (change.operation !== "EVENT" && change.entityVersion > 0) {
+        setLocalEntityVersion(
+          change.entityType,
+          change.entityId,
+          change.entityVersion,
+        );
+      }
       recordApplied(change.changeId, Number(change.seq), change.stream);
     }
     setPullCursor(stream, nextCursor);
@@ -70,6 +88,10 @@ export function commitLocalMutation(input: {
   baseEntityVersion?: number;
 }): string {
   const db = getLocalDb();
+  const baseEntityVersion =
+    input.baseEntityVersion !== undefined
+      ? input.baseEntityVersion
+      : getLocalEntityVersion(input.entityType, input.entityId);
   let changeId = "";
   const run = db.transaction(() => {
     applyChange({
@@ -84,7 +106,7 @@ export function commitLocalMutation(input: {
       payload: input.payload,
       createdAt: new Date().toISOString(),
     });
-    changeId = enqueueOutbox(input);
+    changeId = enqueueOutbox({ ...input, baseEntityVersion });
   });
   run();
   return changeId;

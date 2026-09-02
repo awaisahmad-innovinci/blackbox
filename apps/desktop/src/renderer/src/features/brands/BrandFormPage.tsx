@@ -1,9 +1,13 @@
 import { useCallback } from "react";
 import { brandsApi } from "@renderer/lib/api/brands";
+import { loadTaxonomyOne } from "@renderer/lib/local-db/taxonomy-source";
 import { TaxonomyFormPage } from "../taxonomy/TaxonomyFormPage";
 
 export function BrandFormPage() {
-  const loadOne = useCallback((id: string) => brandsApi.get(id), []);
+  const loadOne = useCallback(
+    (id: string) => loadTaxonomyOne("brand", id, (rowId) => brandsApi.get(rowId)),
+    [],
+  );
   const create = useCallback(
     (body: Parameters<typeof brandsApi.create>[0]) => brandsApi.create(body),
     [],

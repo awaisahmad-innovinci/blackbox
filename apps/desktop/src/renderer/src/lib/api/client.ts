@@ -26,6 +26,13 @@ export function getApiErrorMessage(
   fallback: string,
 ): string {
   if (error instanceof ApiError) {
+    if (
+      error.status === 401 &&
+      error.message !== "Invalid credentials" &&
+      error.message.length > 0
+    ) {
+      return error.message;
+    }
     if (error.status === 401) {
       return "Invalid username or password.";
     }

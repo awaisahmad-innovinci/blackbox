@@ -219,7 +219,7 @@ export type UpdateVendorRequest = CreateVendorRequest;
 
 export interface VendorListQuery {
   search?: string;
-  status?: EntityStatus;
+  status?: EntityStatus | "all";
   groupId?: string;
   page?: number;
   pageSize?: number;

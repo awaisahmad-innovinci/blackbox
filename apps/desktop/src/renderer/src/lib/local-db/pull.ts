@@ -184,7 +184,7 @@ export async function runFullPull(
 
   try {
     const vendorList = await paginateAll((page, pageSize) =>
-      vendorsApi.list({ page, pageSize }),
+      vendorsApi.list({ status: "all", page, pageSize }),
     );
     report("vendors", 0, Math.max(vendorList.length, 1), "Syncing vendors…");
     const details: VendorDetail[] = [];

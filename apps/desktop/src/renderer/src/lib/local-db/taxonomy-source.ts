@@ -24,6 +24,15 @@ function localReader(
   return localDb?.listVendorGroups;
 }
 
+function localGetOne(
+  kind: TaxonomyKind,
+): ((id: string) => Promise<TaxonomyRow | null>) | undefined {
+  const localDb = window.blackbox?.localDb;
+  if (kind === "brand") return localDb?.getBrand;
+  if (kind === "category") return localDb?.getCategory;
+  return localDb?.getVendorGroup;
+}
+
 /**
  * Taxonomy rows from SQLite once a full pull exists, otherwise from the API.
  * The local queries filter by status only, so the search term is applied here.
@@ -50,4 +59,19 @@ export async function loadTaxonomyRows(
     ),
     mode,
   };
+}
+
+/** Single taxonomy row — prefers SQLite when a full pull has completed. */
+export async function loadTaxonomyOne(
+  kind: TaxonomyKind,
+  id: string,
+  fromApi: (id: string) => Promise<TaxonomyRow>,
+): Promise<TaxonomyRow> {
+  const mode = await resolveDataSourceMode();
+  const readLocal = localGetOne(kind);
+  if (mode === "local" && readLocal) {
+    const row = await readLocal(id);
+    if (row) return row;
+  }
+  return fromApi(id);
 }
