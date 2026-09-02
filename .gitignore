@@ -42,6 +42,3 @@ supabase/.temp
 .cache
 
 
-#pipeline
-.github
-apps/desktop/electron-builder.yml
