@@ -129,6 +129,8 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<PaginatedGoodsReceipts>,
     listPoNumbers: () =>
       ipcRenderer.invoke("localDb:listPoNumbers") as Promise<string[]>,
+    listSkuCodes: () =>
+      ipcRenderer.invoke("localDb:listSkuCodes") as Promise<string[]>,
     listReceiptNumbers: () =>
       ipcRenderer.invoke("localDb:listReceiptNumbers") as Promise<string[]>,
     getDashboardSummary: () =>
@@ -226,6 +228,11 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke(
         "localDb:lookupSkuByBarcode",
         barcode,
+      ) as Promise<SkuBarcodeLookupResult | null>,
+    lookupSkuByCode: (sku: string) =>
+      ipcRenderer.invoke(
+        "localDb:lookupSkuByCode",
+        sku,
       ) as Promise<SkuBarcodeLookupResult | null>,
     getPurchaseOrder: (id: string) =>
       ipcRenderer.invoke(

@@ -442,7 +442,6 @@ export function ProductProfilePage() {
         open={skuOpen}
         productId={product.id}
         productName={product.name}
-        existingSkuCodes={skus.map((s) => s.sku)}
         onClose={() => setSkuOpen(false)}
         onCreated={(row, cacheWarning) => {
           setSkuOpen(false);

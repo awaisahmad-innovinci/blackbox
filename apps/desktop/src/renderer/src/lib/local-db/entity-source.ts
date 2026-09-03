@@ -326,6 +326,20 @@ export async function loadSkuByBarcode(
   return skusApi.byBarcode(barcode, warehouseId);
 }
 
+export async function lookupSkuByCode(
+  sku: string,
+): Promise<SkuBarcodeLookupResult | null> {
+  const code = sku.trim();
+  if (!code) return null;
+  try {
+    const local = await window.blackbox?.localDb?.lookupSkuByCode?.(code);
+    if (local) return local;
+  } catch {
+    /* local lookup unavailable */
+  }
+  return null;
+}
+
 export async function lookupSkuByBarcode(
   barcode: string,
 ): Promise<SkuBarcodeLookupResult | null> {

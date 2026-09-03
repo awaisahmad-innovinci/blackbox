@@ -22,7 +22,7 @@ import {
   AddInventoryOutItemDialog,
   type DraftOutLine,
 } from "./AddInventoryOutItemDialog";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -167,6 +167,7 @@ export function InventoryOutPage() {
   useBarcodeScanTarget({
     kind: "barcode",
     enabled: Boolean(warehouseId && !itemOpen && !success),
+    inputRef: barcodeRef,
     onScan: setBarcode,
     onComplete: (code) => {
       void onBarcodeEnter(code);
@@ -518,8 +519,8 @@ export function InventoryOutPage() {
                 <td className="px-4 py-3" colSpan={1}>
                   <Input
                     ref={barcodeRef}
+                    {...barcodeScanInputProps()}
                     className="h-8"
-                    data-barcode-scan=""
                     value={barcode}
                     disabled={!warehouseId || scanBusy}
                     placeholder={

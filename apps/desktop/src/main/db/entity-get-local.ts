@@ -181,6 +181,14 @@ export function listProductSkusLocal(productId: string): ProductSkuDetail[] {
   return rows.map(mapProductSkuRow);
 }
 
+export function listSkuCodesLocal(): string[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(`select sku from product_skus where tenant_id = ?`)
+    .all(DEMO_STORE_TENANT_ID) as Array<{ sku: string }>;
+  return rows.map((row) => String(row.sku));
+}
+
 function mapProductSkuRow(r: Record<string, unknown>): ProductSkuDetail {
   return {
     id: String(r.id),
@@ -806,10 +814,11 @@ export function getSkuByBarcodeLocal(
   return mapSkuSearchRow(row, warehouseId);
 }
 
-export function lookupSkuByBarcodeLocal(
-  barcode: string,
+function lookupProductSkuLocal(
+  whereClause: string,
+  param: string,
 ): SkuBarcodeLookupResult | null {
-  const code = barcode.trim();
+  const code = param.trim();
   if (!code) return null;
   const db = getLocalDb();
   const row = db
@@ -841,7 +850,7 @@ export function lookupSkuByBarcodeLocal(
        left join units bu on bu.id = s.base_unit_id
        left join units pu on pu.id = s.purchase_unit_id
        where s.tenant_id = ?
-         and s.barcode = ?
+         and ${whereClause}
        limit 1`,
     )
     .get(DEMO_STORE_TENANT_ID, code) as Record<string, unknown> | undefined;
@@ -852,6 +861,18 @@ export function lookupSkuByBarcodeLocal(
     productName: String(row.productName ?? ""),
     productStatus: row.productStatus as EntityStatus,
   };
+}
+
+export function lookupSkuByBarcodeLocal(
+  barcode: string,
+): SkuBarcodeLookupResult | null {
+  return lookupProductSkuLocal("s.barcode = ?", barcode);
+}
+
+export function lookupSkuByCodeLocal(
+  sku: string,
+): SkuBarcodeLookupResult | null {
+  return lookupProductSkuLocal("s.sku = ?", sku);
 }
 
 function eachInclusiveDate(dateFrom: string, dateTo: string): string[] {

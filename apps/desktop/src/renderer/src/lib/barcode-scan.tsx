@@ -5,10 +5,17 @@ import {
   useMemo,
   useRef,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 const SCAN_GAP_MS = 40;
 const MIN_SCAN_LEN = 3;
+
+export const BARCODE_SCAN_INPUT = "data-barcode-scan-input";
+
+export function barcodeScanInputProps(): { [BARCODE_SCAN_INPUT]: true } {
+  return { [BARCODE_SCAN_INPUT]: true };
+}
 
 export type BarcodeScanKind = "barcode" | "search";
 export type BarcodeScanLayer = "main" | "dialog";
@@ -17,6 +24,7 @@ export type BarcodeScanTargetOptions = {
   kind: BarcodeScanKind;
   layer?: BarcodeScanLayer;
   enabled: boolean;
+  inputRef?: RefObject<HTMLElement | null>;
   onScan: (code: string) => void;
   onComplete?: (code: string) => void;
 };
@@ -37,56 +45,50 @@ function isPrintable(event: KeyboardEvent): boolean {
   return event.key.length === 1;
 }
 
-function stripLastTypedChar(el: HTMLInputElement | HTMLTextAreaElement): void {
-  const start = el.selectionStart ?? el.value.length;
-  const end = el.selectionEnd ?? start;
-  if (start < 1 || start !== end) return;
-  const next = el.value.slice(0, start - 1) + el.value.slice(end);
+function isScanFieldVisible(el: HTMLElement | null): boolean {
+  if (!el?.isConnected) return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return false;
+  const hit = document.elementFromPoint(
+    rect.left + rect.width / 2,
+    rect.top + rect.height / 2,
+  );
+  return hit === el || (hit instanceof Node && el.contains(hit));
+}
+
+function targetIsVisible(target: RegisteredTarget): boolean {
+  return isScanFieldVisible(target.inputRef?.current ?? null);
+}
+
+function resolveVisibleTarget(
+  targets: RegisteredTarget[],
+): RegisteredTarget | null {
+  const active = targets.filter((t) => t.enabled);
+  const priority: Array<(t: RegisteredTarget) => boolean> = [
+    (t) => t.kind === "barcode" && t.layer === "dialog",
+    (t) => t.kind === "barcode" && (t.layer ?? "main") === "main",
+    (t) => t.kind === "search" && t.layer === "dialog",
+    (t) => t.kind === "search" && (t.layer ?? "main") === "main",
+  ];
+  for (const match of priority) {
+    const found = active.find(match);
+    if (found && targetIsVisible(found)) return found;
+  }
+  return null;
+}
+
+function setInputValue(
+  el: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+): void {
   const proto =
     el instanceof HTMLTextAreaElement
       ? HTMLTextAreaElement.prototype
       : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, next);
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
   el.dispatchEvent(new Event("input", { bubbles: true }));
-  el.setSelectionRange(start - 1, start - 1);
-}
-
-function isManualEntryField(el: EventTarget | null): boolean {
-  return (
-    el instanceof HTMLElement && el.closest("[data-no-barcode-scan]") != null
-  );
-}
-
-function isScanDestinationField(el: EventTarget | null): boolean {
-  return (
-    el instanceof HTMLElement && el.closest("[data-barcode-scan]") != null
-  );
-}
-
-function resolveTarget(targets: RegisteredTarget[]): RegisteredTarget | null {
-  const active = targets.filter((t) => t.enabled);
-
-  const dialogBarcode = active.find(
-    (t) => t.kind === "barcode" && t.layer === "dialog",
-  );
-  if (dialogBarcode) return dialogBarcode;
-
-  const mainBarcode = active.find(
-    (t) => t.kind === "barcode" && (t.layer ?? "main") === "main",
-  );
-  if (mainBarcode) return mainBarcode;
-
-  const dialogSearch = active.find(
-    (t) => t.kind === "search" && t.layer === "dialog",
-  );
-  if (dialogSearch) return dialogSearch;
-
-  const mainSearch = active.find(
-    (t) => t.kind === "search" && (t.layer ?? "main") === "main",
-  );
-  if (mainSearch) return mainSearch;
-
-  return null;
 }
 
 export function BarcodeScanProvider({ children }: { children: ReactNode }) {
@@ -107,52 +109,50 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let buffer = "";
     let lastAt = 0;
+    let wedgeActive = false;
     let leakedFrom: HTMLInputElement | HTMLTextAreaElement | null = null;
-    let strippedLeak = false;
+    let leakSnapshot: string | null = null;
 
     function reset(): void {
       buffer = "";
       lastAt = 0;
+      wedgeActive = false;
       leakedFrom = null;
-      strippedLeak = false;
+      leakSnapshot = null;
     }
 
-    function maybeStripLeak(): void {
-      if (strippedLeak || !leakedFrom) return;
-      stripLastTypedChar(leakedFrom);
-      strippedLeak = true;
+    function restoreLeakSnapshot(): void {
+      if (!leakedFrom || leakSnapshot === null) return;
+      setInputValue(leakedFrom, leakSnapshot);
+      leakedFrom = null;
+      leakSnapshot = null;
     }
 
     function deliverScan(code: string): void {
-      const target = resolveTarget([...targetsRef.current.values()]);
+      const target = resolveVisibleTarget([...targetsRef.current.values()]);
       if (!target) return;
       target.onScan(code);
       target.onComplete?.(code);
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+      if (event.repeat) return;
+
+      const visibleTarget = resolveVisibleTarget([
+        ...targetsRef.current.values(),
+      ]);
+      const targetEl = visibleTarget?.inputRef?.current ?? null;
       const now = performance.now();
       const gap = now - lastAt;
-      const activeTarget = resolveTarget([...targetsRef.current.values()]);
-
-      if (isManualEntryField(event.target)) {
-        reset();
-        return;
-      }
 
       if (event.key === "Enter") {
-        const code = buffer;
-        if (activeTarget && code.length >= MIN_SCAN_LEN) {
+        if (wedgeActive && buffer.length >= MIN_SCAN_LEN) {
           event.preventDefault();
           event.stopPropagation();
-          maybeStripLeak();
+          restoreLeakSnapshot();
+          deliverScan(buffer);
           reset();
-          deliverScan(code);
           return;
-        }
-        if (activeTarget && code.length > 0) {
-          event.preventDefault();
-          event.stopPropagation();
         }
         reset();
         return;
@@ -163,35 +163,38 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!activeTarget) {
-        reset();
-        return;
-      }
-
       if (lastAt === 0 || gap > SCAN_GAP_MS) {
         buffer = event.key;
         lastAt = now;
-        strippedLeak = false;
-        const target = event.target;
-        if (isScanDestinationField(target)) {
-          leakedFrom =
-            target instanceof HTMLInputElement ||
-            target instanceof HTMLTextAreaElement
-              ? target
-              : null;
-          return;
+        wedgeActive = false;
+        const active = event.target;
+        if (
+          active instanceof HTMLInputElement ||
+          active instanceof HTMLTextAreaElement
+        ) {
+          if (active !== targetEl) {
+            leakedFrom = active;
+            leakSnapshot = active.value;
+          } else {
+            leakedFrom = null;
+            leakSnapshot = null;
+          }
+        } else {
+          leakedFrom = null;
+          leakSnapshot = null;
         }
-        leakedFrom = null;
-        event.preventDefault();
-        event.stopPropagation();
         return;
+      }
+
+      if (!wedgeActive) {
+        wedgeActive = true;
+        restoreLeakSnapshot();
       }
 
       buffer += event.key;
       lastAt = now;
       event.preventDefault();
       event.stopPropagation();
-      maybeStripLeak();
     }
 
     document.addEventListener("keydown", onKeyDown, true);
@@ -212,6 +215,7 @@ export function useBarcodeScanTarget({
   kind,
   layer = "main",
   enabled,
+  inputRef,
   onScan,
   onComplete,
 }: BarcodeScanTargetOptions): void {
@@ -234,6 +238,7 @@ export function useBarcodeScanTarget({
       kind,
       layer,
       enabled,
+      inputRef,
       onScan: (code) => onScanRef.current(code),
       onComplete: onCompleteRef.current
         ? (code) => onCompleteRef.current?.(code)
@@ -241,5 +246,5 @@ export function useBarcodeScanTarget({
     };
     registry.register(entry);
     return () => registry.unregister(id);
-  }, [registry, kind, layer, enabled]);
+  }, [registry, kind, layer, enabled, inputRef]);
 }

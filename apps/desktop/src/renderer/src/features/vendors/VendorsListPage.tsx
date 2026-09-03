@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { EntityStatus, VendorGroup, VendorListItem, VendorListQuery } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -12,7 +12,7 @@ import {
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -33,10 +33,12 @@ export function VendorsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
 
@@ -123,9 +125,10 @@ export function VendorsListPage() {
 
       <div className="flex flex-wrap gap-3">
         <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
           className="max-w-xs"
           placeholder="Search vendors..."
-          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

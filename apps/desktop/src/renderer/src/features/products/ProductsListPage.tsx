@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type {
   Brand,
@@ -21,7 +21,7 @@ import {
   loadCategories,
 } from "@renderer/lib/local-db/entity-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -44,10 +44,12 @@ export function ProductsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
 
@@ -138,9 +140,10 @@ export function ProductsListPage() {
 
       <div className="flex flex-wrap gap-3">
         <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
           className="max-w-xs"
           placeholder="Search name, code, SKU…"
-          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

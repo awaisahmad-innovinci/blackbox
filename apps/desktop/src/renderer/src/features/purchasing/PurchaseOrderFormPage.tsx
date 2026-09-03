@@ -13,11 +13,10 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { loadPurchaseOrder, loadVendors, loadVendorSkus, loadWarehouses } from "@renderer/lib/local-db/entity-source";
 import { allocatePoNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
-import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import {
   AddPurchaseOrderItemDialog,
   toDraftPoLine,
@@ -52,7 +51,6 @@ export function PurchaseOrderFormPage() {
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -63,17 +61,6 @@ export function PurchaseOrderFormPage() {
       );
       el?.focus();
       el?.select();
-    });
-  }
-
-  function refocusAfterConfirmDialog() {
-    requestAnimationFrame(() => {
-      const firstLine = lines[0];
-      if (firstLine) {
-        focusQty(firstLine.productSkuId);
-        return;
-      }
-      barcodeRef.current?.focus();
     });
   }
 
@@ -118,6 +105,7 @@ export function PurchaseOrderFormPage() {
   useBarcodeScanTarget({
     kind: "barcode",
     enabled: Boolean(vendorId && warehouseId && !itemOpen),
+    inputRef: barcodeRef,
     onScan: setBarcode,
     onComplete: (code) => {
       void addSkuFromBarcode(code);
@@ -267,6 +255,14 @@ export function PurchaseOrderFormPage() {
   async function persist(submit: boolean) {
     const body = buildBody(submit);
     if (!body) return;
+    if (submit) {
+      const vendorName =
+        vendors.find((v) => v.id === vendorId)?.name ?? "Vendor";
+      const ok = window.confirm(
+        `Submit this Purchase Order?\n\nVendor: ${vendorName}\nTotal: ${grandTotal.toLocaleString()}\nItems: ${lines.length}`,
+      );
+      if (!ok) return;
+    }
 
     setSaving(true);
     setError(null);
@@ -344,14 +340,6 @@ export function PurchaseOrderFormPage() {
     setSaving(false);
     navigate(`/purchase-orders/${saved.id}`, { state: { po: saved } });
   }
-
-  function requestSubmit() {
-    if (!buildBody(true)) return;
-    setSubmitConfirmOpen(true);
-  }
-
-  const submitVendorName =
-    vendors.find((v) => v.id === vendorId)?.name ?? "Vendor";
 
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
@@ -509,7 +497,6 @@ export function PurchaseOrderFormPage() {
                     <Input
                       className="h-8 w-20"
                       data-sku-qty={line.productSkuId}
-                      data-no-barcode-scan=""
                       value={String(line.quantity)}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => {
@@ -563,8 +550,8 @@ export function PurchaseOrderFormPage() {
                   <td className="px-3 py-2" colSpan={3}>
                     <Input
                       ref={barcodeRef}
+                      {...barcodeScanInputProps()}
                       className="h-8"
-                      data-barcode-scan=""
                       value={barcode}
                       placeholder="Scan barcode to add item"
                       onChange={(e) => setBarcode(e.target.value)}
@@ -651,7 +638,7 @@ export function PurchaseOrderFormPage() {
         <Button
           type="button"
           disabled={saving}
-          onClick={() => requestSubmit()}
+          onClick={() => void persist(true)}
         >
           Submit PO
         </Button>
@@ -682,30 +669,6 @@ export function PurchaseOrderFormPage() {
           setItemOpen(false);
           const first = newLines[0];
           if (first) focusQty(first.productSkuId);
-        }}
-      />
-
-      <ConfirmDialog
-        open={submitConfirmOpen}
-        onOpenChange={(open) => {
-          setSubmitConfirmOpen(open);
-          if (!open) refocusAfterConfirmDialog();
-        }}
-        title="Submit Purchase Order?"
-        description={
-          <>
-            Vendor: {submitVendorName}
-            <br />
-            Total: {grandTotal.toLocaleString()}
-            <br />
-            Items: {lines.length}
-          </>
-        }
-        confirmLabel="Submit PO"
-        loading={saving}
-        onConfirm={async () => {
-          setSubmitConfirmOpen(false);
-          await persist(true);
         }}
       />
     </div>

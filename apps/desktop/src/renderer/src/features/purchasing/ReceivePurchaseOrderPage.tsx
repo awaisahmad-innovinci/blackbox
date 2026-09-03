@@ -23,7 +23,6 @@ import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
-import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
@@ -281,16 +280,7 @@ export function ReceivePurchaseOrderPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [success, setSuccess] = useState<GoodsReceiptDetail | null>(null);
-
-  function focusFirstReceiveQty() {
-    requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLInputElement>("[data-receive-qty]");
-      el?.focus();
-      el?.select();
-    });
-  }
 
   const [priceEdit, setPriceEdit] = useState<{
     productLabel: string;
@@ -419,7 +409,7 @@ export function ReceivePurchaseOrderPage() {
     );
   }
 
-  function requestConfirm() {
+  async function onConfirm() {
     if (!id || !header) return;
     for (const line of lines) {
       if (line.receiveQuantity < 0) {
@@ -453,12 +443,11 @@ export function ReceivePurchaseOrderPage() {
       setError("You cannot receive with 0 quantity.");
       return;
     }
-    setError(null);
-    setConfirmOpen(true);
-  }
 
-  async function executeConfirm() {
-    if (!id || !header) return;
+    const ok = window.confirm(
+      `Confirm Receiving Voucher?\n\nPO: ${header.poNumber}\nVendor: ${header.vendorName}\nWarehouse: ${header.warehouseName}\nItems: ${lines.length}\nDiscount: ${discountPct}% (${discountAmount.toLocaleString()})\nReturn credit: ${returnCredit.toLocaleString()}\nTotal: ${grandTotal.toLocaleString()}`,
+    );
+    if (!ok) return;
 
     setSaving(true);
     setError(null);
@@ -901,8 +890,6 @@ export function ReceivePurchaseOrderPage() {
                     <td className="px-3 py-2">
                       <Input
                         className="h-8 w-24"
-                        data-no-barcode-scan=""
-                        data-receive-qty=""
                         value={String(line.receiveQuantity)}
                         onChange={(e) => {
                           const n = Number(e.target.value);
@@ -917,7 +904,6 @@ export function ReceivePurchaseOrderPage() {
                     <td className="px-3 py-2">
                       <Input
                         className="h-8 w-24"
-                        data-no-barcode-scan=""
                         value={String(line.bonusQuantity)}
                         onChange={(e) => {
                           const n = Number(e.target.value);
@@ -1047,7 +1033,7 @@ export function ReceivePurchaseOrderPage() {
         <Button
           type="button"
           disabled={saving || totalReceiveQty <= 0}
-          onClick={() => requestConfirm()}
+          onClick={() => void onConfirm()}
         >
           {saving ? "Confirming…" : "Confirm Receiving"}
         </Button>
@@ -1083,40 +1069,6 @@ export function ReceivePurchaseOrderPage() {
                   : l,
               ),
             );
-          }}
-        />
-      ) : null}
-
-      {header ? (
-        <ConfirmDialog
-          open={confirmOpen}
-          onOpenChange={(open) => {
-            setConfirmOpen(open);
-            if (!open) focusFirstReceiveQty();
-          }}
-          title="Confirm Receiving Voucher?"
-          description={
-            <>
-              PO: {header.poNumber}
-              <br />
-              Vendor: {header.vendorName}
-              <br />
-              Warehouse: {header.warehouseName}
-              <br />
-              Items: {lines.length}
-              <br />
-              Discount: {discountPct}% ({discountAmount.toLocaleString()})
-              <br />
-              Return credit: {returnCredit.toLocaleString()}
-              <br />
-              Total: {grandTotal.toLocaleString()}
-            </>
-          }
-          confirmLabel="Confirm Receiving"
-          loading={saving}
-          onConfirm={async () => {
-            setConfirmOpen(false);
-            await executeConfirm();
           }}
         />
       ) : null}

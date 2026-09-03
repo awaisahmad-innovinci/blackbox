@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SkuSearchResult } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -11,7 +11,7 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { loadSkuSearch } from "@renderer/lib/local-db/entity-source";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 
 export type DraftOutLine = {
   productSkuId: string;
@@ -53,11 +53,13 @@ export function AddInventoryOutItemDialog({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SkuSearchResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const queryRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     layer: "dialog",
     enabled: open,
+    inputRef: queryRef,
     onScan: setQuery,
   });
 
@@ -124,7 +126,8 @@ export function AddInventoryOutItemDialog({
           <div className="space-y-1.5">
             <Label>Search product / SKU</Label>
             <Input
-              data-barcode-scan=""
+              ref={queryRef}
+              {...barcodeScanInputProps()}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search…"
