@@ -519,6 +519,7 @@ export function InventoryOutPage() {
                   <Input
                     ref={barcodeRef}
                     className="h-8"
+                    data-barcode-scan=""
                     value={barcode}
                     disabled={!warehouseId || scanBusy}
                     placeholder={

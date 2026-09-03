@@ -194,6 +194,7 @@ export function AddVendorReturnItemDialog({
           <div className="space-y-1.5">
             <Label>Search vendor SKUs</Label>
             <Input
+              data-barcode-scan=""
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search…"

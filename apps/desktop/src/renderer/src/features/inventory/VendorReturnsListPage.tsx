@@ -138,6 +138,7 @@ export function VendorReturnsListPage() {
         <div className="space-y-1.5">
           <Label>Search</Label>
           <Input
+            data-barcode-scan=""
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Return # or vendor"

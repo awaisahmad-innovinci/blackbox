@@ -455,6 +455,7 @@ export function VendorReturnFormPage() {
                       <Input
                         className="h-8 w-20"
                         data-sku-qty={line.productSkuId}
+                        data-no-barcode-scan=""
                         value={String(line.quantity)}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => {
@@ -501,6 +502,7 @@ export function VendorReturnFormPage() {
                     <Input
                       ref={barcodeRef}
                       className="h-8"
+                      data-barcode-scan=""
                       value={barcode}
                       placeholder="Scan barcode to add item"
                       onChange={(e) => setBarcode(e.target.value)}
