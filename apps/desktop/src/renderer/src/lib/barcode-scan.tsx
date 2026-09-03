@@ -51,6 +51,18 @@ function stripLastTypedChar(el: HTMLInputElement | HTMLTextAreaElement): void {
   el.setSelectionRange(start - 1, start - 1);
 }
 
+function isManualEntryField(el: EventTarget | null): boolean {
+  return (
+    el instanceof HTMLElement && el.closest("[data-no-barcode-scan]") != null
+  );
+}
+
+function isScanDestinationField(el: EventTarget | null): boolean {
+  return (
+    el instanceof HTMLElement && el.closest("[data-barcode-scan]") != null
+  );
+}
+
 function resolveTarget(targets: RegisteredTarget[]): RegisteredTarget | null {
   const active = targets.filter((t) => t.enabled);
 
@@ -121,16 +133,26 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
     function onKeyDown(event: KeyboardEvent): void {
       const now = performance.now();
       const gap = now - lastAt;
+      const activeTarget = resolveTarget([...targetsRef.current.values()]);
+
+      if (isManualEntryField(event.target)) {
+        reset();
+        return;
+      }
 
       if (event.key === "Enter") {
         const code = buffer;
-        if (code.length >= MIN_SCAN_LEN) {
+        if (activeTarget && code.length >= MIN_SCAN_LEN) {
           event.preventDefault();
           event.stopPropagation();
           maybeStripLeak();
           reset();
           deliverScan(code);
           return;
+        }
+        if (activeTarget && code.length > 0) {
+          event.preventDefault();
+          event.stopPropagation();
         }
         reset();
         return;
@@ -141,16 +163,27 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (!activeTarget) {
+        reset();
+        return;
+      }
+
       if (lastAt === 0 || gap > SCAN_GAP_MS) {
         buffer = event.key;
         lastAt = now;
         strippedLeak = false;
         const target = event.target;
-        leakedFrom =
-          target instanceof HTMLInputElement ||
-          target instanceof HTMLTextAreaElement
-            ? target
-            : null;
+        if (isScanDestinationField(target)) {
+          leakedFrom =
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement
+              ? target
+              : null;
+          return;
+        }
+        leakedFrom = null;
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
 

@@ -124,6 +124,7 @@ export function AddInventoryOutItemDialog({
           <div className="space-y-1.5">
             <Label>Search product / SKU</Label>
             <Input
+              data-barcode-scan=""
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search…"

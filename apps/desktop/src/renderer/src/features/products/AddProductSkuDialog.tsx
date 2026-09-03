@@ -397,6 +397,7 @@ export function AddProductSkuDialog({
             <Label>Barcode</Label>
             <Input
               ref={barcodeRef}
+              data-barcode-scan=""
               value={form.barcode}
               onChange={(e) => {
                 setField("barcode", e.target.value);

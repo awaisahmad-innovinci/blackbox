@@ -164,6 +164,7 @@ export function AddPurchaseOrderItemDialog({
           <div className="space-y-1.5">
             <Label>Search SKUs supplied by this vendor</Label>
             <Input
+              data-barcode-scan=""
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Pepsi"

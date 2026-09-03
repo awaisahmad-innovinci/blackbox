@@ -551,6 +551,7 @@ export function SkuProfilePage() {
               <Label>Barcode</Label>
               <Input
                 ref={barcodeRef}
+                data-barcode-scan=""
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="Scan or type barcode"

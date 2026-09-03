@@ -125,6 +125,7 @@ export function VendorsListPage() {
         <Input
           className="max-w-xs"
           placeholder="Search vendors..."
+          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

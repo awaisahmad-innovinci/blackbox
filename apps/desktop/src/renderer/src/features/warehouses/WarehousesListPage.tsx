@@ -112,6 +112,7 @@ export function WarehousesListPage() {
         <Input
           className="max-w-xs"
           placeholder="Search…"
+          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

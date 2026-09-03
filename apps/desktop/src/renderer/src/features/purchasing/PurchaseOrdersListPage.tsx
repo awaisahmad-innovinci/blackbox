@@ -173,6 +173,7 @@ export function PurchaseOrdersListPage() {
         <Input
           className="max-w-xs"
           placeholder="Search PO / vendor…"
+          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

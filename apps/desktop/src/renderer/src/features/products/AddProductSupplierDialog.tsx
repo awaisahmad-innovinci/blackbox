@@ -21,6 +21,14 @@ import { loadVendors } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
+function purchasePriceFromSku(sku: ProductSkuDetail | undefined): number {
+  const unitsPer =
+    sku?.unitsPerPurchaseUnit != null && sku.unitsPerPurchaseUnit > 0
+      ? sku.unitsPerPurchaseUnit
+      : 1;
+  return (sku?.costPrice ?? 0) * unitsPer;
+}
+
 function packagingFromSku(sku: ProductSkuDetail | undefined) {
   return {
     purchaseUnitId: sku?.purchaseUnitId ?? "",
@@ -51,7 +59,6 @@ export function AddProductSupplierDialog({
   const [selectedVendor, setSelectedVendor] = useState<VendorListItem | null>(
     null,
   );
-  const [purchasePrice, setPurchasePrice] = useState("");
   const [purchaseUnitId, setPurchaseUnitId] = useState("");
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
   const [moq, setMoq] = useState("1");
@@ -101,7 +108,6 @@ export function AddProductSupplierDialog({
     setVendorQuery("");
     setVendors([]);
     setSelectedVendor(null);
-    setPurchasePrice("");
     setPurchaseUnitId(packaging.purchaseUnitId);
     setUnitsPerPurchaseUnit(packaging.unitsPerPurchaseUnit);
     setMoq("1");
@@ -117,6 +123,9 @@ export function AddProductSupplierDialog({
   const selectedSku = productSkuId
     ? skus.find((s) => s.id === productSkuId)
     : undefined;
+  const computedPurchasePrice = selectedSku
+    ? purchasePriceFromSku(selectedSku)
+    : null;
 
   async function onSave() {
     if (!productSkuId) {
@@ -127,11 +136,11 @@ export function AddProductSupplierDialog({
       setError("Select a vendor");
       return;
     }
-    const price = Number(purchasePrice);
-    if (Number.isNaN(price) || price < 0) {
-      setError("Purchase price must be a valid number");
+    if (!selectedSku) {
+      setError("Select a SKU first");
       return;
     }
+    const price = purchasePriceFromSku(selectedSku);
     const unitsPerUnit = Number(unitsPerPurchaseUnit);
     if (Number.isNaN(unitsPerUnit) || unitsPerUnit <= 0) {
       setError("Units per purchase unit must be greater than zero");
@@ -148,7 +157,7 @@ export function AddProductSupplierDialog({
       return;
     }
 
-    const sku = skus.find((s) => s.id === productSkuId);
+    const sku = selectedSku;
 
     setSaving(true);
     setError(null);
@@ -321,11 +330,20 @@ export function AddProductSupplierDialog({
           {selectedVendor ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Purchase price *</Label>
+                <Label>
+                  Purchase price
+                  {selectedSku?.purchaseUnitName
+                    ? ` (per ${selectedSku.purchaseUnitName})`
+                    : ""}
+                  *
+                </Label>
                 <Input
-                  value={purchasePrice}
-                  onChange={(e) => setPurchasePrice(e.target.value)}
-                  autoFocus
+                  value={
+                    computedPurchasePrice != null
+                      ? String(computedPurchasePrice)
+                      : "—"
+                  }
+                  disabled
                 />
               </div>
               <div className="space-y-1.5">
@@ -348,7 +366,11 @@ export function AddProductSupplierDialog({
               </div>
               <div className="space-y-1.5">
                 <Label>MOQ</Label>
-                <Input value={moq} onChange={(e) => setMoq(e.target.value)} />
+                <Input
+                  value={moq}
+                  onChange={(e) => setMoq(e.target.value)}
+                  autoFocus
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Lead time (days)</Label>
