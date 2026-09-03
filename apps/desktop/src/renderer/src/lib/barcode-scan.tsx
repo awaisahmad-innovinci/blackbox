@@ -9,6 +9,8 @@ import {
 } from "react";
 
 const SCAN_GAP_MS = 40;
+const SCAN_CHAR_GAP_MS = 20;
+const SCAN_CAPTURE_KEYS = 3;
 const MIN_SCAN_LEN = 3;
 
 export const BARCODE_SCAN_INPUT = "data-barcode-scan-input";
@@ -43,6 +45,21 @@ const BarcodeScanContext = createContext<BarcodeScanRegistry | null>(null);
 function isPrintable(event: KeyboardEvent): boolean {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   return event.key.length === 1;
+}
+
+function isScanField(el: EventTarget | null): boolean {
+  return el instanceof HTMLElement && el.hasAttribute(BARCODE_SCAN_INPUT);
+}
+
+function isEditableField(
+  el: EventTarget | null,
+): el is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el instanceof HTMLSelectElement) return !el.disabled;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return !el.disabled && !el.readOnly;
+  }
+  return false;
 }
 
 function isScanFieldVisible(el: HTMLElement | null): boolean {
@@ -110,27 +127,27 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
     let buffer = "";
     let lastAt = 0;
     let wedgeActive = false;
-    let leakedFrom: HTMLInputElement | HTMLTextAreaElement | null = null;
-    let leakSnapshot: string | null = null;
+    let scanCaptureMode = false;
+    let captureFrom: HTMLInputElement | HTMLTextAreaElement | null = null;
+    let captureSnapshot: string | null = null;
 
     function reset(): void {
       buffer = "";
       lastAt = 0;
       wedgeActive = false;
-      leakedFrom = null;
-      leakSnapshot = null;
+      scanCaptureMode = false;
+      captureFrom = null;
+      captureSnapshot = null;
     }
 
-    function restoreLeakSnapshot(): void {
-      if (!leakedFrom || leakSnapshot === null) return;
-      setInputValue(leakedFrom, leakSnapshot);
-      leakedFrom = null;
-      leakSnapshot = null;
+    function restoreCaptureSnapshot(): void {
+      if (!captureFrom || captureSnapshot === null) return;
+      setInputValue(captureFrom, captureSnapshot);
+      captureFrom = null;
+      captureSnapshot = null;
     }
 
-    function deliverScan(code: string): void {
-      const target = resolveVisibleTarget([...targetsRef.current.values()]);
-      if (!target) return;
+    function deliverScan(code: string, target: RegisteredTarget): void {
       target.onScan(code);
       target.onComplete?.(code);
     }
@@ -141,16 +158,35 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
       const visibleTarget = resolveVisibleTarget([
         ...targetsRef.current.values(),
       ]);
-      const targetEl = visibleTarget?.inputRef?.current ?? null;
+      if (!visibleTarget) {
+        reset();
+        return;
+      }
+
+      const active = event.target;
       const now = performance.now();
-      const gap = now - lastAt;
+      const gap = lastAt === 0 ? Infinity : now - lastAt;
+
+      if (isScanField(active)) {
+        reset();
+        return;
+      }
+
+      const inNonScanEditable = isEditableField(active);
 
       if (event.key === "Enter") {
+        if (scanCaptureMode && buffer.length >= MIN_SCAN_LEN) {
+          event.preventDefault();
+          event.stopPropagation();
+          restoreCaptureSnapshot();
+          deliverScan(buffer, visibleTarget);
+          reset();
+          return;
+        }
         if (wedgeActive && buffer.length >= MIN_SCAN_LEN) {
           event.preventDefault();
           event.stopPropagation();
-          restoreLeakSnapshot();
-          deliverScan(buffer);
+          deliverScan(buffer, visibleTarget);
           reset();
           return;
         }
@@ -163,32 +199,56 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (inNonScanEditable) {
+        if (scanCaptureMode) {
+          if (gap > SCAN_GAP_MS) {
+            reset();
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          buffer += event.key;
+          lastAt = now;
+          return;
+        }
+
+        if (lastAt === 0 || gap > SCAN_CHAR_GAP_MS) {
+          buffer = event.key;
+          lastAt = now;
+          if (
+            active instanceof HTMLInputElement ||
+            active instanceof HTMLTextAreaElement
+          ) {
+            captureFrom = active;
+            captureSnapshot = active.value;
+          } else {
+            captureFrom = null;
+            captureSnapshot = null;
+          }
+          return;
+        }
+
+        buffer += event.key;
+        lastAt = now;
+
+        if (buffer.length >= SCAN_CAPTURE_KEYS) {
+          scanCaptureMode = true;
+          restoreCaptureSnapshot();
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+
       if (lastAt === 0 || gap > SCAN_GAP_MS) {
         buffer = event.key;
         lastAt = now;
         wedgeActive = false;
-        const active = event.target;
-        if (
-          active instanceof HTMLInputElement ||
-          active instanceof HTMLTextAreaElement
-        ) {
-          if (active !== targetEl) {
-            leakedFrom = active;
-            leakSnapshot = active.value;
-          } else {
-            leakedFrom = null;
-            leakSnapshot = null;
-          }
-        } else {
-          leakedFrom = null;
-          leakSnapshot = null;
-        }
         return;
       }
 
       if (!wedgeActive) {
         wedgeActive = true;
-        restoreLeakSnapshot();
       }
 
       buffer += event.key;
