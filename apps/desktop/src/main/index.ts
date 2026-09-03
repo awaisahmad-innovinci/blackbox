@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from "electron";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type {
   Brand,
   Category,
@@ -173,7 +173,33 @@ function createWindow(): void {
   }
 }
 
+const DEBUG_LOG_PATHS = [
+  join(process.cwd(), "../../.cursor/debug-b2ecf6.log"),
+  join(__dirname, "../../../.cursor/debug-b2ecf6.log"),
+];
+
+function appendAgentDebugLog(payload: Record<string, unknown>): void {
+  const line = `${JSON.stringify({
+    sessionId: "b2ecf6",
+    ...payload,
+    timestamp: Date.now(),
+  })}\n`;
+  for (const logPath of DEBUG_LOG_PATHS) {
+    try {
+      mkdirSync(dirname(logPath), { recursive: true });
+      appendFileSync(logPath, line);
+      return;
+    } catch {
+      /* try next path */
+    }
+  }
+}
+
 function registerIpc(): void {
+  ipcMain.handle("debug:log", (_event, payload: Record<string, unknown>) => {
+    appendAgentDebugLog(payload);
+    return { ok: true as const };
+  });
   ipcMain.handle("localDb:getStatus", () => getLocalDbStatus());
   ipcMain.handle("localDb:getSyncMeta", (_event, key: string) =>
     getSyncMeta(key),

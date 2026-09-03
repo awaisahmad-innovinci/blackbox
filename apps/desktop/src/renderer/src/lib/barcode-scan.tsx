@@ -9,8 +9,6 @@ import {
 } from "react";
 
 const SCAN_GAP_MS = 40;
-const SCAN_CHAR_GAP_MS = 20;
-const SCAN_CAPTURE_KEYS = 3;
 const MIN_SCAN_LEN = 3;
 
 export const BARCODE_SCAN_INPUT = "data-barcode-scan-input";
@@ -62,6 +60,49 @@ function isEditableField(
   return false;
 }
 
+type FieldInPath = "scan" | "editable" | null;
+
+function fieldInEventPath(event: KeyboardEvent): FieldInPath {
+  for (const node of event.composedPath()) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (isScanField(node)) return "scan";
+    if (isEditableField(node)) return "editable";
+  }
+  return null;
+}
+
+function eventTargetTag(el: EventTarget | null): string {
+  if (el instanceof HTMLElement) {
+    return `${el.tagName}${el instanceof HTMLInputElement ? `[${el.type}]` : ""}`;
+  }
+  return String(el ?? "null");
+}
+
+// #region agent log
+function debugBarcodeLog(
+  hypothesisId: string,
+  message: string,
+  data: Record<string, unknown>,
+): void {
+  const payload = {
+    hypothesisId,
+    location: "barcode-scan.tsx",
+    message,
+    data: { platform: window.blackbox?.platform, ...data },
+    runId: "win32-no-global-wedge",
+  };
+  void window.blackbox?.debugLog?.(payload);
+  fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "b2ecf6",
+    },
+    body: JSON.stringify({ sessionId: "b2ecf6", ...payload, timestamp: Date.now() }),
+  }).catch(() => {});
+}
+// #endregion
+
 function isScanFieldVisible(el: HTMLElement | null): boolean {
   if (!el?.isConnected) return false;
   const style = window.getComputedStyle(el);
@@ -96,18 +137,6 @@ function resolveVisibleTarget(
   return null;
 }
 
-function setInputValue(
-  el: HTMLInputElement | HTMLTextAreaElement,
-  value: string,
-): void {
-  const proto =
-    el instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 export function BarcodeScanProvider({ children }: { children: ReactNode }) {
   const targetsRef = useRef<Map<symbol, RegisteredTarget>>(new Map());
 
@@ -124,27 +153,28 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    const platform = window.blackbox?.platform ?? "unknown";
+
+    // Packaged Windows builds deliver scanner/keyboard events with timing that
+    // falsely triggers the global wedge and preventDefault() in normal fields.
+    // Scanning still works via native input when the barcode/search field is focused.
+    if (platform === "win32") {
+      // #region agent log
+      debugBarcodeLog("H-WIN", "global wedge disabled on Windows", {
+        platform,
+      });
+      // #endregion
+      return;
+    }
+
     let buffer = "";
     let lastAt = 0;
     let wedgeActive = false;
-    let scanCaptureMode = false;
-    let captureFrom: HTMLInputElement | HTMLTextAreaElement | null = null;
-    let captureSnapshot: string | null = null;
 
     function reset(): void {
       buffer = "";
       lastAt = 0;
       wedgeActive = false;
-      scanCaptureMode = false;
-      captureFrom = null;
-      captureSnapshot = null;
-    }
-
-    function restoreCaptureSnapshot(): void {
-      if (!captureFrom || captureSnapshot === null) return;
-      setInputValue(captureFrom, captureSnapshot);
-      captureFrom = null;
-      captureSnapshot = null;
     }
 
     function deliverScan(code: string, target: RegisteredTarget): void {
@@ -155,34 +185,26 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
     function onKeyDown(event: KeyboardEvent): void {
       if (event.repeat) return;
 
+      const pathField = fieldInEventPath(event);
+      const active = event.target;
+      const now = performance.now();
+      const gap = lastAt === 0 ? Infinity : now - lastAt;
+
+      if (pathField === "scan" || pathField === "editable") {
+        reset();
+        return;
+      }
+
       const visibleTarget = resolveVisibleTarget([
         ...targetsRef.current.values(),
       ]);
+
       if (!visibleTarget) {
         reset();
         return;
       }
 
-      const active = event.target;
-      const now = performance.now();
-      const gap = lastAt === 0 ? Infinity : now - lastAt;
-
-      if (isScanField(active)) {
-        reset();
-        return;
-      }
-
-      const inNonScanEditable = isEditableField(active);
-
       if (event.key === "Enter") {
-        if (scanCaptureMode && buffer.length >= MIN_SCAN_LEN) {
-          event.preventDefault();
-          event.stopPropagation();
-          restoreCaptureSnapshot();
-          deliverScan(buffer, visibleTarget);
-          reset();
-          return;
-        }
         if (wedgeActive && buffer.length >= MIN_SCAN_LEN) {
           event.preventDefault();
           event.stopPropagation();
@@ -196,47 +218,6 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
 
       if (!isPrintable(event)) {
         if (gap > SCAN_GAP_MS) reset();
-        return;
-      }
-
-      if (inNonScanEditable) {
-        if (scanCaptureMode) {
-          if (gap > SCAN_GAP_MS) {
-            reset();
-            return;
-          }
-          event.preventDefault();
-          event.stopPropagation();
-          buffer += event.key;
-          lastAt = now;
-          return;
-        }
-
-        if (lastAt === 0 || gap > SCAN_CHAR_GAP_MS) {
-          buffer = event.key;
-          lastAt = now;
-          if (
-            active instanceof HTMLInputElement ||
-            active instanceof HTMLTextAreaElement
-          ) {
-            captureFrom = active;
-            captureSnapshot = active.value;
-          } else {
-            captureFrom = null;
-            captureSnapshot = null;
-          }
-          return;
-        }
-
-        buffer += event.key;
-        lastAt = now;
-
-        if (buffer.length >= SCAN_CAPTURE_KEYS) {
-          scanCaptureMode = true;
-          restoreCaptureSnapshot();
-          event.preventDefault();
-          event.stopPropagation();
-        }
         return;
       }
 
@@ -307,4 +288,43 @@ export function useBarcodeScanTarget({
     registry.register(entry);
     return () => registry.unregister(id);
   }, [registry, kind, layer, enabled, inputRef]);
+
+  // Windows: no global wedge — fire onComplete when Enter is pressed in the scan input.
+  useEffect(() => {
+    if (window.blackbox?.platform !== "win32" || !enabled) return;
+
+    let attached: HTMLInputElement | null = null;
+
+    function onEnter(event: KeyboardEvent): void {
+      if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      const code = event.target.value.trim();
+      if (code.length < MIN_SCAN_LEN) return;
+      onScanRef.current(code);
+      onCompleteRef.current?.(code);
+      // #region agent log
+      debugBarcodeLog("H-WIN", "scan enter handled on input", {
+        codeLen: code.length,
+        kind,
+      });
+      // #endregion
+    }
+
+    function tryAttach(): void {
+      const el = inputRef?.current;
+      if (!(el instanceof HTMLInputElement) || el === attached) return;
+      attached?.removeEventListener("keydown", onEnter);
+      attached = el;
+      el.addEventListener("keydown", onEnter);
+    }
+
+    tryAttach();
+    const poll = window.setInterval(tryAttach, 250);
+
+    return () => {
+      window.clearInterval(poll);
+      attached?.removeEventListener("keydown", onEnter);
+    };
+  }, [enabled, inputRef, kind]);
 }
