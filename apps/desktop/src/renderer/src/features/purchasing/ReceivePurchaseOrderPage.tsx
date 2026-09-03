@@ -23,6 +23,7 @@ import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
+import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
@@ -280,6 +281,7 @@ export function ReceivePurchaseOrderPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [success, setSuccess] = useState<GoodsReceiptDetail | null>(null);
 
   const [priceEdit, setPriceEdit] = useState<{
@@ -409,45 +411,45 @@ export function ReceivePurchaseOrderPage() {
     );
   }
 
-  async function onConfirm() {
-    if (!id || !header) return;
+  function validateReceive(): boolean {
+    if (!id || !header) return false;
     for (const line of lines) {
       if (line.receiveQuantity < 0) {
         setError("Received quantity must be >= 0");
-        return;
+        return false;
       }
       if (line.receiveQuantity > line.orderedQuantity) {
         setError(
           "Received quantity cannot be greater than ordered quantity.",
         );
-        return;
+        return false;
       }
       if (line.bonusQuantity < 0) {
         setError("Bonus / sample quantity must be >= 0");
-        return;
+        return false;
       }
       if (line.receivingUnitCost < 0) {
         setError("Receiving unit cost must be >= 0");
-        return;
+        return false;
       }
       if (line.discountPercent < 0 || line.discountPercent > 100) {
         setError("Line discount % must be between 0 and 100");
-        return;
+        return false;
       }
     }
     if (discountPct < 0 || discountPct > 100) {
       setError("Discount % must be between 0 and 100");
-      return;
+      return false;
     }
     if (totalReceiveQty <= 0) {
       setError("You cannot receive with 0 quantity.");
-      return;
+      return false;
     }
+    return true;
+  }
 
-    const ok = window.confirm(
-      `Confirm Receiving Voucher?\n\nPO: ${header.poNumber}\nVendor: ${header.vendorName}\nWarehouse: ${header.warehouseName}\nItems: ${lines.length}\nDiscount: ${discountPct}% (${discountAmount.toLocaleString()})\nReturn credit: ${returnCredit.toLocaleString()}\nTotal: ${grandTotal.toLocaleString()}`,
-    );
-    if (!ok) return;
+  async function executeConfirm() {
+    if (!id || !header) return;
 
     setSaving(true);
     setError(null);
@@ -1033,7 +1035,10 @@ export function ReceivePurchaseOrderPage() {
         <Button
           type="button"
           disabled={saving || totalReceiveQty <= 0}
-          onClick={() => void onConfirm()}
+          onClick={() => {
+            if (!validateReceive()) return;
+            setConfirmOpen(true);
+          }}
         >
           {saving ? "Confirming…" : "Confirm Receiving"}
         </Button>
@@ -1072,6 +1077,33 @@ export function ReceivePurchaseOrderPage() {
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Confirm Receiving Voucher?"
+        description={
+          header ? (
+            <>
+              <p>PO: {header.poNumber}</p>
+              <p>Vendor: {header.vendorName}</p>
+              <p>Warehouse: {header.warehouseName}</p>
+              <p>Items: {lines.length}</p>
+              <p>
+                Discount: {discountPct}% ({discountAmount.toLocaleString()})
+              </p>
+              <p>Return credit: {returnCredit.toLocaleString()}</p>
+              <p>Total: {grandTotal.toLocaleString()}</p>
+            </>
+          ) : null
+        }
+        confirmLabel="Confirm Receiving"
+        loading={saving}
+        onConfirm={async () => {
+          await executeConfirm();
+          setConfirmOpen(false);
+        }}
+      />
     </div>
   );
 }
