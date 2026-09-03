@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import type {
   ProductSkuDetail,
-  UnitListItem,
   VendorListItem,
   VendorSku,
 } from "@blackbox/shared";
@@ -17,7 +16,6 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { unitsApi } from "@renderer/lib/api/units";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { loadVendors } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -53,7 +51,6 @@ export function AddProductSupplierDialog({
   const [selectedVendor, setSelectedVendor] = useState<VendorListItem | null>(
     null,
   );
-  const [units, setUnits] = useState<UnitListItem[]>([]);
   const [purchasePrice, setPurchasePrice] = useState("");
   const [purchaseUnitId, setPurchaseUnitId] = useState("");
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
@@ -66,7 +63,6 @@ export function AddProductSupplierDialog({
 
   useEffect(() => {
     if (!open) return;
-    void unitsApi.list().then(setUnits).catch(() => undefined);
     if (lockedSkuId) {
       setProductSkuId(lockedSkuId);
     } else if (skus.length === 1) {
@@ -118,6 +114,9 @@ export function AddProductSupplierDialog({
   const lockedSku = lockedSkuId
     ? skus.find((s) => s.id === lockedSkuId)
     : null;
+  const selectedSku = productSkuId
+    ? skus.find((s) => s.id === productSkuId)
+    : undefined;
 
   async function onSave() {
     if (!productSkuId) {
@@ -150,7 +149,6 @@ export function AddProductSupplierDialog({
     }
 
     const sku = skus.find((s) => s.id === productSkuId);
-    const purchaseUnit = units.find((u) => u.id === purchaseUnitId);
 
     setSaving(true);
     setError(null);
@@ -165,7 +163,7 @@ export function AddProductSupplierDialog({
           vendorSkuCode: null,
           purchasePrice: price,
           purchaseUnitId: purchaseUnitId || null,
-          purchaseUnitName: purchaseUnit?.name ?? null,
+          purchaseUnitName: sku?.purchaseUnitName ?? null,
           unitsPerPurchaseUnit: unitsPerUnit,
           minimumOrderQuantity,
           leadTimeDays: leadTime,
@@ -332,24 +330,20 @@ export function AddProductSupplierDialog({
               </div>
               <div className="space-y-1.5">
                 <Label>Purchase unit</Label>
-                <select
-                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                  value={purchaseUnitId}
-                  onChange={(e) => setPurchaseUnitId(e.target.value)}
-                >
-                  <option value="">—</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                <Input
+                  value={selectedSku?.purchaseUnitName || "—"}
+                  disabled
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Units / purchase unit</Label>
                 <Input
-                  value={unitsPerPurchaseUnit}
-                  onChange={(e) => setUnitsPerPurchaseUnit(e.target.value)}
+                  value={
+                    selectedSku?.unitsPerPurchaseUnit != null
+                      ? String(selectedSku.unitsPerPurchaseUnit)
+                      : "—"
+                  }
+                  disabled
                 />
               </div>
               <div className="space-y-1.5">
