@@ -3,7 +3,7 @@ name: Build Electron App (Windows & Linux)
 on:
   push:
     branches:
-      - staging
+      - production
 
 jobs:
   build:
@@ -43,7 +43,7 @@ jobs:
 
       - name: Package Electron app
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: https://blackboxapi-production-2736.up.railway.app
         run: |
           pnpm --filter @blackbox/desktop exec electron-vite build
           pnpm exec electron-builder --project apps/desktop --publish never
