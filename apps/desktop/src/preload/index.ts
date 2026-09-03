@@ -55,8 +55,6 @@ type Ok = { ok: true };
 
 contextBridge.exposeInMainWorld("blackbox", {
   platform: process.platform,
-  debugLog: (payload: Record<string, unknown>) =>
-    ipcRenderer.invoke("debug:log", payload) as Promise<{ ok: true }>,
   localDb: {
     getStatus: () =>
       ipcRenderer.invoke("localDb:getStatus") as Promise<LocalDbStatus>,

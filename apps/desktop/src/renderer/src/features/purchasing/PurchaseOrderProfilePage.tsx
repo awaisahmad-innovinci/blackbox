@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -16,6 +17,8 @@ export function PurchaseOrderProfilePage() {
   const [po, setPo] = useState<PurchaseOrderDetail | null>(seeded ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -39,10 +42,6 @@ export function PurchaseOrderProfilePage() {
 
   async function onSubmit() {
     if (!po) return;
-    const ok = window.confirm(
-      `Submit this Purchase Order?\n\nVendor: ${po.vendorName}\nTotal: ${po.total.toLocaleString()}\nItems: ${po.items.length}`,
-    );
-    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
@@ -62,7 +61,6 @@ export function PurchaseOrderProfilePage() {
 
   async function onCancel() {
     if (!po) return;
-    if (!window.confirm(`Cancel purchase order ${po.poNumber}?`)) return;
     setBusy(true);
     setError(null);
     try {
@@ -132,7 +130,7 @@ export function PurchaseOrderProfilePage() {
               </Button>
             ) : null}
             {canSubmit ? (
-              <Button disabled={busy} onClick={() => void onSubmit()}>
+              <Button disabled={busy} onClick={() => setSubmitConfirmOpen(true)}>
                 Submit PO
               </Button>
             ) : null}
@@ -147,7 +145,7 @@ export function PurchaseOrderProfilePage() {
               <Button
                 variant="outline"
                 disabled={busy}
-                onClick={() => void onCancel()}
+                onClick={() => setCancelConfirmOpen(true)}
               >
                 Cancel PO
               </Button>
@@ -275,6 +273,42 @@ export function PurchaseOrderProfilePage() {
         </div>
       </section>
       </PrintDocument>
+
+      <ConfirmDialog
+        open={submitConfirmOpen}
+        onOpenChange={setSubmitConfirmOpen}
+        title="Submit this Purchase Order?"
+        description={
+          po ? (
+            <>
+              <p>Vendor: {po.vendorName}</p>
+              <p>Total: {po.total.toLocaleString()}</p>
+              <p>Items: {po.items.length}</p>
+            </>
+          ) : null
+        }
+        confirmLabel="Submit PO"
+        loading={busy}
+        onConfirm={async () => {
+          await onSubmit();
+          setSubmitConfirmOpen(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={cancelConfirmOpen}
+        onOpenChange={setCancelConfirmOpen}
+        title="Cancel purchase order?"
+        description={
+          po ? `Cancel purchase order ${po.poNumber}?` : null
+        }
+        confirmLabel="Cancel PO"
+        loading={busy}
+        onConfirm={async () => {
+          await onCancel();
+          setCancelConfirmOpen(false);
+        }}
+      />
     </>
   );
 }

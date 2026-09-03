@@ -9,6 +9,7 @@ import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
+import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -51,6 +52,7 @@ export function PurchaseOrderFormPage() {
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -255,14 +257,6 @@ export function PurchaseOrderFormPage() {
   async function persist(submit: boolean) {
     const body = buildBody(submit);
     if (!body) return;
-    if (submit) {
-      const vendorName =
-        vendors.find((v) => v.id === vendorId)?.name ?? "Vendor";
-      const ok = window.confirm(
-        `Submit this Purchase Order?\n\nVendor: ${vendorName}\nTotal: ${grandTotal.toLocaleString()}\nItems: ${lines.length}`,
-      );
-      if (!ok) return;
-    }
 
     setSaving(true);
     setError(null);
@@ -638,7 +632,10 @@ export function PurchaseOrderFormPage() {
         <Button
           type="button"
           disabled={saving}
-          onClick={() => void persist(true)}
+          onClick={() => {
+            if (!buildBody(true)) return;
+            setSubmitConfirmOpen(true);
+          }}
         >
           Submit PO
         </Button>
@@ -669,6 +666,28 @@ export function PurchaseOrderFormPage() {
           setItemOpen(false);
           const first = newLines[0];
           if (first) focusQty(first.productSkuId);
+        }}
+      />
+
+      <ConfirmDialog
+        open={submitConfirmOpen}
+        onOpenChange={setSubmitConfirmOpen}
+        title="Submit this Purchase Order?"
+        description={
+          <>
+            <p>
+              Vendor:{" "}
+              {vendors.find((v) => v.id === vendorId)?.name ?? "Vendor"}
+            </p>
+            <p>Total: {grandTotal.toLocaleString()}</p>
+            <p>Items: {lines.length}</p>
+          </>
+        }
+        confirmLabel="Submit PO"
+        loading={saving}
+        onConfirm={async () => {
+          await persist(true);
+          setSubmitConfirmOpen(false);
         }}
       />
     </div>

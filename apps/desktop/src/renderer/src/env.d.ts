@@ -62,7 +62,6 @@ declare global {
   interface Window {
     blackbox?: {
       platform: NodeJS.Platform;
-      debugLog?: (payload: Record<string, unknown>) => Promise<{ ok: true }>;
       localDb?: {
         getStatus: () => Promise<LocalDbStatus>;
         getSyncMeta: (key: string) => Promise<string | null>;
