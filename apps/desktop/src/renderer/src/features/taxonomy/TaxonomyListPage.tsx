@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { EntityStatus } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -7,7 +7,7 @@ import { Skeleton } from "@blackbox/ui/skeleton";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import type { DataSourceMode } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -43,6 +43,7 @@ export function TaxonomyListPage({
   const navigate = useNavigate();
   const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<EntityStatus | "all">("all");
   const [items, setItems] = useState<TaxonomyRow[]>([]);
   const [page, setPage] = useState(1);
@@ -54,6 +55,7 @@ export function TaxonomyListPage({
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
 
@@ -105,9 +107,10 @@ export function TaxonomyListPage({
 
       <div className="flex flex-wrap gap-3">
         <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
           className="max-w-xs"
           placeholder="Search…"
-          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

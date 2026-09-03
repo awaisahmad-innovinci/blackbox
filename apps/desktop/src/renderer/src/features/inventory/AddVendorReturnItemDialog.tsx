@@ -14,7 +14,7 @@ import {
   loadLastPurchaseCost,
   loadVendorSkus,
 } from "@renderer/lib/local-db/entity-source";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 
 export type DraftReturnLine = {
   productSkuId: string;
@@ -78,11 +78,13 @@ export function AddVendorReturnItemDialog({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const queryRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     layer: "dialog",
     enabled: open,
+    inputRef: queryRef,
     onScan: setQuery,
   });
 
@@ -194,7 +196,8 @@ export function AddVendorReturnItemDialog({
           <div className="space-y-1.5">
             <Label>Search vendor SKUs</Label>
             <Input
-              data-barcode-scan=""
+              ref={queryRef}
+              {...barcodeScanInputProps()}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search…"

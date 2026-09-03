@@ -85,6 +85,8 @@ import {
   getSkuProfileLocal,
   getSkuByBarcodeLocal,
   lookupSkuByBarcodeLocal,
+  lookupSkuByCodeLocal,
+  listSkuCodesLocal,
   getVendorSkuLocal,
   searchSkusLocal,
   listInventoryInOutReportLocal,
@@ -343,6 +345,7 @@ function registerIpc(): void {
       listGoodsReceiptsLocal(query),
   );
   ipcMain.handle("localDb:listPoNumbers", () => listPoNumbersLocal());
+  ipcMain.handle("localDb:listSkuCodes", () => listSkuCodesLocal());
   ipcMain.handle("localDb:listReceiptNumbers", () =>
     listReceiptNumbersLocal(),
   );
@@ -437,6 +440,9 @@ function registerIpc(): void {
   );
   ipcMain.handle("localDb:lookupSkuByBarcode", (_event, barcode: string) =>
     lookupSkuByBarcodeLocal(barcode),
+  );
+  ipcMain.handle("localDb:lookupSkuByCode", (_event, sku: string) =>
+    lookupSkuByCodeLocal(sku),
   );
   ipcMain.handle("localDb:getPurchaseOrder", (_event, id: string) =>
     getPurchaseOrderLocal(id),

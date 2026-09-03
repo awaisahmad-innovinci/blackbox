@@ -1,6 +1,7 @@
 import {
   nextPoNumber,
   nextReceiptNumber,
+  nextSkuCodeForProduct,
   nextVendorCode,
 } from "@blackbox/shared";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
@@ -53,6 +54,20 @@ async function existingReceiptNumbers(): Promise<string[]> {
   }
   const remote = await goodsReceiptsApi.list({ pageSize: 500 });
   return remote.items.map((r) => r.receiptNumber);
+}
+
+async function existingSkuCodes(): Promise<string[]> {
+  try {
+    const local = await window.blackbox?.localDb?.listSkuCodes?.();
+    if (local != null) return local;
+  } catch {
+    /* fall through */
+  }
+  return [];
+}
+
+export async function allocateSkuCode(productName: string): Promise<string> {
+  return nextSkuCodeForProduct(productName, await existingSkuCodes());
 }
 
 export async function allocateVendorCode(tenantName: string): Promise<string> {

@@ -26,7 +26,7 @@ import {
 } from "@renderer/lib/local-db/local-write";
 import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 function toProductSkuRow(
@@ -89,6 +89,7 @@ export function SkuProfilePage() {
     kind: "barcode",
     layer: "dialog",
     enabled: editOpen,
+    inputRef: barcodeRef,
     onScan: (code) => {
       setBarcode(code);
       requestAnimationFrame(() => {
@@ -551,7 +552,7 @@ export function SkuProfilePage() {
               <Label>Barcode</Label>
               <Input
                 ref={barcodeRef}
-                data-barcode-scan=""
+                {...barcodeScanInputProps()}
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="Scan or type barcode"

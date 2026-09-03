@@ -6,7 +6,6 @@ import type {
   SkuBarcodeLookupResult,
   UnitListItem,
 } from "@blackbox/shared";
-import { nextSkuCodeForProduct } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -19,9 +18,10 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
-import { loadUnits, lookupSkuByBarcode } from "@renderer/lib/local-db/entity-source";
+import { allocateSkuCode } from "@renderer/lib/document-numbers";
+import { loadUnits, lookupSkuByBarcode, lookupSkuByCode } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 const emptyForm = {
@@ -80,14 +80,12 @@ export function AddProductSkuDialog({
   open,
   productId,
   productName,
-  existingSkuCodes,
   onClose,
   onCreated,
 }: {
   open: boolean;
   productId: string;
   productName: string;
-  existingSkuCodes: string[];
   onClose: () => void;
   onCreated: (row: ProductSkuDetail, cacheWarning: boolean) => void;
 }) {
@@ -111,16 +109,16 @@ export function AddProductSkuDialog({
 
   useEffect(() => {
     if (!open) return;
-    setForm({
-      ...emptyForm,
-      sku: nextSkuCodeForProduct(productName, existingSkuCodes),
-    });
+    setForm(emptyForm);
     setError(null);
     setDuplicateLookup(null);
     setDuplicateMessage(null);
     setAttempted(false);
+    void allocateSkuCode(productName).then((code) => {
+      setForm((prev) => ({ ...prev, sku: code }));
+    });
     void loadUnits().then(setUnits).catch(() => undefined);
-  }, [open, productName, existingSkuCodes]);
+  }, [open, productName]);
 
   async function applyBarcode(
     code: string,
@@ -164,6 +162,7 @@ export function AddProductSkuDialog({
     kind: "barcode",
     layer: "dialog",
     enabled: open,
+    inputRef: barcodeRef,
     onScan: (code) => {
       const trimmed = code.trim();
       barcodeValueRef.current = trimmed;
@@ -177,14 +176,14 @@ export function AddProductSkuDialog({
   });
 
   function reset() {
-    setForm({
-      ...emptyForm,
-      sku: nextSkuCodeForProduct(productName, existingSkuCodes),
-    });
+    setForm(emptyForm);
     setError(null);
     setDuplicateLookup(null);
     setDuplicateMessage(null);
     setAttempted(false);
+    void allocateSkuCode(productName).then((code) => {
+      setForm((prev) => ({ ...prev, sku: code }));
+    });
   }
 
   function setField<K extends keyof typeof emptyForm>(
@@ -295,6 +294,22 @@ export function AddProductSkuDialog({
     let row: ProductSkuDetail;
     try {
       if (await isDeviceBound()) {
+        let skuCode = form.sku.trim();
+        const skuDup = await lookupSkuByCode(skuCode);
+        if (skuDup) {
+          skuCode = await allocateSkuCode(productName);
+          const stillDup = await lookupSkuByCode(skuCode);
+          if (stillDup) {
+            setSaving(false);
+            setError(
+              `SKU code ${skuCode} already exists on ${stillDup.productName}.`,
+            );
+            return;
+          }
+          body.sku = skuCode;
+          setForm((prev) => ({ ...prev, sku: skuCode }));
+        }
+
         const localId = crypto.randomUUID();
         const baseUnit = units.find((u) => u.id === body.baseUnitId);
         const purchaseUnit = units.find((u) => u.id === body.purchaseUnitId);
@@ -302,7 +317,7 @@ export function AddProductSkuDialog({
           id: localId,
           productId,
           variantName: body.variantName,
-          sku: body.sku ?? "",
+          sku: skuCode,
           barcode: body.barcode ?? null,
           sizeValue: body.sizeValue ?? null,
           sizeUnit: body.sizeUnit ?? null,
@@ -397,7 +412,7 @@ export function AddProductSkuDialog({
             <Label>Barcode</Label>
             <Input
               ref={barcodeRef}
-              data-barcode-scan=""
+              {...barcodeScanInputProps()}
               value={form.barcode}
               onChange={(e) => {
                 setField("barcode", e.target.value);

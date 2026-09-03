@@ -13,7 +13,7 @@ import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import {
@@ -137,6 +137,7 @@ export function VendorReturnFormPage() {
   useBarcodeScanTarget({
     kind: "barcode",
     enabled: Boolean(vendorId && warehouseId && !itemOpen && !success),
+    inputRef: barcodeRef,
     onScan: setBarcode,
     onComplete: (code) => {
       void addSkuFromBarcode(code);
@@ -455,7 +456,6 @@ export function VendorReturnFormPage() {
                       <Input
                         className="h-8 w-20"
                         data-sku-qty={line.productSkuId}
-                        data-no-barcode-scan=""
                         value={String(line.quantity)}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => {
@@ -501,8 +501,8 @@ export function VendorReturnFormPage() {
                   <td className="px-3 py-2" colSpan={3}>
                     <Input
                       ref={barcodeRef}
+                      {...barcodeScanInputProps()}
                       className="h-8"
-                      data-barcode-scan=""
                       value={barcode}
                       placeholder="Scan barcode to add item"
                       onChange={(e) => setBarcode(e.target.value)}

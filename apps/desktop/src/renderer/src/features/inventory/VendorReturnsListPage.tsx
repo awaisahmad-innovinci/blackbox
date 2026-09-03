@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type {
   VendorListItem,
@@ -11,7 +11,7 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { loadVendorReturns, loadVendors } from "@renderer/lib/local-db/entity-source";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -30,10 +30,12 @@ export function VendorReturnsListPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
 
@@ -138,7 +140,8 @@ export function VendorReturnsListPage() {
         <div className="space-y-1.5">
           <Label>Search</Label>
           <Input
-            data-barcode-scan=""
+            ref={searchRef}
+            {...barcodeScanInputProps()}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Return # or vendor"

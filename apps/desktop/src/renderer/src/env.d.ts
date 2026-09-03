@@ -119,6 +119,7 @@ declare global {
           query?: GoodsReceiptListQuery,
         ) => Promise<PaginatedGoodsReceipts>;
         listPoNumbers: () => Promise<string[]>;
+        listSkuCodes: () => Promise<string[]>;
         listReceiptNumbers: () => Promise<string[]>;
         getDashboardSummary: () => Promise<DashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
@@ -175,6 +176,9 @@ declare global {
         ) => Promise<SkuSearchResult | null>;
         lookupSkuByBarcode: (
           barcode: string,
+        ) => Promise<SkuBarcodeLookupResult | null>;
+        lookupSkuByCode: (
+          sku: string,
         ) => Promise<SkuBarcodeLookupResult | null>;
         getPurchaseOrder: (id: string) => Promise<PurchaseOrderDetail | null>;
         getReceivingDraft: (poId: string) => Promise<ReceivingDraft | null>;
