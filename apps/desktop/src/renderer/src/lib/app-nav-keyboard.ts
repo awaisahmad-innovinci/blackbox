@@ -77,6 +77,10 @@ export const GLOBAL_TAXONOMY_SHORTCUTS = [
   { kind: "vendor_group", shortcut: "g" },
 ] as const satisfies ReadonlyArray<{ kind: TaxonomyKind; shortcut: string }>;
 
+export const GLOBAL_NAV_SHORTCUTS = [
+  { shortcut: "r", to: "/inventory/returns/new" },
+] as const;
+
 export function matchAppNavShortcut(
   event: KeyboardEvent,
 ): AppNavSectionId | null {
@@ -113,6 +117,19 @@ export function matchGlobalTaxonomyShortcut(
 
   event.preventDefault();
   return match.kind;
+}
+
+export function matchGlobalNavShortcut(event: KeyboardEvent): string | null {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return null;
+  }
+
+  const key = event.key.toLowerCase();
+  const match = GLOBAL_NAV_SHORTCUTS.find((s) => s.shortcut === key);
+  if (!match) return null;
+
+  event.preventDefault();
+  return match.to;
 }
 
 export function parseNavMenuDigit(key: string): number | null {
