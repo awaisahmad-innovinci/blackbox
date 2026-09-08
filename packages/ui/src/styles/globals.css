@@ -153,4 +153,9 @@
   :focus-visible {
     @apply outline-none;
   }
+
+  select:focus-visible,
+  textarea:not([data-slot="textarea"]):focus-visible {
+    @apply border-ring ring-[3px] ring-ring/50 outline-none;
+  }
 }

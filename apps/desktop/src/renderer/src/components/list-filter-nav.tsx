@@ -6,7 +6,7 @@ import {
 } from "@blackbox/ui/lib/form-keyboard";
 
 export const FILTER_SELECT_CLASS =
-  "border-input bg-background h-9 rounded-md border px-3 text-sm";
+  "border-input bg-background h-9 rounded-md border px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 export function filterSelectProps(): {
   "data-enter-picker": "";

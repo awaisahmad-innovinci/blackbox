@@ -147,12 +147,22 @@ export const BarcodeAssignRow = forwardRef<
     checking?: boolean;
     onApply: (code: string) => void | Promise<void>;
     layer?: BarcodeScanLayer;
+    buttonLabel?: "default" | "short";
   }
 >(function BarcodeAssignRow(
-  { value, checking = false, onApply, layer = "dialog" },
+  { value, checking = false, onApply, layer = "dialog", buttonLabel = "default" },
   ref,
 ) {
   const [scanOpen, setScanOpen] = useState(false);
+  const hasBarcode = Boolean(value.trim());
+  const actionLabel =
+    buttonLabel === "short"
+      ? hasBarcode
+        ? "Change"
+        : "Scan"
+      : hasBarcode
+        ? "Change barcode"
+        : "Scan barcode";
 
   useImperativeHandle(ref, () => ({
     openScan: () => setScanOpen(true),
@@ -161,18 +171,19 @@ export const BarcodeAssignRow = forwardRef<
   return (
     <div className="space-y-1.5">
       <Label>Barcode</Label>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium tabular-nums">
+      <div className="flex items-center gap-2">
+        <div className="border-input bg-background flex h-9 min-w-0 flex-1 basis-0 items-center truncate rounded-md border px-3 text-sm font-medium tabular-nums">
           {value.trim() || "—"}
-        </span>
+        </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="h-9 shrink-0 whitespace-nowrap"
           disabled={checking}
           onClick={() => setScanOpen(true)}
         >
-          {value.trim() ? "Change barcode" : "Scan barcode"}
+          {actionLabel}
         </Button>
       </div>
       {checking ? (

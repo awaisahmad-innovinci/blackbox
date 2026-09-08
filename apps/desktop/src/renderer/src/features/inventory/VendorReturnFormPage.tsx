@@ -26,10 +26,6 @@ import {
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
-import {
-  ListTableFocusable,
-  ListTableRow,
-} from "@renderer/components/list-table-row";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -440,7 +436,7 @@ export function VendorReturnFormPage() {
             </Button>
           </div>
         </div>
-        <div className="border-border overflow-x-auto rounded-lg border">
+        <FormEnterNav className="border-border overflow-x-auto rounded-lg border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
@@ -465,7 +461,7 @@ export function VendorReturnFormPage() {
                 </tr>
               ) : null}
               {lines.map((line) => (
-                <ListTableRow key={line.productSkuId}>
+                <tr key={line.productSkuId} className="border-border border-t">
                   <td className="px-3 py-2">
                     {line.productName}
                     <div className="text-muted-foreground text-xs">
@@ -474,43 +470,39 @@ export function VendorReturnFormPage() {
                   </td>
                   <td className="px-3 py-2">{line.sku}</td>
                   <td className="px-3 py-2">
-                    <ListTableFocusable>
-                      <select
-                        className="border-input bg-background h-8 min-w-[7rem] rounded-md border px-2 text-sm"
-                        {...formSelectPickerProps()}
-                        value={line.reason}
-                        onChange={(e) =>
-                          updateLine(line.productSkuId, {
-                            reason: e.target.value as VendorReturnReason,
-                          })
-                        }
-                      >
-                        {VENDOR_RETURN_REASONS.map((r) => (
-                          <option key={r} value={r}>
-                            {VENDOR_RETURN_REASON_LABELS[r]}
-                          </option>
-                        ))}
-                      </select>
-                    </ListTableFocusable>
+                    <select
+                      className="border-input bg-background h-8 min-w-[7rem] rounded-md border px-2 text-sm"
+                      {...formSelectPickerProps()}
+                      value={line.reason}
+                      onChange={(e) =>
+                        updateLine(line.productSkuId, {
+                          reason: e.target.value as VendorReturnReason,
+                        })
+                      }
+                    >
+                      {VENDOR_RETURN_REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {VENDOR_RETURN_REASON_LABELS[r]}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
-                      <ListTableFocusable>
-                        <Input
-                          className="h-8 w-20"
-                          data-sku-qty={line.productSkuId}
-                          value={String(line.quantity)}
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) => {
-                            const quantity = Number(e.target.value);
-                            updateLine(line.productSkuId, {
-                              quantity: Number.isNaN(quantity)
-                                ? line.quantity
-                                : quantity,
-                            });
-                          }}
-                        />
-                      </ListTableFocusable>
+                      <Input
+                        className="h-8 w-20"
+                        data-sku-qty={line.productSkuId}
+                        value={String(line.quantity)}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const quantity = Number(e.target.value);
+                          updateLine(line.productSkuId, {
+                            quantity: Number.isNaN(quantity)
+                              ? line.quantity
+                              : quantity,
+                          });
+                        }}
+                      />
                       <span className="text-muted-foreground text-xs whitespace-nowrap">
                         {line.purchaseUnitName || ""}
                       </span>
@@ -527,7 +519,6 @@ export function VendorReturnFormPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      tabIndex={-1}
                       onClick={() =>
                         setLines((prev) =>
                           prev.filter(
@@ -539,11 +530,11 @@ export function VendorReturnFormPage() {
                       Remove
                     </Button>
                   </td>
-                </ListTableRow>
+                </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </FormEnterNav>
       </section>
 
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">

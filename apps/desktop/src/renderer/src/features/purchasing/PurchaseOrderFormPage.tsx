@@ -333,7 +333,10 @@ export function PurchaseOrderFormPage() {
         });
         void syncNow();
         setSaving(false);
-        navigate(`/purchase-orders/${localId}`, { state: { po: saved } });
+        navigate(`/purchase-orders/${localId}`, {
+          state: { po: saved },
+          replace: true,
+        });
         return;
       }
       saved = isEdit
@@ -351,7 +354,10 @@ export function PurchaseOrderFormPage() {
       /* optional cache */
     }
     setSaving(false);
-    navigate(`/purchase-orders/${saved.id}`, { state: { po: saved } });
+    navigate(`/purchase-orders/${saved.id}`, {
+      state: { po: saved },
+      replace: true,
+    });
   }
 
   usePageKeyboard({

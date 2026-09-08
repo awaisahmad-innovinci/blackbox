@@ -8,7 +8,8 @@ import type {
   SkuSupplier,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { FORM_FIELD_FULL, FORM_GRID_TIGHT } from "@renderer/lib/form-layout";
+import { BackButton } from "@renderer/app/BackButton";
+import { FORM_FIELD_FULL, FORM_GRID_TWO_COL } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -473,9 +474,7 @@ export function SkuProfilePage() {
               Activate
             </Button>
           )}
-          <Button variant="ghost" onClick={() => navigate(-1)}>
-            Back
-          </Button>
+          <BackButton to="/products" />
         </div>
       </div>
 
@@ -684,7 +683,7 @@ export function SkuProfilePage() {
               {formError}
             </div>
           ) : null}
-          <div className={FORM_GRID_TIGHT}>
+          <div className={FORM_GRID_TWO_COL}>
             <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
               <Label>Variant</Label>
               <Input

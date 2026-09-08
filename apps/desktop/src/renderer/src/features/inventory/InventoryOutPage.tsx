@@ -27,10 +27,6 @@ import {
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
-import {
-  ListTableFocusable,
-  ListTableRow,
-} from "@renderer/components/list-table-row";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
@@ -496,7 +492,7 @@ export function InventoryOutPage() {
           </div>
         </div>
 
-        <div className="border-border overflow-x-auto rounded-lg border">
+        <FormEnterNav className="border-border overflow-x-auto rounded-lg border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr>
@@ -513,7 +509,7 @@ export function InventoryOutPage() {
             </thead>
             <tbody>
               {lines.map((line) => (
-                <ListTableRow key={line.productSkuId}>
+                <tr key={line.productSkuId} className="border-border border-t">
                   <td className="px-4 py-3 tabular-nums">
                     {line.barcode || "—"}
                   </td>
@@ -528,27 +524,26 @@ export function InventoryOutPage() {
                   <td className="px-4 py-3 tabular-nums">{unitPrice(line)}</td>
                   <td className="px-4 py-3">
                     {line.unitsPerPurchaseUnit > 1 ? (
-                      <ListTableFocusable>
-                        <select
-                          className="border-input bg-background h-8 rounded-md border px-2 text-sm"
-                          value={line.sellUnit}
-                          onChange={(e) => {
-                            const sellUnit = e.target.value as SellUnit;
-                            setLines((prev) =>
-                              prev.map((l) =>
-                                l.productSkuId === line.productSkuId
-                                  ? { ...l, sellUnit, lastScanMultiplier: undefined }
-                                  : l,
-                              ),
-                            );
-                          }}
-                        >
-                          <option value="pc">{line.baseUnitName ?? "pc"}</option>
-                          <option value="box">
-                            {line.purchaseUnitName ?? "box"}
-                          </option>
-                        </select>
-                      </ListTableFocusable>
+                      <select
+                        className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                        {...formSelectPickerProps()}
+                        value={line.sellUnit}
+                        onChange={(e) => {
+                          const sellUnit = e.target.value as SellUnit;
+                          setLines((prev) =>
+                            prev.map((l) =>
+                              l.productSkuId === line.productSkuId
+                                ? { ...l, sellUnit, lastScanMultiplier: undefined }
+                                : l,
+                            ),
+                          );
+                        }}
+                      >
+                        <option value="pc">{line.baseUnitName ?? "pc"}</option>
+                        <option value="box">
+                          {line.purchaseUnitName ?? "box"}
+                        </option>
+                      </select>
                     ) : (
                       <span className="text-muted-foreground">
                         {line.baseUnitName ?? "pc"}
@@ -556,41 +551,39 @@ export function InventoryOutPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <ListTableFocusable>
-                      <Input
-                        className="h-8 w-24"
-                        value={String(
+                    <Input
+                      className="h-8 w-24"
+                      value={String(
+                        line.sellUnit === "box" && line.unitsPerPurchaseUnit > 1
+                          ? round4(line.quantity / line.unitsPerPurchaseUnit)
+                          : line.quantity,
+                      )}
+                      aria-invalid={
+                        line.quantity <= 0 ||
+                        line.quantity > line.quantityAvailable
+                      }
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        const baseQty =
                           line.sellUnit === "box" && line.unitsPerPurchaseUnit > 1
-                            ? round4(line.quantity / line.unitsPerPurchaseUnit)
-                            : line.quantity,
-                        )}
-                        aria-invalid={
-                          line.quantity <= 0 ||
-                          line.quantity > line.quantityAvailable
-                        }
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          const baseQty =
-                            line.sellUnit === "box" && line.unitsPerPurchaseUnit > 1
-                              ? round4(n * line.unitsPerPurchaseUnit)
-                              : Number.isNaN(n)
-                                ? 0
-                                : n;
-                          setLines((prev) =>
-                            prev.map((l) =>
-                              l.productSkuId === line.productSkuId
-                                ? {
-                                    ...l,
-                                    quantity: baseQty,
-                                    lastScanMultiplier: undefined,
-                                  }
-                                : l,
-                            ),
-                          );
-                        }}
-                      />
-                    </ListTableFocusable>
+                            ? round4(n * line.unitsPerPurchaseUnit)
+                            : Number.isNaN(n)
+                              ? 0
+                              : n;
+                        setLines((prev) =>
+                          prev.map((l) =>
+                            l.productSkuId === line.productSkuId
+                              ? {
+                                  ...l,
+                                  quantity: baseQty,
+                                  lastScanMultiplier: undefined,
+                                }
+                              : l,
+                          ),
+                        );
+                      }}
+                    />
                     {quantityHint(line) ? (
                       <p className="text-muted-foreground mt-1 text-xs">
                         {quantityHint(line)}
@@ -610,7 +603,6 @@ export function InventoryOutPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      tabIndex={-1}
                       onClick={() =>
                         setLines((prev) =>
                           prev.filter(
@@ -622,11 +614,11 @@ export function InventoryOutPage() {
                       Remove
                     </Button>
                   </td>
-                </ListTableRow>
+                </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </FormEnterNav>
 
         <section className="ml-auto grid max-w-sm gap-2 text-sm">
           <div className="flex justify-between gap-6">
