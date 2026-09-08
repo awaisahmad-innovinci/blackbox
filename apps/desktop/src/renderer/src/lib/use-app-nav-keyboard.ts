@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import {
   APP_NAV_SECTIONS,
   matchAppNavShortcut,
+  matchGlobalNavShortcut,
   matchGlobalTaxonomyShortcut,
   matchNavDropdownItem,
   type NavDropdownId,
@@ -73,6 +74,13 @@ export function useAppNavKeyboard({
       const taxonomyKind = matchGlobalTaxonomyShortcut(event);
       if (taxonomyKind) {
         onGlobalTaxonomyShortcut?.(taxonomyKind);
+        return;
+      }
+
+      const navTo = matchGlobalNavShortcut(event);
+      if (navTo) {
+        setOpenNavDropdown(null);
+        navigate(navTo);
         return;
       }
 
