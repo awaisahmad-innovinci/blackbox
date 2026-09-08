@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type {
   VendorListItem,
   VendorReturnListItem,
@@ -8,8 +8,17 @@ import type {
 import { VENDOR_RETURN_STATUSES } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
-import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
+import {
+  KEYBOARD_HINT_LIST_ROWS,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import {
+  FILTER_SELECT_CLASS,
+  filterSelectProps,
+  ListFilterNav,
+} from "@renderer/components/list-filter-nav";
 import { loadVendorReturns, loadVendors } from "@renderer/lib/local-db/entity-source";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
@@ -38,6 +47,10 @@ export function VendorReturnsListPage() {
     inputRef: searchRef,
     onScan: setSearch,
   });
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     void loadVendors({ status: "active", pageSize: 100 })
@@ -104,50 +117,44 @@ export function VendorReturnsListPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label>Vendor</Label>
-          <select
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={vendorId}
-            onChange={(e) => setVendorId(e.target.value)}
-          >
-            <option value="">All vendors</option>
-            {vendors.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Status</Label>
-          <select
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={status}
-            onChange={(e) =>
-              setStatus(e.target.value as VendorReturnStatus | "")
-            }
-          >
-            <option value="">All</option>
-            {VENDOR_RETURN_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Search</Label>
-          <Input
-            ref={searchRef}
-            {...barcodeScanInputProps()}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Return # or vendor"
-          />
-        </div>
-      </section>
+      <ListFilterNav>
+        <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
+          className="max-w-xs"
+          placeholder="Return # or vendor"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
+          value={vendorId}
+          onChange={(e) => setVendorId(e.target.value)}
+        >
+          <option value="">All vendors</option>
+          {vendors.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
+          value={status}
+          onChange={(e) =>
+            setStatus(e.target.value as VendorReturnStatus | "")
+          }
+        >
+          <option value="">All</option>
+          {VENDOR_RETURN_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </ListFilterNav>
 
       <div className="border-border overflow-hidden rounded-lg border">
         <table className="w-full text-left text-sm">
@@ -177,14 +184,17 @@ export function VendorReturnsListPage() {
               </tr>
             ) : (
               items.map((row) => (
-                <tr key={row.id} className="border-border border-t">
+                <ListTableRow
+                  key={row.id}
+                  onActivate={() => navigate(`/inventory/returns/${row.id}`)}
+                >
                   <td className="px-4 py-3">
-                    <Link
+                    <ListTableLink
                       to={`/inventory/returns/${row.id}`}
                       className="text-primary font-medium hover:underline"
                     >
                       {row.returnNumber}
-                    </Link>
+                    </ListTableLink>
                   </td>
                   <td className="px-4 py-3">{row.vendorName}</td>
                   <td className="px-4 py-3">{row.warehouseName}</td>
@@ -194,7 +204,7 @@ export function VendorReturnsListPage() {
                     {row.total.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 tabular-nums">{row.itemCount}</td>
-                </tr>
+                </ListTableRow>
               ))
             )}
           </tbody>
@@ -211,6 +221,7 @@ export function VendorReturnsListPage() {
           setPage(1);
         }}
       />
+      <KeyboardHints hints={[KEYBOARD_HINT_LIST_ROWS]} />
     </div>
   );
 }

@@ -70,6 +70,40 @@ export class GoodsReceipt {
   otherCharges!: string;
 
   @Column({
+    name: "adv_tax",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  advTax!: string;
+
+  @Column({
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  gst!: string;
+
+  @Column({
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  incentive!: string;
+
+  @Column({
+    name: "shelf_rent",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  shelfRent!: string;
+
+  @Column({
     name: "return_credit",
     type: "numeric",
     precision: 14,

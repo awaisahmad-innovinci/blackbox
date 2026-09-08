@@ -8,12 +8,14 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
     db.prepare(
       `insert into goods_receipts (
         id, tenant_id, receipt_number, purchase_order_id, vendor_id, warehouse_id,
-        status, received_at, voucher_number, subtotal, discount, tax, other_charges,
-        return_credit, total, notes, created_at, updated_at, sync_status, server_updated_at
+        status, received_at, voucher_number, subtotal, discount, tax, adv_tax, gst,
+        incentive, shelf_rent, other_charges, return_credit, total, notes,
+        created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @receiptNumber, @purchaseOrderId, @vendorId, @warehouseId,
-        @status, @receivedAt, @voucherNumber, @subtotal, @discount, @tax, @otherCharges,
-        @returnCredit, @total, @notes, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+        @status, @receivedAt, @voucherNumber, @subtotal, @discount, @tax, @advTax, @gst,
+        @incentive, @shelfRent, @otherCharges, @returnCredit, @total, @notes,
+        @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )
       on conflict(id) do update set
         receipt_number = excluded.receipt_number,
@@ -26,6 +28,10 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
         subtotal = excluded.subtotal,
         discount = excluded.discount,
         tax = excluded.tax,
+        adv_tax = excluded.adv_tax,
+        gst = excluded.gst,
+        incentive = excluded.incentive,
+        shelf_rent = excluded.shelf_rent,
         other_charges = excluded.other_charges,
         return_credit = excluded.return_credit,
         total = excluded.total,
@@ -45,11 +51,15 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       voucherNumber: detail.voucherNumber,
       subtotal: detail.subtotal,
       discount: detail.discount,
-      tax: detail.tax,
-      otherCharges: detail.otherCharges,
+      tax: detail.saleTax,
+      advTax: detail.advTax,
+      gst: detail.gst,
+      incentive: detail.incentive,
+      shelfRent: detail.shelfRent,
+      otherCharges: 0,
       returnCredit: detail.returnCredit ?? 0,
       total: detail.total,
-      notes: detail.notes,
+      notes: "",
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
       serverUpdatedAt: detail.updatedAt,

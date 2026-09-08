@@ -1,7 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Brand, Category, EntityStatus, ProductType } from "@blackbox/shared";
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS } from "@blackbox/shared";
+import {
+  normalizeOptionalStoredText,
+  normalizeStoredText,
+} from "@blackbox/shared";
+import { FORM_FIELD_FULL, FORM_GRID } from "@renderer/lib/form-layout";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -15,6 +24,14 @@ import {
 } from "@renderer/lib/local-db/entity-source";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import {
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_SAVE,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
+import type { TaxonomyKind } from "@renderer/features/taxonomy/create-taxonomy";
 
 export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +49,28 @@ export function ProductFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
+  const [createTaxonomyKind, setCreateTaxonomyKind] =
+    useState<TaxonomyKind | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function onTaxonomyCreated(row: Brand | Category) {
+    if (createTaxonomyKind === "brand") {
+      setBrands((prev) =>
+        prev.some((b) => b.id === row.id) ? prev : [...prev, row as Brand],
+      );
+      setBrandId(row.id);
+    } else if (createTaxonomyKind === "category") {
+      setCategories((prev) =>
+        prev.some((c) => c.id === row.id) ? prev : [...prev, row as Category],
+      );
+      setCategoryId(row.id);
+    }
+    setCreateTaxonomyKind(null);
+  }
+
+  usePageKeyboard({
+    onSave: () => formRef.current?.requestSubmit(),
+  });
 
   useEffect(() => {
     void loadBrands("active")
@@ -86,12 +125,14 @@ export function ProductFormPage() {
     setSaving(true);
     setError(null);
 
+    const normalizedName = normalizeStoredText(name);
+    const normalizedDescription = normalizeOptionalStoredText(description);
     const body = {
-      name: name.trim(),
+      name: normalizedName,
       brandId,
       categoryId,
       productType,
-      description: description.trim(),
+      description: normalizedDescription,
       status,
     };
 
@@ -100,14 +141,14 @@ export function ProductFormPage() {
         const localId = isEdit && id ? id : crypto.randomUUID();
         const local = {
           id: localId,
-          name: name.trim(),
+          name: normalizedName,
           productCode: isEdit ? "" : `LOCAL-${localId.slice(0, 8)}`,
           brandId,
           brandName: brands.find((b) => b.id === brandId)?.name ?? "",
           categoryId,
           categoryName: categories.find((c) => c.id === categoryId)?.name ?? "",
           productType,
-          description: description.trim(),
+          description: normalizedDescription,
           imagePath: null,
           status,
           totalOnHand: 0,
@@ -143,14 +184,14 @@ export function ProductFormPage() {
         const localId = crypto.randomUUID();
         const local = {
           id: localId,
-          name: name.trim(),
+          name: normalizedName,
           productCode: `LOCAL-${localId.slice(0, 8)}`,
           brandId,
           brandName: "",
           categoryId,
           categoryName: "",
           productType,
-          description: description.trim(),
+          description: normalizedDescription,
           imagePath: null,
           status,
           totalOnHand: 0,
@@ -202,7 +243,7 @@ export function ProductFormPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {isEdit ? "Edit Product" : "Add Product"}
@@ -221,14 +262,15 @@ export function ProductFormPage() {
         </div>
       ) : null}
 
-      <form onSubmit={onSubmit} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
+      <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
+        <FormEnterNav className={FORM_GRID}>
+          <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
             <Label htmlFor="name">Name *</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={(e) => setName(normalizeStoredText(e.target.value))}
               required
             />
           </div>
@@ -237,6 +279,7 @@ export function ProductFormPage() {
             <select
               id="type"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={productType}
               onChange={(e) => setProductType(e.target.value as ProductType)}
             >
@@ -252,6 +295,7 @@ export function ProductFormPage() {
             <select
               id="status"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={status}
               onChange={(e) => setStatus(e.target.value as EntityStatus)}
             >
@@ -260,10 +304,22 @@ export function ProductFormPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="brand">Brand *</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="brand">Brand *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => setCreateTaxonomyKind("brand")}
+              >
+                + New brand
+              </Button>
+            </div>
             <select
               id="brand"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={brandId}
               onChange={(e) => setBrandId(e.target.value)}
               required
@@ -277,10 +333,22 @@ export function ProductFormPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="category">Category *</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="category">Category *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => setCreateTaxonomyKind("category")}
+              >
+                + New category
+              </Button>
+            </div>
             <select
               id="category"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               required
@@ -299,10 +367,13 @@ export function ProductFormPage() {
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onBlur={(e) =>
+                setDescription(normalizeOptionalStoredText(e.target.value))
+              }
               rows={3}
             />
           </div>
-        </div>
+        </FormEnterNav>
 
         <div className="flex gap-3">
           <Button type="submit" disabled={saving}>
@@ -317,6 +388,17 @@ export function ProductFormPage() {
           </Button>
         </div>
       </form>
+
+      <KeyboardHints hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SAVE]} />
+
+      {createTaxonomyKind ? (
+        <AddTaxonomyDialog
+          open
+          kind={createTaxonomyKind}
+          onClose={() => setCreateTaxonomyKind(null)}
+          onCreated={onTaxonomyCreated}
+        />
+      ) : null}
     </div>
   );
 }

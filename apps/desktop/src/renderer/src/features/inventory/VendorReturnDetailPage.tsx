@@ -6,6 +6,7 @@ import {
   VENDOR_RETURN_SETTLEMENT_LABELS,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { ListTableRow } from "@renderer/components/list-table-row";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -91,10 +92,6 @@ export function VendorReturnDetailPage() {
             <dt className="text-muted-foreground">Return date</dt>
             <dd className="font-medium">{detail.returnDate}</dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="text-muted-foreground">Notes</dt>
-            <dd className="font-medium">{detail.notes || "—"}</dd>
-          </div>
         </dl>
       </section>
 
@@ -115,7 +112,7 @@ export function VendorReturnDetailPage() {
             </thead>
             <tbody>
               {detail.items.map((item) => (
-                <tr key={item.id} className="border-border border-t">
+                <ListTableRow key={item.id}>
                   <td className="px-4 py-3">
                     {item.productName}
                     <div className="text-muted-foreground text-xs">
@@ -145,7 +142,7 @@ export function VendorReturnDetailPage() {
                       </div>
                     ) : null}
                   </td>
-                </tr>
+                </ListTableRow>
               ))}
             </tbody>
           </table>

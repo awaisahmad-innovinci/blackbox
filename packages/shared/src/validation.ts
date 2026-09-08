@@ -84,3 +84,13 @@ export function livePasswordError(value: string): string | null {
   if (value.length < 8) return "Password must be at least 8 characters";
   return null;
 }
+
+/** Trim and uppercase inventory name/description fields for storage. */
+export function normalizeStoredText(value: string): string {
+  return value.trim().toLocaleUpperCase("en-US");
+}
+
+export function normalizeOptionalStoredText(value: string | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  return trimmed ? normalizeStoredText(trimmed) : "";
+}

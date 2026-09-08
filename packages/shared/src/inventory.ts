@@ -290,9 +290,72 @@ export interface SkuSearchResult {
   quantityAvailable?: number;
   /** Present when search includes warehouseId. */
   costPrice?: number;
+  /** Present when resolved via barcode scan. */
+  scannedQuantityMultiplier?: number;
+  unitsPerPurchaseUnit?: number;
+  baseUnitName?: string | null;
+  purchaseUnitName?: string | null;
+  sellingPrice?: number;
+  sellingPricePerPurchaseUnit?: number | null;
 }
 
 /** Tenant-wide barcode lookup for duplicate detection (any SKU/product status). */
+export interface SkuBarcode {
+  id: string;
+  productSkuId: string;
+  barcode: string;
+  status: EntityStatus;
+  quantityMultiplier: number;
+}
+
+export interface CreateSkuBarcodeRequest {
+  barcode: string;
+  quantityMultiplier?: number;
+}
+
+export type SellUnit = "pc" | "box";
+
+export function lineTotalForScan(input: {
+  quantityMultiplier: number;
+  unitsPerPurchaseUnit: number;
+  sellingPrice: number;
+  sellingPricePerPurchaseUnit: number | null;
+  quantity?: number;
+  sellUnit?: SellUnit;
+}): { baseQuantity: number; unitPrice: number; lineTotal: number } {
+  const multiplier = input.quantityMultiplier > 0 ? input.quantityMultiplier : 1;
+  const unitsPerBox =
+    input.unitsPerPurchaseUnit > 0 ? input.unitsPerPurchaseUnit : 1;
+  const sellUnit = input.sellUnit ?? (multiplier > 1 ? "box" : "pc");
+  const count =
+    input.quantity != null && input.quantity > 0 ? input.quantity : multiplier;
+
+  if (sellUnit === "box" && unitsPerBox > 1) {
+    const boxCount =
+      multiplier >= unitsPerBox ? count / unitsPerBox : count / multiplier;
+    const baseQuantity = round4(boxCount * unitsPerBox);
+    const unitPrice =
+      input.sellingPricePerPurchaseUnit ??
+      round4(input.sellingPrice * unitsPerBox);
+    return {
+      baseQuantity,
+      unitPrice,
+      lineTotal: round4(boxCount * unitPrice),
+    };
+  }
+
+  const baseQuantity = round4(count);
+  return {
+    baseQuantity,
+    unitPrice: input.sellingPrice,
+    lineTotal: round4(baseQuantity * input.sellingPrice),
+  };
+}
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
 export interface SkuBarcodeLookupResult {
   id: string;
   productId: string;
@@ -310,11 +373,14 @@ export interface SkuBarcodeLookupResult {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   sellingPrice: number;
+  sellingPricePerPurchaseUnit: number | null;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
   trackInventory: boolean;
   status: EntityStatus;
+  /** Present when resolved via barcode scan. */
+  scannedQuantityMultiplier?: number;
 }
 
 export interface SkuDetail {
@@ -325,6 +391,7 @@ export interface SkuDetail {
   variantName: string;
   sku: string;
   barcode: string | null;
+  barcodes: SkuBarcode[];
   sizeValue: string | null;
   sizeUnit: string | null;
   baseUnitId: string | null;
@@ -334,6 +401,7 @@ export interface SkuDetail {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   sellingPrice: number;
+  sellingPricePerPurchaseUnit: number | null;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -467,6 +535,7 @@ export interface ProductSkuDetail {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   sellingPrice: number;
+  sellingPricePerPurchaseUnit: number | null;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -485,6 +554,7 @@ export interface CreateProductSkuRequest {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   sellingPrice: number;
+  sellingPricePerPurchaseUnit?: number | null;
   reorderLevel?: number;
   minimumStockLevel?: number;
   maximumStockLevel?: number | null;
@@ -513,6 +583,14 @@ export function nextSkuCode(
 
 export function roundMoney4(n: number): number {
   return Math.round(n * 10000) / 10000;
+}
+
+/** Markup on cost: cost 100 + margin 40% → 140 */
+export function sellingPriceFromCostMargin(
+  cost: number,
+  marginPercent: number,
+): number {
+  return roundMoney4(cost * (1 + marginPercent / 100));
 }
 
 /** Weighted average unit cost after a purchase receipt (base-unit qty and cost). */
@@ -560,8 +638,68 @@ export function netUnitAfterDiscounts(
 }
 
 /**
- * Landed purchase-unit cost: line % first, then voucher discount/tax/other
- * spread equally across every received purchase unit.
+ * Header charge additions spread into landed unit cost (taxes only).
+ * Vendor incentive is a credit — use goodsReceiptCostCredits().
+ */
+export function goodsReceiptCostCharges(charges: {
+  saleTax?: number;
+  advTax?: number;
+  gst?: number;
+  /** @deprecated legacy alias for saleTax */
+  tax?: number;
+}): number {
+  return roundMoney4(
+    Number(charges.saleTax ?? charges.tax ?? 0) +
+      Number(charges.advTax ?? 0) +
+      Number(charges.gst ?? 0),
+  );
+}
+
+/** Vendor credits that reduce landed unit cost and the bill total. */
+export function goodsReceiptCostCredits(credits: {
+  incentive?: number;
+}): number {
+  return roundMoney4(Number(credits.incentive ?? 0));
+}
+
+/** Voucher total; shelf rent and incentive reduce payable total. */
+export function goodsReceiptGrandTotal(input: {
+  subtotal: number;
+  discount: number;
+  saleTax?: number;
+  advTax?: number;
+  gst?: number;
+  incentive?: number;
+  shelfRent?: number;
+  returnCredit?: number;
+  /** @deprecated legacy */
+  tax?: number;
+}): number {
+  const saleTax = Number(input.saleTax ?? input.tax ?? 0);
+  const advTax = Number(input.advTax ?? 0);
+  const gst = Number(input.gst ?? 0);
+  const incentive = Number(input.incentive ?? 0);
+  const shelfRent = Number(input.shelfRent ?? 0);
+  const returnCredit = Number(input.returnCredit ?? 0);
+  return Math.max(
+    0,
+    roundMoney4(
+      input.subtotal -
+        input.discount +
+        saleTax +
+        advTax +
+        gst -
+        incentive -
+        shelfRent -
+        returnCredit,
+    ),
+  );
+}
+
+/**
+ * Landed purchase-unit cost: line % first, then header discount, taxes,
+ * and vendor incentive spread equally across every received purchase unit.
+ * Shelf rent is excluded — bill total only.
  */
 export function landedUnitByQuantity(
   qty: number,
@@ -569,8 +707,8 @@ export function landedUnitByQuantity(
   discountPercent: number,
   totalReceivedQty: number,
   headerDiscountAmount: number,
-  tax: number,
-  otherCharges: number,
+  costCharges: number,
+  costCredits = 0,
 ): number {
   const lineNet = lineTotalAfterDiscount(qty, unitCost, discountPercent);
   const lineUnit = qty > 0 ? lineNet / qty : 0;
@@ -580,9 +718,9 @@ export function landedUnitByQuantity(
       : 0;
   const perPiece =
     totalQty > 0
-      ? (Number(tax || 0) +
-          Number(otherCharges || 0) -
-          Number(headerDiscountAmount || 0)) /
+      ? (Number(costCharges || 0) -
+          Number(headerDiscountAmount || 0) -
+          Number(costCredits || 0)) /
         totalQty
       : 0;
   return Math.max(0, roundMoney4(lineUnit + perPiece));
@@ -790,7 +928,14 @@ export interface CreateGoodsReceiptRequest {
   voucherNumber?: string | null;
   notes?: string;
   discount?: number;
+  saleTax?: number;
+  advTax?: number;
+  gst?: number;
+  incentive?: number;
+  shelfRent?: number;
+  /** @deprecated use saleTax */
   tax?: number;
+  /** @deprecated ignored; always stored as 0 */
   otherCharges?: number;
   items: CreateGoodsReceiptItemRequest[];
   returnAdjustments?: GoodsReceiptReturnAdjustment[];
@@ -831,7 +976,14 @@ export interface GoodsReceiptDetail {
   voucherNumber: string | null;
   subtotal: number;
   discount: number;
+  saleTax: number;
+  advTax: number;
+  gst: number;
+  incentive: number;
+  shelfRent: number;
+  /** @deprecated use saleTax */
   tax: number;
+  /** @deprecated always 0 on new receipts */
   otherCharges: number;
   returnCredit: number;
   total: number;

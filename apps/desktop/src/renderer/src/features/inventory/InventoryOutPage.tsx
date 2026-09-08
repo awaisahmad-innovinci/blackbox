@@ -2,14 +2,36 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type {
   InventoryOutDetail,
+  SellUnit,
+  SkuSearchResult,
   WarehouseListItem,
 } from "@blackbox/shared";
+import { lineTotalForScan } from "@blackbox/shared";
+import { FORM_GRID } from "@renderer/lib/form-layout";
+import {
+  FormEnterNav,
+  formDatePickerProps,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { Textarea } from "@blackbox/ui/textarea";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
+import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
+import {
+  KEYBOARD_HINT_ADD,
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_LIST_ROWS,
+  KEYBOARD_HINT_SAVE,
+  KEYBOARD_HINT_SCAN,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import {
+  ListTableFocusable,
+  ListTableRow,
+} from "@renderer/components/list-table-row";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -22,7 +44,6 @@ import {
   AddInventoryOutItemDialog,
   type DraftOutLine,
 } from "./AddInventoryOutItemDialog";
-import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -33,40 +54,72 @@ function round4(n: number): number {
 }
 
 function lineTotal(line: DraftOutLine): number {
-  return round4(line.quantity * line.costPrice);
+  const pricing = lineTotalForScan({
+    quantityMultiplier:
+      line.lastScanMultiplier ??
+      (line.sellUnit === "box" ? line.unitsPerPurchaseUnit : 1),
+    unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+    sellingPrice: line.sellingPrice,
+    sellingPricePerPurchaseUnit: line.sellingPricePerPurchaseUnit,
+    quantity: line.quantity,
+    sellUnit: line.sellUnit,
+  });
+  return pricing.lineTotal > 0 ? pricing.lineTotal : round4(line.quantity * line.costPrice);
+}
+
+function unitPrice(line: DraftOutLine): number {
+  const pricing = lineTotalForScan({
+    quantityMultiplier:
+      line.lastScanMultiplier ??
+      (line.sellUnit === "box" ? line.unitsPerPurchaseUnit : 1),
+    unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+    sellingPrice: line.sellingPrice,
+    sellingPricePerPurchaseUnit: line.sellingPricePerPurchaseUnit,
+    quantity: line.quantity,
+    sellUnit: line.sellUnit,
+  });
+  return pricing.unitPrice > 0 ? pricing.unitPrice : line.costPrice;
+}
+
+function quantityHint(line: DraftOutLine): string | null {
+  if (line.unitsPerPurchaseUnit <= 1 || line.quantity <= 0) return null;
+  const boxes = round4(line.quantity / line.unitsPerPurchaseUnit);
+  if (line.sellUnit === "box") {
+    return `${line.quantity} ${line.baseUnitName ?? "pcs"} (${boxes} ${line.purchaseUnitName ?? "box"})`;
+  }
+  if (line.quantity >= line.unitsPerPurchaseUnit) {
+    return `${line.quantity} ${line.baseUnitName ?? "pcs"} (${boxes} ${line.purchaseUnitName ?? "box"})`;
+  }
+  return null;
 }
 
 export function InventoryOutPage() {
   const navigate = useNavigate();
-  const barcodeRef = useRef<HTMLInputElement>(null);
 
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [outDate, setOutDate] = useState(todayIso());
   const [reference, setReference] = useState("");
-  const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<DraftOutLine[]>([]);
   const [itemOpen, setItemOpen] = useState(false);
-  const [barcode, setBarcode] = useState("");
+  const [scanOpen, setScanOpen] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<InventoryOutDetail | null>(null);
+  const warehouseRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     void loadWarehouses()
       .then((rows) => {
         setWarehouses(rows);
-        if (rows.length === 1) setWarehouseId(rows[0]!.id);
+        if (rows.length > 0) {
+          setWarehouseId((current) => current || rows[0]!.id);
+        }
+        requestAnimationFrame(() => warehouseRef.current?.focus());
       })
       .catch(() => undefined);
   }, []);
-
-  useEffect(() => {
-    if (warehouseId && !success) {
-      barcodeRef.current?.focus();
-    }
-  }, [warehouseId, success, lines.length]);
 
   const existingSkuIds = useMemo(
     () => lines.map((l) => l.productSkuId),
@@ -86,32 +139,40 @@ export function InventoryOutPage() {
     [lines],
   );
 
-  function upsertScannedLine(row: {
-    id: string;
-    productName: string;
-    variantName: string;
-    sku: string;
-    barcode: string | null;
-    quantityAvailable: number;
-    costPrice: number;
-  }): string | null {
-    const available = row.quantityAvailable;
+  function upsertScannedLine(row: SkuSearchResult): string | null {
+    const available = row.quantityAvailable ?? 0;
     if (available <= 0) {
       return `No available quantity for ${row.sku}`;
     }
 
+    const multiplier = row.scannedQuantityMultiplier ?? 1;
+    const unitsPerPurchaseUnit = row.unitsPerPurchaseUnit ?? 1;
+    const sellUnit: SellUnit =
+      multiplier > 1 && multiplier >= unitsPerPurchaseUnit ? "box" : "pc";
+
     const existing = lines.find((l) => l.productSkuId === row.id);
     if (existing) {
-      const nextQty = round4(existing.quantity + 1);
+      const nextQty = round4(existing.quantity + multiplier);
       if (nextQty > available) {
         return `Cannot exceed available (${available}) for ${row.sku}`;
       }
       setLines((prev) =>
         prev.map((l) =>
-          l.productSkuId === row.id ? { ...l, quantity: nextQty } : l,
+          l.productSkuId === row.id
+            ? {
+                ...l,
+                quantity: nextQty,
+                sellUnit,
+                lastScanMultiplier: multiplier,
+              }
+            : l,
         ),
       );
       return null;
+    }
+
+    if (multiplier > available) {
+      return `Cannot exceed available (${available}) for ${row.sku}`;
     }
 
     setLines((prev) => [
@@ -122,17 +183,24 @@ export function InventoryOutPage() {
         variantName: row.variantName,
         sku: row.sku,
         barcode: row.barcode,
-        quantity: 1,
+        quantity: multiplier,
         quantityAvailable: available,
-        costPrice: row.costPrice,
+        costPrice: row.costPrice ?? 0,
+        unitsPerPurchaseUnit,
+        baseUnitName: row.baseUnitName ?? null,
+        purchaseUnitName: row.purchaseUnitName ?? null,
+        sellingPrice: row.sellingPrice ?? row.costPrice ?? 0,
+        sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit ?? null,
+        sellUnit,
+        lastScanMultiplier: multiplier,
       },
     ]);
     return null;
   }
 
-  async function onBarcodeEnter(scannedCode?: string) {
+  async function onBarcodeEnter(scannedCode: string) {
     setError(null);
-    const code = (scannedCode ?? barcode).trim();
+    const code = scannedCode.trim();
     if (!warehouseId) {
       setError("Select a warehouse first");
       return;
@@ -142,37 +210,16 @@ export function InventoryOutPage() {
     setScanBusy(true);
     try {
       const row = await loadSkuByBarcode(code, warehouseId);
-      const err = upsertScannedLine({
-        id: row.id,
-        productName: row.productName,
-        variantName: row.variantName,
-        sku: row.sku,
-        barcode: row.barcode,
-        quantityAvailable: row.quantityAvailable ?? 0,
-        costPrice: row.costPrice ?? 0,
-      });
+      const err = upsertScannedLine(row);
       if (err) {
         setError(err);
-      } else {
-        setBarcode("");
       }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "SKU not found for barcode"));
     } finally {
       setScanBusy(false);
-      requestAnimationFrame(() => barcodeRef.current?.focus());
     }
   }
-
-  useBarcodeScanTarget({
-    kind: "barcode",
-    enabled: Boolean(warehouseId && !itemOpen && !success),
-    inputRef: barcodeRef,
-    onScan: setBarcode,
-    onComplete: (code) => {
-      void onBarcodeEnter(code);
-    },
-  });
 
   async function onConfirm() {
     setError(null);
@@ -208,7 +255,7 @@ export function InventoryOutPage() {
           sku: l.sku,
           barcode: l.barcode,
           quantity: l.quantity,
-          unitCost: l.costPrice,
+          unitCost: unitPrice(l),
           lineTotal: lineTotal(l),
         }));
         const detail: InventoryOutDetail = {
@@ -218,7 +265,7 @@ export function InventoryOutPage() {
           warehouseName,
           outDate,
           reference: reference.trim() || null,
-          notes: notes.trim(),
+          notes: "",
           status: "POSTED",
           subtotal: items.reduce((sum, i) => sum + i.lineTotal, 0),
           total: items.reduce((sum, i) => sum + i.lineTotal, 0),
@@ -263,7 +310,7 @@ export function InventoryOutPage() {
         warehouseId,
         outDate,
         reference: reference.trim() || null,
-        notes: notes.trim(),
+        notes: "",
         items: lines.map((l) => ({
           productSkuId: l.productSkuId,
           quantity: l.quantity,
@@ -283,6 +330,21 @@ export function InventoryOutPage() {
       setSaving(false);
     }
   }
+
+  usePageKeyboard({
+    enabled: !success,
+    onSave: () => {
+      if (!saving && canPost) void onConfirm();
+    },
+    onScan: () => {
+      if (!warehouseId || itemOpen || scanBusy || success) return;
+      setScanOpen(true);
+    },
+    onAddItem: () => {
+      if (!warehouseId || success) return;
+      setItemOpen(true);
+    },
+  });
 
   if (success) {
     return (
@@ -329,10 +391,6 @@ export function InventoryOutPage() {
               <dt className="text-muted-foreground">Reference</dt>
               <dd className="font-medium">{success.reference || "—"}</dd>
             </div>
-            <div>
-              <dt className="text-muted-foreground">Notes</dt>
-              <dd className="font-medium">{success.notes || "—"}</dd>
-            </div>
           </dl>
         </section>
 
@@ -371,17 +429,18 @@ export function InventoryOutPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <FormEnterNav className={FORM_GRID}>
         <div className="space-y-1.5">
           <Label htmlFor="warehouse">Warehouse</Label>
           <select
+            ref={warehouseRef}
             id="warehouse"
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            {...formSelectPickerProps()}
             value={warehouseId}
             onChange={(e) => {
               setWarehouseId(e.target.value);
               setLines([]);
-              setBarcode("");
               setError(null);
             }}
           >
@@ -398,6 +457,7 @@ export function InventoryOutPage() {
           <Input
             id="outDate"
             type="date"
+            {...formDatePickerProps()}
             value={outDate}
             onChange={(e) => setOutDate(e.target.value)}
           />
@@ -411,28 +471,29 @@ export function InventoryOutPage() {
             placeholder="Ticket / reason code"
           />
         </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="notes">Notes (optional)</Label>
-          <Textarea
-            id="notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-          />
-        </div>
-      </section>
+      </FormEnterNav>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-medium">Bill</h2>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!warehouseId}
-            onClick={() => setItemOpen(true)}
-          >
-            Add SKU
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!warehouseId || itemOpen || scanBusy || Boolean(success)}
+              onClick={() => setScanOpen(true)}
+            >
+              Scan barcode
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!warehouseId}
+              onClick={() => setItemOpen(true)}
+            >
+              Add SKU
+            </Button>
+          </div>
         </div>
 
         <div className="border-border overflow-x-auto rounded-lg border">
@@ -443,7 +504,8 @@ export function InventoryOutPage() {
                 <th className="px-4 py-3 font-medium">Product</th>
                 <th className="px-4 py-3 font-medium">SKU</th>
                 <th className="px-4 py-3 font-medium">Available</th>
-                <th className="px-4 py-3 font-medium">Avg cost</th>
+                <th className="px-4 py-3 font-medium">Unit price</th>
+                <th className="px-4 py-3 font-medium">Sell as</th>
                 <th className="px-4 py-3 font-medium">Qty</th>
                 <th className="px-4 py-3 font-medium">Line total</th>
                 <th className="px-4 py-3 font-medium" />
@@ -451,7 +513,7 @@ export function InventoryOutPage() {
             </thead>
             <tbody>
               {lines.map((line) => (
-                <tr key={line.productSkuId} className="border-border border-t">
+                <ListTableRow key={line.productSkuId}>
                   <td className="px-4 py-3 tabular-nums">
                     {line.barcode || "—"}
                   </td>
@@ -463,30 +525,77 @@ export function InventoryOutPage() {
                   <td className="px-4 py-3 tabular-nums">
                     {line.quantityAvailable}
                   </td>
-                  <td className="px-4 py-3 tabular-nums">{line.costPrice}</td>
+                  <td className="px-4 py-3 tabular-nums">{unitPrice(line)}</td>
+                  <td className="px-4 py-3">
+                    {line.unitsPerPurchaseUnit > 1 ? (
+                      <ListTableFocusable>
+                        <select
+                          className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                          value={line.sellUnit}
+                          onChange={(e) => {
+                            const sellUnit = e.target.value as SellUnit;
+                            setLines((prev) =>
+                              prev.map((l) =>
+                                l.productSkuId === line.productSkuId
+                                  ? { ...l, sellUnit, lastScanMultiplier: undefined }
+                                  : l,
+                              ),
+                            );
+                          }}
+                        >
+                          <option value="pc">{line.baseUnitName ?? "pc"}</option>
+                          <option value="box">
+                            {line.purchaseUnitName ?? "box"}
+                          </option>
+                        </select>
+                      </ListTableFocusable>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {line.baseUnitName ?? "pc"}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 align-top">
-                    <Input
-                      className="h-8 w-24"
-                      value={String(line.quantity)}
-                      aria-invalid={
-                        line.quantity <= 0 ||
-                        line.quantity > line.quantityAvailable
-                      }
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => {
-                        const n = Number(e.target.value);
-                        setLines((prev) =>
-                          prev.map((l) =>
-                            l.productSkuId === line.productSkuId
-                              ? {
-                                  ...l,
-                                  quantity: Number.isNaN(n) ? 0 : n,
-                                }
-                              : l,
-                          ),
-                        );
-                      }}
-                    />
+                    <ListTableFocusable>
+                      <Input
+                        className="h-8 w-24"
+                        value={String(
+                          line.sellUnit === "box" && line.unitsPerPurchaseUnit > 1
+                            ? round4(line.quantity / line.unitsPerPurchaseUnit)
+                            : line.quantity,
+                        )}
+                        aria-invalid={
+                          line.quantity <= 0 ||
+                          line.quantity > line.quantityAvailable
+                        }
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          const baseQty =
+                            line.sellUnit === "box" && line.unitsPerPurchaseUnit > 1
+                              ? round4(n * line.unitsPerPurchaseUnit)
+                              : Number.isNaN(n)
+                                ? 0
+                                : n;
+                          setLines((prev) =>
+                            prev.map((l) =>
+                              l.productSkuId === line.productSkuId
+                                ? {
+                                    ...l,
+                                    quantity: baseQty,
+                                    lastScanMultiplier: undefined,
+                                  }
+                                : l,
+                            ),
+                          );
+                        }}
+                      />
+                    </ListTableFocusable>
+                    {quantityHint(line) ? (
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {quantityHint(line)}
+                      </p>
+                    ) : null}
                     {line.quantity > line.quantityAvailable ? (
                       <p className="text-destructive mt-1 text-xs">
                         Quantity must be at most {line.quantityAvailable}
@@ -501,6 +610,7 @@ export function InventoryOutPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
+                      tabIndex={-1}
                       onClick={() =>
                         setLines((prev) =>
                           prev.filter(
@@ -512,38 +622,8 @@ export function InventoryOutPage() {
                       Remove
                     </Button>
                   </td>
-                </tr>
+                </ListTableRow>
               ))}
-
-              <tr className="border-border border-t bg-muted/20">
-                <td className="px-4 py-3" colSpan={1}>
-                  <Input
-                    ref={barcodeRef}
-                    {...barcodeScanInputProps()}
-                    className="h-8"
-                    value={barcode}
-                    disabled={!warehouseId || scanBusy}
-                    placeholder={
-                      warehouseId
-                        ? "Scan barcode…"
-                        : "Select warehouse first"
-                    }
-                    onChange={(e) => setBarcode(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void onBarcodeEnter();
-                      }
-                    }}
-                  />
-                </td>
-                <td
-                  colSpan={7}
-                  className="text-muted-foreground px-4 py-3 text-sm"
-                >
-                  Press Enter after scan to add / increment qty by 1
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -573,6 +653,16 @@ export function InventoryOutPage() {
         </Button>
       </div>
 
+      <KeyboardHints
+        hints={[
+          KEYBOARD_HINT_ENTER,
+          KEYBOARD_HINT_LIST_ROWS,
+          KEYBOARD_HINT_SCAN,
+          KEYBOARD_HINT_ADD,
+          KEYBOARD_HINT_SAVE,
+        ]}
+      />
+
       <AddInventoryOutItemDialog
         open={itemOpen}
         warehouseId={warehouseId}
@@ -582,6 +672,15 @@ export function InventoryOutPage() {
           setLines((prev) => [...prev, ...added]);
           setItemOpen(false);
         }}
+      />
+
+      <ScanBarcodePanel
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        busy={scanBusy}
+        clearAfterComplete
+        description="Scan or type a barcode, then press Enter to add or increment qty by 1."
+        onComplete={(code) => onBarcodeEnter(code)}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type { EntityStatus, WarehouseListItem } from "@blackbox/shared";
+import { normalizeStoredText } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { Warehouse } from "../../db/entities";
@@ -53,7 +54,7 @@ export class WarehousesService {
     const tenantId = this.fixedTenant.tenantId;
     const row = this.warehouses.create({
       tenantId,
-      name: dto.name.trim(),
+      name: normalizeStoredText(dto.name),
       code: dto.code.trim(),
       location: dto.location?.trim() ? dto.location.trim() : null,
       status: dto.status ?? "active",
@@ -74,7 +75,7 @@ export class WarehousesService {
     dto: UpdateWarehouseDto,
   ): Promise<WarehouseListItem> {
     const row = await this.require(id);
-    row.name = dto.name.trim();
+    row.name = normalizeStoredText(dto.name);
     row.code = dto.code.trim();
     row.location = dto.location?.trim() ? dto.location.trim() : null;
     if (dto.status) row.status = dto.status;

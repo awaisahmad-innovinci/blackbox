@@ -7,19 +7,36 @@ import type {
   WarehouseListItem,
 } from "@blackbox/shared";
 import { VENDOR_RETURN_REASONS, VENDOR_RETURN_REASON_LABELS } from "@blackbox/shared";
+import { FORM_GRID } from "@renderer/lib/form-layout";
+import {
+  FormEnterNav,
+  formDatePickerProps,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
+import {
+  KEYBOARD_HINT_ADD,
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_LIST_ROWS,
+  KEYBOARD_HINT_SAVE,
+  KEYBOARD_HINT_SCAN,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import {
+  ListTableFocusable,
+  ListTableRow,
+} from "@renderer/components/list-table-row";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
-import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import {
+  findVendorSkuByBarcode,
   loadLastPurchaseCost,
-  loadSkuByBarcode,
-  loadVendorSkus,
   loadVendors,
   loadWarehouses,
 } from "@renderer/lib/local-db/entity-source";
@@ -44,15 +61,14 @@ export function VendorReturnFormPage() {
   const [vendorId, setVendorId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [returnDate, setReturnDate] = useState(todayIso());
-  const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<DraftReturnLine[]>([]);
   const [itemOpen, setItemOpen] = useState(false);
-  const [barcode, setBarcode] = useState("");
+  const [scanOpen, setScanOpen] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<VendorReturnDetail | null>(null);
-  const barcodeRef = useRef<HTMLInputElement>(null);
+  const vendorRef = useRef<HTMLSelectElement>(null);
 
   function focusQty(productSkuId: string) {
     requestAnimationFrame(() => {
@@ -91,24 +107,21 @@ export function VendorReturnFormPage() {
     setScanBusy(true);
     setError(null);
     try {
-      const rows = await loadVendorSkus(vendorId, trimmed, warehouseId);
-      const exact = rows.filter((r) => (r.barcode ?? "").trim() === trimmed);
-      if (exact.length === 0) {
-        try {
-          await loadSkuByBarcode(trimmed, warehouseId);
-          setError("This SKU does not belong to the selected vendor");
-        } catch {
-          setError("No SKU found for this barcode");
-        }
+      const result = await findVendorSkuByBarcode(
+        vendorId,
+        trimmed,
+        warehouseId,
+      );
+      if (result.kind === "not_found") {
+        setError("No SKU found for this barcode");
         return;
       }
-      if (exact.length > 1) {
-        setError("Multiple SKUs match this barcode");
+      if (result.kind === "not_linked") {
+        setError("This SKU is not linked to the selected vendor");
         return;
       }
-      const match = exact[0]!;
+      const match = result.row;
       if (lines.some((l) => l.productSkuId === match.productSkuId)) {
-        setBarcode("");
         focusQty(match.productSkuId);
         return;
       }
@@ -123,30 +136,28 @@ export function VendorReturnFormPage() {
       } catch {
         /* fallback to purchasePrice */
       }
-      setLines((prev) => [...prev, toDraftReturnLine(match, unitCost)]);
-      setBarcode("");
+      setLines((prev) => [
+        ...prev,
+        {
+          ...toDraftReturnLine(match, unitCost),
+          quantity: result.scannedQuantityMultiplier,
+          lineTotal: round4(result.scannedQuantityMultiplier * unitCost),
+        },
+      ]);
       focusQty(match.productSkuId);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Barcode lookup failed"));
     } finally {
       setScanBusy(false);
-      requestAnimationFrame(() => barcodeRef.current?.focus());
     }
   }
 
-  useBarcodeScanTarget({
-    kind: "barcode",
-    enabled: Boolean(vendorId && warehouseId && !itemOpen && !success),
-    inputRef: barcodeRef,
-    onScan: setBarcode,
-    onComplete: (code) => {
-      void addSkuFromBarcode(code);
-    },
-  });
-
   useEffect(() => {
     void loadVendors({ status: "active", pageSize: 100 })
-      .then((r) => setVendors(r.items))
+      .then((r) => {
+        setVendors(r.items);
+        requestAnimationFrame(() => vendorRef.current?.focus());
+      })
       .catch(() => undefined);
     void loadWarehouses().then((rows) => {
       setWarehouses(rows);
@@ -226,7 +237,7 @@ export function VendorReturnFormPage() {
           warehouseId,
           warehouseName,
           returnDate,
-          notes: notes.trim(),
+          notes: "",
           status: "OPEN",
           subtotal,
           total: subtotal,
@@ -275,7 +286,7 @@ export function VendorReturnFormPage() {
         vendorId,
         warehouseId,
         returnDate,
-        notes: notes.trim(),
+        notes: "",
         items: lines.map((l) => ({
           productSkuId: l.productSkuId,
           vendorSkuId: l.vendorSkuId,
@@ -296,6 +307,21 @@ export function VendorReturnFormPage() {
       setSaving(false);
     }
   }
+
+  usePageKeyboard({
+    enabled: !success,
+    onSave: () => {
+      if (!saving) void onConfirm();
+    },
+    onScan: () => {
+      if (!vendorId || !warehouseId || itemOpen || scanBusy || success) return;
+      setScanOpen(true);
+    },
+    onAddItem: () => {
+      if (!vendorId || !warehouseId || success) return;
+      setItemOpen(true);
+    },
+  });
 
   if (success) {
     return (
@@ -345,11 +371,13 @@ export function VendorReturnFormPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <FormEnterNav className={FORM_GRID}>
         <div className="space-y-1.5">
           <Label>Vendor</Label>
           <select
+            ref={vendorRef}
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            {...formSelectPickerProps()}
             value={vendorId}
             onChange={(e) => setVendorId(e.target.value)}
           >
@@ -365,6 +393,7 @@ export function VendorReturnFormPage() {
           <Label>Warehouse</Label>
           <select
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            {...formSelectPickerProps()}
             value={warehouseId}
             onChange={(e) => setWarehouseId(e.target.value)}
           >
@@ -380,23 +409,36 @@ export function VendorReturnFormPage() {
           <Label>Return date</Label>
           <Input
             type="date"
+            {...formDatePickerProps()}
             value={returnDate}
             onChange={(e) => setReturnDate(e.target.value)}
           />
         </div>
-      </section>
+      </FormEnterNav>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-medium">Items</h2>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!vendorId || !warehouseId}
-            onClick={() => setItemOpen(true)}
-          >
-            Add items
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                !vendorId || !warehouseId || itemOpen || scanBusy || Boolean(success)
+              }
+              onClick={() => setScanOpen(true)}
+            >
+              Scan barcode
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!vendorId || !warehouseId}
+              onClick={() => setItemOpen(true)}
+            >
+              Add items
+            </Button>
+          </div>
         </div>
         <div className="border-border overflow-x-auto rounded-lg border">
           <table className="w-full text-left text-sm">
@@ -423,10 +465,7 @@ export function VendorReturnFormPage() {
                 </tr>
               ) : null}
               {lines.map((line) => (
-                <tr
-                  key={line.productSkuId}
-                  className="border-border border-t"
-                >
+                <ListTableRow key={line.productSkuId}>
                   <td className="px-3 py-2">
                     {line.productName}
                     <div className="text-muted-foreground text-xs">
@@ -435,38 +474,43 @@ export function VendorReturnFormPage() {
                   </td>
                   <td className="px-3 py-2">{line.sku}</td>
                   <td className="px-3 py-2">
-                    <select
-                      className="border-input bg-background h-8 min-w-[7rem] rounded-md border px-2 text-sm"
-                      value={line.reason}
-                      onChange={(e) =>
-                        updateLine(line.productSkuId, {
-                          reason: e.target.value as VendorReturnReason,
-                        })
-                      }
-                    >
-                      {VENDOR_RETURN_REASONS.map((r) => (
-                        <option key={r} value={r}>
-                          {VENDOR_RETURN_REASON_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
+                    <ListTableFocusable>
+                      <select
+                        className="border-input bg-background h-8 min-w-[7rem] rounded-md border px-2 text-sm"
+                        {...formSelectPickerProps()}
+                        value={line.reason}
+                        onChange={(e) =>
+                          updateLine(line.productSkuId, {
+                            reason: e.target.value as VendorReturnReason,
+                          })
+                        }
+                      >
+                        {VENDOR_RETURN_REASONS.map((r) => (
+                          <option key={r} value={r}>
+                            {VENDOR_RETURN_REASON_LABELS[r]}
+                          </option>
+                        ))}
+                      </select>
+                    </ListTableFocusable>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
-                      <Input
-                        className="h-8 w-20"
-                        data-sku-qty={line.productSkuId}
-                        value={String(line.quantity)}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const quantity = Number(e.target.value);
-                          updateLine(line.productSkuId, {
-                            quantity: Number.isNaN(quantity)
-                              ? line.quantity
-                              : quantity,
-                          });
-                        }}
-                      />
+                      <ListTableFocusable>
+                        <Input
+                          className="h-8 w-20"
+                          data-sku-qty={line.productSkuId}
+                          value={String(line.quantity)}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const quantity = Number(e.target.value);
+                            updateLine(line.productSkuId, {
+                              quantity: Number.isNaN(quantity)
+                                ? line.quantity
+                                : quantity,
+                            });
+                          }}
+                        />
+                      </ListTableFocusable>
                       <span className="text-muted-foreground text-xs whitespace-nowrap">
                         {line.purchaseUnitName || ""}
                       </span>
@@ -483,6 +527,7 @@ export function VendorReturnFormPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
+                      tabIndex={-1}
                       onClick={() =>
                         setLines((prev) =>
                           prev.filter(
@@ -494,36 +539,8 @@ export function VendorReturnFormPage() {
                       Remove
                     </Button>
                   </td>
-                </tr>
+                </ListTableRow>
               ))}
-              {vendorId && warehouseId ? (
-                <tr className="border-border bg-muted/30 border-t">
-                  <td className="px-3 py-2" colSpan={3}>
-                    <Input
-                      ref={barcodeRef}
-                      {...barcodeScanInputProps()}
-                      className="h-8"
-                      value={barcode}
-                      placeholder="Scan barcode to add item"
-                      onChange={(e) => setBarcode(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void addSkuFromBarcode(barcode);
-                      }}
-                    />
-                  </td>
-                  <td
-                    className="text-muted-foreground px-3 py-2 text-xs"
-                    colSpan={4}
-                  >
-                    {scanBusy
-                      ? "Looking up…"
-                      : "Scan or type a barcode, then press Enter."}
-                  </td>
-                </tr>
-              ) : null}
             </tbody>
           </table>
         </div>
@@ -535,16 +552,6 @@ export function VendorReturnFormPage() {
           <span className="tabular-nums">{subtotal.toLocaleString()}</span>
         </div>
       </section>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea
-          id="notes"
-          rows={3}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </div>
 
       <div className="flex flex-wrap gap-3">
         <Button type="button" disabled={saving} onClick={() => void onConfirm()}>
@@ -559,6 +566,16 @@ export function VendorReturnFormPage() {
         </Button>
       </div>
 
+      <KeyboardHints
+        hints={[
+          KEYBOARD_HINT_ENTER,
+          KEYBOARD_HINT_LIST_ROWS,
+          KEYBOARD_HINT_SCAN,
+          KEYBOARD_HINT_ADD,
+          KEYBOARD_HINT_SAVE,
+        ]}
+      />
+
       {itemOpen ? (
         <AddVendorReturnItemDialog
           open
@@ -571,6 +588,14 @@ export function VendorReturnFormPage() {
           }
         />
       ) : null}
+
+      <ScanBarcodePanel
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        busy={scanBusy}
+        clearAfterComplete
+        onComplete={(code) => addSkuFromBarcode(code)}
+      />
     </div>
   );
 }

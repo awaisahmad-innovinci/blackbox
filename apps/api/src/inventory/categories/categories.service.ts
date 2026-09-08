@@ -5,6 +5,10 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type { Category as CategoryDto, EntityStatus } from "@blackbox/shared";
+import {
+  normalizeOptionalStoredText,
+  normalizeStoredText,
+} from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { Category } from "../../db/entities";
@@ -53,8 +57,8 @@ export class CategoriesService {
     const tenantId = this.fixedTenant.tenantId;
     const row = this.categories.create({
       tenantId,
-      name: dto.name.trim(),
-      description: dto.description?.trim() ?? "",
+      name: normalizeStoredText(dto.name),
+      description: normalizeOptionalStoredText(dto.description),
       status: dto.status ?? "active",
     });
     try {
@@ -70,8 +74,8 @@ export class CategoriesService {
 
   async update(id: string, dto: UpdateCategoryDto): Promise<CategoryDto> {
     const row = await this.require(id);
-    row.name = dto.name.trim();
-    row.description = dto.description?.trim() ?? "";
+    row.name = normalizeStoredText(dto.name);
+    row.description = normalizeOptionalStoredText(dto.description);
     if (dto.status) row.status = dto.status;
     try {
       await this.categories.save(row);

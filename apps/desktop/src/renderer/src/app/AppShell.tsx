@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
-import { handleEnterToNextField } from "@blackbox/ui/lib/form-keyboard";
+import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,11 +12,16 @@ import {
 import { useSession } from "@renderer/lib/session/context";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
-
-const NAV = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/warehouses", label: "Warehouses" },
-] as const;
+import { NavDropdownMenuItem } from "@renderer/components/nav-dropdown-menu-item";
+import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
+import type { TaxonomyKind } from "@renderer/lib/app-nav-keyboard";
+import {
+  APP_NAV_SECTIONS,
+  appNavShortcutLabel,
+  NAV_DROPDOWN_MENUS,
+  type NavDropdownId,
+} from "@renderer/lib/app-nav-keyboard";
+import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
 
 const DEVICE_LABEL: Record<string, string> = {
   unknown: "Device status unknown",
@@ -26,6 +31,15 @@ const DEVICE_LABEL: Record<string, string> = {
   revoked: "Device revoked",
 };
 
+function navItemClass(active: boolean): string {
+  return cn(
+    "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    active
+      ? "bg-primary/10 text-primary"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
+}
+
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,6 +47,26 @@ export function AppShell() {
   const sync = useSyncStatus();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [openNavDropdown, setOpenNavDropdown] = useState<NavDropdownId | null>(
+    null,
+  );
+  const [globalTaxonomyKind, setGlobalTaxonomyKind] =
+    useState<TaxonomyKind | null>(null);
+  const { activeIndex, setNavRef, handleMenubarKeyDown, onNavFocus } =
+    useAppNavKeyboard({
+      openNavDropdown,
+      setOpenNavDropdown,
+      onGlobalTaxonomyShortcut: setGlobalTaxonomyKind,
+    });
+
+  function handleNavDropdownChange(id: NavDropdownId, open: boolean) {
+    if (open) {
+      setOpenNavDropdown(id);
+      return;
+    }
+    setOpenNavDropdown((current) => (current === id ? null : current));
+  }
+
   const vendorsActive =
     location.pathname.startsWith("/vendors") ||
     location.pathname.startsWith("/vendor-groups");
@@ -47,125 +81,135 @@ export function AppShell() {
     location.pathname.startsWith("/purchasing") ||
     location.pathname.startsWith("/goods-receipts");
 
+  const dashboardSection = APP_NAV_SECTIONS[0]!;
+  const warehousesSection = APP_NAV_SECTIONS[1]!;
+  const inventorySection = APP_NAV_SECTIONS[2]!;
+  const purchasingSection = APP_NAV_SECTIONS[3]!;
+  const vendorsSection = APP_NAV_SECTIONS[4]!;
+
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <header className="border-border/80 bg-card/40 sticky top-0 z-10 border-b backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
+        <div className="mx-auto flex h-14 w-full max-w-none items-center gap-6 px-8 lg:px-10">
           <Link to="/" className="text-lg font-semibold tracking-tight">
             Blackbox
           </Link>
-          <nav className="flex items-center gap-1">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={"end" in item ? item.end : false}
-                className={({ isActive }) =>
-                  cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-            <DropdownMenu>
+          <nav
+            role="menubar"
+            aria-label="Main"
+            className="flex items-center gap-1"
+            onKeyDown={handleMenubarKeyDown}
+          >
+            <NavLink
+              ref={setNavRef(0)}
+              to={dashboardSection.to}
+              end
+              role="menuitem"
+              tabIndex={activeIndex === 0 ? 0 : -1}
+              aria-keyshortcuts={appNavShortcutLabel(dashboardSection.shortcut)}
+              title={`${dashboardSection.label} (${appNavShortcutLabel(dashboardSection.shortcut)})`}
+              onFocus={() => onNavFocus(0)}
+              className={({ isActive }) => navItemClass(isActive)}
+            >
+              {dashboardSection.label}
+            </NavLink>
+            <NavLink
+              ref={setNavRef(1)}
+              to={warehousesSection.to}
+              role="menuitem"
+              tabIndex={activeIndex === 1 ? 0 : -1}
+              aria-keyshortcuts={appNavShortcutLabel(warehousesSection.shortcut)}
+              title={`${warehousesSection.label} (${appNavShortcutLabel(warehousesSection.shortcut)})`}
+              onFocus={() => onNavFocus(1)}
+              className={({ isActive }) => navItemClass(isActive)}
+            >
+              {warehousesSection.label}
+            </NavLink>
+            <DropdownMenu
+              open={openNavDropdown === "inventory"}
+              onOpenChange={(open) => handleNavDropdownChange("inventory", open)}
+            >
               <DropdownMenuTrigger
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  inventoryActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
+                ref={setNavRef(2)}
+                role="menuitem"
+                tabIndex={activeIndex === 2 ? 0 : -1}
+                aria-keyshortcuts={appNavShortcutLabel(inventorySection.shortcut)}
+                title={`${inventorySection.label} (${appNavShortcutLabel(inventorySection.shortcut)})`}
+                onFocus={() => onNavFocus(2)}
+                className={navItemClass(inventoryActive)}
               >
-                Inventory
+                {inventorySection.label}
                 <span className="text-[10px] opacity-70" aria-hidden>
                   ▼
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onSelect={() => navigate("/products/new")}>
-                  Add Product
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/products")}>
-                  See Products
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/brands")}>
-                  Brands
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/categories")}>
-                  Categories
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/inventory/out")}>
-                  Inventory Out
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => navigate("/inventory/returns")}
-                >
-                  Vendor Returns
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => navigate("/inventory/reports")}
-                >
-                  In / out report
-                </DropdownMenuItem>
+                {NAV_DROPDOWN_MENUS.inventory.map((item, index) => (
+                  <NavDropdownMenuItem
+                    key={item.to}
+                    index={index}
+                    label={item.label}
+                    onSelect={() => navigate(item.to)}
+                  />
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <DropdownMenu>
+            <DropdownMenu
+              open={openNavDropdown === "purchasing"}
+              onOpenChange={(open) => handleNavDropdownChange("purchasing", open)}
+            >
               <DropdownMenuTrigger
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  purchasingActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
+                ref={setNavRef(3)}
+                role="menuitem"
+                tabIndex={activeIndex === 3 ? 0 : -1}
+                aria-keyshortcuts={appNavShortcutLabel(purchasingSection.shortcut)}
+                title={`${purchasingSection.label} (${appNavShortcutLabel(purchasingSection.shortcut)})`}
+                onFocus={() => onNavFocus(3)}
+                className={navItemClass(purchasingActive)}
               >
-                Purchasing
+                {purchasingSection.label}
                 <span className="text-[10px] opacity-70" aria-hidden>
                   ▼
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem
-                  onSelect={() => navigate("/purchase-orders/new")}
-                >
-                  Create Purchase Order
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/purchase-orders")}>
-                  Purchase Orders
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/goods-receipts")}>
-                  Purchase Vouchers
-                </DropdownMenuItem>
+                {NAV_DROPDOWN_MENUS.purchasing.map((item, index) => (
+                  <NavDropdownMenuItem
+                    key={item.to}
+                    index={index}
+                    label={item.label}
+                    onSelect={() => navigate(item.to)}
+                  />
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <DropdownMenu>
+            <DropdownMenu
+              open={openNavDropdown === "vendors"}
+              onOpenChange={(open) => handleNavDropdownChange("vendors", open)}
+            >
               <DropdownMenuTrigger
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  vendorsActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
+                ref={setNavRef(4)}
+                role="menuitem"
+                tabIndex={activeIndex === 4 ? 0 : -1}
+                aria-keyshortcuts={appNavShortcutLabel(vendorsSection.shortcut)}
+                title={`${vendorsSection.label} (${appNavShortcutLabel(vendorsSection.shortcut)})`}
+                onFocus={() => onNavFocus(4)}
+                className={navItemClass(vendorsActive)}
               >
-                Vendors
+                {vendorsSection.label}
                 <span className="text-[10px] opacity-70" aria-hidden>
                   ▼
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onSelect={() => navigate("/vendors/new")}>
-                  Add Vendor
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/vendors")}>
-                  See Vendors
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/vendor-groups")}>
-                  Vendor Groups
-                </DropdownMenuItem>
+                {NAV_DROPDOWN_MENUS.vendors.map((item, index) => (
+                  <NavDropdownMenuItem
+                    key={item.to}
+                    index={index}
+                    label={item.label}
+                    onSelect={() => navigate(item.to)}
+                  />
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </nav>
@@ -231,9 +275,9 @@ export function AppShell() {
         </div>
       ) : null}
       <main
-        className="mx-auto w-full max-w-6xl flex-1 px-6 py-8"
+        className="mx-auto w-full max-w-none flex-1 px-8 py-8 lg:px-10"
         data-enter-nav=""
-        onKeyDown={handleEnterToNextField}
+        onKeyDown={handleEnterNavKeyDown}
       >
         <Outlet />
       </main>
@@ -256,6 +300,15 @@ export function AppShell() {
           }
         }}
       />
+
+      {globalTaxonomyKind ? (
+        <AddTaxonomyDialog
+          open
+          kind={globalTaxonomyKind}
+          onClose={() => setGlobalTaxonomyKind(null)}
+          onCreated={() => setGlobalTaxonomyKind(null)}
+        />
+      ) : null}
     </div>
   );
 }

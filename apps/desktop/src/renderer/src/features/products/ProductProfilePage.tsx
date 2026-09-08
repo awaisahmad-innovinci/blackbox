@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   ProductDetail,
   ProductSkuDetail,
@@ -10,6 +10,7 @@ import type {
 import { PRODUCT_TYPE_LABELS } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { BackButton } from "@renderer/app/BackButton";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
 import { loadProductProfile } from "@renderer/lib/local-db/entity-source";
@@ -251,14 +252,17 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 skus.map((s) => (
-                  <tr key={s.id} className="border-border border-t">
+                  <ListTableRow
+                    key={s.id}
+                    onActivate={() => navigate(`/skus/${s.id}`)}
+                  >
                     <td className="px-4 py-3">
-                      <Link
+                      <ListTableLink
                         to={`/skus/${s.id}`}
                         className="text-primary hover:underline"
                       >
                         {s.variantName || "—"}
-                      </Link>
+                      </ListTableLink>
                       {skusMissingSupplier.has(s.id) ? (
                         <div className="text-amber-700 dark:text-amber-400 mt-1 text-xs">
                           Needs supplier
@@ -270,7 +274,7 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3 tabular-nums">{s.costPrice}</td>
                     <td className="px-4 py-3 tabular-nums">{s.sellingPrice}</td>
                     <td className="px-4 py-3 capitalize">{s.status}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -317,14 +321,17 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 suppliers.map((s) => (
-                  <tr key={s.vendorSkuId} className="border-border border-t">
+                  <ListTableRow
+                    key={s.vendorSkuId}
+                    onActivate={() => navigate(`/vendors/${s.vendorId}`)}
+                  >
                     <td className="px-4 py-3">
-                      <Link
+                      <ListTableLink
                         to={`/vendors/${s.vendorId}`}
                         className="text-primary hover:underline"
                       >
                         {s.vendorName}
-                      </Link>
+                      </ListTableLink>
                     </td>
                     <td className="px-4 py-3">
                       {s.variantName} · {s.sku}
@@ -335,7 +342,7 @@ export function ProductProfilePage() {
                     </td>
                     <td className="px-4 py-3">{s.leadTimeDays}d</td>
                     <td className="px-4 py-3">{s.isPreferred ? "Yes" : "No"}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -368,9 +375,8 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 inventory.map((row) => (
-                  <tr
+                  <ListTableRow
                     key={`${row.warehouseId}-${row.productSkuId}`}
-                    className="border-border border-t"
                   >
                     <td className="px-4 py-3">{row.warehouseName}</td>
                     <td className="px-4 py-3">
@@ -385,7 +391,7 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3 tabular-nums">
                       {row.quantityAvailable}
                     </td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -419,7 +425,7 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 movements.map((m) => (
-                  <tr key={m.id} className="border-border border-t">
+                  <ListTableRow key={m.id}>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {new Date(m.createdAt).toLocaleString()}
                     </td>
@@ -430,7 +436,7 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3">{m.movementType}</td>
                     <td className="px-4 py-3 tabular-nums">{m.quantity}</td>
                     <td className="px-4 py-3">{m.reason || "—"}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>

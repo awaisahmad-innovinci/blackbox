@@ -25,6 +25,10 @@ import {
 } from "@renderer/lib/local-db/pull";
 import { ImportMasterDataDialog } from "./ImportMasterDataDialog";
 import { DeviceSessionCard } from "./DeviceSessionCard";
+import {
+  KEYBOARD_HINT_APP_NAV,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
 
 type LocalDbStatus = Awaited<
   ReturnType<NonNullable<NonNullable<Window["blackbox"]>["localDb"]>["getStatus"]>
@@ -396,6 +400,8 @@ export function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      <KeyboardHints hints={[KEYBOARD_HINT_APP_NAV]} />
     </div>
   );
 }

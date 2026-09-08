@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type {
   PurchaseOrderListItem,
   PurchaseOrderStatus,
@@ -19,6 +19,19 @@ import {
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
+import {
+  KEYBOARD_HINT_LIST_ROWS,
+  KEYBOARD_HINT_NEW,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import {
+  FILTER_SELECT_CLASS,
+  filterDateProps,
+  filterSelectProps,
+  ListFilterNav,
+} from "@renderer/components/list-filter-nav";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -52,6 +65,14 @@ export function PurchaseOrdersListPage() {
     inputRef: searchRef,
     onScan: setSearch,
   });
+
+  usePageKeyboard({
+    onNew: () => navigate("/purchase-orders/new"),
+  });
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,7 +192,7 @@ export function PurchaseOrdersListPage() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <ListFilterNav>
         <Input
           ref={searchRef}
           {...barcodeScanInputProps()}
@@ -181,7 +202,8 @@ export function PurchaseOrdersListPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={status}
           onChange={(e) =>
             setStatus(e.target.value as PurchaseOrderStatus | "")
@@ -195,7 +217,8 @@ export function PurchaseOrdersListPage() {
           ))}
         </select>
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={vendorId}
           onChange={(e) => setVendorId(e.target.value)}
         >
@@ -207,7 +230,8 @@ export function PurchaseOrdersListPage() {
           ))}
         </select>
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={warehouseId}
           onChange={(e) => setWarehouseId(e.target.value)}
         >
@@ -221,16 +245,18 @@ export function PurchaseOrdersListPage() {
         <Input
           type="date"
           className="w-auto"
+          {...filterDateProps()}
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
         />
         <Input
           type="date"
           className="w-auto"
+          {...filterDateProps()}
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
         />
-      </div>
+      </ListFilterNav>
 
       {error ? (
         <div
@@ -271,14 +297,17 @@ export function PurchaseOrdersListPage() {
               </tr>
             ) : (
               items.map((po) => (
-                <tr key={po.id} className="border-border border-t">
+                <ListTableRow
+                  key={po.id}
+                  onActivate={() => navigate(`/purchase-orders/${po.id}`)}
+                >
                   <td className="px-4 py-3">
-                    <Link
+                    <ListTableLink
                       to={`/purchase-orders/${po.id}`}
                       className="text-primary font-medium hover:underline"
                     >
                       {po.poNumber}
-                    </Link>
+                    </ListTableLink>
                   </td>
                   <td className="px-4 py-3">{po.vendorName}</td>
                   <td className="px-4 py-3">{po.warehouseName}</td>
@@ -289,7 +318,7 @@ export function PurchaseOrdersListPage() {
                   <td className="px-4 py-3 tabular-nums">
                     {po.total.toLocaleString()}
                   </td>
-                </tr>
+                </ListTableRow>
               ))
             )}
           </tbody>
@@ -306,6 +335,7 @@ export function PurchaseOrdersListPage() {
           setPage(1);
         }}
       />
+      <KeyboardHints hints={[KEYBOARD_HINT_NEW, KEYBOARD_HINT_LIST_ROWS]} />
     </div>
   );
 }

@@ -81,3 +81,7 @@ export interface JwtPayload {
   /** Present on desktop sessions bound to a registered device. */
   deviceId?: string;
 }
+
+/** Desktop login when the user already has an active session on a different device. */
+export const SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE =
+  "This account is already signed in on another device. Sign out there first, then try again.";

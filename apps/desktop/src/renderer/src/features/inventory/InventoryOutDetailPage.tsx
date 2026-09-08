@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { InventoryOutDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { ListTableRow } from "@renderer/components/list-table-row";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -88,10 +89,6 @@ export function InventoryOutDetailPage() {
             <dt className="text-muted-foreground">Reference</dt>
             <dd className="font-medium">{detail.reference || "—"}</dd>
           </div>
-          <div>
-            <dt className="text-muted-foreground">Notes</dt>
-            <dd className="font-medium">{detail.notes || "—"}</dd>
-          </div>
         </dl>
       </section>
 
@@ -111,7 +108,7 @@ export function InventoryOutDetailPage() {
             </thead>
             <tbody>
               {detail.items.map((item) => (
-                <tr key={item.id} className="border-border border-t">
+                <ListTableRow key={item.id}>
                   <td className="px-4 py-3 tabular-nums">
                     {item.barcode || "—"}
                   </td>
@@ -125,7 +122,7 @@ export function InventoryOutDetailPage() {
                   <td className="px-4 py-3 tabular-nums">
                     {item.lineTotal.toLocaleString()}
                   </td>
-                </tr>
+                </ListTableRow>
               ))}
             </tbody>
           </table>

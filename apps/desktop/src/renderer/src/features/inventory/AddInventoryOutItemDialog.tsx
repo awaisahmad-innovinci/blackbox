@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { SkuSearchResult } from "@blackbox/shared";
+import type { SellUnit, SkuSearchResult } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -12,6 +12,11 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { loadSkuSearch } from "@renderer/lib/local-db/entity-source";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  KEYBOARD_HINT_PICK_ROWS,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListPickFocusable, ListPickRow } from "@renderer/components/list-table-row";
 
 export type DraftOutLine = {
   productSkuId: string;
@@ -22,6 +27,13 @@ export type DraftOutLine = {
   quantity: number;
   quantityAvailable: number;
   costPrice: number;
+  unitsPerPurchaseUnit: number;
+  baseUnitName: string | null;
+  purchaseUnitName: string | null;
+  sellingPrice: number;
+  sellingPricePerPurchaseUnit: number | null;
+  sellUnit: SellUnit;
+  lastScanMultiplier?: number;
 };
 
 export function toDraftOutLine(row: SkuSearchResult): DraftOutLine {
@@ -34,6 +46,13 @@ export function toDraftOutLine(row: SkuSearchResult): DraftOutLine {
     quantity: 0,
     quantityAvailable: row.quantityAvailable ?? 0,
     costPrice: row.costPrice ?? 0,
+    unitsPerPurchaseUnit: row.unitsPerPurchaseUnit ?? 1,
+    baseUnitName: row.baseUnitName ?? null,
+    purchaseUnitName: row.purchaseUnitName ?? null,
+    sellingPrice: row.sellingPrice ?? row.costPrice ?? 0,
+    sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit ?? null,
+    sellUnit: "pc",
+    lastScanMultiplier: row.scannedQuantityMultiplier,
   };
 }
 
@@ -112,7 +131,7 @@ export function AddInventoryOutItemDialog({
         }
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add SKUs</DialogTitle>
         </DialogHeader>
@@ -146,48 +165,48 @@ export function AddInventoryOutItemDialog({
                 const disabled = added || unavailable;
                 const checked = selectedIds.includes(r.id);
                 return (
-                  <li key={r.id}>
-                    <label
-                      className={
-                        disabled
-                          ? "flex cursor-not-allowed items-start gap-3 px-3 py-2 text-sm opacity-60"
-                          : "hover:bg-muted/50 flex cursor-pointer items-start gap-3 px-3 py-2 text-sm"
-                      }
-                    >
+                  <ListPickRow
+                    key={r.id}
+                    disabled={disabled}
+                    onActivate={() => toggle(r.id)}
+                    className="flex items-start gap-3 px-3 py-2 text-sm"
+                  >
+                    <ListPickFocusable>
                       <input
                         type="checkbox"
-                        className="mt-1"
+                        className="pointer-events-none mt-1"
                         checked={checked}
                         disabled={disabled}
-                        onChange={() => toggle(r.id)}
+                        readOnly
                       />
-                      <span className="flex-1">
-                        <span className="font-medium">{r.productName}</span>
-                        {added ? (
-                          <span className="text-muted-foreground ml-2 text-xs">
-                            Added
-                          </span>
-                        ) : unavailable ? (
-                          <span className="text-muted-foreground ml-2 text-xs">
-                            Unavailable
-                          </span>
-                        ) : null}
-                        <span className="text-muted-foreground block">
-                          {r.variantName || "—"} · {r.sku}
-                          {r.barcode ? ` · ${r.barcode}` : ""}
+                    </ListPickFocusable>
+                    <span className="flex-1">
+                      <span className="font-medium">{r.productName}</span>
+                      {added ? (
+                        <span className="text-muted-foreground ml-2 text-xs">
+                          Added
                         </span>
-                        <span className="text-muted-foreground block tabular-nums">
-                          Available{" "}
-                          {(r.quantityAvailable ?? 0).toLocaleString()} · Avg
-                          cost {(r.costPrice ?? 0).toLocaleString()}
+                      ) : unavailable ? (
+                        <span className="text-muted-foreground ml-2 text-xs">
+                          Unavailable
                         </span>
+                      ) : null}
+                      <span className="text-muted-foreground block">
+                        {r.variantName || "—"} · {r.sku}
+                        {r.barcode ? ` · ${r.barcode}` : ""}
                       </span>
-                    </label>
-                  </li>
+                      <span className="text-muted-foreground block tabular-nums">
+                        Available{" "}
+                        {(r.quantityAvailable ?? 0).toLocaleString()} · Avg
+                        cost {(r.costPrice ?? 0).toLocaleString()}
+                      </span>
+                    </span>
+                  </ListPickRow>
                 );
               })
             )}
           </ul>
+          <KeyboardHints hints={[KEYBOARD_HINT_PICK_ROWS]} />
         </div>
 
         <DialogFooter>

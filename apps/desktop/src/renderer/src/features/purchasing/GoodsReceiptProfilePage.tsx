@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { GoodsReceiptDetail } from "@blackbox/shared";
 import { formatStoredDateTime } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -101,10 +102,6 @@ export function GoodsReceiptProfilePage() {
             <dt className="text-muted-foreground">Voucher</dt>
             <dd className="font-medium">{receipt.voucherNumber || "—"}</dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="text-muted-foreground">Notes</dt>
-            <dd className="font-medium">{receipt.notes || "—"}</dd>
-          </div>
         </dl>
       </section>
 
@@ -127,7 +124,10 @@ export function GoodsReceiptProfilePage() {
             </thead>
             <tbody>
               {receipt.items.map((item) => (
-                <tr key={item.id} className="border-border border-t">
+                <ListTableRow
+                  key={item.id}
+                  onActivate={() => navigate(`/skus/${item.productSkuId}`)}
+                >
                   <td className="px-4 py-3">
                     {item.productName}
                     <div className="text-muted-foreground text-xs">
@@ -135,12 +135,12 @@ export function GoodsReceiptProfilePage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Link
+                    <ListTableLink
                       to={`/skus/${item.productSkuId}`}
                       className="text-primary hover:underline"
                     >
                       {item.sku}
-                    </Link>
+                    </ListTableLink>
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {item.orderedQuantity}
@@ -163,7 +163,7 @@ export function GoodsReceiptProfilePage() {
                   <td className="px-4 py-3 tabular-nums">
                     {item.lineTotal.toLocaleString()}
                   </td>
-                </tr>
+                </ListTableRow>
               ))}
             </tbody>
           </table>
@@ -184,13 +184,31 @@ export function GoodsReceiptProfilePage() {
           </span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Tax</span>
-          <span className="tabular-nums">{receipt.tax.toLocaleString()}</span>
+          <span className="text-muted-foreground">Sale tax</span>
+          <span className="tabular-nums">
+            {receipt.saleTax.toLocaleString()}
+          </span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Other charges</span>
+          <span className="text-muted-foreground">Adv tax</span>
           <span className="tabular-nums">
-            {receipt.otherCharges.toLocaleString()}
+            {receipt.advTax.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-muted-foreground">GST</span>
+          <span className="tabular-nums">{receipt.gst.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-muted-foreground">Incentive</span>
+          <span className="tabular-nums text-green-700 dark:text-green-400">
+            −{receipt.incentive.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-muted-foreground">Shelf rent</span>
+          <span className="tabular-nums text-green-700 dark:text-green-400">
+            −{receipt.shelfRent.toLocaleString()}
           </span>
         </div>
         {receipt.returnCredit > 0 ? (

@@ -1,5 +1,7 @@
 import type {
   CreateProductSkuRequest,
+  CreateSkuBarcodeRequest,
+  SkuBarcode,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
@@ -49,6 +51,20 @@ export const skusApi = {
   },
   listVendors(id: string): Promise<SkuSupplier[]> {
     return apiFetch<SkuSupplier[]>(`/skus/${id}/vendors`);
+  },
+  listBarcodes(id: string): Promise<SkuBarcode[]> {
+    return apiFetch<SkuBarcode[]>(`/skus/${id}/barcodes`);
+  },
+  addBarcode(id: string, body: CreateSkuBarcodeRequest): Promise<SkuBarcode> {
+    return apiFetch<SkuBarcode>(`/skus/${id}/barcodes`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  removeBarcode(id: string, barcodeId: string): Promise<{ ok: true }> {
+    return apiFetch<{ ok: true }>(`/skus/${id}/barcodes/${barcodeId}`, {
+      method: "DELETE",
+    });
   },
 };
 

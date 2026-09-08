@@ -198,6 +198,13 @@ export function listProductsLocal(
             lower(s.sku) like '%' || @search || '%'
             or lower(coalesce(s.barcode, '')) like '%' || @search || '%'
             or lower(s.variant_name) like '%' || @search || '%'
+            or exists (
+              select 1 from product_sku_barcodes b
+              where b.product_sku_id = s.id
+                and b.tenant_id = s.tenant_id
+                and b.status = 'active'
+                and lower(b.barcode) like '%' || @search || '%'
+            )
           )
       )
       or exists (

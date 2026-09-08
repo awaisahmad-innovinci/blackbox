@@ -21,6 +21,7 @@ import type {
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
   ReceivingDraft,
+  SkuBarcode,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
@@ -180,6 +181,9 @@ declare global {
         lookupSkuByCode: (
           sku: string,
         ) => Promise<SkuBarcodeLookupResult | null>;
+        listSkuBarcodes: (skuId: string) => Promise<SkuBarcode[]>;
+        upsertSkuBarcode: (row: SkuBarcode) => Promise<void>;
+        deleteSkuBarcode: (id: string, productSkuId: string) => Promise<void>;
         getPurchaseOrder: (id: string) => Promise<PurchaseOrderDetail | null>;
         getReceivingDraft: (poId: string) => Promise<ReceivingDraft | null>;
         getGoodsReceipt: (id: string) => Promise<GoodsReceiptDetail | null>;

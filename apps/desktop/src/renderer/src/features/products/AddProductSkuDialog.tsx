@@ -5,7 +5,11 @@ import type {
   ProductSkuDetail,
   SkuBarcodeLookupResult,
   UnitListItem,
+  VendorDetail,
+  VendorSku,
 } from "@blackbox/shared";
+import { normalizeStoredText } from "@blackbox/shared";
+import { FORM_FIELD_FULL, FORM_GRID_TIGHT } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -17,12 +21,29 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { BarcodeAssignRow, type BarcodeAssignRowHandle } from "@renderer/components/scan-barcode-panel";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
+import {
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_SAVE,
+  KEYBOARD_HINT_SCAN,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { productsApi } from "@renderer/lib/api/products";
 import { allocateSkuCode } from "@renderer/lib/document-numbers";
 import { loadUnits, lookupSkuByBarcode, lookupSkuByCode } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import { syncNow } from "@renderer/lib/sync/sync-status";
+import {
+  optionalNonNegativeMargin,
+  sellingFromMargin,
+  sellingGreaterThanCost,
+} from "@renderer/lib/sku-pricing";
+import { createVendorSkuLink } from "@renderer/features/vendors/create-vendor-sku-link";
 
 const emptyForm = {
   variantName: "",
@@ -34,6 +55,7 @@ const emptyForm = {
   purchaseUnitId: "",
   unitsPerPurchaseUnit: "",
   costPrice: "",
+  marginPercent: "",
   sellingPrice: "",
   reorderLevel: "0",
   minimumStockLevel: "0",
@@ -80,14 +102,19 @@ export function AddProductSkuDialog({
   open,
   productId,
   productName,
+  linkToVendor,
   onClose,
   onCreated,
+  onVendorSkuLinked,
 }: {
   open: boolean;
   productId: string;
   productName: string;
+  /** When set, auto-links the new SKU to this vendor after creation. */
+  linkToVendor?: VendorDetail;
   onClose: () => void;
   onCreated: (row: ProductSkuDetail, cacheWarning: boolean) => void;
+  onVendorSkuLinked?: (row: VendorSku, cacheWarning: boolean) => void;
 }) {
   const [units, setUnits] = useState<UnitListItem[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -100,12 +127,7 @@ export function AddProductSkuDialog({
   const [barcodeChecking, setBarcodeChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attempted, setAttempted] = useState(false);
-  const barcodeRef = useRef<HTMLInputElement>(null);
-  const barcodeValueRef = useRef("");
-
-  useEffect(() => {
-    barcodeValueRef.current = form.barcode;
-  }, [form.barcode]);
+  const barcodeRowRef = useRef<BarcodeAssignRowHandle>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -120,12 +142,10 @@ export function AddProductSkuDialog({
     void loadUnits().then(setUnits).catch(() => undefined);
   }, [open, productName]);
 
-  async function applyBarcode(
-    code: string,
-    options: { focusAfter?: boolean } = {},
-  ) {
+  async function applyBarcode(code: string) {
     const trimmed = code.trim();
     if (!trimmed) {
+      setForm((prev) => ({ ...prev, barcode: "" }));
       setDuplicateLookup(null);
       setDuplicateMessage(null);
       return;
@@ -149,31 +169,8 @@ export function AddProductSkuDialog({
       setError(getApiErrorMessage(err, "Barcode lookup failed"));
     } finally {
       setBarcodeChecking(false);
-      if (options.focusAfter) {
-        requestAnimationFrame(() => {
-          barcodeRef.current?.focus();
-          barcodeRef.current?.select();
-        });
-      }
     }
   }
-
-  useBarcodeScanTarget({
-    kind: "barcode",
-    layer: "dialog",
-    enabled: open,
-    inputRef: barcodeRef,
-    onScan: (code) => {
-      const trimmed = code.trim();
-      barcodeValueRef.current = trimmed;
-      setForm((prev) => ({ ...prev, barcode: trimmed }));
-      if (duplicateLookup) {
-        setDuplicateLookup(null);
-        setDuplicateMessage(null);
-      }
-      void applyBarcode(trimmed, { focusAfter: true });
-    },
-  });
 
   function reset() {
     setForm(emptyForm);
@@ -191,6 +188,24 @@ export function AddProductSkuDialog({
     value: (typeof emptyForm)[K],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function onCostPriceChange(value: string) {
+    setForm((prev) => {
+      const next = { ...prev, costPrice: value };
+      const calculated = sellingFromMargin(value, prev.marginPercent);
+      if (calculated != null) next.sellingPrice = calculated;
+      return next;
+    });
+  }
+
+  function onMarginPercentChange(value: string) {
+    setForm((prev) => {
+      const next = { ...prev, marginPercent: value };
+      const calculated = sellingFromMargin(prev.costPrice, value);
+      if (calculated != null) next.sellingPrice = calculated;
+      return next;
+    });
   }
 
   const fieldErrors = useMemo(
@@ -214,9 +229,11 @@ export function AddProductSkuDialog({
         form.costPrice.trim() || attempted
           ? requiredNonNegative(form.costPrice, "Cost price")
           : null,
+      marginPercent: optionalNonNegativeMargin(form.marginPercent),
       sellingPrice:
         form.sellingPrice.trim() || attempted
-          ? requiredNonNegative(form.sellingPrice, "Selling price")
+          ? requiredNonNegative(form.sellingPrice, "Selling price") ||
+            sellingGreaterThanCost(form.costPrice, form.sellingPrice)
           : null,
     }),
     [form, attempted],
@@ -229,7 +246,9 @@ export function AddProductSkuDialog({
     !requiredSelect(form.purchaseUnitId, "Purchase unit") &&
     !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
     !requiredNonNegative(form.costPrice, "Cost price") &&
+    !optionalNonNegativeMargin(form.marginPercent) &&
     !requiredNonNegative(form.sellingPrice, "Selling price") &&
+    !sellingGreaterThanCost(form.costPrice, form.sellingPrice) &&
     !duplicateLookup &&
     !barcodeChecking;
 
@@ -255,9 +274,13 @@ export function AddProductSkuDialog({
         return;
       }
     }
+    if (nums.sellingPrice <= nums.costPrice) {
+      setError("Selling price must be greater than cost price");
+      return;
+    }
 
     const body: CreateProductSkuRequest = {
-      variantName: form.variantName.trim(),
+      variantName: normalizeStoredText(form.variantName),
       sku: form.sku.trim(),
       barcode: form.barcode.trim() || null,
       sizeValue: form.sizeValue.trim() || null,
@@ -292,6 +315,7 @@ export function AddProductSkuDialog({
       }
     }
     let row: ProductSkuDetail;
+    let skuCacheWarning = false;
     try {
       if (await isDeviceBound()) {
         let skuCode = form.sku.trim();
@@ -328,6 +352,7 @@ export function AddProductSkuDialog({
           unitsPerPurchaseUnit: body.unitsPerPurchaseUnit,
           costPrice: body.costPrice,
           sellingPrice: body.sellingPrice,
+          sellingPricePerPurchaseUnit: body.sellingPricePerPurchaseUnit ?? null,
           reorderLevel: body.reorderLevel ?? 0,
           minimumStockLevel: body.minimumStockLevel ?? 0,
           maximumStockLevel: body.maximumStockLevel ?? null,
@@ -340,8 +365,48 @@ export function AddProductSkuDialog({
           operation: "UPSERT",
           payload: row as unknown as Record<string, unknown>,
         });
+        if (body.barcode) {
+          const barcodeId = crypto.randomUUID();
+          await commitLocalChange({
+            entityType: "product_sku_barcode",
+            entityId: barcodeId,
+            operation: "UPSERT",
+            payload: {
+              id: barcodeId,
+              productSkuId: localId,
+              barcode: body.barcode,
+              status: "active",
+              quantityMultiplier: 1,
+            },
+          });
+          row = { ...row, barcode: body.barcode };
+        }
         void syncNow();
         setSaving(false);
+        if (linkToVendor && onVendorSkuLinked) {
+          try {
+            const { row: vendorSku, cacheWarning: linkCacheWarning } =
+              await createVendorSkuLink({
+                vendorId: linkToVendor.id,
+                productName,
+                sku: row,
+              });
+            reset();
+            onCreated(row, false);
+            onVendorSkuLinked(vendorSku, linkCacheWarning);
+            return;
+          } catch (err: unknown) {
+            reset();
+            onCreated(row, false);
+            setError(
+              getApiErrorMessage(
+                err,
+                "SKU created but failed to link vendor. Link it from the vendor profile.",
+              ),
+            );
+            return;
+          }
+        }
         reset();
         onCreated(row, false);
         return;
@@ -359,10 +424,45 @@ export function AddProductSkuDialog({
     } catch {
       cacheWarning = true;
     }
+    skuCacheWarning = cacheWarning;
     setSaving(false);
+
+    if (linkToVendor && onVendorSkuLinked) {
+      try {
+        const { row: vendorSku, cacheWarning: linkCacheWarning } =
+          await createVendorSkuLink({
+            vendorId: linkToVendor.id,
+            productName,
+            sku: row,
+          });
+        reset();
+        onCreated(row, skuCacheWarning);
+        onVendorSkuLinked(vendorSku, linkCacheWarning);
+        return;
+      } catch (err: unknown) {
+        reset();
+        onCreated(row, skuCacheWarning);
+        setError(
+          getApiErrorMessage(
+            err,
+            "SKU created but failed to link vendor. Link it from the vendor profile.",
+          ),
+        );
+        return;
+      }
+    }
+
     reset();
     onCreated(row, cacheWarning);
   }
+
+  usePageKeyboard({
+    enabled: open,
+    onSave: () => {
+      if (!saving && canSave) void onSave();
+    },
+    onScan: () => barcodeRowRef.current?.openScan(),
+  });
 
   return (
     <Dialog
@@ -374,7 +474,7 @@ export function AddProductSkuDialog({
         }
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add SKU</DialogTitle>
         </DialogHeader>
@@ -391,12 +491,15 @@ export function AddProductSkuDialog({
           </div>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
+        <FormEnterNav className={FORM_GRID_TIGHT}>
+          <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
             <Label>Variant *</Label>
             <Input
               value={form.variantName}
               onChange={(e) => setField("variantName", e.target.value)}
+              onBlur={(e) =>
+                setField("variantName", normalizeStoredText(e.target.value))
+              }
               aria-invalid={Boolean(fieldErrors.variantName)}
               autoFocus
             />
@@ -409,27 +512,19 @@ export function AddProductSkuDialog({
             <Input value={form.sku} readOnly disabled />
           </div>
           <div className="space-y-1.5">
-            <Label>Barcode</Label>
-            <Input
-              ref={barcodeRef}
-              {...barcodeScanInputProps()}
+            <BarcodeAssignRow
+              ref={barcodeRowRef}
               value={form.barcode}
-              onChange={(e) => {
-                setField("barcode", e.target.value);
-                barcodeValueRef.current = e.target.value;
+              checking={barcodeChecking}
+              layer="dialog"
+              onApply={async (code) => {
                 if (duplicateLookup) {
                   setDuplicateLookup(null);
                   setDuplicateMessage(null);
                 }
+                await applyBarcode(code);
               }}
-              onBlur={() => void applyBarcode(barcodeValueRef.current)}
-              placeholder="Scan or type barcode"
-              data-enter-submit=""
-              autoComplete="off"
             />
-            {barcodeChecking ? (
-              <p className="text-muted-foreground text-xs">Checking barcode…</p>
-            ) : null}
           </div>
           <div className="space-y-1.5">
             <Label>Size value</Label>
@@ -451,6 +546,7 @@ export function AddProductSkuDialog({
             <Label>Base unit *</Label>
             <select
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={form.baseUnitId}
               aria-invalid={Boolean(fieldErrors.baseUnitId)}
               onChange={(e) => setField("baseUnitId", e.target.value)}
@@ -470,6 +566,7 @@ export function AddProductSkuDialog({
             <Label>Purchase unit *</Label>
             <select
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={form.purchaseUnitId}
               aria-invalid={Boolean(fieldErrors.purchaseUnitId)}
               onChange={(e) => setField("purchaseUnitId", e.target.value)}
@@ -505,10 +602,22 @@ export function AddProductSkuDialog({
             <Input
               value={form.costPrice}
               aria-invalid={Boolean(fieldErrors.costPrice)}
-              onChange={(e) => setField("costPrice", e.target.value)}
+              onChange={(e) => onCostPriceChange(e.target.value)}
             />
             {fieldErrors.costPrice ? (
               <p className="text-destructive text-xs">{fieldErrors.costPrice}</p>
+            ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Margin %</Label>
+            <Input
+              value={form.marginPercent}
+              aria-invalid={Boolean(fieldErrors.marginPercent)}
+              placeholder="Optional — auto-fills selling price"
+              onChange={(e) => onMarginPercentChange(e.target.value)}
+            />
+            {fieldErrors.marginPercent ? (
+              <p className="text-destructive text-xs">{fieldErrors.marginPercent}</p>
             ) : null}
           </div>
           <div className="space-y-1.5">
@@ -550,6 +659,7 @@ export function AddProductSkuDialog({
             <Label>Status</Label>
             <select
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={form.status}
               onChange={(e) =>
                 setField("status", e.target.value as EntityStatus)
@@ -559,7 +669,7 @@ export function AddProductSkuDialog({
               <option value="inactive">Inactive</option>
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <label className={`flex items-center gap-2 text-sm ${FORM_FIELD_FULL}`}>
             <input
               type="checkbox"
               checked={form.trackInventory}
@@ -567,7 +677,11 @@ export function AddProductSkuDialog({
             />
             Track inventory
           </label>
-        </div>
+        </FormEnterNav>
+
+        <KeyboardHints
+          hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SCAN, KEYBOARD_HINT_SAVE]}
+        />
 
         <DialogFooter>
           <Button

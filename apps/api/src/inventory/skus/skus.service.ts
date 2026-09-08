@@ -12,15 +12,18 @@ import type {
   SkuSearchResult,
   WarehouseStockRow,
 } from "@blackbox/shared";
+import { normalizeStoredText } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { InventoryStock, ProductSku, Unit } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
+import { SkuBarcodesService } from "./sku-barcodes.service";
 
-function toNum(value: string | null | undefined): number {
-  if (value == null || value === "") return 0;
-  return Number(value);
+function toNum(value: string | null | undefined, fallback = 0): number {
+  if (value == null || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function toNumOrNull(value: string | null | undefined): number | null {
@@ -38,6 +41,7 @@ export class SkusService {
     private readonly units: Repository<Unit>,
     @InjectRepository(InventoryStock)
     private readonly stock: Repository<InventoryStock>,
+    private readonly skuBarcodes: SkuBarcodesService,
   ) {}
 
   async search(
@@ -60,7 +64,14 @@ export class SkusService {
         `(LOWER(product.name) LIKE :term
           OR LOWER(sku.variant_name) LIKE :term
           OR LOWER(sku.sku) LIKE :term
-          OR LOWER(COALESCE(sku.barcode, '')) LIKE :term)`,
+          OR LOWER(COALESCE(sku.barcode, '')) LIKE :term
+          OR EXISTS (
+            SELECT 1 FROM product_sku_barcodes b
+            WHERE b.product_sku_id = sku.id
+              AND b.tenant_id = sku.tenant_id
+              AND b.status = 'active'
+              AND LOWER(b.barcode) LIKE :term
+          ))`,
         { term },
       );
     }
@@ -110,9 +121,12 @@ export class SkusService {
       throw new BadRequestException("warehouseId is required");
     }
 
+    const match = await this.skuBarcodes.findBarcodeMatch(tenantId, code, true);
+    if (!match) throw new NotFoundException("SKU not found for barcode");
+
     const sku = await this.skus.findOne({
-      where: { tenantId, barcode: code, status: "active" },
-      relations: { product: true },
+      where: { id: match.skuId, tenantId, status: "active" },
+      relations: { product: true, baseUnit: true, purchaseUnit: true },
     });
     if (!sku) throw new NotFoundException("SKU not found for barcode");
 
@@ -129,6 +143,12 @@ export class SkusService {
       barcode: sku.barcode,
       quantityAvailable: stock ? toNum(stock.quantityAvailable) : 0,
       costPrice: toNum(sku.costPrice),
+      scannedQuantityMultiplier: match.quantityMultiplier,
+      unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit, 1),
+      baseUnitName: sku.baseUnit?.name ?? null,
+      purchaseUnitName: sku.purchaseUnit?.name ?? null,
+      sellingPrice: toNum(sku.sellingPrice),
+      sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
     };
   }
 
@@ -139,8 +159,11 @@ export class SkusService {
       throw new BadRequestException("Barcode is required");
     }
 
+    const match = await this.skuBarcodes.findBarcodeMatch(tenantId, code);
+    if (!match) throw new NotFoundException("SKU not found for barcode");
+
     const sku = await this.skus.findOne({
-      where: { tenantId, barcode: code },
+      where: { id: match.skuId, tenantId },
       relations: { product: true, baseUnit: true, purchaseUnit: true },
     });
     if (!sku) throw new NotFoundException("SKU not found for barcode");
@@ -162,11 +185,13 @@ export class SkusService {
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
       sellingPrice: toNum(sku.sellingPrice),
+      sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
       reorderLevel: toNum(sku.reorderLevel),
       minimumStockLevel: toNum(sku.minimumStockLevel),
       maximumStockLevel: toNumOrNull(sku.maximumStockLevel),
       trackInventory: sku.trackInventory,
       status: sku.status as EntityStatus,
+      scannedQuantityMultiplier: match.quantityMultiplier,
     };
   }
 
@@ -177,7 +202,8 @@ export class SkusService {
       relations: { product: true, baseUnit: true, purchaseUnit: true },
     });
     if (!sku) throw new NotFoundException("SKU not found");
-    return this.mapDetail(sku);
+    const barcodes = await this.skuBarcodes.listBySku(id);
+    return this.mapDetail(sku, barcodes);
   }
 
   async update(id: string, dto: UpdateProductSkuDto): Promise<SkuDetail> {
@@ -186,10 +212,14 @@ export class SkusService {
     if (!sku) throw new NotFoundException("SKU not found");
 
     await this.assertUnits(tenantId, dto.baseUnitId, dto.purchaseUnitId);
+    if (dto.sellingPrice <= dto.costPrice) {
+      throw new BadRequestException(
+        "Selling price must be greater than cost price",
+      );
+    }
 
-    sku.variantName = dto.variantName.trim();
+    sku.variantName = normalizeStoredText(dto.variantName);
     sku.sku = dto.sku.trim();
-    sku.barcode = dto.barcode?.trim() || null;
     sku.sizeValue = dto.sizeValue?.trim() || null;
     sku.sizeUnit = dto.sizeUnit?.trim() || null;
     sku.baseUnitId = dto.baseUnitId;
@@ -197,6 +227,10 @@ export class SkusService {
     sku.unitsPerPurchaseUnit = String(dto.unitsPerPurchaseUnit);
     sku.costPrice = String(dto.costPrice);
     sku.sellingPrice = String(dto.sellingPrice);
+    sku.sellingPricePerPurchaseUnit =
+      dto.sellingPricePerPurchaseUnit == null
+        ? null
+        : String(dto.sellingPricePerPurchaseUnit);
     sku.reorderLevel = String(dto.reorderLevel ?? 0);
     sku.minimumStockLevel = String(dto.minimumStockLevel ?? 0);
     sku.maximumStockLevel =
@@ -209,7 +243,7 @@ export class SkusService {
       return this.getById(id);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("SKU or barcode already exists");
+        throw new ConflictException("SKU code already exists");
       }
       throw error;
     }
@@ -250,7 +284,10 @@ export class SkusService {
     }));
   }
 
-  private mapDetail(sku: ProductSku): SkuDetail {
+  private mapDetail(
+    sku: ProductSku,
+    barcodes: SkuDetail["barcodes"],
+  ): SkuDetail {
     return {
       id: sku.id,
       productId: sku.productId,
@@ -259,6 +296,7 @@ export class SkusService {
       variantName: sku.variantName,
       sku: sku.sku,
       barcode: sku.barcode,
+      barcodes,
       sizeValue: sku.sizeValue,
       sizeUnit: sku.sizeUnit,
       baseUnitId: sku.baseUnitId,
@@ -268,6 +306,7 @@ export class SkusService {
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
       sellingPrice: toNum(sku.sellingPrice),
+      sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
       reorderLevel: toNum(sku.reorderLevel),
       minimumStockLevel: toNum(sku.minimumStockLevel),
       maximumStockLevel: toNumOrNull(sku.maximumStockLevel),
