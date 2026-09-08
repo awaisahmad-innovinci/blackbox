@@ -16,4 +16,4 @@ export const KEYBOARD_HINT_NEW = "F4 / Ctrl+N new";
 export const KEYBOARD_HINT_LIST_ROWS = "Tab rows · Enter open or edit";
 export const KEYBOARD_HINT_PICK_ROWS = "Tab rows · Enter select";
 export const KEYBOARD_HINT_APP_NAV =
-  "Alt+R new return · Alt+B brand · Alt+C category · Alt+G vendor group · Alt+D dashboard · Alt+W warehouses · Alt+I/P/V open menu · 1–9 pick item · ←/→ nav menu";
+  "Alt+R new return · Alt+B brand · Alt+C category · Ctrl+Alt+G vendor group · Ctrl+Alt+V vendors · Alt+D dashboard · Alt+W warehouses · Alt+I/P open menu · 1–9 pick item · ←/→ nav menu";

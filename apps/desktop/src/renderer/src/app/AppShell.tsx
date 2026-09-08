@@ -191,8 +191,14 @@ export function AppShell() {
                 ref={setNavRef(4)}
                 role="menuitem"
                 tabIndex={activeIndex === 4 ? 0 : -1}
-                aria-keyshortcuts={appNavShortcutLabel(vendorsSection.shortcut)}
-                title={`${vendorsSection.label} (${appNavShortcutLabel(vendorsSection.shortcut)})`}
+                aria-keyshortcuts={appNavShortcutLabel(
+                  vendorsSection.shortcut,
+                  vendorsSection.requireCtrl,
+                )}
+                title={`${vendorsSection.label} (${appNavShortcutLabel(
+                  vendorsSection.shortcut,
+                  vendorsSection.requireCtrl,
+                )})`}
                 onFocus={() => onNavFocus(4)}
                 className={navItemClass(vendorsActive)}
               >
