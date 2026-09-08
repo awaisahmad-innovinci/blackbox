@@ -10,6 +10,7 @@ import {
   FormEnterNav,
   formSelectPickerProps,
 } from "@renderer/components/form-enter-nav";
+import { FormSelectWithAction } from "@renderer/components/form-select-with-action";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -272,66 +273,43 @@ export function AddProductDialog({
               ))}
             </select>
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="product-brand">Brand *</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-xs"
-                onClick={() => setCreateTaxonomyKind("brand")}
-              >
-                + New brand
-              </Button>
-            </div>
-            <select
-              id="product-brand"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              {...formSelectPickerProps()}
-              value={form.brandId}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, brandId: e.target.value }))
-              }
-            >
-              <option value="">Select brand…</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="product-category">Category *</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-xs"
-                onClick={() => setCreateTaxonomyKind("category")}
-              >
-                + New category
-              </Button>
-            </div>
-            <select
-              id="product-category"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              {...formSelectPickerProps()}
-              value={form.categoryId}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, categoryId: e.target.value }))
-              }
-            >
-              <option value="">Select category…</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FormSelectWithAction
+            id="product-brand"
+            label="Brand *"
+            actionLabel="+ New brand"
+            onAction={() => setCreateTaxonomyKind("brand")}
+            {...formSelectPickerProps()}
+            value={form.brandId}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, brandId: e.target.value }))
+            }
+          >
+            <option value="">Select brand…</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
+          <FormSelectWithAction
+            id="product-category"
+            label="Category *"
+            actionLabel="+ New category"
+            onAction={() => setCreateTaxonomyKind("category")}
+            className="space-y-1.5 sm:col-span-2"
+            {...formSelectPickerProps()}
+            value={form.categoryId}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, categoryId: e.target.value }))
+            }
+          >
+            <option value="">Select category…</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="product-description">Description</Label>
             <Textarea

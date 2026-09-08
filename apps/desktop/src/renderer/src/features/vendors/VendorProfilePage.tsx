@@ -118,7 +118,7 @@ export function VendorProfilePage() {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <BackButton />
+          <BackButton to="/vendors" />
           <h1 className="mt-2 text-2xl font-semibold tracking-tight uppercase">
             {vendor.name}
           </h1>

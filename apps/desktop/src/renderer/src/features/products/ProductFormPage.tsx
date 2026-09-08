@@ -11,6 +11,7 @@ import {
   FormEnterNav,
   formSelectPickerProps,
 } from "@renderer/components/form-enter-nav";
+import { FormSelectWithAction } from "@renderer/components/form-select-with-action";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -165,7 +166,10 @@ export function ProductFormPage() {
         });
         void syncNow();
         setSaving(false);
-        navigate(`/products/${localId}`, { state: { product: local } });
+        navigate(`/products/${localId}`, {
+          state: { product: local },
+          replace: true,
+        });
         return;
       } catch (err: unknown) {
         setSaving(false);
@@ -211,7 +215,10 @@ export function ProductFormPage() {
             baseEntityVersion: 0,
           });
           setSaving(false);
-          navigate(`/products/${localId}`, { state: { product: local } });
+          navigate(`/products/${localId}`, {
+            state: { product: local },
+            replace: true,
+          });
           return;
         } catch {
           /* fall through */
@@ -235,6 +242,7 @@ export function ProductFormPage() {
         product: saved,
         cacheWarning: localCacheWarning ? true : undefined,
       },
+      replace: true,
     });
   }
 
@@ -303,64 +311,40 @@ export function ProductFormPage() {
               <option value="inactive">Inactive</option>
             </select>
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="brand">Brand *</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-xs"
-                onClick={() => setCreateTaxonomyKind("brand")}
-              >
-                + New brand
-              </Button>
-            </div>
-            <select
-              id="brand"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              {...formSelectPickerProps()}
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              required
-            >
-              <option value="">Select brand…</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="category">Category *</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-xs"
-                onClick={() => setCreateTaxonomyKind("category")}
-              >
-                + New category
-              </Button>
-            </div>
-            <select
-              id="category"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              {...formSelectPickerProps()}
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              required
-            >
-              <option value="">Select category…</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FormSelectWithAction
+            id="brand"
+            label="Brand *"
+            actionLabel="+ New brand"
+            onAction={() => setCreateTaxonomyKind("brand")}
+            {...formSelectPickerProps()}
+            value={brandId}
+            onChange={(e) => setBrandId(e.target.value)}
+            required
+          >
+            <option value="">Select brand…</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
+          <FormSelectWithAction
+            id="category"
+            label="Category *"
+            actionLabel="+ New category"
+            onAction={() => setCreateTaxonomyKind("category")}
+            {...formSelectPickerProps()}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            required
+          >
+            <option value="">Select category…</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="description">Description</Label>
             <Textarea

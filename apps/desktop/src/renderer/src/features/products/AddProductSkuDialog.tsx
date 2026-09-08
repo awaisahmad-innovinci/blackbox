@@ -9,7 +9,7 @@ import type {
   VendorSku,
 } from "@blackbox/shared";
 import { normalizeStoredText } from "@blackbox/shared";
-import { FORM_FIELD_FULL, FORM_GRID_TIGHT } from "@renderer/lib/form-layout";
+import { FORM_DIALOG_FIELD_FULL, FORM_DIALOG_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -474,7 +474,7 @@ export function AddProductSkuDialog({
         }
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto lg:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add SKU</DialogTitle>
         </DialogHeader>
@@ -491,8 +491,8 @@ export function AddProductSkuDialog({
           </div>
         ) : null}
 
-        <FormEnterNav className={FORM_GRID_TIGHT}>
-          <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
+        <FormEnterNav className={FORM_DIALOG_GRID}>
+          <div className={`space-y-1.5 ${FORM_DIALOG_FIELD_FULL}`}>
             <Label>Variant *</Label>
             <Input
               value={form.variantName}
@@ -512,11 +512,20 @@ export function AddProductSkuDialog({
             <Input value={form.sku} readOnly disabled />
           </div>
           <div className="space-y-1.5">
+            <Label>Size value</Label>
+            <Input
+              value={form.sizeValue}
+              onChange={(e) => setField("sizeValue", e.target.value)}
+              placeholder="1"
+            />
+          </div>
+          <div className={`${FORM_DIALOG_FIELD_FULL}`}>
             <BarcodeAssignRow
               ref={barcodeRowRef}
               value={form.barcode}
               checking={barcodeChecking}
               layer="dialog"
+              buttonLabel="short"
               onApply={async (code) => {
                 if (duplicateLookup) {
                   setDuplicateLookup(null);
@@ -524,14 +533,6 @@ export function AddProductSkuDialog({
                 }
                 await applyBarcode(code);
               }}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Size value</Label>
-            <Input
-              value={form.sizeValue}
-              onChange={(e) => setField("sizeValue", e.target.value)}
-              placeholder="1"
             />
           </div>
           <div className="space-y-1.5">
@@ -669,7 +670,7 @@ export function AddProductSkuDialog({
               <option value="inactive">Inactive</option>
             </select>
           </div>
-          <label className={`flex items-center gap-2 text-sm ${FORM_FIELD_FULL}`}>
+          <label className={`flex items-center gap-2 text-sm ${FORM_DIALOG_FIELD_FULL}`}>
             <input
               type="checkbox"
               checked={form.trackInventory}

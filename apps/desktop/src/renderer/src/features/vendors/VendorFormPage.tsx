@@ -20,6 +20,7 @@ import {
   normalizeStoredText,
 } from "@blackbox/shared";
 import { FORM_FIELD_FULL, FORM_GRID } from "@renderer/lib/form-layout";
+import { FormSelectWithAction } from "@renderer/components/form-select-with-action";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -442,6 +443,7 @@ export function VendorFormPage() {
         setSaving(false);
         navigate(`/vendors/${localId}`, {
           state: { vendor: saved, flash: "Vendor created successfully." },
+          replace: true,
         });
         return;
       }
@@ -544,35 +546,23 @@ export function VendorFormPage() {
               <p className="text-destructive text-xs">{fieldErrors.vendorCode}</p>
             ) : null}
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="group">Vendor Group</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-xs"
-                onClick={() => setCreateTaxonomyKind("vendor_group")}
-              >
-                + New group
-              </Button>
-            </div>
-            <select
-              id="group"
-              data-enter-picker=""
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              value={form.groupId}
-              onFocus={handleEnterPickerFocus}
-              onChange={(e) => setForm({ ...form, groupId: e.target.value })}
-            >
-              <option value="">Select group</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FormSelectWithAction
+            id="group"
+            label="Vendor Group"
+            actionLabel="+ New group"
+            onAction={() => setCreateTaxonomyKind("vendor_group")}
+            data-enter-picker=""
+            value={form.groupId}
+            onFocus={handleEnterPickerFocus}
+            onChange={(e) => setForm({ ...form, groupId: e.target.value })}
+          >
+            <option value="">Select group</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
           <div className="space-y-1.5">
             <Label>Status</Label>
             <select

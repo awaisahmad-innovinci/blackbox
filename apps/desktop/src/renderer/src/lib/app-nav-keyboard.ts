@@ -66,6 +66,7 @@ export const APP_NAV_SECTIONS = [
     id: "vendors",
     label: "Vendors",
     shortcut: "v",
+    requireCtrl: true,
     kind: "dropdown",
     dropdownId: "vendors",
   },
@@ -74,46 +75,71 @@ export const APP_NAV_SECTIONS = [
 export const GLOBAL_TAXONOMY_SHORTCUTS = [
   { kind: "brand", shortcut: "b" },
   { kind: "category", shortcut: "c" },
-  { kind: "vendor_group", shortcut: "g" },
-] as const satisfies ReadonlyArray<{ kind: TaxonomyKind; shortcut: string }>;
+  { kind: "vendor_group", shortcut: "g", requireCtrl: true },
+] as const satisfies ReadonlyArray<{
+  kind: TaxonomyKind;
+  shortcut: string;
+  requireCtrl?: boolean;
+}>;
 
 export const GLOBAL_NAV_SHORTCUTS = [
   { shortcut: "r", to: "/inventory/returns/new" },
 ] as const;
 
+function navModifiersMatch(event: KeyboardEvent, requireCtrl: boolean): boolean {
+  if (!event.altKey || event.shiftKey || event.metaKey) return false;
+  return requireCtrl ? event.ctrlKey : !event.ctrlKey;
+}
+
 export function matchAppNavShortcut(
   event: KeyboardEvent,
 ): AppNavSectionId | null {
-  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
-    return null;
-  }
-
   const key = event.key.toLowerCase();
   const section = APP_NAV_SECTIONS.find((s) => s.shortcut === key);
   if (!section) return null;
+  if (
+    !navModifiersMatch(
+      event,
+      "requireCtrl" in section ? section.requireCtrl : false,
+    )
+  ) {
+    return null;
+  }
 
   event.preventDefault();
   return section.id;
 }
 
-export function appNavShortcutLabel(shortcut: string): string {
-  return `Alt+${shortcut.toUpperCase()}`;
+export function appNavShortcutLabel(
+  shortcut: string,
+  requireCtrl = false,
+): string {
+  return requireCtrl
+    ? `Ctrl+Alt+${shortcut.toUpperCase()}`
+    : `Alt+${shortcut.toUpperCase()}`;
 }
 
-export function globalTaxonomyShortcutLabel(shortcut: string): string {
-  return appNavShortcutLabel(shortcut);
+export function globalTaxonomyShortcutLabel(
+  shortcut: string,
+  requireCtrl = false,
+): string {
+  return appNavShortcutLabel(shortcut, requireCtrl);
 }
 
 export function matchGlobalTaxonomyShortcut(
   event: KeyboardEvent,
 ): TaxonomyKind | null {
-  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
-    return null;
-  }
-
   const key = event.key.toLowerCase();
   const match = GLOBAL_TAXONOMY_SHORTCUTS.find((s) => s.shortcut === key);
   if (!match) return null;
+  if (
+    !navModifiersMatch(
+      event,
+      "requireCtrl" in match ? match.requireCtrl : false,
+    )
+  ) {
+    return null;
+  }
 
   event.preventDefault();
   return match.kind;
