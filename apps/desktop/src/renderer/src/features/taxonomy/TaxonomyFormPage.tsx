@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { EntityStatus, SyncEntityType } from "@blackbox/shared";
+import {
+  normalizeOptionalStoredText,
+  normalizeStoredText,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -8,6 +12,16 @@ import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import {
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_SAVE,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import type { TaxonomyRow } from "./TaxonomyListPage";
 
 export function TaxonomyFormPage({
@@ -52,6 +66,11 @@ export function TaxonomyFormPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  usePageKeyboard({
+    onSave: () => void onSave(),
+    enabled: !loading,
+  });
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -85,8 +104,8 @@ export function TaxonomyFormPage({
     setSaving(true);
     try {
       const body = {
-        name: name.trim(),
-        description: description.trim(),
+        name: normalizeStoredText(name),
+        description: normalizeOptionalStoredText(description),
         status,
       };
       if (syncEntityType && (await isDeviceBound())) {
@@ -124,7 +143,7 @@ export function TaxonomyFormPage({
           entityType: syncEntityType,
           entityId: id,
           operation: "DELETE",
-          payload: { id, name, description, status: "inactive" },
+          payload: { id, name: normalizeStoredText(name), description: normalizeOptionalStoredText(description), status: "inactive" },
         });
         void syncNow();
         navigate(basePath);
@@ -145,8 +164,8 @@ export function TaxonomyFormPage({
     setSaving(true);
     try {
       const body = {
-        name: name.trim(),
-        description: description.trim(),
+        name: normalizeStoredText(name),
+        description: normalizeOptionalStoredText(description),
         status: "active" as const,
       };
       if (syncEntityType && (await isDeviceBound())) {
@@ -200,13 +219,14 @@ export function TaxonomyFormPage({
         </div>
       ) : null}
 
-      <section className="grid max-w-xl gap-4">
+      <FormEnterNav className="grid max-w-xl gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="name">Name *</Label>
           <Input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onBlur={(e) => setName(normalizeStoredText(e.target.value))}
             autoFocus
           />
         </div>
@@ -216,6 +236,9 @@ export function TaxonomyFormPage({
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            onBlur={(e) =>
+              setDescription(normalizeOptionalStoredText(e.target.value))
+            }
             rows={3}
           />
         </div>
@@ -225,6 +248,7 @@ export function TaxonomyFormPage({
             <select
               id="status"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={status}
               onChange={(e) => setStatus(e.target.value as EntityStatus)}
             >
@@ -233,7 +257,7 @@ export function TaxonomyFormPage({
             </select>
           </div>
         ) : null}
-      </section>
+      </FormEnterNav>
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={saving} onClick={() => void onSave()}>
@@ -267,6 +291,8 @@ export function TaxonomyFormPage({
           </Button>
         ) : null}
       </div>
+
+      <KeyboardHints hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SAVE]} />
     </div>
   );
 }

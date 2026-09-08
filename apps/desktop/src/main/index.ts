@@ -95,6 +95,11 @@ import {
   listVendorSkusLocal,
 } from "./db/entity-get-local";
 import {
+  deleteSkuBarcodeLocal,
+  listSkuBarcodesLocal,
+  upsertSkuBarcodeLocal,
+} from "./db/sku-barcodes-local";
+import {
   getDashboardSummaryLocal,
   listBrandsLocal,
   getBrandLocal,
@@ -443,6 +448,21 @@ function registerIpc(): void {
   );
   ipcMain.handle("localDb:lookupSkuByCode", (_event, sku: string) =>
     lookupSkuByCodeLocal(sku),
+  );
+  ipcMain.handle("localDb:listSkuBarcodes", (_event, skuId: string) =>
+    listSkuBarcodesLocal(skuId),
+  );
+  ipcMain.handle(
+    "localDb:upsertSkuBarcode",
+    (_event, row: import("@blackbox/shared").SkuBarcode) => {
+      upsertSkuBarcodeLocal(row);
+    },
+  );
+  ipcMain.handle(
+    "localDb:deleteSkuBarcode",
+    (_event, id: string, productSkuId: string) => {
+      deleteSkuBarcodeLocal(id, productSkuId);
+    },
   );
   ipcMain.handle("localDb:getPurchaseOrder", (_event, id: string) =>
     getPurchaseOrderLocal(id),

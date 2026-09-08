@@ -16,12 +16,13 @@ import {
   DEFAULT_ROLES,
   OFFLINE_AUTHORIZATION_DAYS_DEFAULT,
   REFRESH_TOKEN_TTL_SECONDS,
+  SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE,
   type AuthResponse,
   type AuthUser,
   type JwtPayload,
   type Permission,
 } from "@blackbox/shared";
-import { DataSource, IsNull, QueryFailedError, Repository } from "typeorm";
+import { DataSource, IsNull, Not, QueryFailedError, Repository } from "typeorm";
 import { DeviceUser } from "../db/entities/device-user.entity";
 import { Device } from "../db/entities/device.entity";
 import { Permission as PermissionEntity } from "../db/entities/permission.entity";
@@ -210,6 +211,11 @@ export class AuthService {
         user.tenantId,
         dto.fingerprint.trim(),
         dto.deviceName?.trim() || "Desktop",
+      );
+      await this.assertSingleDesktopSessionAllowed(
+        user.id,
+        user.tenantId,
+        deviceId,
       );
     }
 
@@ -491,5 +497,51 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
+  }
+
+  private async getActiveDesktopRefreshTokens(
+    userId: string,
+    tenantId: string,
+  ): Promise<RefreshToken[]> {
+    const rows = await this.refreshTokens.find({
+      where: {
+        userId,
+        tenantId,
+        deviceId: Not(IsNull()),
+        revokedAt: IsNull(),
+      },
+    });
+    const now = Date.now();
+    return rows.filter((row) => row.expiresAt.getTime() > now);
+  }
+
+  /**
+   * Desktop only: block login when another device still has an active session.
+   * Credentials must already be verified before calling this.
+   */
+  private async assertSingleDesktopSessionAllowed(
+    userId: string,
+    tenantId: string,
+    incomingDeviceId: string,
+  ): Promise<void> {
+    const active = await this.getActiveDesktopRefreshTokens(userId, tenantId);
+    if (active.length === 0) return;
+
+    const hasOtherDevice = active.some(
+      (token) => token.deviceId !== incomingDeviceId,
+    );
+    if (hasOtherDevice) {
+      throw new ConflictException(
+        SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE,
+      );
+    }
+
+    const now = new Date();
+    for (const token of active) {
+      if (token.deviceId === incomingDeviceId) {
+        token.revokedAt = now;
+        await this.refreshTokens.save(token);
+      }
+    }
   }
 }

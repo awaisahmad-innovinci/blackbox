@@ -24,7 +24,9 @@ import type {
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PaginatedGoodsReceipts,
+  PaginatedProducts,
   PendingVendorReturnLine,
+  ProductListQuery,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -81,6 +83,16 @@ export async function loadProduct(id: string): Promise<ProductDetail> {
   const local = await window.blackbox?.localDb?.getProduct(id);
   if (local) return local;
   return productsApi.get(id);
+}
+
+export async function loadProducts(
+  query: ProductListQuery = {},
+): Promise<PaginatedProducts> {
+  const mode = await resolveDataSourceMode();
+  if (mode === "local" && window.blackbox?.localDb?.listProducts) {
+    return window.blackbox.localDb.listProducts(query);
+  }
+  return productsApi.list(query);
 }
 
 export async function loadProductProfile(
@@ -284,15 +296,9 @@ export async function loadVendorSkus(
   q?: string,
   warehouseId?: string,
 ): Promise<VendorSku[]> {
-  try {
-    const local = await window.blackbox?.localDb?.listVendorSkus?.(
-      vendorId,
-      q,
-      warehouseId,
-    );
-    if (local) return local;
-  } catch {
-    /* fall through to API */
+  const mode = await resolveDataSourceMode();
+  if (mode === "local" && window.blackbox?.localDb?.listVendorSkus) {
+    return window.blackbox.localDb.listVendorSkus(vendorId, q, warehouseId);
   }
   return vendorSkusApi.listByVendor(vendorId, q, warehouseId);
 }
@@ -301,13 +307,35 @@ export async function loadSkuSearch(
   q?: string,
   warehouseId?: string,
 ): Promise<SkuSearchResult[]> {
-  try {
-    const local = await window.blackbox?.localDb?.searchSkus?.(q, warehouseId);
-    if (local) return local;
-  } catch {
-    /* fall through to API */
+  const mode = await resolveDataSourceMode();
+  if (mode === "local" && window.blackbox?.localDb?.searchSkus) {
+    return window.blackbox.localDb.searchSkus(q, warehouseId);
   }
   return skusApi.search(q, warehouseId);
+}
+
+export type VendorSkuBarcodeLookup =
+  | { kind: "found"; row: VendorSku; scannedQuantityMultiplier: number }
+  | { kind: "not_found" }
+  | { kind: "not_linked" };
+
+export async function findVendorSkuByBarcode(
+  vendorId: string,
+  barcode: string,
+  warehouseId?: string,
+): Promise<VendorSkuBarcodeLookup> {
+  const code = barcode.trim();
+  if (!code) return { kind: "not_found" };
+  const sku = await lookupSkuByBarcode(code);
+  if (!sku) return { kind: "not_found" };
+  const rows = await loadVendorSkus(vendorId, undefined, warehouseId);
+  const match = rows.find((r) => r.productSkuId === sku.id);
+  if (!match) return { kind: "not_linked" };
+  return {
+    kind: "found",
+    row: match,
+    scannedQuantityMultiplier: sku.scannedQuantityMultiplier ?? 1,
+  };
 }
 
 export async function loadSkuByBarcode(

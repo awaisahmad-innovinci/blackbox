@@ -8,6 +8,10 @@ import type {
   EntityStatus,
   VendorGroup as VendorGroupDto,
 } from "@blackbox/shared";
+import {
+  normalizeOptionalStoredText,
+  normalizeStoredText,
+} from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { VendorGroup } from "../../db/entities";
@@ -56,8 +60,8 @@ export class VendorGroupsService {
     const tenantId = this.fixedTenant.tenantId;
     const row = this.groups.create({
       tenantId,
-      name: dto.name.trim(),
-      description: dto.description?.trim() ?? "",
+      name: normalizeStoredText(dto.name),
+      description: normalizeOptionalStoredText(dto.description),
       status: dto.status ?? "active",
     });
     try {
@@ -73,8 +77,8 @@ export class VendorGroupsService {
 
   async update(id: string, dto: UpdateVendorGroupDto): Promise<VendorGroupDto> {
     const row = await this.require(id);
-    row.name = dto.name.trim();
-    row.description = dto.description?.trim() ?? "";
+    row.name = normalizeStoredText(dto.name);
+    row.description = normalizeOptionalStoredText(dto.description);
     if (dto.status) row.status = dto.status;
     try {
       await this.groups.save(row);

@@ -53,6 +53,8 @@ import {
   liveEmailError as checkLiveEmailError,
   livePhone11DigitError as checkLivePhone11DigitError,
   livePasswordError as checkLivePasswordError,
+  normalizeStoredText as normalizeStoredTextFn,
+  normalizeOptionalStoredText as normalizeOptionalStoredTextFn,
 } from "./validation";
 
 import {
@@ -89,6 +91,7 @@ export type {
   MessageResponse,
   JwtPayload,
 } from "./auth";
+export { SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE } from "./auth";
 export type {
   DeviceStatus,
   Device,
@@ -154,7 +157,10 @@ export type {
   VendorSku,
   CreateVendorSkuRequest,
   UpdateVendorSkuRequest,
+  SellUnit,
   SkuSearchResult,
+  SkuBarcode,
+  CreateSkuBarcodeRequest,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSupplier,
@@ -287,11 +293,16 @@ export {
   MASTER_DATA_IMPORT_FILES,
   nextSkuCode,
   roundMoney4,
+  sellingPriceFromCostMargin,
   weightedAvgUnitCost,
   clampDiscountPercent,
   lineTotalAfterDiscount,
   netUnitAfterDiscounts,
+  goodsReceiptCostCharges,
+  goodsReceiptCostCredits,
+  goodsReceiptGrandTotal,
   landedUnitByQuantity,
+  lineTotalForScan,
 } from "./inventory";
 export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
 export const PAYMENT_TERMS = paymentTermsList;
@@ -318,5 +329,7 @@ export const liveUsernameError = checkLiveUsernameError;
 export const liveEmailError = checkLiveEmailError;
 export const livePhone11DigitError = checkLivePhone11DigitError;
 export const livePasswordError = checkLivePasswordError;
+export const normalizeStoredText = normalizeStoredTextFn;
+export const normalizeOptionalStoredText = normalizeOptionalStoredTextFn;
 
 export { buildReceivedAtIso, formatStoredDateTime } from "./datetime";

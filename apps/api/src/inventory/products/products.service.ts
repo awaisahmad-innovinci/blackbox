@@ -18,6 +18,10 @@ import type {
   WarehouseStockRow,
 } from "@blackbox/shared";
 import { nextSkuCodeForProduct } from "@blackbox/shared";
+import {
+  normalizeOptionalStoredText,
+  normalizeStoredText,
+} from "@blackbox/shared";
 import { In, Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import {
@@ -31,6 +35,7 @@ import {
   VendorSku,
 } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { SkuBarcodesService } from "../skus/sku-barcodes.service";
 import {
   CreateProductDto,
   CreateProductSkuDto,
@@ -68,6 +73,7 @@ export class ProductsService {
     private readonly stock: Repository<InventoryStock>,
     @InjectRepository(InventoryMovement)
     private readonly movements: Repository<InventoryMovement>,
+    private readonly skuBarcodes: SkuBarcodesService,
   ) {}
 
   async list(query: ListProductsQueryDto): Promise<PaginatedProducts> {
@@ -99,7 +105,14 @@ export class ProductsService {
             SELECT 1 FROM product_skus s
             WHERE s.product_id = p.id AND s.tenant_id = p.tenant_id
               AND (LOWER(s.sku) LIKE :term OR LOWER(COALESCE(s.barcode, '')) LIKE :term
-                   OR LOWER(s.variant_name) LIKE :term)
+                   OR LOWER(s.variant_name) LIKE :term
+                   OR EXISTS (
+                     SELECT 1 FROM product_sku_barcodes b
+                     WHERE b.product_sku_id = s.id
+                       AND b.tenant_id = s.tenant_id
+                       AND b.status = 'active'
+                       AND LOWER(b.barcode) LIKE :term
+                   ))
           )
           OR EXISTS (
             SELECT 1 FROM brands b
@@ -248,12 +261,12 @@ export class ProductsService {
       const saved = await this.products.save(
         this.products.create({
           tenantId,
-          name: dto.name.trim(),
+          name: normalizeStoredText(dto.name),
           productCode,
           brandId: dto.brandId,
           categoryId: dto.categoryId,
           productType: dto.productType ?? "STOCK_ITEM",
-          description: dto.description?.trim() ?? "",
+          description: normalizeOptionalStoredText(dto.description),
           imagePath: null,
           status: dto.status ?? "active",
         }),
@@ -274,11 +287,11 @@ export class ProductsService {
 
     await this.assertBrandCategory(tenantId, dto.brandId, dto.categoryId);
 
-    product.name = dto.name.trim();
+    product.name = normalizeStoredText(dto.name);
     product.brandId = dto.brandId;
     product.categoryId = dto.categoryId;
     product.productType = dto.productType ?? product.productType;
-    product.description = dto.description?.trim() ?? "";
+    product.description = normalizeOptionalStoredText(dto.description);
     if (dto.status) product.status = dto.status;
 
     await this.products.save(product);
@@ -312,6 +325,11 @@ export class ProductsService {
     const tenantId = this.fixedTenant.tenantId;
     const product = await this.requireProduct(productId);
     await this.assertUnits(tenantId, dto.baseUnitId, dto.purchaseUnitId);
+    if (dto.sellingPrice <= dto.costPrice) {
+      throw new BadRequestException(
+        "Selling price must be greater than cost price",
+      );
+    }
 
     const existing = await this.skus.find({
       where: { tenantId, productId },
@@ -329,9 +347,9 @@ export class ProductsService {
         this.skus.create({
           tenantId,
           productId,
-          variantName: dto.variantName.trim(),
+          variantName: normalizeStoredText(dto.variantName),
           sku: skuCode,
-          barcode: dto.barcode?.trim() || null,
+          barcode: null,
           sizeValue: dto.sizeValue?.trim() || null,
           sizeUnit: dto.sizeUnit?.trim() || null,
           baseUnitId: dto.baseUnitId,
@@ -339,6 +357,10 @@ export class ProductsService {
           unitsPerPurchaseUnit: String(dto.unitsPerPurchaseUnit),
           costPrice: String(dto.costPrice),
           sellingPrice: String(dto.sellingPrice),
+          sellingPricePerPurchaseUnit:
+            dto.sellingPricePerPurchaseUnit == null
+              ? null
+              : String(dto.sellingPricePerPurchaseUnit),
           reorderLevel: String(dto.reorderLevel ?? 0),
           minimumStockLevel: String(dto.minimumStockLevel ?? 0),
           maximumStockLevel:
@@ -349,6 +371,9 @@ export class ProductsService {
           status: dto.status ?? "active",
         }),
       );
+      if (dto.barcode?.trim()) {
+        await this.skuBarcodes.add(saved.id, dto.barcode.trim());
+      }
       const full = await this.skus.findOne({
         where: { id: saved.id },
         relations: { baseUnit: true, purchaseUnit: true },
@@ -356,7 +381,7 @@ export class ProductsService {
       return this.mapSkuDetail(full!);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("SKU or barcode already exists");
+        throw new ConflictException("SKU code already exists");
       }
       throw error;
     }
@@ -465,6 +490,7 @@ export class ProductsService {
       unitsPerPurchaseUnit: toNum(s.unitsPerPurchaseUnit),
       costPrice: toNum(s.costPrice),
       sellingPrice: toNum(s.sellingPrice),
+      sellingPricePerPurchaseUnit: toNumOrNull(s.sellingPricePerPurchaseUnit),
       reorderLevel: toNum(s.reorderLevel),
       minimumStockLevel: toNum(s.minimumStockLevel),
       maximumStockLevel: toNumOrNull(s.maximumStockLevel),

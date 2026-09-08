@@ -42,6 +42,13 @@ Duplicate tenant-scoped email/username → `409 Conflict`.
 - If the password is correct but the user is **deactivated** (`is_active = false`), respond with **`403`** and message **`This account has been deactivated by an administrator.`**
 - Then verify the tenant is active; inactive tenant → **`401 Invalid credentials`**.
 
+**Desktop single session** (after credentials and permissions are verified):
+
+- One active desktop session per user. Web sessions (`device_id` null) do **not** block desktop login.
+- If the user already has a non-revoked, unexpired refresh token on a **different** `device_id`, respond with **`409 Conflict`** and message **`This account is already signed in on another device. Sign out there first, then try again.`**
+- Re-login on the **same** desktop (same fingerprint / `device_id`) revokes the previous desktop refresh token and proceeds.
+- Wrong username/password still returns **`401 Invalid credentials`** only — the session check runs **after** password verification.
+
 ### JWT access token
 
 Minimal claims: `sub` (user id), `tenantId`. `iat` / `exp` from the JWT library (access TTL **15 minutes** / 900s).

@@ -33,6 +33,10 @@ import { upsertInventoryMovementLocal } from "./movements-local";
 import { applyStockDeltaLocal } from "./stock-local";
 import { upsertProductLocal, upsertProductSkuLocal } from "./products-local";
 import { upsertVendorLocal, upsertVendorSkuLocal } from "./vendors-local";
+import {
+  deleteSkuBarcodeLocal,
+  upsertSkuBarcodeLocal,
+} from "./sku-barcodes-local";
 import { upsertPurchaseOrderLocal } from "./purchase-orders-local";
 import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
@@ -184,6 +188,10 @@ export function applyChange(change: SyncChangeDto): void {
       unitsPerPurchaseUnit: Number(p.unitsPerPurchaseUnit ?? 1),
       costPrice: Number(p.costPrice ?? 0),
       sellingPrice: Number(p.sellingPrice ?? 0),
+      sellingPricePerPurchaseUnit:
+        p.sellingPricePerPurchaseUnit == null
+          ? null
+          : Number(p.sellingPricePerPurchaseUnit),
       reorderLevel: Number(p.reorderLevel ?? 0),
       minimumStockLevel: Number(p.minimumStockLevel ?? 0),
       maximumStockLevel:
@@ -239,6 +247,21 @@ export function applyChange(change: SyncChangeDto): void {
     });
     return;
   }
+  if (change.entityType === "product_sku_barcode") {
+    const productSkuId = str(p.productSkuId);
+    if (change.operation === "DELETE") {
+      deleteSkuBarcodeLocal(change.entityId, productSkuId);
+    } else {
+      upsertSkuBarcodeLocal({
+        id: change.entityId,
+        productSkuId,
+        barcode: str(p.barcode),
+        quantityMultiplier: Number(p.quantityMultiplier ?? 1),
+        status: statusOf(p, change.operation),
+      });
+    }
+    return;
+  }
   if (change.entityType === "purchase_order") {
     const existing = getPurchaseOrderLocal(change.entityId);
     const items = Array.isArray(p.items)
@@ -290,11 +313,16 @@ export function applyChange(change: SyncChangeDto): void {
       voucherNumber: (p.voucherNumber as string | null) ?? null,
       subtotal: Number(p.subtotal ?? 0),
       discount: Number(p.discount ?? 0),
-      tax: Number(p.tax ?? 0),
-      otherCharges: Number(p.otherCharges ?? 0),
+      saleTax: Number(p.saleTax ?? p.tax ?? 0),
+      advTax: Number(p.advTax ?? 0),
+      gst: Number(p.gst ?? 0),
+      incentive: Number(p.incentive ?? 0),
+      shelfRent: Number(p.shelfRent ?? 0),
+      tax: Number(p.saleTax ?? p.tax ?? 0),
+      otherCharges: 0,
       returnCredit: Number(p.returnCredit ?? 0),
       total: Number(p.total ?? 0),
-      notes: str(p.notes),
+      notes: "",
       items: Array.isArray(p.items)
         ? (p.items as GoodsReceiptDetail["items"])
         : [],

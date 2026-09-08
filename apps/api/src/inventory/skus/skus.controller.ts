@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -9,15 +10,19 @@ import {
   Query,
 } from "@nestjs/common";
 import type {
+  CreateSkuBarcodeRequest,
+  SkuBarcode,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { IsOptional, IsString, IsUUID } from "class-validator";
+import { IsOptional, IsString, IsUUID, Min, IsNumber } from "class-validator";
+import { Type } from "class-transformer";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
 import { VendorSkusService } from "../vendors/vendor-skus.service";
+import { SkuBarcodesService } from "./sku-barcodes.service";
 import { SkusService } from "./skus.service";
 
 class SearchSkusQueryDto {
@@ -43,11 +48,23 @@ class ExistsByBarcodeQueryDto {
   barcode!: string;
 }
 
+class CreateSkuBarcodeBodyDto implements CreateSkuBarcodeRequest {
+  @IsString()
+  barcode!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.0001)
+  quantityMultiplier?: number;
+}
+
 @Controller("skus")
 export class SkusController {
   constructor(
     private readonly skus: SkusService,
     private readonly vendorSkus: VendorSkusService,
+    private readonly skuBarcodes: SkuBarcodesService,
   ) {}
 
   @Get()
@@ -99,5 +116,30 @@ export class SkusController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<SkuSupplier[]> {
     return this.vendorSkus.listBySku(id);
+  }
+
+  @Get(":id/barcodes")
+  listBarcodes(@Param("id", ParseUUIDPipe) id: string): Promise<SkuBarcode[]> {
+    return this.skuBarcodes.listBySku(id);
+  }
+
+  @Post(":id/barcodes")
+  addBarcode(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: CreateSkuBarcodeBodyDto,
+  ): Promise<SkuBarcode> {
+    return this.skuBarcodes.add(
+      id,
+      dto.barcode,
+      dto.quantityMultiplier ?? 1,
+    );
+  }
+
+  @Delete(":id/barcodes/:barcodeId")
+  removeBarcode(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("barcodeId", ParseUUIDPipe) barcodeId: string,
+  ): Promise<{ ok: true }> {
+    return this.skuBarcodes.remove(id, barcodeId).then(() => ({ ok: true }));
   }
 }

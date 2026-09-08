@@ -10,6 +10,7 @@ import {
   Unit,
   VendorSku,
 } from "../../db/entities";
+import { SkusModule } from "../skus/skus.module";
 import { ProductsController } from "./products.controller";
 import { ProductsService } from "./products.service";
 
@@ -25,6 +26,7 @@ import { ProductsService } from "./products.service";
       InventoryStock,
       InventoryMovement,
     ]),
+    SkusModule,
   ],
   controllers: [ProductsController],
   providers: [ProductsService],

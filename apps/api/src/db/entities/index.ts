@@ -16,6 +16,7 @@ import { Brand } from "./brand.entity";
 import { Unit } from "./unit.entity";
 import { Product } from "./product.entity";
 import { ProductSku } from "./product-sku.entity";
+import { ProductSkuBarcode } from "./product-sku-barcode.entity";
 import { VendorGroup } from "./vendor-group.entity";
 import { Vendor } from "./vendor.entity";
 import { VendorContact } from "./vendor-contact.entity";
@@ -52,6 +53,7 @@ export const entities = [
   Unit,
   Product,
   ProductSku,
+  ProductSkuBarcode,
   VendorGroup,
   Vendor,
   VendorContact,
@@ -89,6 +91,7 @@ export {
   Unit,
   Product,
   ProductSku,
+  ProductSkuBarcode,
   VendorGroup,
   Vendor,
   VendorContact,

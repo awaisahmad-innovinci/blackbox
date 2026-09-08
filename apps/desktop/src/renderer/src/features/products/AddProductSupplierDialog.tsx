@@ -14,7 +14,15 @@ import {
 } from "@blackbox/ui/dialog";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { Textarea } from "@blackbox/ui/textarea";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
+import {
+  KEYBOARD_HINT_PICK_ROWS,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListPickRow } from "@renderer/components/list-table-row";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { loadVendors } from "@renderer/lib/local-db/entity-source";
@@ -64,7 +72,6 @@ export function AddProductSupplierDialog({
   const [moq, setMoq] = useState("1");
   const [leadTimeDays, setLeadTimeDays] = useState("0");
   const [isPreferred, setIsPreferred] = useState(false);
-  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -113,7 +120,6 @@ export function AddProductSupplierDialog({
     setMoq("1");
     setLeadTimeDays("0");
     setIsPreferred(false);
-    setNotes("");
     setError(null);
   }
 
@@ -178,7 +184,7 @@ export function AddProductSupplierDialog({
           leadTimeDays: leadTime,
           isPreferred,
           status: "active",
-          notes: notes.trim(),
+          notes: "",
           productName: sku?.variantName || sku?.sku || "",
           variantName: sku?.variantName ?? "",
           sku: sku?.sku ?? "",
@@ -206,7 +212,7 @@ export function AddProductSupplierDialog({
         minimumOrderQuantity,
         leadTimeDays: leadTime,
         isPreferred,
-        notes: notes.trim(),
+        notes: "",
       });
     } catch (err: unknown) {
       setSaving(false);
@@ -235,7 +241,7 @@ export function AddProductSupplierDialog({
         }
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {lockedSkuId ? "Add Required Supplier" : "Add Supplier"}
@@ -255,7 +261,7 @@ export function AddProductSupplierDialog({
           </div>
         ) : null}
 
-        <div className="space-y-3">
+        <FormEnterNav className="space-y-3">
           <div className="space-y-1.5">
             <Label>SKU *</Label>
             {lockedSkuId ? (
@@ -270,6 +276,7 @@ export function AddProductSupplierDialog({
             ) : (
               <select
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                {...formSelectPickerProps()}
                 value={productSkuId}
                 onChange={(e) => setProductSkuId(e.target.value)}
               >
@@ -295,18 +302,18 @@ export function AddProductSupplierDialog({
               </div>
               <ul className="border-border max-h-40 divide-y overflow-y-auto rounded-md border">
                 {vendors.map((v) => (
-                  <li key={v.id}>
-                    <button
-                      type="button"
-                      className="hover:bg-muted/50 w-full px-3 py-2 text-left text-sm"
-                      onClick={() => setSelectedVendor(v)}
-                    >
+                  <ListPickRow
+                    key={v.id}
+                    onActivate={() => setSelectedVendor(v)}
+                  >
+                    <div className="px-3 py-2 text-sm">
                       <div className="font-medium">{v.name}</div>
                       <div className="text-muted-foreground">{v.vendorCode}</div>
-                    </button>
-                  </li>
+                    </div>
+                  </ListPickRow>
                 ))}
               </ul>
+              <KeyboardHints hints={[KEYBOARD_HINT_PICK_ROWS]} />
             </>
           ) : (
             <div className="bg-muted/40 flex items-center justify-between rounded-md px-3 py-2 text-sm">
@@ -387,17 +394,9 @@ export function AddProductSupplierDialog({
                 />
                 Preferred supplier
               </label>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label>Notes</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                />
-              </div>
             </div>
           ) : null}
-        </div>
+        </FormEnterNav>
 
         <DialogFooter>
           <Button

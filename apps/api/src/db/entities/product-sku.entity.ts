@@ -78,6 +78,15 @@ export class ProductSku {
   sellingPrice!: string;
 
   @Column({
+    name: "selling_price_per_purchase_unit",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    nullable: true,
+  })
+  sellingPricePerPurchaseUnit!: string | null;
+
+  @Column({
     name: "reorder_level",
     type: "numeric",
     precision: 14,

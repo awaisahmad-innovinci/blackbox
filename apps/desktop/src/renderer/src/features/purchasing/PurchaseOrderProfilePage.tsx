@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -182,10 +183,6 @@ export function PurchaseOrderProfilePage() {
             <dt className="text-muted-foreground">Expected delivery</dt>
             <dd className="font-medium">{po.expectedDate || "—"}</dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="text-muted-foreground">Notes</dt>
-            <dd className="font-medium">{po.notes || "—"}</dd>
-          </div>
         </dl>
       </section>
 
@@ -215,7 +212,10 @@ export function PurchaseOrderProfilePage() {
                 </tr>
               ) : (
                 po.items.map((item) => (
-                  <tr key={item.id} className="border-border border-t">
+                  <ListTableRow
+                    key={item.id}
+                    onActivate={() => navigate(`/skus/${item.productSkuId}`)}
+                  >
                     <td className="px-4 py-3">
                       {item.productName}
                       <div className="text-muted-foreground text-xs">
@@ -223,12 +223,12 @@ export function PurchaseOrderProfilePage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Link
+                      <ListTableLink
                         to={`/skus/${item.productSkuId}`}
                         className="text-primary hover:underline"
                       >
                         {item.sku}
-                      </Link>
+                      </ListTableLink>
                     </td>
                     <td className="px-4 py-3">
                       {item.purchaseUnitName || "—"}
@@ -240,7 +240,7 @@ export function PurchaseOrderProfilePage() {
                     <td className="px-4 py-3 tabular-nums">
                       {item.lineTotal.toLocaleString()}
                     </td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -249,26 +249,8 @@ export function PurchaseOrderProfilePage() {
       </section>
 
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Subtotal</span>
-          <span className="tabular-nums">{po.subtotal.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Discount</span>
-          <span className="tabular-nums">{po.discount.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Tax</span>
-          <span className="tabular-nums">{po.tax.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Other charges</span>
-          <span className="tabular-nums">
-            {po.otherCharges.toLocaleString()}
-          </span>
-        </div>
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
-          <span>Grand total</span>
+          <span>Total</span>
           <span className="tabular-nums">{po.total.toLocaleString()}</span>
         </div>
       </section>

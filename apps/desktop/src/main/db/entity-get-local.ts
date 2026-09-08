@@ -18,6 +18,7 @@ import type {
   ReceivingDraft,
   ReceivingLineDraft,
   SkuBarcodeLookupResult,
+  SkuBarcode,
   SkuDetail,
   SkuSearchResult,
   SkuSupplier,
@@ -34,6 +35,11 @@ import type {
 } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
+import {
+  findBarcodeMatchLocal,
+  findSkuIdByBarcodeLocal,
+  listSkuBarcodesLocal,
+} from "./sku-barcodes-local";
 
 function num(value: unknown, fallback = 0): number {
   const n = Number(value);
@@ -166,6 +172,7 @@ export function listProductSkusLocal(productId: string): ProductSkuDetail[] {
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
          s.selling_price as sellingPrice,
+         s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          s.reorder_level as reorderLevel,
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
@@ -205,6 +212,7 @@ function mapProductSkuRow(r: Record<string, unknown>): ProductSkuDetail {
     unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1),
     costPrice: num(r.costPrice),
     sellingPrice: num(r.sellingPrice),
+    sellingPricePerPurchaseUnit: numOrNull(r.sellingPricePerPurchaseUnit),
     reorderLevel: num(r.reorderLevel),
     minimumStockLevel: num(r.minimumStockLevel),
     maximumStockLevel: numOrNull(r.maximumStockLevel),
@@ -487,6 +495,13 @@ export function listVendorSkusLocal(
            or lower(s.sku) like '%' || @q || '%'
            or lower(coalesce(s.barcode, '')) like '%' || @q || '%'
            or lower(coalesce(vs.vendor_sku_code, '')) like '%' || @q || '%'
+           or exists (
+             select 1 from product_sku_barcodes b
+             where b.product_sku_id = s.id
+               and b.tenant_id = s.tenant_id
+               and b.status = 'active'
+               and lower(b.barcode) like '%' || @q || '%'
+           )
          )
        order by p.name collate nocase, s.sku collate nocase`,
     )
@@ -599,6 +614,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
          s.selling_price as sellingPrice,
+         s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          s.reorder_level as reorderLevel,
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
@@ -612,6 +628,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
     )
     .get(id, DEMO_STORE_TENANT_ID) as Record<string, unknown> | undefined;
   if (!row) return null;
+  const barcodes = listSkuBarcodesLocal(id);
   return {
     id: String(row.id),
     productId: String(row.productId),
@@ -620,6 +637,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
     variantName: String(row.variantName ?? ""),
     sku: String(row.sku),
     barcode: (row.barcode as string | null) ?? null,
+    barcodes,
     sizeValue: (row.sizeValue as string | null) ?? null,
     sizeUnit: (row.sizeUnit as string | null) ?? null,
     baseUnitId: (row.baseUnitId as string | null) ?? null,
@@ -629,6 +647,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
     unitsPerPurchaseUnit: num(row.unitsPerPurchaseUnit, 1),
     costPrice: num(row.costPrice),
     sellingPrice: num(row.sellingPrice),
+    sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
     reorderLevel: num(row.reorderLevel),
     minimumStockLevel: num(row.minimumStockLevel),
     maximumStockLevel: numOrNull(row.maximumStockLevel),
@@ -766,6 +785,13 @@ export function searchSkusLocal(
            or lower(s.variant_name) like '%' || @q || '%'
            or lower(s.sku) like '%' || @q || '%'
            or lower(coalesce(s.barcode, '')) like '%' || @q || '%'
+           or exists (
+             select 1 from product_sku_barcodes b
+             where b.product_sku_id = s.id
+               and b.tenant_id = s.tenant_id
+               and b.status = 'active'
+               and lower(b.barcode) like '%' || @q || '%'
+           )
          )
        order by p.name collate nocase, s.variant_name collate nocase
        limit 50`,
@@ -784,6 +810,8 @@ export function getSkuByBarcodeLocal(
 ): SkuSearchResult | null {
   const code = barcode.trim();
   if (!code || !warehouseId) return null;
+  const match = findBarcodeMatchLocal(code, true);
+  if (!match) return null;
   const db = getLocalDb();
   const row = db
     .prepare(
@@ -794,24 +822,39 @@ export function getSkuByBarcodeLocal(
          s.variant_name as variantName,
          s.sku,
          s.barcode,
+         s.units_per_purchase_unit as unitsPerPurchaseUnit,
+         bu.name as baseUnitName,
+         pu.name as purchaseUnitName,
          s.cost_price as costPrice,
+         s.selling_price as sellingPrice,
+         s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(st.quantity_available, 0) as quantityAvailable
        from product_skus s
        inner join products p on p.id = s.product_id
+       left join units bu on bu.id = s.base_unit_id
+       left join units pu on pu.id = s.purchase_unit_id
        left join inventory_stock st
          on st.product_sku_id = s.id
         and st.warehouse_id = ?
         and st.tenant_id = s.tenant_id
        where s.tenant_id = ?
          and s.status = 'active'
-         and s.barcode = ?
+         and s.id = ?
        limit 1`,
     )
-    .get(warehouseId, DEMO_STORE_TENANT_ID, code) as
+    .get(warehouseId, DEMO_STORE_TENANT_ID, match.skuId) as
     | Record<string, unknown>
     | undefined;
   if (!row) return null;
-  return mapSkuSearchRow(row, warehouseId);
+  return {
+    ...mapSkuSearchRow(row, warehouseId),
+    scannedQuantityMultiplier: match.quantityMultiplier,
+    unitsPerPurchaseUnit: num(row.unitsPerPurchaseUnit, 1),
+    baseUnitName: (row.baseUnitName as string | null) ?? null,
+    purchaseUnitName: (row.purchaseUnitName as string | null) ?? null,
+    sellingPrice: num(row.sellingPrice),
+    sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
+  };
 }
 
 function lookupProductSkuLocal(
@@ -840,6 +883,7 @@ function lookupProductSkuLocal(
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
          s.selling_price as sellingPrice,
+         s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          s.reorder_level as reorderLevel,
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
@@ -866,7 +910,14 @@ function lookupProductSkuLocal(
 export function lookupSkuByBarcodeLocal(
   barcode: string,
 ): SkuBarcodeLookupResult | null {
-  return lookupProductSkuLocal("s.barcode = ?", barcode);
+  const match = findBarcodeMatchLocal(barcode);
+  if (!match) return null;
+  const detail = lookupProductSkuLocal("s.id = ?", match.skuId);
+  if (!detail) return null;
+  return {
+    ...detail,
+    scannedQuantityMultiplier: match.quantityMultiplier,
+  };
 }
 
 export function lookupSkuByCodeLocal(
@@ -1151,6 +1202,10 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
          gr.subtotal,
          gr.discount,
          gr.tax,
+         coalesce(gr.adv_tax, 0) as advTax,
+         coalesce(gr.gst, 0) as gst,
+         coalesce(gr.incentive, 0) as incentive,
+         coalesce(gr.shelf_rent, 0) as shelfRent,
          gr.other_charges as otherCharges,
          coalesce(gr.return_credit, 0) as returnCredit,
          gr.total,
@@ -1211,6 +1266,11 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
     voucherNumber: (row.voucherNumber as string | null) ?? null,
     subtotal: num(row.subtotal),
     discount: num(row.discount),
+    saleTax: num(row.tax),
+    advTax: num(row.advTax),
+    gst: num(row.gst),
+    incentive: num(row.incentive),
+    shelfRent: num(row.shelfRent),
     tax: num(row.tax),
     otherCharges: num(row.otherCharges),
     returnCredit: num(row.returnCredit),

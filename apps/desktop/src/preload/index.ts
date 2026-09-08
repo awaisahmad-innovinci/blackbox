@@ -234,6 +234,15 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:lookupSkuByCode",
         sku,
       ) as Promise<SkuBarcodeLookupResult | null>,
+    listSkuBarcodes: (skuId: string) =>
+      ipcRenderer.invoke(
+        "localDb:listSkuBarcodes",
+        skuId,
+      ) as Promise<import("@blackbox/shared").SkuBarcode[]>,
+    upsertSkuBarcode: (row: import("@blackbox/shared").SkuBarcode) =>
+      ipcRenderer.invoke("localDb:upsertSkuBarcode", row),
+    deleteSkuBarcode: (id: string, productSkuId: string) =>
+      ipcRenderer.invoke("localDb:deleteSkuBarcode", id, productSkuId),
     getPurchaseOrder: (id: string) =>
       ipcRenderer.invoke(
         "localDb:getPurchaseOrder",

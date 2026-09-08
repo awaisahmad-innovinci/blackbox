@@ -6,6 +6,7 @@ import type {
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
+import { ListTableFocusable, ListTableRow } from "@renderer/components/list-table-row";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -235,7 +236,7 @@ function MovementTable({
               </tr>
             ) : (
               items.map((item) => (
-                <tr key={item.id} className="border-border border-t">
+                <ListTableRow key={item.id}>
                   <td className="px-4 py-3 tabular-nums">
                     {item.createdAt.replace("T", " ").slice(0, 19)}
                   </td>
@@ -251,7 +252,7 @@ function MovementTable({
                   <td className="px-4 py-3">{item.warehouseName}</td>
                   <td className="px-4 py-3 tabular-nums">{item.quantity}</td>
                   <td className="px-4 py-3">{item.reason || "—"}</td>
-                </tr>
+                </ListTableRow>
               ))
             )}
           </tbody>
@@ -292,19 +293,24 @@ function MonthTable({
           </thead>
           <tbody>
             {report.byDay.map((row) => (
-              <tr key={row.date} className="border-border border-t">
+              <ListTableRow
+                key={row.date}
+                onActivate={() => onOpenDay(row.date)}
+              >
                 <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    className="text-primary hover:underline"
-                    onClick={() => onOpenDay(row.date)}
-                  >
-                    {row.date}
-                  </button>
+                  <ListTableFocusable>
+                    <button
+                      type="button"
+                      className="text-primary hover:underline"
+                      onClick={() => onOpenDay(row.date)}
+                    >
+                      {row.date}
+                    </button>
+                  </ListTableFocusable>
                 </td>
                 <td className="px-4 py-3 tabular-nums">{row.inboundQty}</td>
                 <td className="px-4 py-3 tabular-nums">{row.outboundQty}</td>
-              </tr>
+              </ListTableRow>
             ))}
           </tbody>
           <tfoot>

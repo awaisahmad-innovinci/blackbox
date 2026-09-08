@@ -37,6 +37,7 @@ import {
   type WarehouseDto,
 } from "@/lib/admin-api";
 import { ApiError, toUserFacingError } from "@/lib/api-error";
+import { normalizeStoredText } from "@blackbox/shared";
 
 const emptyDraft = {
   name: "",
@@ -139,7 +140,7 @@ export default function WarehousesPage() {
     e.preventDefault();
     if (saving) return;
     setFormError(null);
-    const name = draft.name.trim();
+    const name = normalizeStoredText(draft.name);
     const code = draft.code.trim();
     if (!name) {
       setFormError("Name is required.");
@@ -336,6 +337,12 @@ export default function WarehousesPage() {
                   value={draft.name}
                   onChange={(e) =>
                     setDraft((d) => ({ ...d, name: e.target.value }))
+                  }
+                  onBlur={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      name: normalizeStoredText(e.target.value),
+                    }))
                   }
                   aria-invalid={formError === "Name is required."}
                 />

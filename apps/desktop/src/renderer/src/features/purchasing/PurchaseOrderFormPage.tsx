@@ -5,17 +5,31 @@ import type {
   VendorListItem,
   WarehouseListItem,
 } from "@blackbox/shared";
+import { FORM_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { Textarea } from "@blackbox/ui/textarea";
+import { handleEnterPickerFocus } from "@blackbox/ui/lib/form-keyboard";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
+import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
+import {
+  KEYBOARD_HINT_ADD,
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_LIST_ROWS,
+  KEYBOARD_HINT_SAVE,
+  KEYBOARD_HINT_SCAN,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import {
+  ListTableFocusable,
+  ListTableRow,
+} from "@renderer/components/list-table-row";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
-import { loadPurchaseOrder, loadVendors, loadVendorSkus, loadWarehouses } from "@renderer/lib/local-db/entity-source";
+import { loadPurchaseOrder, loadVendors, loadVendorSkus, loadWarehouses, findVendorSkuByBarcode } from "@renderer/lib/local-db/entity-source";
 import { allocatePoNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
 import {
@@ -26,6 +40,10 @@ import {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
 }
 
 export function PurchaseOrderFormPage() {
@@ -42,19 +60,15 @@ export function PurchaseOrderFormPage() {
   const [warehouseId, setWarehouseId] = useState("");
   const [orderDate, setOrderDate] = useState(todayIso());
   const [expectedDate, setExpectedDate] = useState("");
-  const [notes, setNotes] = useState("");
-  const [discount, setDiscount] = useState("0");
-  const [tax, setTax] = useState("0");
-  const [otherCharges, setOtherCharges] = useState("0");
   const [lines, setLines] = useState<DraftPoLine[]>([]);
+  const orderDateRef = useRef<HTMLInputElement>(null);
   const [itemOpen, setItemOpen] = useState(false);
-  const [barcode, setBarcode] = useState("");
+  const [scanOpen, setScanOpen] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(isEdit);
-  const barcodeRef = useRef<HTMLInputElement>(null);
 
   function focusQty(productSkuId: string) {
     requestAnimationFrame(() => {
@@ -77,25 +91,35 @@ export function PurchaseOrderFormPage() {
     setScanBusy(true);
     setError(null);
     try {
-      const rows = await loadVendorSkus(vendorId, trimmed, warehouseId);
-      const exact = rows.filter((r) => (r.barcode ?? "").trim() === trimmed);
-      if (exact.length === 0) {
-        setError("No supplier SKU found for this barcode");
+      const result = await findVendorSkuByBarcode(
+        vendorId,
+        trimmed,
+        warehouseId,
+      );
+      if (result.kind === "not_found") {
+        setError("No SKU found for this barcode");
         return;
       }
-      if (exact.length > 1) {
-        setError("Multiple supplier SKUs match this barcode");
+      if (result.kind === "not_linked") {
+        setError("This SKU is not linked to the selected vendor");
         return;
       }
-      const match = exact[0]!;
+      const match = result.row;
       if (lines.some((l) => l.productSkuId === match.productSkuId)) {
         setError("Already added — update its quantity");
-        setBarcode("");
         focusQty(match.productSkuId);
         return;
       }
-      setLines((prev) => [...prev, toDraftPoLine(match)]);
-      setBarcode("");
+      setLines((prev) => [
+        ...prev,
+        {
+          ...toDraftPoLine(match),
+          quantity: result.scannedQuantityMultiplier,
+          lineTotal: round4(
+            result.scannedQuantityMultiplier * match.purchasePrice,
+          ),
+        },
+      ]);
       focusQty(match.productSkuId);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Barcode lookup failed"));
@@ -104,25 +128,29 @@ export function PurchaseOrderFormPage() {
     }
   }
 
-  useBarcodeScanTarget({
-    kind: "barcode",
-    enabled: Boolean(vendorId && warehouseId && !itemOpen),
-    inputRef: barcodeRef,
-    onScan: setBarcode,
-    onComplete: (code) => {
-      void addSkuFromBarcode(code);
-    },
-  });
-
   useEffect(() => {
     void loadVendors({ status: "active", pageSize: 100 })
-      .then((r) => setVendors(r.items))
+      .then((r) => {
+        setVendors(r.items);
+        if (!isEdit && r.items.length > 0) {
+          setVendorId((current) => current || r.items[0]!.id);
+        }
+      })
       .catch(() => undefined);
-    void loadWarehouses().then((rows) => {
-      setWarehouses(rows);
-      if (!isEdit && rows.length === 1) setWarehouseId(rows[0]!.id);
-    }).catch(() => undefined);
+    void loadWarehouses()
+      .then((rows) => {
+        setWarehouses(rows);
+        if (!isEdit && rows.length > 0) {
+          setWarehouseId((current) => current || rows[0]!.id);
+        }
+      })
+      .catch(() => undefined);
   }, [isEdit]);
+
+  useEffect(() => {
+    if (loading || isEdit) return;
+    requestAnimationFrame(() => orderDateRef.current?.focus());
+  }, [loading, isEdit]);
 
   useEffect(() => {
     if (isEdit) return;
@@ -162,10 +190,6 @@ export function PurchaseOrderFormPage() {
         setWarehouseId(po.warehouseId);
         setOrderDate(po.orderDate);
         setExpectedDate(po.expectedDate ?? "");
-        setNotes(po.notes);
-        setDiscount(String(po.discount));
-        setTax(String(po.tax));
-        setOtherCharges(String(po.otherCharges));
         setLines(
           po.items.map((i) => ({
             productSkuId: i.productSkuId,
@@ -204,11 +228,6 @@ export function PurchaseOrderFormPage() {
       ) / 10000,
     [lines],
   );
-  const discountN = Number(discount) || 0;
-  const taxN = Number(tax) || 0;
-  const otherN = Number(otherCharges) || 0;
-  const grandTotal =
-    Math.round((subtotal - discountN + taxN + otherN) * 10000) / 10000;
 
   function buildBody(submit?: boolean): CreatePurchaseOrderRequest | null {
     if (!vendorId) {
@@ -240,10 +259,10 @@ export function PurchaseOrderFormPage() {
       warehouseId,
       orderDate,
       expectedDate: expectedDate || null,
-      notes: notes.trim(),
-      discount: discountN,
-      tax: taxN,
-      otherCharges: otherN,
+      notes: "",
+      discount: 0,
+      tax: 0,
+      otherCharges: 0,
       items: lines.map((l) => ({
         productSkuId: l.productSkuId,
         vendorSkuId: l.vendorSkuId,
@@ -280,11 +299,11 @@ export function PurchaseOrderFormPage() {
           orderDate: body.orderDate ?? todayIso(),
           expectedDate: body.expectedDate ?? null,
           subtotal,
-          discount: body.discount ?? 0,
-          tax: body.tax ?? 0,
-          otherCharges: body.otherCharges ?? 0,
-          total: grandTotal,
-          notes: body.notes ?? "",
+          discount: 0,
+          tax: 0,
+          otherCharges: 0,
+          total: subtotal,
+          notes: "",
           items: lines.map((l) => ({
             id: crypto.randomUUID(),
             productSkuId: l.productSkuId,
@@ -335,12 +354,28 @@ export function PurchaseOrderFormPage() {
     navigate(`/purchase-orders/${saved.id}`, { state: { po: saved } });
   }
 
+  usePageKeyboard({
+    onSave: () => {
+      if (saving) return;
+      if (!buildBody(true)) return;
+      setSubmitConfirmOpen(true);
+    },
+    onScan: () => {
+      if (!vendorId || !warehouseId || itemOpen || scanBusy) return;
+      setScanOpen(true);
+    },
+    onAddItem: () => {
+      if (!vendorId || !warehouseId) return;
+      setItemOpen(true);
+    },
+  });
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {isEdit ? "Edit Purchase Order" : "Create Purchase Order"}
@@ -359,36 +394,40 @@ export function PurchaseOrderFormPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <section className={FORM_GRID}>
         <div className="space-y-1.5">
-          <Label>PO Number</Label>
-          <Input value={poNumber} disabled />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Status</Label>
-          <Input value={status} disabled />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Order date</Label>
+          <Label htmlFor="po-order-date">Order date</Label>
           <Input
+            ref={orderDateRef}
+            id="po-order-date"
             type="date"
+            data-enter-picker=""
             value={orderDate}
+            min={isEdit ? undefined : todayIso()}
+            onFocus={handleEnterPickerFocus}
             onChange={(e) => setOrderDate(e.target.value)}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Expected delivery</Label>
+          <Label htmlFor="po-expected-date">Expected delivery</Label>
           <Input
+            id="po-expected-date"
             type="date"
+            data-enter-picker=""
             value={expectedDate}
+            min={orderDate || (!isEdit ? todayIso() : undefined)}
+            onFocus={handleEnterPickerFocus}
             onChange={(e) => setExpectedDate(e.target.value)}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Vendor *</Label>
+          <Label htmlFor="po-vendor">Vendor *</Label>
           <select
+            id="po-vendor"
+            data-enter-picker=""
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
             value={vendorId}
+            onFocus={handleEnterPickerFocus}
             onChange={(e) => {
               setVendorId(e.target.value);
               setLines([]);
@@ -403,10 +442,13 @@ export function PurchaseOrderFormPage() {
           </select>
         </div>
         <div className="space-y-1.5">
-          <Label>Receive into warehouse *</Label>
+          <Label htmlFor="po-warehouse">Receive into warehouse *</Label>
           <select
+            id="po-warehouse"
+            data-enter-picker=""
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
             value={warehouseId}
+            onFocus={handleEnterPickerFocus}
             onChange={(e) => {
               setWarehouseId(e.target.value);
               setLines([]);
@@ -420,19 +462,38 @@ export function PurchaseOrderFormPage() {
             ))}
           </select>
         </div>
+        <div className="space-y-1.5">
+          <Label>PO Number</Label>
+          <Input value={poNumber} disabled />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Status</Label>
+          <Input value={status} disabled />
+        </div>
       </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-medium">Order items</h2>
-          <Button
-            type="button"
-            size="sm"
-            disabled={!vendorId || !warehouseId}
-            onClick={() => setItemOpen(true)}
-          >
-            + Add Item
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!vendorId || !warehouseId || itemOpen || scanBusy}
+              onClick={() => setScanOpen(true)}
+            >
+              Scan barcode
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!vendorId || !warehouseId}
+              onClick={() => setItemOpen(true)}
+            >
+              + Add Item
+            </Button>
+          </div>
         </div>
         {!vendorId || !warehouseId ? (
           <p className="text-muted-foreground text-sm">
@@ -467,7 +528,7 @@ export function PurchaseOrderFormPage() {
                 </tr>
               ) : null}
               {lines.map((line) => (
-                <tr key={line.productSkuId} className="border-border border-t">
+                <ListTableRow key={line.productSkuId}>
                   <td className="px-3 py-2">
                     {line.productName}
                     <div className="text-muted-foreground text-xs">
@@ -488,35 +549,37 @@ export function PurchaseOrderFormPage() {
                     {line.quantityAvailable.toLocaleString()} base
                   </td>
                   <td className="px-3 py-2">
-                    <Input
-                      className="h-8 w-20"
-                      data-sku-qty={line.productSkuId}
-                      value={String(line.quantity)}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => {
-                        const quantity = Number(e.target.value);
-                        setLines((prev) =>
-                          prev.map((l) =>
-                            l.productSkuId === line.productSkuId
-                              ? {
-                                  ...l,
-                                  quantity: Number.isNaN(quantity)
-                                    ? l.quantity
-                                    : quantity,
-                                  lineTotal:
-                                    Math.round(
-                                      (Number.isNaN(quantity)
-                                        ? l.quantity
-                                        : quantity) *
-                                        l.unitCost *
-                                        10000,
-                                    ) / 10000,
-                                }
-                              : l,
-                          ),
-                        );
-                      }}
-                    />
+                    <ListTableFocusable>
+                      <Input
+                        className="h-8 w-20"
+                        data-sku-qty={line.productSkuId}
+                        value={String(line.quantity)}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const quantity = Number(e.target.value);
+                          setLines((prev) =>
+                            prev.map((l) =>
+                              l.productSkuId === line.productSkuId
+                                ? {
+                                    ...l,
+                                    quantity: Number.isNaN(quantity)
+                                      ? l.quantity
+                                      : quantity,
+                                    lineTotal:
+                                      Math.round(
+                                        (Number.isNaN(quantity)
+                                          ? l.quantity
+                                          : quantity) *
+                                          l.unitCost *
+                                          10000,
+                                      ) / 10000,
+                                  }
+                                : l,
+                            ),
+                          );
+                        }}
+                      />
+                    </ListTableFocusable>
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {(line.quantity * line.unitCost).toLocaleString()}
@@ -526,6 +589,7 @@ export function PurchaseOrderFormPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
+                      tabIndex={-1}
                       onClick={() =>
                         setLines((prev) =>
                           prev.filter(
@@ -537,88 +601,19 @@ export function PurchaseOrderFormPage() {
                       Remove
                     </Button>
                   </td>
-                </tr>
+                </ListTableRow>
               ))}
-              {vendorId && warehouseId ? (
-                <tr className="border-border bg-muted/30 border-t">
-                  <td className="px-3 py-2" colSpan={3}>
-                    <Input
-                      ref={barcodeRef}
-                      {...barcodeScanInputProps()}
-                      className="h-8"
-                      value={barcode}
-                      placeholder="Scan barcode to add item"
-                      onChange={(e) => setBarcode(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void addSkuFromBarcode(barcode);
-                      }}
-                    />
-                  </td>
-                  <td
-                    className="text-muted-foreground px-3 py-2 text-xs"
-                    colSpan={5}
-                  >
-                    {scanBusy
-                      ? "Looking up…"
-                      : "Scan or type a barcode, then press Enter."}
-                  </td>
-                </tr>
-              ) : null}
             </tbody>
           </table>
         </div>
       </section>
 
-      <section className="grid gap-3 sm:max-w-sm sm:ml-auto text-sm">
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Subtotal</span>
+      <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
+        <div className="flex justify-between gap-6 border-t pt-2 font-medium">
+          <span>Total</span>
           <span className="tabular-nums">{subtotal.toLocaleString()}</span>
         </div>
-        <div className="flex items-center justify-between gap-6">
-          <Label htmlFor="discount">Discount</Label>
-          <Input
-            id="discount"
-            className="h-8 w-28"
-            value={discount}
-            onChange={(e) => setDiscount(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-6">
-          <Label htmlFor="tax">Tax</Label>
-          <Input
-            id="tax"
-            className="h-8 w-28"
-            value={tax}
-            onChange={(e) => setTax(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-6">
-          <Label htmlFor="other">Other charges</Label>
-          <Input
-            id="other"
-            className="h-8 w-28"
-            value={otherCharges}
-            onChange={(e) => setOtherCharges(e.target.value)}
-          />
-        </div>
-        <div className="flex justify-between gap-6 border-t pt-2 font-medium">
-          <span>Grand total</span>
-          <span className="tabular-nums">{grandTotal.toLocaleString()}</span>
-        </div>
       </section>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea
-          id="notes"
-          rows={3}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </div>
 
       <div className="flex flex-wrap gap-3">
         <Button
@@ -650,6 +645,16 @@ export function PurchaseOrderFormPage() {
         </Button>
       </div>
 
+      <KeyboardHints
+        hints={[
+          KEYBOARD_HINT_ENTER,
+          KEYBOARD_HINT_LIST_ROWS,
+          KEYBOARD_HINT_SCAN,
+          KEYBOARD_HINT_ADD,
+          KEYBOARD_HINT_SAVE,
+        ]}
+      />
+
       <AddPurchaseOrderItemDialog
         open={itemOpen}
         vendorId={vendorId}
@@ -669,6 +674,14 @@ export function PurchaseOrderFormPage() {
         }}
       />
 
+      <ScanBarcodePanel
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        busy={scanBusy}
+        clearAfterComplete
+        onComplete={(code) => addSkuFromBarcode(code)}
+      />
+
       <ConfirmDialog
         open={submitConfirmOpen}
         onOpenChange={setSubmitConfirmOpen}
@@ -679,7 +692,7 @@ export function PurchaseOrderFormPage() {
               Vendor:{" "}
               {vendors.find((v) => v.id === vendorId)?.name ?? "Vendor"}
             </p>
-            <p>Total: {grandTotal.toLocaleString()}</p>
+            <p>Total: {subtotal.toLocaleString()}</p>
             <p>Items: {lines.length}</p>
           </>
         }
