@@ -90,10 +90,14 @@ export function WarehouseFormPage() {
         navigate("/warehouses");
         return;
       }
-      if (isEdit && id) {
-        await warehousesApi.update(id, body);
-      } else {
-        await warehousesApi.create(body);
+      const saved =
+        isEdit && id
+          ? await warehousesApi.update(id, body)
+          : await warehousesApi.create(body);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
       }
       navigate("/warehouses");
     } catch (err: unknown) {
@@ -125,7 +129,12 @@ export function WarehouseFormPage() {
         navigate("/warehouses");
         return;
       }
-      await warehousesApi.deactivate(id);
+      const saved = await warehousesApi.deactivate(id);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
+      }
       navigate("/warehouses");
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to deactivate warehouse"));
@@ -156,7 +165,12 @@ export function WarehouseFormPage() {
         navigate("/warehouses");
         return;
       }
-      await warehousesApi.update(id, body);
+      const saved = await warehousesApi.update(id, body);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
+      }
       navigate("/warehouses");
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to activate warehouse"));

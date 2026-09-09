@@ -22,7 +22,25 @@ import {
   formSelectPickerProps,
 } from "@renderer/components/form-enter-nav";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import type { Brand, Category, VendorGroup } from "@blackbox/shared";
 import type { TaxonomyRow } from "./TaxonomyListPage";
+
+async function upsertTaxonomyCache(
+  kind: "brand" | "category" | "vendor_group",
+  row: TaxonomyRow,
+): Promise<void> {
+  try {
+    if (kind === "brand") {
+      await window.blackbox?.localDb?.upsertBrands?.([row as Brand]);
+    } else if (kind === "category") {
+      await window.blackbox?.localDb?.upsertCategories?.([row as Category]);
+    } else {
+      await window.blackbox?.localDb?.upsertVendorGroups?.([row as VendorGroup]);
+    }
+  } catch {
+    /* optional cache */
+  }
+}
 
 export function TaxonomyFormPage({
   titleNew,
@@ -120,10 +138,10 @@ export function TaxonomyFormPage({
         navigate(basePath);
         return;
       }
-      if (isEdit && id) {
-        await update(id, body);
-      } else {
-        await create(body);
+      const saved =
+        isEdit && id ? await update(id, body) : await create(body);
+      if (syncEntityType) {
+        await upsertTaxonomyCache(syncEntityType, saved);
       }
       navigate(basePath);
     } catch (err: unknown) {
@@ -149,7 +167,10 @@ export function TaxonomyFormPage({
         navigate(basePath);
         return;
       }
-      await deactivate(id);
+      const saved = await deactivate(id);
+      if (syncEntityType) {
+        await upsertTaxonomyCache(syncEntityType, saved);
+      }
       navigate(basePath);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, `Failed to deactivate ${entityLabel}`));
@@ -179,7 +200,10 @@ export function TaxonomyFormPage({
         navigate(basePath);
         return;
       }
-      await update(id, body);
+      const saved = await update(id, body);
+      if (syncEntityType) {
+        await upsertTaxonomyCache(syncEntityType, saved);
+      }
       navigate(basePath);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, `Failed to activate ${entityLabel}`));

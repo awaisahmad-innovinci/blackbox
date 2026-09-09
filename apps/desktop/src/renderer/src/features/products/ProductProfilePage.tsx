@@ -14,6 +14,11 @@ import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
 import { loadProductProfile } from "@renderer/lib/local-db/entity-source";
+import {
+  commitLocalChange,
+  isDeviceBound,
+} from "@renderer/lib/local-db/local-write";
+import { syncNow } from "@renderer/lib/sync/sync-status";
 import { AddProductSkuDialog } from "./AddProductSkuDialog";
 import { AddProductSupplierDialog } from "./AddProductSupplierDialog";
 
@@ -68,7 +73,25 @@ export function ProductProfilePage() {
     if (!id || !product) return;
     if (!window.confirm(`Deactivate ${product.name}?`)) return;
     setBusy(true);
+    setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: ProductDetail = {
+          ...product,
+          status: "inactive",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "product",
+          entityId: id,
+          operation: "DELETE",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setProduct(updated);
+        return;
+      }
       const updated = await productsApi.deactivate(id);
       setProduct(updated);
       try {
@@ -91,7 +114,25 @@ export function ProductProfilePage() {
     }
     if (!window.confirm(`Activate ${product.name}?`)) return;
     setBusy(true);
+    setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: ProductDetail = {
+          ...product,
+          status: "active",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "product",
+          entityId: id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setProduct(updated);
+        return;
+      }
       const updated = await productsApi.update(id, {
         name: product.name,
         brandId: product.brandId,
