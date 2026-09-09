@@ -5,7 +5,10 @@ import {
   normalizeOptionalStoredText,
   normalizeStoredText,
 } from "@blackbox/shared";
-import { FORM_FIELD_FULL, FORM_GRID_TIGHT } from "@renderer/lib/form-layout";
+import {
+  FORM_DIALOG_FIELD_FULL,
+  FORM_DIALOG_GRID,
+} from "@renderer/lib/form-layout";
 import {
   FormEnterNav,
   formSelectPickerProps,
@@ -236,8 +239,8 @@ export function AddProductDialog({
           </div>
         ) : null}
 
-        <FormEnterNav className={FORM_GRID_TIGHT}>
-          <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
+        <FormEnterNav className={FORM_DIALOG_GRID}>
+          <div className={`space-y-1.5 ${FORM_DIALOG_FIELD_FULL}`}>
             <Label htmlFor="product-name">Name *</Label>
             <Input
               id="product-name"
@@ -296,7 +299,6 @@ export function AddProductDialog({
             label="Category *"
             actionLabel="+ New category"
             onAction={() => setCreateTaxonomyKind("category")}
-            className="space-y-1.5 sm:col-span-2"
             {...formSelectPickerProps()}
             value={form.categoryId}
             onChange={(e) =>
@@ -310,7 +312,7 @@ export function AddProductDialog({
               </option>
             ))}
           </FormSelectWithAction>
-          <div className="space-y-1.5 sm:col-span-2">
+          <div className={`space-y-1.5 ${FORM_DIALOG_FIELD_FULL}`}>
             <Label htmlFor="product-description">Description</Label>
             <Textarea
               id="product-description"
