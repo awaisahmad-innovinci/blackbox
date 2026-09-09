@@ -745,6 +745,7 @@ export function VendorFormPage() {
         <AddTaxonomyDialog
           open
           kind={createTaxonomyKind}
+          returnFocusTo="group"
           onClose={() => setCreateTaxonomyKind(null)}
           onCreated={onVendorGroupCreated}
         />

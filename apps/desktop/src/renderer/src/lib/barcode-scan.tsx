@@ -78,13 +78,28 @@ function activeFieldType(): FieldInPath {
   return null;
 }
 
-function shouldBailFromWedge(event: KeyboardEvent): boolean {
+function hasActiveDialogBarcodeTarget(targets: RegisteredTarget[]): boolean {
+  return targets.some(
+    (t) =>
+      t.enabled &&
+      t.kind === "barcode" &&
+      t.layer === "dialog" &&
+      targetIsVisible(t),
+  );
+}
+
+function shouldBailFromWedge(
+  event: KeyboardEvent,
+  options?: { dialogBarcodeActive?: boolean },
+): boolean {
   if (event.repeat) return true;
   if (event.ctrlKey || event.metaKey || event.altKey) return true;
   const pathField = fieldInEventPath(event);
-  if (pathField === "scan" || pathField === "editable") return true;
+  if (pathField === "scan") return true;
+  if (pathField === "editable" && !options?.dialogBarcodeActive) return true;
   const active = activeFieldType();
-  if (active === "scan" || active === "editable") return true;
+  if (active === "scan") return true;
+  if (active === "editable" && !options?.dialogBarcodeActive) return true;
   return false;
 }
 
@@ -154,14 +169,17 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
     }
 
     function onKeyDown(event: KeyboardEvent): void {
-      if (shouldBailFromWedge(event)) {
+      const allTargets = [...targetsRef.current.values()];
+      const wedgeOpts = {
+        dialogBarcodeActive: hasActiveDialogBarcodeTarget(allTargets),
+      };
+
+      if (shouldBailFromWedge(event, wedgeOpts)) {
         reset();
         return;
       }
 
-      const visibleTarget = resolveVisibleTarget([
-        ...targetsRef.current.values(),
-      ]);
+      const visibleTarget = resolveVisibleTarget(allTargets);
 
       if (!visibleTarget) {
         reset();
@@ -173,7 +191,7 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
 
       if (event.key === "Enter") {
         if (wedgeActive && buffer.length >= MIN_SCAN_LEN) {
-          if (shouldBailFromWedge(event)) {
+          if (shouldBailFromWedge(event, wedgeOpts)) {
             reset();
             return;
           }
@@ -199,7 +217,7 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (shouldBailFromWedge(event)) {
+      if (shouldBailFromWedge(event, wedgeOpts)) {
         reset();
         return;
       }

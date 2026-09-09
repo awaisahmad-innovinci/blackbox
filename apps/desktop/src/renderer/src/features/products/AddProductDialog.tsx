@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Brand, Category, ProductDetail, ProductType } from "@blackbox/shared";
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS } from "@blackbox/shared";
 import {
@@ -57,22 +57,25 @@ export function AddProductDialog({
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [createTaxonomyKind, setCreateTaxonomyKind] =
-    useState<TaxonomyKind | null>(null);
+  const [taxonomyDialog, setTaxonomyDialog] = useState<{
+    kind: TaxonomyKind;
+    returnFocusTo: string;
+  } | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   function onTaxonomyCreated(row: Brand | Category) {
-    if (createTaxonomyKind === "brand") {
+    if (taxonomyDialog?.kind === "brand") {
       setBrands((prev) =>
         prev.some((b) => b.id === row.id) ? prev : [...prev, row as Brand],
       );
       setForm((prev) => ({ ...prev, brandId: row.id }));
-    } else if (createTaxonomyKind === "category") {
+    } else if (taxonomyDialog?.kind === "category") {
       setCategories((prev) =>
         prev.some((c) => c.id === row.id) ? prev : [...prev, row as Category],
       );
       setForm((prev) => ({ ...prev, categoryId: row.id }));
     }
-    setCreateTaxonomyKind(null);
+    setTaxonomyDialog(null);
   }
 
   useEffect(() => {
@@ -85,6 +88,7 @@ export function AddProductDialog({
     void loadCategories("active")
       .then(setCategories)
       .catch(() => undefined);
+    requestAnimationFrame(() => nameRef.current?.focus());
   }, [open]);
 
   async function onSave() {
@@ -243,6 +247,7 @@ export function AddProductDialog({
           <div className={`space-y-1.5 ${FORM_DIALOG_FIELD_FULL}`}>
             <Label htmlFor="product-name">Name *</Label>
             <Input
+              ref={nameRef}
               id="product-name"
               value={form.name}
               onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -252,7 +257,6 @@ export function AddProductDialog({
                   name: normalizeStoredText(e.target.value),
                 }))
               }
-              autoFocus
             />
           </div>
           <div className="space-y-1.5">
@@ -280,7 +284,12 @@ export function AddProductDialog({
             id="product-brand"
             label="Brand *"
             actionLabel="+ New brand"
-            onAction={() => setCreateTaxonomyKind("brand")}
+            onAction={() =>
+              setTaxonomyDialog({
+                kind: "brand",
+                returnFocusTo: "product-brand",
+              })
+            }
             {...formSelectPickerProps()}
             value={form.brandId}
             onChange={(e) =>
@@ -298,7 +307,12 @@ export function AddProductDialog({
             id="product-category"
             label="Category *"
             actionLabel="+ New category"
-            onAction={() => setCreateTaxonomyKind("category")}
+            onAction={() =>
+              setTaxonomyDialog({
+                kind: "category",
+                returnFocusTo: "product-category",
+              })
+            }
             {...formSelectPickerProps()}
             value={form.categoryId}
             onChange={(e) =>
@@ -351,11 +365,12 @@ export function AddProductDialog({
       </DialogContent>
     </Dialog>
 
-      {createTaxonomyKind ? (
+      {taxonomyDialog ? (
         <AddTaxonomyDialog
           open
-          kind={createTaxonomyKind}
-          onClose={() => setCreateTaxonomyKind(null)}
+          kind={taxonomyDialog.kind}
+          returnFocusTo={taxonomyDialog.returnFocusTo}
+          onClose={() => setTaxonomyDialog(null)}
           onCreated={onTaxonomyCreated}
         />
       ) : null}

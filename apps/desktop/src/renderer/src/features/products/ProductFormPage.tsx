@@ -50,23 +50,25 @@ export function ProductFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
-  const [createTaxonomyKind, setCreateTaxonomyKind] =
-    useState<TaxonomyKind | null>(null);
+  const [taxonomyDialog, setTaxonomyDialog] = useState<{
+    kind: TaxonomyKind;
+    returnFocusTo: string;
+  } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   function onTaxonomyCreated(row: Brand | Category) {
-    if (createTaxonomyKind === "brand") {
+    if (taxonomyDialog?.kind === "brand") {
       setBrands((prev) =>
         prev.some((b) => b.id === row.id) ? prev : [...prev, row as Brand],
       );
       setBrandId(row.id);
-    } else if (createTaxonomyKind === "category") {
+    } else if (taxonomyDialog?.kind === "category") {
       setCategories((prev) =>
         prev.some((c) => c.id === row.id) ? prev : [...prev, row as Category],
       );
       setCategoryId(row.id);
     }
-    setCreateTaxonomyKind(null);
+    setTaxonomyDialog(null);
   }
 
   usePageKeyboard({
@@ -313,7 +315,9 @@ export function ProductFormPage() {
             id="brand"
             label="Brand *"
             actionLabel="+ New brand"
-            onAction={() => setCreateTaxonomyKind("brand")}
+            onAction={() =>
+              setTaxonomyDialog({ kind: "brand", returnFocusTo: "brand" })
+            }
             {...formSelectPickerProps()}
             value={brandId}
             onChange={(e) => setBrandId(e.target.value)}
@@ -330,7 +334,9 @@ export function ProductFormPage() {
             id="category"
             label="Category *"
             actionLabel="+ New category"
-            onAction={() => setCreateTaxonomyKind("category")}
+            onAction={() =>
+              setTaxonomyDialog({ kind: "category", returnFocusTo: "category" })
+            }
             {...formSelectPickerProps()}
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
@@ -373,11 +379,12 @@ export function ProductFormPage() {
 
       <KeyboardHints hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SAVE]} />
 
-      {createTaxonomyKind ? (
+      {taxonomyDialog ? (
         <AddTaxonomyDialog
           open
-          kind={createTaxonomyKind}
-          onClose={() => setCreateTaxonomyKind(null)}
+          kind={taxonomyDialog.kind}
+          returnFocusTo={taxonomyDialog.returnFocusTo}
+          onClose={() => setTaxonomyDialog(null)}
           onCreated={onTaxonomyCreated}
         />
       ) : null}

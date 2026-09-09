@@ -16,6 +16,7 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { focusFormSelect } from "@renderer/lib/focus-form-select";
 import { createTaxonomy, type TaxonomyKind } from "./create-taxonomy";
 
 const titles: Record<TaxonomyKind, string> = {
@@ -29,11 +30,13 @@ export function AddTaxonomyDialog({
   kind,
   onClose,
   onCreated,
+  returnFocusTo,
 }: {
   open: boolean;
   kind: TaxonomyKind;
   onClose: () => void;
   onCreated: (row: Brand | Category | VendorGroup) => void;
+  returnFocusTo?: string;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -46,6 +49,18 @@ export function AddTaxonomyDialog({
     setDescription("");
     setError(null);
   }, [open, kind]);
+
+  function restoreFocus(): void {
+    if (returnFocusTo) focusFormSelect(returnFocusTo);
+  }
+
+  function handleClose(): void {
+    setName("");
+    setDescription("");
+    setError(null);
+    onClose();
+    restoreFocus();
+  }
 
   async function onSave() {
     if (!name.trim()) {
@@ -64,6 +79,7 @@ export function AddTaxonomyDialog({
       setName("");
       setDescription("");
       onCreated(row);
+      restoreFocus();
     } catch (err: unknown) {
       setSaving(false);
       setError(getApiErrorMessage(err, `Failed to create ${kind}`));
@@ -74,15 +90,15 @@ export function AddTaxonomyDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && !saving) {
-          setName("");
-          setDescription("");
-          setError(null);
-          onClose();
-        }
+        if (!next && !saving) handleClose();
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent
+        className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto"
+        onCloseAutoFocus={(event) => {
+          if (returnFocusTo) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{titles[kind]}</DialogTitle>
         </DialogHeader>
@@ -123,12 +139,7 @@ export function AddTaxonomyDialog({
             type="button"
             variant="outline"
             disabled={saving}
-            onClick={() => {
-              setName("");
-              setDescription("");
-              setError(null);
-              onClose();
-            }}
+            onClick={handleClose}
           >
             Cancel
           </Button>
