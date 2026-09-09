@@ -12,18 +12,16 @@ import { Label } from "@blackbox/ui/label";
 import { handleEnterPickerFocus } from "@blackbox/ui/lib/form-keyboard";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
+import { FormEnterNav } from "@renderer/components/form-enter-nav";
 import {
   KEYBOARD_HINT_ADD,
   KEYBOARD_HINT_ENTER,
-  KEYBOARD_HINT_LIST_ROWS,
   KEYBOARD_HINT_SAVE,
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
-import {
-  ListTableFocusable,
-  ListTableRow,
-} from "@renderer/components/list-table-row";
+import { confirmRemoveTableLine } from "@renderer/lib/confirm-remove-line";
+import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
@@ -71,13 +69,7 @@ export function PurchaseOrderFormPage() {
   const [loading, setLoading] = useState(isEdit);
 
   function focusQty(productSkuId: string) {
-    requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLInputElement>(
-        `[data-sku-qty="${productSkuId}"]`,
-      );
-      el?.focus();
-      el?.select();
-    });
+    focusLineQty(productSkuId);
   }
 
   async function addSkuFromBarcode(code: string) {
@@ -508,7 +500,7 @@ export function PurchaseOrderFormPage() {
               : "Select a warehouse before adding items."}
           </p>
         ) : null}
-        <div className="border-border overflow-hidden rounded-lg border">
+        <FormEnterNav className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
@@ -534,7 +526,7 @@ export function PurchaseOrderFormPage() {
                 </tr>
               ) : null}
               {lines.map((line) => (
-                <ListTableRow key={line.productSkuId}>
+                <tr key={line.productSkuId} className="border-border border-t">
                   <td className="px-3 py-2">
                     {line.productName}
                     <div className="text-muted-foreground text-xs">
@@ -555,37 +547,35 @@ export function PurchaseOrderFormPage() {
                     {line.quantityAvailable.toLocaleString()} base
                   </td>
                   <td className="px-3 py-2">
-                    <ListTableFocusable>
-                      <Input
-                        className="h-8 w-20"
-                        data-sku-qty={line.productSkuId}
-                        value={String(line.quantity)}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const quantity = Number(e.target.value);
-                          setLines((prev) =>
-                            prev.map((l) =>
-                              l.productSkuId === line.productSkuId
-                                ? {
-                                    ...l,
-                                    quantity: Number.isNaN(quantity)
-                                      ? l.quantity
-                                      : quantity,
-                                    lineTotal:
-                                      Math.round(
-                                        (Number.isNaN(quantity)
-                                          ? l.quantity
-                                          : quantity) *
-                                          l.unitCost *
-                                          10000,
-                                      ) / 10000,
-                                  }
-                                : l,
-                            ),
-                          );
-                        }}
-                      />
-                    </ListTableFocusable>
+                    <Input
+                      className="h-8 w-20"
+                      data-sku-qty={line.productSkuId}
+                      value={String(line.quantity)}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const quantity = Number(e.target.value);
+                        setLines((prev) =>
+                          prev.map((l) =>
+                            l.productSkuId === line.productSkuId
+                              ? {
+                                  ...l,
+                                  quantity: Number.isNaN(quantity)
+                                    ? l.quantity
+                                    : quantity,
+                                  lineTotal:
+                                    Math.round(
+                                      (Number.isNaN(quantity)
+                                        ? l.quantity
+                                        : quantity) *
+                                        l.unitCost *
+                                        10000,
+                                    ) / 10000,
+                                }
+                              : l,
+                          ),
+                        );
+                      }}
+                    />
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {(line.quantity * line.unitCost).toLocaleString()}
@@ -595,23 +585,23 @@ export function PurchaseOrderFormPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      tabIndex={-1}
-                      onClick={() =>
+                      onClick={() => {
+                        if (!confirmRemoveTableLine(line.sku)) return;
                         setLines((prev) =>
                           prev.filter(
                             (l) => l.productSkuId !== line.productSkuId,
                           ),
-                        )
-                      }
+                        );
+                      }}
                     >
                       Remove
                     </Button>
                   </td>
-                </ListTableRow>
+                </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </FormEnterNav>
       </section>
 
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
@@ -654,7 +644,6 @@ export function PurchaseOrderFormPage() {
       <KeyboardHints
         hints={[
           KEYBOARD_HINT_ENTER,
-          KEYBOARD_HINT_LIST_ROWS,
           KEYBOARD_HINT_SCAN,
           KEYBOARD_HINT_ADD,
           KEYBOARD_HINT_SAVE,

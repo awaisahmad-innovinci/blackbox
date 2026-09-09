@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { FORM_GRID_TIGHT } from "@renderer/lib/form-layout";
+import {
+  FORM_DIALOG_FIELD_FULL,
+  FORM_DIALOG_GRID,
+} from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -120,7 +123,7 @@ export function UpdateVendorSkuPriceDialog({
         if (!next) onClose();
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto lg:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Update SKU Price</DialogTitle>
         </DialogHeader>
@@ -135,7 +138,7 @@ export function UpdateVendorSkuPriceDialog({
             {error}
           </div>
         ) : null}
-        <div className={FORM_GRID_TIGHT}>
+        <div className={FORM_DIALOG_GRID}>
           <div className="space-y-1.5">
             <Label>Purchase / cost (per {unitLabel})</Label>
             <Input
@@ -161,7 +164,7 @@ export function UpdateVendorSkuPriceDialog({
               <p className="text-destructive text-xs">{marginError}</p>
             ) : null}
           </div>
-          <div className="space-y-1.5">
+          <div className={`space-y-1.5 ${FORM_DIALOG_FIELD_FULL}`}>
             <Label>Sale price (per piece)</Label>
             <Input
               value={sellingPrice}

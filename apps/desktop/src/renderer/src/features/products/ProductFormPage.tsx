@@ -205,15 +205,13 @@ export function ProductFormPage() {
           updatedAt: new Date().toISOString(),
         };
         try {
-          await window.blackbox.localDb?.upsertProduct(local);
-          await window.blackbox.sync.enqueue({
-            stream: "master_data",
+          await commitLocalChange({
             entityType: "product",
             entityId: localId,
-            operation: "UPSERT",
+            operation: status === "inactive" ? "DELETE" : "UPSERT",
             payload: local,
-            baseEntityVersion: 0,
           });
+          void syncNow();
           setSaving(false);
           navigate(`/products/${localId}`, {
             state: { product: local },

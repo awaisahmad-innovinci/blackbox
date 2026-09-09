@@ -21,11 +21,12 @@ import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import {
   KEYBOARD_HINT_ADD,
   KEYBOARD_HINT_ENTER,
-  KEYBOARD_HINT_LIST_ROWS,
   KEYBOARD_HINT_SAVE,
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
+import { confirmRemoveTableLine } from "@renderer/lib/confirm-remove-line";
+import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -67,13 +68,7 @@ export function VendorReturnFormPage() {
   const vendorRef = useRef<HTMLSelectElement>(null);
 
   function focusQty(productSkuId: string) {
-    requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLInputElement>(
-        `[data-sku-qty="${productSkuId}"]`,
-      );
-      el?.focus();
-      el?.select();
-    });
+    focusLineQty(productSkuId);
   }
 
   function updateLine(
@@ -519,13 +514,14 @@ export function VendorReturnFormPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() =>
+                      onClick={() => {
+                        if (!confirmRemoveTableLine(line.sku)) return;
                         setLines((prev) =>
                           prev.filter(
                             (l) => l.productSkuId !== line.productSkuId,
                           ),
-                        )
-                      }
+                        );
+                      }}
                     >
                       Remove
                     </Button>
@@ -560,7 +556,6 @@ export function VendorReturnFormPage() {
       <KeyboardHints
         hints={[
           KEYBOARD_HINT_ENTER,
-          KEYBOARD_HINT_LIST_ROWS,
           KEYBOARD_HINT_SCAN,
           KEYBOARD_HINT_ADD,
           KEYBOARD_HINT_SAVE,
@@ -574,9 +569,14 @@ export function VendorReturnFormPage() {
           warehouseId={warehouseId}
           existingSkuIds={lines.map((l) => l.productSkuId)}
           onClose={() => setItemOpen(false)}
-          onAddMany={(newLines) =>
-            setLines((prev) => [...prev, ...newLines])
-          }
+          onAddMany={(newLines) => {
+            const merged = [...lines, ...newLines];
+            setLines(merged);
+            setItemOpen(false);
+            if (merged[0]) {
+              focusLineQty(merged[0].productSkuId);
+            }
+          }}
         />
       ) : null}
 

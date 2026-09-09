@@ -9,6 +9,11 @@ import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { loadPurchaseOrder } from "@renderer/lib/local-db/entity-source";
+import {
+  commitLocalChange,
+  isDeviceBound,
+} from "@renderer/lib/local-db/local-write";
+import { syncNow } from "@renderer/lib/sync/sync-status";
 
 export function PurchaseOrderProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +51,23 @@ export function PurchaseOrderProfilePage() {
     setBusy(true);
     setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: PurchaseOrderDetail = {
+          ...po,
+          status: "SUBMITTED",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "purchase_order",
+          entityId: po.id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setPo(updated);
+        return;
+      }
       const updated = await purchaseOrdersApi.submit(po.id);
       try {
         await window.blackbox?.localDb?.upsertPurchaseOrder(updated);
@@ -65,6 +87,23 @@ export function PurchaseOrderProfilePage() {
     setBusy(true);
     setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: PurchaseOrderDetail = {
+          ...po,
+          status: "CANCELLED",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "purchase_order",
+          entityId: po.id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setPo(updated);
+        return;
+      }
       const updated = await purchaseOrdersApi.cancel(po.id);
       try {
         await window.blackbox?.localDb?.upsertPurchaseOrder(updated);

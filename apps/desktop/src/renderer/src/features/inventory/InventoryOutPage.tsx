@@ -22,11 +22,12 @@ import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import {
   KEYBOARD_HINT_ADD,
   KEYBOARD_HINT_ENTER,
-  KEYBOARD_HINT_LIST_ROWS,
   KEYBOARD_HINT_SAVE,
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
+import { confirmRemoveTableLine } from "@renderer/lib/confirm-remove-line";
+import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
@@ -164,6 +165,7 @@ export function InventoryOutPage() {
             : l,
         ),
       );
+      focusLineQty(row.id);
       return null;
     }
 
@@ -191,6 +193,7 @@ export function InventoryOutPage() {
         lastScanMultiplier: multiplier,
       },
     ]);
+    focusLineQty(row.id);
     return null;
   }
 
@@ -553,6 +556,7 @@ export function InventoryOutPage() {
                   <td className="px-4 py-3 align-top">
                     <Input
                       className="h-8 w-24"
+                      data-sku-qty={line.productSkuId}
                       value={String(
                         line.sellUnit === "box" && line.unitsPerPurchaseUnit > 1
                           ? round4(line.quantity / line.unitsPerPurchaseUnit)
@@ -603,13 +607,14 @@ export function InventoryOutPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() =>
+                      onClick={() => {
+                        if (!confirmRemoveTableLine(line.sku)) return;
                         setLines((prev) =>
                           prev.filter(
                             (l) => l.productSkuId !== line.productSkuId,
                           ),
-                        )
-                      }
+                        );
+                      }}
                     >
                       Remove
                     </Button>
@@ -648,7 +653,6 @@ export function InventoryOutPage() {
       <KeyboardHints
         hints={[
           KEYBOARD_HINT_ENTER,
-          KEYBOARD_HINT_LIST_ROWS,
           KEYBOARD_HINT_SCAN,
           KEYBOARD_HINT_ADD,
           KEYBOARD_HINT_SAVE,
@@ -661,8 +665,12 @@ export function InventoryOutPage() {
         existingSkuIds={existingSkuIds}
         onClose={() => setItemOpen(false)}
         onAddMany={(added) => {
-          setLines((prev) => [...prev, ...added]);
+          const merged = [...lines, ...added];
+          setLines(merged);
           setItemOpen(false);
+          if (merged[0]) {
+            focusLineQty(merged[0].productSkuId);
+          }
         }}
       />
 
