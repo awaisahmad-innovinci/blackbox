@@ -9,7 +9,14 @@ import type {
   WarehouseStockRow,
 } from "@blackbox/shared";
 import { BackButton } from "@renderer/app/BackButton";
-import { FORM_FIELD_FULL, FORM_GRID_TWO_COL } from "@renderer/lib/form-layout";
+import {
+  FORM_DIALOG_FIELD_FULL,
+  FORM_DIALOG_GRID,
+} from "@renderer/lib/form-layout";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -674,7 +681,7 @@ export function SkuProfilePage() {
       </section>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+        <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit SKU</DialogTitle>
           </DialogHeader>
@@ -683,9 +690,9 @@ export function SkuProfilePage() {
               {formError}
             </div>
           ) : null}
-          <div className={FORM_GRID_TWO_COL}>
-            <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
-              <Label>Variant</Label>
+          <FormEnterNav className={FORM_DIALOG_GRID}>
+            <div className={`space-y-1.5 ${FORM_DIALOG_FIELD_FULL}`}>
+              <Label>Variant *</Label>
               <Input
                 value={variantName}
                 onChange={(e) => setVariantName(e.target.value)}
@@ -717,6 +724,7 @@ export function SkuProfilePage() {
               <Label>Base unit *</Label>
               <select
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                {...formSelectPickerProps()}
                 value={baseUnitId}
                 aria-invalid={Boolean(baseUnitError)}
                 onChange={(e) => setBaseUnitId(e.target.value)}
@@ -736,6 +744,7 @@ export function SkuProfilePage() {
               <Label>Purchase unit *</Label>
               <select
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                {...formSelectPickerProps()}
                 value={purchaseUnitId}
                 aria-invalid={Boolean(purchaseUnitError)}
                 onChange={(e) => setPurchaseUnitId(e.target.value)}
@@ -752,7 +761,7 @@ export function SkuProfilePage() {
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Units / purchase *</Label>
+              <Label>Units / purchase unit *</Label>
               <Input
                 value={unitsPerPurchaseUnit}
                 aria-invalid={Boolean(unitsPerError)}
@@ -763,7 +772,7 @@ export function SkuProfilePage() {
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Cost *</Label>
+              <Label>Cost price *</Label>
               <Input
                 value={costPrice}
                 aria-invalid={Boolean(costError)}
@@ -786,7 +795,7 @@ export function SkuProfilePage() {
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Selling *</Label>
+              <Label>Selling price *</Label>
               <Input
                 value={sellingPrice}
                 aria-invalid={Boolean(sellingError)}
@@ -809,21 +818,21 @@ export function SkuProfilePage() {
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Reorder</Label>
+              <Label>Reorder level</Label>
               <Input
                 value={reorderLevel}
                 onChange={(e) => setReorderLevel(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Min stock</Label>
+              <Label>Minimum stock</Label>
               <Input
                 value={minimumStockLevel}
                 onChange={(e) => setMinimumStockLevel(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Max stock</Label>
+              <Label>Maximum stock</Label>
               <Input
                 value={maximumStockLevel}
                 onChange={(e) => setMaximumStockLevel(e.target.value)}
@@ -834,6 +843,7 @@ export function SkuProfilePage() {
               <select
                 id="sku-status"
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                {...formSelectPickerProps()}
                 value={status}
                 onChange={(e) => setStatus(e.target.value as EntityStatus)}
               >
@@ -841,7 +851,7 @@ export function SkuProfilePage() {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-            <label className={`flex items-center gap-2 text-sm ${FORM_FIELD_FULL}`}>
+            <label className={`flex items-center gap-2 text-sm ${FORM_DIALOG_FIELD_FULL}`}>
               <input
                 type="checkbox"
                 checked={trackInventory}
@@ -849,7 +859,7 @@ export function SkuProfilePage() {
               />
               Track inventory
             </label>
-          </div>
+          </FormEnterNav>
           <KeyboardHints hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SAVE]} />
           <DialogFooter>
             <Button
