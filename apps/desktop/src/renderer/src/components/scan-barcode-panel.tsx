@@ -27,7 +27,7 @@ export function ScanBarcodePanel({
   title = "Scan barcode",
   description = "Scan or type a barcode, then press Enter.",
   busy = false,
-  layer = "main",
+  layer = "dialog",
   initialValue = "",
   allowEmpty = false,
   confirmLabel = "OK",

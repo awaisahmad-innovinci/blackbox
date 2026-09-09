@@ -350,7 +350,7 @@ export class GoodsReceiptsService {
         subtotal = round4(subtotal + lineTotal);
         const billedDelta = round4(item.receivedQuantity * unitsPer);
         const stockDelta = round4(
-          (item.receivedQuantity + bonusQuantity) * unitsPer,
+          item.receivedQuantity * unitsPer + bonusQuantity,
         );
 
         builtLines.push({

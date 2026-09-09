@@ -487,7 +487,7 @@ export function ReceivePurchaseOrderPage() {
         return false;
       }
       if (line.bonusQuantity < 0) {
-        setError("Bonus / sample quantity must be >= 0");
+        setError("FOC (pcs) must be >= 0");
         return false;
       }
       if (line.receivingUnitCost < 0) {
@@ -601,7 +601,7 @@ export function ReceivePurchaseOrderPage() {
             line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
           const billedDelta = line.receiveQuantity * unitsPer;
           const stockDelta =
-            (line.receiveQuantity + line.bonusQuantity) * unitsPer;
+            line.receiveQuantity * unitsPer + line.bonusQuantity;
           if (!(stockDelta > 0)) continue;
           const movementId = crypto.randomUUID();
           if (billedDelta > 0) {
@@ -939,7 +939,7 @@ export function ReceivePurchaseOrderPage() {
                   <th className="px-3 py-2 font-medium">SKU</th>
                   <th className="px-3 py-2 font-medium">Ordered</th>
                   <th className="px-3 py-2 font-medium">Receive qty</th>
-                  <th className="px-3 py-2 font-medium">Bonus / Sample</th>
+                  <th className="px-3 py-2 font-medium">FOC (pcs)</th>
                   <th className="px-3 py-2 font-medium">PO price</th>
                   <th className="px-3 py-2 font-medium">Sale price</th>
                   <th className="px-3 py-2 font-medium">Discount %</th>

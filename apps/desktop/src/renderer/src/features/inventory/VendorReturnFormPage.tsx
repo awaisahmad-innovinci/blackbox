@@ -67,10 +67,6 @@ export function VendorReturnFormPage() {
   const [success, setSuccess] = useState<VendorReturnDetail | null>(null);
   const vendorRef = useRef<HTMLSelectElement>(null);
 
-  function focusQty(productSkuId: string) {
-    focusLineQty(productSkuId);
-  }
-
   function updateLine(
     productSkuId: string,
     patch: Partial<Pick<DraftReturnLine, "quantity" | "reason">>,
@@ -113,7 +109,7 @@ export function VendorReturnFormPage() {
       }
       const match = result.row;
       if (lines.some((l) => l.productSkuId === match.productSkuId)) {
-        focusQty(match.productSkuId);
+        setError("Already added — update its quantity");
         return;
       }
       const available = match.quantityAvailable ?? 0;
@@ -135,7 +131,6 @@ export function VendorReturnFormPage() {
           lineTotal: round4(result.scannedQuantityMultiplier * unitCost),
         },
       ]);
-      focusQty(match.productSkuId);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Barcode lookup failed"));
     } finally {

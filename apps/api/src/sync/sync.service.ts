@@ -1007,7 +1007,7 @@ export class SyncService {
       const received = Number(item.receivedQuantity ?? 0);
       const bonus = Number(item.bonusQuantity ?? 0);
       const billedDelta = roundMoney4(received * unitsPer);
-      const stockDelta = roundMoney4((received + bonus) * unitsPer);
+      const stockDelta = roundMoney4(received * unitsPer + bonus);
       if (stockDelta <= 0) continue;
 
       let state = running.get(productSkuId);

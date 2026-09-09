@@ -149,24 +149,7 @@ export function InventoryOutPage() {
 
     const existing = lines.find((l) => l.productSkuId === row.id);
     if (existing) {
-      const nextQty = round4(existing.quantity + multiplier);
-      if (nextQty > available) {
-        return `Cannot exceed available (${available}) for ${row.sku}`;
-      }
-      setLines((prev) =>
-        prev.map((l) =>
-          l.productSkuId === row.id
-            ? {
-                ...l,
-                quantity: nextQty,
-                sellUnit,
-                lastScanMultiplier: multiplier,
-              }
-            : l,
-        ),
-      );
-      focusLineQty(row.id);
-      return null;
+      return "This barcode is already in your list — update quantity manually.";
     }
 
     if (multiplier > available) {
@@ -193,7 +176,6 @@ export function InventoryOutPage() {
         lastScanMultiplier: multiplier,
       },
     ]);
-    focusLineQty(row.id);
     return null;
   }
 
@@ -679,7 +661,7 @@ export function InventoryOutPage() {
         onOpenChange={setScanOpen}
         busy={scanBusy}
         clearAfterComplete
-        description="Scan or type a barcode, then press Enter to add or increment qty by 1."
+        description="Scan or type a barcode, then press Enter to add it to the list."
         onComplete={(code) => onBarcodeEnter(code)}
       />
     </div>

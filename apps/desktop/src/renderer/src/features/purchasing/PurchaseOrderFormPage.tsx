@@ -99,7 +99,6 @@ export function PurchaseOrderFormPage() {
       const match = result.row;
       if (lines.some((l) => l.productSkuId === match.productSkuId)) {
         setError("Already added — update its quantity");
-        focusQty(match.productSkuId);
         return;
       }
       setLines((prev) => [
@@ -112,7 +111,6 @@ export function PurchaseOrderFormPage() {
           ),
         },
       ]);
-      focusQty(match.productSkuId);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Barcode lookup failed"));
     } finally {

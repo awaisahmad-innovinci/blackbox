@@ -115,7 +115,7 @@ export function GoodsReceiptProfilePage() {
                 <th className="px-4 py-3 font-medium">SKU</th>
                 <th className="px-4 py-3 font-medium">Ordered</th>
                 <th className="px-4 py-3 font-medium">Received</th>
-                <th className="px-4 py-3 font-medium">Bonus / Sample</th>
+                <th className="px-4 py-3 font-medium">FOC (pcs)</th>
                 <th className="px-4 py-3 font-medium">PO cost</th>
                 <th className="px-4 py-3 font-medium">Recv cost</th>
                 <th className="px-4 py-3 font-medium">Discount %</th>
