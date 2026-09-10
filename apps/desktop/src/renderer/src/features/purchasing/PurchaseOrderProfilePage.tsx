@@ -2,11 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { ConfirmDialog } from "@renderer/components/confirm-dialog";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { loadPurchaseOrder } from "@renderer/lib/local-db/entity-source";
+import {
+  commitLocalChange,
+  isDeviceBound,
+} from "@renderer/lib/local-db/local-write";
+import { syncNow } from "@renderer/lib/sync/sync-status";
 
 export function PurchaseOrderProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +23,8 @@ export function PurchaseOrderProfilePage() {
   const [po, setPo] = useState<PurchaseOrderDetail | null>(seeded ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -39,13 +48,26 @@ export function PurchaseOrderProfilePage() {
 
   async function onSubmit() {
     if (!po) return;
-    const ok = window.confirm(
-      `Submit this Purchase Order?\n\nVendor: ${po.vendorName}\nTotal: ${po.total.toLocaleString()}\nItems: ${po.items.length}`,
-    );
-    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: PurchaseOrderDetail = {
+          ...po,
+          status: "SUBMITTED",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "purchase_order",
+          entityId: po.id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setPo(updated);
+        return;
+      }
       const updated = await purchaseOrdersApi.submit(po.id);
       try {
         await window.blackbox?.localDb?.upsertPurchaseOrder(updated);
@@ -62,10 +84,26 @@ export function PurchaseOrderProfilePage() {
 
   async function onCancel() {
     if (!po) return;
-    if (!window.confirm(`Cancel purchase order ${po.poNumber}?`)) return;
     setBusy(true);
     setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: PurchaseOrderDetail = {
+          ...po,
+          status: "CANCELLED",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "purchase_order",
+          entityId: po.id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setPo(updated);
+        return;
+      }
       const updated = await purchaseOrdersApi.cancel(po.id);
       try {
         await window.blackbox?.localDb?.upsertPurchaseOrder(updated);
@@ -132,7 +170,7 @@ export function PurchaseOrderProfilePage() {
               </Button>
             ) : null}
             {canSubmit ? (
-              <Button disabled={busy} onClick={() => void onSubmit()}>
+              <Button disabled={busy} onClick={() => setSubmitConfirmOpen(true)}>
                 Submit PO
               </Button>
             ) : null}
@@ -147,7 +185,7 @@ export function PurchaseOrderProfilePage() {
               <Button
                 variant="outline"
                 disabled={busy}
-                onClick={() => void onCancel()}
+                onClick={() => setCancelConfirmOpen(true)}
               >
                 Cancel PO
               </Button>
@@ -184,10 +222,6 @@ export function PurchaseOrderProfilePage() {
             <dt className="text-muted-foreground">Expected delivery</dt>
             <dd className="font-medium">{po.expectedDate || "—"}</dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="text-muted-foreground">Notes</dt>
-            <dd className="font-medium">{po.notes || "—"}</dd>
-          </div>
         </dl>
       </section>
 
@@ -217,7 +251,10 @@ export function PurchaseOrderProfilePage() {
                 </tr>
               ) : (
                 po.items.map((item) => (
-                  <tr key={item.id} className="border-border border-t">
+                  <ListTableRow
+                    key={item.id}
+                    onActivate={() => navigate(`/skus/${item.productSkuId}`)}
+                  >
                     <td className="px-4 py-3">
                       {item.productName}
                       <div className="text-muted-foreground text-xs">
@@ -225,12 +262,12 @@ export function PurchaseOrderProfilePage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Link
+                      <ListTableLink
                         to={`/skus/${item.productSkuId}`}
                         className="text-primary hover:underline"
                       >
                         {item.sku}
-                      </Link>
+                      </ListTableLink>
                     </td>
                     <td className="px-4 py-3">
                       {item.purchaseUnitName || "—"}
@@ -242,7 +279,7 @@ export function PurchaseOrderProfilePage() {
                     <td className="px-4 py-3 tabular-nums">
                       {item.lineTotal.toLocaleString()}
                     </td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -251,30 +288,48 @@ export function PurchaseOrderProfilePage() {
       </section>
 
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Subtotal</span>
-          <span className="tabular-nums">{po.subtotal.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Discount</span>
-          <span className="tabular-nums">{po.discount.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Tax</span>
-          <span className="tabular-nums">{po.tax.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Other charges</span>
-          <span className="tabular-nums">
-            {po.otherCharges.toLocaleString()}
-          </span>
-        </div>
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
-          <span>Grand total</span>
+          <span>Total</span>
           <span className="tabular-nums">{po.total.toLocaleString()}</span>
         </div>
       </section>
       </PrintDocument>
+
+      <ConfirmDialog
+        open={submitConfirmOpen}
+        onOpenChange={setSubmitConfirmOpen}
+        title="Submit this Purchase Order?"
+        description={
+          po ? (
+            <>
+              <p>Vendor: {po.vendorName}</p>
+              <p>Total: {po.total.toLocaleString()}</p>
+              <p>Items: {po.items.length}</p>
+            </>
+          ) : null
+        }
+        confirmLabel="Submit PO"
+        loading={busy}
+        onConfirm={async () => {
+          await onSubmit();
+          setSubmitConfirmOpen(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={cancelConfirmOpen}
+        onOpenChange={setCancelConfirmOpen}
+        title="Cancel purchase order?"
+        description={
+          po ? `Cancel purchase order ${po.poNumber}?` : null
+        }
+        confirmLabel="Cancel PO"
+        loading={busy}
+        onConfirm={async () => {
+          await onCancel();
+          setCancelConfirmOpen(false);
+        }}
+      />
     </>
   );
 }

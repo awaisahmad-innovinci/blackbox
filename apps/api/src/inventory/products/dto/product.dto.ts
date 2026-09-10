@@ -113,6 +113,13 @@ export class CreateProductSkuDto {
   sellingPrice!: number;
 
   @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  sellingPricePerPurchaseUnit?: number | null;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)

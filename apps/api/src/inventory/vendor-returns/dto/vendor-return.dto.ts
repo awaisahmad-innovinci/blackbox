@@ -106,6 +106,17 @@ export class LastPurchaseCostQueryDto {
   productSkuId!: string;
 }
 
+export class ReturnableQuantityQueryDto {
+  @IsUUID()
+  vendorId!: string;
+
+  @IsUUID()
+  productSkuId!: string;
+
+  @IsUUID()
+  warehouseId!: string;
+}
+
 export class PendingVendorReturnsQueryDto {
   @IsUUID()
   vendorId!: string;

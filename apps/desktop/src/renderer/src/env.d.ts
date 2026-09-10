@@ -10,6 +10,8 @@ import type {
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
+  InventoryOutListQuery,
+  PaginatedInventoryOuts,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
@@ -21,6 +23,7 @@ import type {
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
   ReceivingDraft,
+  SkuBarcode,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
@@ -119,7 +122,12 @@ declare global {
           query?: GoodsReceiptListQuery,
         ) => Promise<PaginatedGoodsReceipts>;
         listPoNumbers: () => Promise<string[]>;
+        listSkuCodes: () => Promise<string[]>;
         listReceiptNumbers: () => Promise<string[]>;
+        listOutNumbers: () => Promise<string[]>;
+        listInventoryOuts: (
+          query?: InventoryOutListQuery,
+        ) => Promise<PaginatedInventoryOuts>;
         getDashboardSummary: () => Promise<DashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
@@ -176,6 +184,12 @@ declare global {
         lookupSkuByBarcode: (
           barcode: string,
         ) => Promise<SkuBarcodeLookupResult | null>;
+        lookupSkuByCode: (
+          sku: string,
+        ) => Promise<SkuBarcodeLookupResult | null>;
+        listSkuBarcodes: (skuId: string) => Promise<SkuBarcode[]>;
+        upsertSkuBarcode: (row: SkuBarcode) => Promise<void>;
+        deleteSkuBarcode: (id: string, productSkuId: string) => Promise<void>;
         getPurchaseOrder: (id: string) => Promise<PurchaseOrderDetail | null>;
         getReceivingDraft: (poId: string) => Promise<ReceivingDraft | null>;
         getGoodsReceipt: (id: string) => Promise<GoodsReceiptDetail | null>;
@@ -190,6 +204,11 @@ declare global {
         lastPurchaseCost: (
           vendorId: string,
           productSkuId: string,
+        ) => Promise<number>;
+        vendorReturnableQuantity: (
+          vendorId: string,
+          productSkuId: string,
+          warehouseId: string,
         ) => Promise<number>;
         inventoryInOutReport: (
           dateFrom: string,

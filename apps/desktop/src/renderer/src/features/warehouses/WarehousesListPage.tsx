@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { EntityStatus, WarehouseListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
@@ -12,7 +12,17 @@ import {
 } from "@renderer/lib/local-db/data-source";
 import { useSession } from "@renderer/lib/session/context";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
+import {
+  KEYBOARD_HINT_LIST_ROWS,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import {
+  FILTER_SELECT_CLASS,
+  filterSelectProps,
+  ListFilterNav,
+} from "@renderer/components/list-filter-nav";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -33,10 +43,12 @@ export function WarehousesListPage() {
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
 
@@ -108,16 +120,18 @@ export function WarehousesListPage() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <ListFilterNav>
         <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
           className="max-w-xs"
           placeholder="Search…"
-          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={status}
           onChange={(e) => setStatus(e.target.value as EntityStatus | "all")}
         >
@@ -125,7 +139,7 @@ export function WarehousesListPage() {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-      </div>
+      </ListFilterNav>
 
       {error ? (
         <div
@@ -168,18 +182,22 @@ export function WarehousesListPage() {
             ) : null}
             {!loading
               ? pageItems.map((row) => (
-                  <tr
+                  <ListTableRow
                     key={row.id}
-                    className="border-border hover:bg-muted/30 border-t"
+                    onActivate={
+                      canWrite
+                        ? () => navigate(`/warehouses/${row.id}/edit`)
+                        : undefined
+                    }
                   >
                     <td className="px-4 py-3 font-medium">
                       {canWrite ? (
-                        <Link
+                        <ListTableLink
                           to={`/warehouses/${row.id}/edit`}
                           className="text-primary hover:underline"
                         >
                           {row.name}
-                        </Link>
+                        </ListTableLink>
                       ) : (
                         row.name
                       )}
@@ -187,7 +205,7 @@ export function WarehousesListPage() {
                     <td className="px-4 py-3 font-mono text-xs">{row.code}</td>
                     <td className="px-4 py-3">{row.location?.trim() || "—"}</td>
                     <td className="px-4 py-3 capitalize">{row.status}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               : null}
           </tbody>
@@ -204,6 +222,7 @@ export function WarehousesListPage() {
           setPage(1);
         }}
       />
+      <KeyboardHints hints={[KEYBOARD_HINT_LIST_ROWS]} />
     </div>
   );
 }

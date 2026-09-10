@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { EntityStatus } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
@@ -7,7 +7,19 @@ import { Skeleton } from "@blackbox/ui/skeleton";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import type { DataSourceMode } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  KEYBOARD_HINT_LIST_ROWS,
+  KEYBOARD_HINT_NEW,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import {
+  FILTER_SELECT_CLASS,
+  filterSelectProps,
+  ListFilterNav,
+} from "@renderer/components/list-filter-nav";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -43,6 +55,7 @@ export function TaxonomyListPage({
   const navigate = useNavigate();
   const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<EntityStatus | "all">("all");
   const [items, setItems] = useState<TaxonomyRow[]>([]);
   const [page, setPage] = useState(1);
@@ -54,8 +67,17 @@ export function TaxonomyListPage({
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
+
+  usePageKeyboard({
+    onNew: () => navigate(`${basePath}/new`),
+  });
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useResetPageOnFilterChange(setPage, [search, status, dataVersion]);
 
@@ -103,16 +125,18 @@ export function TaxonomyListPage({
         <Button onClick={() => navigate(`${basePath}/new`)}>{createLabel}</Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <ListFilterNav>
         <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
           className="max-w-xs"
           placeholder="Search…"
-          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={status}
           onChange={(e) => setStatus(e.target.value as EntityStatus | "all")}
         >
@@ -120,7 +144,7 @@ export function TaxonomyListPage({
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-      </div>
+      </ListFilterNav>
 
       {error ? (
         <div
@@ -162,23 +186,23 @@ export function TaxonomyListPage({
             ) : null}
             {!loading
               ? pageItems.map((row) => (
-                  <tr
+                  <ListTableRow
                     key={row.id}
-                    className="border-border hover:bg-muted/30 border-t"
+                    onActivate={() => navigate(`${basePath}/${row.id}/edit`)}
                   >
                     <td className="px-4 py-3 font-medium">
-                      <Link
+                      <ListTableLink
                         to={`${basePath}/${row.id}/edit`}
                         className="text-primary hover:underline"
                       >
                         {row.name}
-                      </Link>
+                      </ListTableLink>
                     </td>
                     <td className="px-4 py-3">
                       {row.description?.trim() || "—"}
                     </td>
                     <td className="px-4 py-3 capitalize">{row.status}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               : null}
           </tbody>
@@ -195,6 +219,7 @@ export function TaxonomyListPage({
           setPage(1);
         }}
       />
+      <KeyboardHints hints={[KEYBOARD_HINT_NEW, KEYBOARD_HINT_LIST_ROWS]} />
     </div>
   );
 }

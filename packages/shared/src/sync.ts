@@ -23,6 +23,7 @@ export type MasterDataEntityType =
   | "vendor_group"
   | "product"
   | "product_sku"
+  | "product_sku_barcode"
   | "vendor"
   | "vendor_sku";
 

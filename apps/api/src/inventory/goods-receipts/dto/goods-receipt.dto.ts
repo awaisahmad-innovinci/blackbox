@@ -65,8 +65,40 @@ export class CreateGoodsReceiptDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
+  saleTax?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  advTax?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  gst?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  incentive?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  shelfRent?: number;
+
+  /** @deprecated use saleTax */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
   tax?: number;
 
+  /** @deprecated ignored */
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

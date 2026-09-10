@@ -259,7 +259,7 @@ export class VendorReturnsService {
           );
         }
         const unitsPer = toNum(vendorSku?.unitsPerPurchaseUnit) || 1;
-        const stockDelta = round4(qty * unitsPer);
+        const stockDelta = round4(qty);
         const available = toNum(stock.quantityAvailable);
         if (stockDelta > available) {
           throw new BadRequestException(
@@ -268,7 +268,7 @@ export class VendorReturnsService {
         }
 
         const unitCost = round4(item.unitCost);
-        const lineTotal = round4(qty * unitCost);
+        const lineTotal = round4((qty / unitsPer) * unitCost);
         subtotal = round4(subtotal + lineTotal);
         builtLines.push({
           productSkuId: item.productSkuId,
@@ -314,7 +314,7 @@ export class VendorReturnsService {
           }),
         );
 
-        const stockDelta = round4(line.quantity * line.unitsPerPurchaseUnit);
+        const stockDelta = round4(line.quantity);
         await manager.getRepository(InventoryMovement).save(
           manager.getRepository(InventoryMovement).create({
             tenantId,
@@ -364,6 +364,7 @@ export class VendorReturnsService {
       .map((l) => {
         const quantity = toNum(l.quantity);
         const unitCost = toNum(l.unitCost);
+        const unitsPer = toNum(l.unitsPerPurchaseUnit) || 1;
         return {
           vendorReturnItemId: l.id,
           vendorReturnId: l.vendorReturnId,
@@ -376,11 +377,61 @@ export class VendorReturnsService {
           reason: l.reason as VendorReturnReason,
           quantity,
           unitCost,
-          lineTotal: round4(quantity * unitCost),
+          lineTotal: round4((quantity / unitsPer) * unitCost),
           purchaseUnitName: l.purchaseUnit?.name ?? null,
-          unitsPerPurchaseUnit: toNum(l.unitsPerPurchaseUnit) || 1,
+          unitsPerPurchaseUnit: unitsPer,
         };
       });
+  }
+
+  async returnableQuantity(
+    vendorId: string,
+    productSkuId: string,
+    warehouseId: string,
+  ): Promise<{ quantityAvailable: number }> {
+    const tenantId = this.fixedTenant.tenantId;
+
+    const receivedRaw = await this.dataSource
+      .getRepository(GoodsReceiptItem)
+      .createQueryBuilder("i")
+      .innerJoin("i.goodsReceipt", "gr")
+      .select(
+        `COALESCE(SUM(
+          i.received_quantity * COALESCE(i.units_per_purchase_unit, 1)
+          + COALESCE(i.bonus_quantity, 0)
+        ), 0)`,
+        "receivedBase",
+      )
+      .where("i.tenant_id = :tenantId", { tenantId })
+      .andWhere("i.product_sku_id = :productSkuId", { productSkuId })
+      .andWhere("gr.vendor_id = :vendorId", { vendorId })
+      .andWhere("gr.warehouse_id = :warehouseId", { warehouseId })
+      .andWhere("gr.status = :status", { status: "POSTED" })
+      .getRawOne<{ receivedBase: string }>();
+
+    const returnedRaw = await this.dataSource
+      .getRepository(VendorReturnItem)
+      .createQueryBuilder("i")
+      .innerJoin("i.vendorReturn", "vr")
+      .select(
+        `COALESCE(SUM(i.quantity), 0)`,
+        "returnedBase",
+      )
+      .where("i.tenant_id = :tenantId", { tenantId })
+      .andWhere("i.product_sku_id = :productSkuId", { productSkuId })
+      .andWhere("vr.vendor_id = :vendorId", { vendorId })
+      .andWhere("vr.warehouse_id = :warehouseId", { warehouseId })
+      .getRawOne<{ returnedBase: string }>();
+
+    const stock = await this.dataSource.getRepository(InventoryStock).findOne({
+      where: { tenantId, productSkuId, warehouseId },
+    });
+
+    const receivedBase = toNum(receivedRaw?.receivedBase);
+    const returnedBase = toNum(returnedRaw?.returnedBase);
+    const warehouseBase = toNum(stock?.quantityAvailable);
+    const net = Math.max(0, receivedBase - returnedBase);
+    return { quantityAvailable: Math.min(warehouseBase, net) };
   }
 
   async lastPurchaseCost(
@@ -443,6 +494,7 @@ export class VendorReturnsService {
     const items: VendorReturnItemRow[] = lines.map((l) => {
       const quantity = toNum(l.quantity);
       const unitCost = toNum(l.unitCost);
+      const unitsPer = toNum(l.unitsPerPurchaseUnit) || 1;
       return {
         id: l.id,
         productSkuId: l.productSkuId,
@@ -453,10 +505,10 @@ export class VendorReturnsService {
         barcode: l.productSku?.barcode ?? null,
         purchaseUnitId: l.purchaseUnitId,
         purchaseUnitName: l.purchaseUnit?.name ?? null,
-        unitsPerPurchaseUnit: toNum(l.unitsPerPurchaseUnit) || 1,
+        unitsPerPurchaseUnit: unitsPer,
         quantity,
         unitCost,
-        lineTotal: round4(quantity * unitCost),
+        lineTotal: round4((quantity / unitsPer) * unitCost),
         reason: l.reason as VendorReturnReason,
         settlement: (l.settlement as VendorReturnSettlement | null) ?? null,
         goodsReceiptId: l.goodsReceiptId,

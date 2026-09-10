@@ -186,6 +186,28 @@ export type WarehouseDto = {
   status: "active" | "inactive";
 };
 
+export type VendorListItemDto = {
+  id: string;
+  name: string;
+  vendorCode: string;
+  status: "active" | "inactive";
+};
+
+export function listVendors(query?: {
+  status?: "active" | "inactive";
+  search?: string;
+  pageSize?: number;
+}) {
+  const params = new URLSearchParams();
+  if (query?.status) params.set("status", query.status);
+  if (query?.search?.trim()) params.set("search", query.search.trim());
+  if (query?.pageSize != null) params.set("pageSize", String(query.pageSize));
+  const s = params.toString();
+  return apiFetch<{ items: VendorListItemDto[] }>(
+    `/vendors${s ? `?${s}` : ""}`,
+  );
+}
+
 export function listWarehouses(query?: {
   status?: "active" | "inactive" | "all";
   q?: string;

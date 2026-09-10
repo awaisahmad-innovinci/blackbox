@@ -688,6 +688,107 @@ create table if not exists local_entity_versions (
       backfillLocalEntityVersions(db);
     },
   },
+  {
+    id: "013_goods_receipt_charge_fields",
+    sql: `-- column adds applied in after()`,
+    after: (db) => {
+      const cols = (
+        db.prepare("pragma table_info(goods_receipts)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      const add = (name: string, ddl: string) => {
+        if (!cols.includes(name)) {
+          db.exec(`alter table goods_receipts add column ${ddl}`);
+        }
+      };
+      add("adv_tax", "adv_tax real not null default 0");
+      add("gst", "gst real not null default 0");
+      add("incentive", "incentive real not null default 0");
+      add("shelf_rent", "shelf_rent real not null default 0");
+    },
+  },
+  {
+    id: "014_product_sku_barcodes",
+    sql: `
+create table if not exists product_sku_barcodes (
+  id text primary key,
+  tenant_id text not null,
+  product_sku_id text not null,
+  barcode text not null,
+  status text not null default 'active',
+  created_at text not null,
+  updated_at text not null,
+  sync_status text not null default 'synced',
+  server_updated_at text,
+  unique (tenant_id, barcode)
+);
+
+create index if not exists product_sku_barcodes_sku_id_idx
+  on product_sku_barcodes (product_sku_id);
+`,
+    after: (db) => {
+      db.exec(`
+insert into product_sku_barcodes (
+  id, tenant_id, product_sku_id, barcode, status, created_at, updated_at, sync_status
+)
+select
+  lower(hex(randomblob(4))) || '-' ||
+  lower(hex(randomblob(2))) || '-4' ||
+  substr(lower(hex(randomblob(2))), 2) || '-' ||
+  substr('89ab', abs(random()) % 4 + 1, 1) ||
+  substr(lower(hex(randomblob(2))), 2) || '-' ||
+  lower(hex(randomblob(6))),
+  tenant_id,
+  id,
+  barcode,
+  'active',
+  datetime('now'),
+  datetime('now'),
+  'synced'
+from product_skus
+where barcode is not null and trim(barcode) != ''
+  and not exists (
+    select 1 from product_sku_barcodes b
+    where b.tenant_id = product_skus.tenant_id
+      and b.barcode = product_skus.barcode
+  );
+`);
+    },
+  },
+  {
+    id: "015_sku_barcode_multiplier_box_price",
+    sql: `-- column adds applied in after()`,
+    after: (db) => {
+      const barcodeCols = (
+        db.prepare("pragma table_info(product_sku_barcodes)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!barcodeCols.includes("quantity_multiplier")) {
+        db.exec(
+          `alter table product_sku_barcodes add column quantity_multiplier real not null default 1`,
+        );
+      }
+
+      const skuCols = (
+        db.prepare("pragma table_info(product_skus)").all() as { name: string }[]
+      ).map((c) => c.name);
+      if (!skuCols.includes("selling_price_per_purchase_unit")) {
+        db.exec(
+          `alter table product_skus add column selling_price_per_purchase_unit real`,
+        );
+      }
+    },
+  },
+  {
+    id: "016_vendor_return_qty_pcs",
+    sql: `
+update vendor_return_items
+set quantity = quantity * units_per_purchase_unit
+where units_per_purchase_unit > 0;
+`,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

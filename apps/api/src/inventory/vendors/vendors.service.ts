@@ -16,6 +16,7 @@ import type {
   VendorListItem,
 } from "@blackbox/shared";
 import { VENDOR_CONTACT_TYPES } from "@blackbox/shared";
+import { normalizeOptionalStoredText, normalizeStoredText } from "@blackbox/shared";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import {
   Vendor,
@@ -176,7 +177,7 @@ export class VendorsService {
         await this.assertUniqueCode(tenantId, vendorCode);
         const vendor = manager.create(Vendor, {
           tenantId,
-          name: dto.name.trim(),
+          name: normalizeStoredText(dto.name),
           vendorCode,
           groupId: dto.groupId ?? null,
           status: dto.status ?? "active",
@@ -221,7 +222,7 @@ export class VendorsService {
 
     try {
       await this.dataSource.transaction(async (manager) => {
-        existing.name = dto.name.trim();
+        existing.name = normalizeStoredText(dto.name);
         existing.vendorCode = vendorCode;
         existing.groupId = dto.groupId ?? null;
         existing.status = dto.status ?? existing.status;
@@ -310,7 +311,9 @@ export class VendorsService {
         tenantId,
         vendorId,
         contactType: type,
-        name: input?.name?.trim() || null,
+        name: input?.name?.trim()
+          ? normalizeStoredText(input.name)
+          : null,
         phone: input?.phone?.trim() || null,
         email: input?.email?.trim() || null,
       });

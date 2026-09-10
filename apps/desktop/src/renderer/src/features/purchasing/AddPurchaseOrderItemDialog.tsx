@@ -11,7 +11,12 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { loadVendorSkus } from "@renderer/lib/local-db/entity-source";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  KEYBOARD_HINT_PICK_ROWS,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListPickFocusable, ListPickRow } from "@renderer/components/list-table-row";
 
 export type DraftPoLine = {
   productSkuId: string;
@@ -70,11 +75,13 @@ export function AddPurchaseOrderItemDialog({
   const [results, setResults] = useState<VendorSku[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const queryRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     layer: "dialog",
     enabled: open,
+    inputRef: queryRef,
     onScan: setQuery,
   });
 
@@ -150,7 +157,7 @@ export function AddPurchaseOrderItemDialog({
         }
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Items</DialogTitle>
         </DialogHeader>
@@ -164,7 +171,8 @@ export function AddPurchaseOrderItemDialog({
           <div className="space-y-1.5">
             <Label>Search SKUs supplied by this vendor</Label>
             <Input
-              data-barcode-scan=""
+              ref={queryRef}
+              {...barcodeScanInputProps()}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Pepsi"
@@ -178,73 +186,71 @@ export function AddPurchaseOrderItemDialog({
               </li>
             ) : (
               <>
-                <li>
-                  <label
-                    className={
-                      selectableIds.length === 0
-                        ? "flex cursor-not-allowed items-center gap-3 px-3 py-2 text-sm opacity-60"
-                        : "hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2 text-sm"
-                    }
-                  >
+                <ListPickRow
+                  disabled={selectableIds.length === 0}
+                  onActivate={toggleSelectAll}
+                  className="flex items-center gap-3 px-3 py-2 text-sm"
+                >
+                  <ListPickFocusable>
                     <input
                       ref={selectAllRef}
                       type="checkbox"
-                      className="mt-0.5"
+                      className="pointer-events-none mt-0.5"
                       checked={allSelected}
                       disabled={selectableIds.length === 0}
-                      onChange={toggleSelectAll}
+                      readOnly
                     />
-                    <span className="font-medium">Select all</span>
-                    <span className="text-muted-foreground text-xs">
-                      {selectableIds.length} SKUs
-                    </span>
-                  </label>
-                </li>
+                  </ListPickFocusable>
+                  <span className="font-medium">Select all</span>
+                  <span className="text-muted-foreground text-xs">
+                    {selectableIds.length} SKUs
+                  </span>
+                </ListPickRow>
                 {results.map((r) => {
                   const added = existingSkuIds.includes(r.productSkuId);
                   const disabled = rowDisabled(r);
                   const checked = selectedIds.includes(r.id);
                   return (
-                    <li key={r.id}>
-                      <label
-                        className={
-                          disabled
-                            ? "flex cursor-not-allowed items-start gap-3 px-3 py-2 text-sm opacity-60"
-                            : "hover:bg-muted/50 flex cursor-pointer items-start gap-3 px-3 py-2 text-sm"
-                        }
-                      >
+                    <ListPickRow
+                      key={r.id}
+                      disabled={disabled}
+                      onActivate={() => toggle(r.id)}
+                      className="flex items-start gap-3 px-3 py-2 text-sm"
+                    >
+                      <ListPickFocusable>
                         <input
                           type="checkbox"
-                          className="mt-1"
+                          className="pointer-events-none mt-1"
                           checked={checked}
                           disabled={disabled}
-                          onChange={() => toggle(r.id)}
+                          readOnly
                         />
-                        <span className="flex-1">
-                          <span className="font-medium">{r.productName}</span>
-                          {added ? (
-                            <span className="text-muted-foreground ml-2 text-xs">
-                              Added
-                            </span>
-                          ) : null}
-                          <span className="text-muted-foreground block">
-                            {r.variantName || "—"} · {r.sku}
-                            {r.barcode ? ` · ${r.barcode}` : ""}
+                      </ListPickFocusable>
+                      <span className="flex-1">
+                        <span className="font-medium">{r.productName}</span>
+                        {added ? (
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            Added
                           </span>
-                          <span className="text-muted-foreground block tabular-nums">
-                            Cost {r.purchasePrice.toLocaleString()} ·{" "}
-                            {r.purchaseUnitName || "—"} · MOQ{" "}
-                            {r.minimumOrderQuantity} · Available{" "}
-                            {(r.quantityAvailable ?? 0).toLocaleString()}
-                          </span>
+                        ) : null}
+                        <span className="text-muted-foreground block">
+                          {r.variantName || "—"} · {r.sku}
+                          {r.barcode ? ` · ${r.barcode}` : ""}
                         </span>
-                      </label>
-                    </li>
+                        <span className="text-muted-foreground block tabular-nums">
+                          Cost {r.purchasePrice.toLocaleString()} ·{" "}
+                          {r.purchaseUnitName || "—"} · MOQ{" "}
+                          {r.minimumOrderQuantity} · Available{" "}
+                          {(r.quantityAvailable ?? 0).toLocaleString()}
+                        </span>
+                      </span>
+                    </ListPickRow>
                   );
                 })}
               </>
             )}
           </ul>
+          <KeyboardHints hints={[KEYBOARD_HINT_PICK_ROWS]} />
         </div>
 
         <DialogFooter>

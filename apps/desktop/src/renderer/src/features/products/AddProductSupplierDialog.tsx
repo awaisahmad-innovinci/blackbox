@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   ProductSkuDetail,
+  ProductSupplierRow,
   VendorListItem,
   VendorSku,
 } from "@blackbox/shared";
@@ -14,7 +15,15 @@ import {
 } from "@blackbox/ui/dialog";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { Textarea } from "@blackbox/ui/textarea";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
+import {
+  KEYBOARD_HINT_PICK_ROWS,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListPickRow } from "@renderer/components/list-table-row";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { loadVendors } from "@renderer/lib/local-db/entity-source";
@@ -43,6 +52,7 @@ export function AddProductSupplierDialog({
   open,
   skus,
   lockedSkuId,
+  existingSuppliers,
   onClose,
   onCreated,
 }: {
@@ -50,6 +60,7 @@ export function AddProductSupplierDialog({
   skus: ProductSkuDetail[];
   /** When set, SKU is fixed (required first supplier after Add SKU). */
   lockedSkuId?: string | null;
+  existingSuppliers?: ProductSupplierRow[];
   onClose: () => void;
   onCreated: (row: VendorSku, cacheWarning: boolean) => void;
 }) {
@@ -61,10 +72,10 @@ export function AddProductSupplierDialog({
   );
   const [purchaseUnitId, setPurchaseUnitId] = useState("");
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
+  const [purchasePrice, setPurchasePrice] = useState("");
   const [moq, setMoq] = useState("1");
   const [leadTimeDays, setLeadTimeDays] = useState("0");
   const [isPreferred, setIsPreferred] = useState(false);
-  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -83,6 +94,7 @@ export function AddProductSupplierDialog({
     const packaging = packagingFromSku(sku);
     setPurchaseUnitId(packaging.purchaseUnitId);
     setUnitsPerPurchaseUnit(packaging.unitsPerPurchaseUnit);
+    setPurchasePrice(String(purchasePriceFromSku(sku)));
   }, [open, productSkuId, skus]);
 
   useEffect(() => {
@@ -110,10 +122,10 @@ export function AddProductSupplierDialog({
     setSelectedVendor(null);
     setPurchaseUnitId(packaging.purchaseUnitId);
     setUnitsPerPurchaseUnit(packaging.unitsPerPurchaseUnit);
+    setPurchasePrice(String(purchasePriceFromSku(sku)));
     setMoq("1");
     setLeadTimeDays("0");
     setIsPreferred(false);
-    setNotes("");
     setError(null);
   }
 
@@ -123,9 +135,16 @@ export function AddProductSupplierDialog({
   const selectedSku = productSkuId
     ? skus.find((s) => s.id === productSkuId)
     : undefined;
-  const computedPurchasePrice = selectedSku
-    ? purchasePriceFromSku(selectedSku)
-    : null;
+
+  const linkedVendorIds = useMemo(
+    () =>
+      new Set(
+        existingSuppliers
+          ?.filter((s) => s.productSkuId === productSkuId)
+          .map((s) => s.vendorId) ?? [],
+      ),
+    [existingSuppliers, productSkuId],
+  );
 
   async function onSave() {
     if (!productSkuId) {
@@ -136,11 +155,19 @@ export function AddProductSupplierDialog({
       setError("Select a vendor");
       return;
     }
+    if (linkedVendorIds.has(selectedVendor.id)) {
+      setError("This vendor is already linked to this SKU");
+      return;
+    }
     if (!selectedSku) {
       setError("Select a SKU first");
       return;
     }
-    const price = purchasePriceFromSku(selectedSku);
+    const price = Number(purchasePrice);
+    if (Number.isNaN(price) || price < 0) {
+      setError("Purchase price must be a non-negative number");
+      return;
+    }
     const unitsPerUnit = Number(unitsPerPurchaseUnit);
     if (Number.isNaN(unitsPerUnit) || unitsPerUnit <= 0) {
       setError("Units per purchase unit must be greater than zero");
@@ -178,7 +205,7 @@ export function AddProductSupplierDialog({
           leadTimeDays: leadTime,
           isPreferred,
           status: "active",
-          notes: notes.trim(),
+          notes: "",
           productName: sku?.variantName || sku?.sku || "",
           variantName: sku?.variantName ?? "",
           sku: sku?.sku ?? "",
@@ -206,7 +233,7 @@ export function AddProductSupplierDialog({
         minimumOrderQuantity,
         leadTimeDays: leadTime,
         isPreferred,
-        notes: notes.trim(),
+        notes: "",
       });
     } catch (err: unknown) {
       setSaving(false);
@@ -235,7 +262,7 @@ export function AddProductSupplierDialog({
         }
       }}
     >
-      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {lockedSkuId ? "Add Required Supplier" : "Add Supplier"}
@@ -255,7 +282,7 @@ export function AddProductSupplierDialog({
           </div>
         ) : null}
 
-        <div className="space-y-3">
+        <FormEnterNav className="space-y-3">
           <div className="space-y-1.5">
             <Label>SKU *</Label>
             {lockedSkuId ? (
@@ -270,6 +297,7 @@ export function AddProductSupplierDialog({
             ) : (
               <select
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                {...formSelectPickerProps()}
                 value={productSkuId}
                 onChange={(e) => setProductSkuId(e.target.value)}
               >
@@ -294,19 +322,32 @@ export function AddProductSupplierDialog({
                 />
               </div>
               <ul className="border-border max-h-40 divide-y overflow-y-auto rounded-md border">
-                {vendors.map((v) => (
-                  <li key={v.id}>
-                    <button
-                      type="button"
-                      className="hover:bg-muted/50 w-full px-3 py-2 text-left text-sm"
-                      onClick={() => setSelectedVendor(v)}
+                {vendors.map((v) => {
+                  const alreadyLinked = linkedVendorIds.has(v.id);
+                  return (
+                    <ListPickRow
+                      key={v.id}
+                      disabled={alreadyLinked}
+                      onActivate={() => {
+                        if (!alreadyLinked) setSelectedVendor(v);
+                      }}
                     >
-                      <div className="font-medium">{v.name}</div>
-                      <div className="text-muted-foreground">{v.vendorCode}</div>
-                    </button>
-                  </li>
-                ))}
+                      <div className="px-3 py-2 text-sm">
+                        <div className="font-medium">
+                          {v.name}
+                          {alreadyLinked ? (
+                            <span className="text-muted-foreground ml-2 text-xs font-normal">
+                              Already linked
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="text-muted-foreground">{v.vendorCode}</div>
+                      </div>
+                    </ListPickRow>
+                  );
+                })}
               </ul>
+              <KeyboardHints hints={[KEYBOARD_HINT_PICK_ROWS]} />
             </>
           ) : (
             <div className="bg-muted/40 flex items-center justify-between rounded-md px-3 py-2 text-sm">
@@ -338,13 +379,17 @@ export function AddProductSupplierDialog({
                   *
                 </Label>
                 <Input
-                  value={
-                    computedPurchasePrice != null
-                      ? String(computedPurchasePrice)
-                      : "—"
-                  }
-                  disabled
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={purchasePrice}
+                  onChange={(e) => setPurchasePrice(e.target.value)}
+                  autoFocus
                 />
+                <p className="text-muted-foreground text-xs">
+                  Defaults from SKU cost; change if this vendor&apos;s price
+                  differs.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Purchase unit</Label>
@@ -369,7 +414,6 @@ export function AddProductSupplierDialog({
                 <Input
                   value={moq}
                   onChange={(e) => setMoq(e.target.value)}
-                  autoFocus
                 />
               </div>
               <div className="space-y-1.5">
@@ -387,17 +431,9 @@ export function AddProductSupplierDialog({
                 />
                 Preferred supplier
               </label>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label>Notes</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                />
-              </div>
             </div>
           ) : null}
-        </div>
+        </FormEnterNav>
 
         <DialogFooter>
           <Button

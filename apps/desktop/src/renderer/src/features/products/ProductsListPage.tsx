@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type {
   Brand,
   Category,
@@ -11,7 +11,6 @@ import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Skeleton } from "@blackbox/ui/skeleton";
 import { ApiError } from "@renderer/lib/api/client";
-import { productsApi } from "@renderer/lib/api/products";
 import {
   resolveDataSourceMode,
   type DataSourceMode,
@@ -19,9 +18,22 @@ import {
 import {
   loadBrands,
   loadCategories,
+  loadProducts,
 } from "@renderer/lib/local-db/entity-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  KEYBOARD_HINT_LIST_ROWS,
+  KEYBOARD_HINT_NEW,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import {
+  FILTER_SELECT_CLASS,
+  filterSelectProps,
+  ListFilterNav,
+} from "@renderer/components/list-filter-nav";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -44,12 +56,22 @@ export function ProductsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
+
+  usePageKeyboard({
+    onNew: () => navigate("/products/new"),
+  });
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,10 +117,7 @@ export function ProductsListPage() {
             page,
             pageSize,
           };
-          const res =
-            mode === "local" && window.blackbox?.localDb?.listProducts
-              ? await window.blackbox.localDb.listProducts(query)
-              : await productsApi.list(query);
+          const res = await loadProducts(query);
           if (!cancelled) {
             setItems(res.items);
             setTotal(res.total);
@@ -136,16 +155,18 @@ export function ProductsListPage() {
         <Button onClick={() => navigate("/products/new")}>+ Add Product</Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <ListFilterNav>
         <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
           className="max-w-xs"
           placeholder="Search name, code, SKU…"
-          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={status}
           onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
         >
@@ -154,7 +175,8 @@ export function ProductsListPage() {
           <option value="inactive">Inactive</option>
         </select>
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={brandId}
           onChange={(e) => setBrandId(e.target.value)}
         >
@@ -166,7 +188,8 @@ export function ProductsListPage() {
           ))}
         </select>
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
         >
@@ -177,7 +200,7 @@ export function ProductsListPage() {
             </option>
           ))}
         </select>
-      </div>
+      </ListFilterNav>
 
       {error ? (
         <div
@@ -220,14 +243,17 @@ export function ProductsListPage() {
               </tr>
             ) : (
               items.map((p) => (
-                <tr key={p.id} className="border-border border-t">
+                <ListTableRow
+                  key={p.id}
+                  onActivate={() => navigate(`/products/${p.id}`)}
+                >
                   <td className="px-4 py-3">
-                    <Link
+                    <ListTableLink
                       to={`/products/${p.id}`}
                       className="text-primary font-medium hover:underline"
                     >
                       {p.name}
-                    </Link>
+                    </ListTableLink>
                   </td>
                   <td className="px-4 py-3">{p.brandName || "—"}</td>
                   <td className="px-4 py-3">{p.categoryName || "—"}</td>
@@ -238,7 +264,7 @@ export function ProductsListPage() {
                   <td className="px-4 py-3 tabular-nums">{p.totalAvailable}</td>
                   <td className="px-4 py-3 tabular-nums">{p.supplierCount}</td>
                   <td className="px-4 py-3 capitalize">{p.status}</td>
-                </tr>
+                </ListTableRow>
               ))
             )}
           </tbody>
@@ -255,6 +281,7 @@ export function ProductsListPage() {
           setPage(1);
         }}
       />
+      <KeyboardHints hints={[KEYBOARD_HINT_NEW, KEYBOARD_HINT_LIST_ROWS]} />
     </div>
   );
 }

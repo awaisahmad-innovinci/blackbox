@@ -8,6 +8,8 @@ import { InjectRepository } from "@nestjs/typeorm";
 import {
   SYNC_PULL_BATCH_SIZE,
   SYNC_STREAMS,
+  goodsReceiptCostCharges,
+  goodsReceiptCostCredits,
   landedUnitByQuantity,
   roundMoney4,
   streamForEntity,
@@ -19,6 +21,10 @@ import {
   type SyncPullResponse,
   type SyncStatusResponse,
   type SyncStream,
+} from "@blackbox/shared";
+import {
+  normalizeOptionalStoredText,
+  normalizeStoredText,
 } from "@blackbox/shared";
 import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
 import { randomUUID } from "node:crypto";
@@ -37,6 +43,7 @@ import {
   InventoryStock,
   Product,
   ProductSku,
+  ProductSkuBarcode,
   PurchaseOrder,
   PurchaseOrderItem,
   SyncChange,
@@ -564,7 +571,7 @@ export class SyncService {
         });
         const row = existing ?? manager.create(Product, { id: change.entityId, tenantId });
         Object.assign(row, {
-          name: String(p.name ?? row.name ?? ""),
+          name: normalizeStoredText(String(p.name ?? row.name ?? "")),
           productCode: p.productCode
             ? String(p.productCode)
             : (row.productCode ?? `SYNC-${change.entityId.slice(0, 8)}`),
@@ -572,7 +579,9 @@ export class SyncService {
           brandId: (p.brandId as string | null | undefined) ?? row.brandId ?? null,
           categoryId: (p.categoryId as string | null | undefined) ?? row.categoryId ?? null,
           productType: String(p.productType ?? row.productType ?? "STOCK_ITEM"),
-          description: String(p.description ?? row.description ?? ""),
+          description: normalizeOptionalStoredText(
+            String(p.description ?? row.description ?? ""),
+          ),
           imagePath: (p.imagePath as string | null | undefined) ?? row.imagePath ?? null,
           status: inactive ? "inactive" : String(p.status ?? row.status ?? "active"),
         });
@@ -593,7 +602,7 @@ export class SyncService {
           productId,
           sku: String(p.sku ?? row.sku ?? ""),
           barcode: (p.barcode as string | null | undefined) ?? row.barcode ?? null,
-          variantName: String(p.variantName ?? row.variantName ?? ""),
+          variantName: normalizeStoredText(String(p.variantName ?? row.variantName ?? "")),
           sizeValue: (p.sizeValue as string | null | undefined) ?? row.sizeValue ?? null,
           sizeUnit: (p.sizeUnit as string | null | undefined) ?? row.sizeUnit ?? null,
           baseUnitId: (p.baseUnitId as string | null | undefined) ?? row.baseUnitId ?? null,
@@ -602,6 +611,10 @@ export class SyncService {
           unitsPerPurchaseUnit: String(p.unitsPerPurchaseUnit ?? row.unitsPerPurchaseUnit ?? 1),
           costPrice: String(p.costPrice ?? row.costPrice ?? 0),
           sellingPrice: String(p.sellingPrice ?? row.sellingPrice ?? 0),
+          sellingPricePerPurchaseUnit:
+            p.sellingPricePerPurchaseUnit == null
+              ? row.sellingPricePerPurchaseUnit
+              : String(p.sellingPricePerPurchaseUnit),
           reorderLevel: String(p.reorderLevel ?? row.reorderLevel ?? 0),
           minimumStockLevel: String(p.minimumStockLevel ?? row.minimumStockLevel ?? 0),
           maximumStockLevel:
@@ -614,13 +627,52 @@ export class SyncService {
         await manager.save(row);
         break;
       }
+      case "product_sku_barcode": {
+        const productSkuId = String(p.productSkuId ?? "");
+        const sku = await manager.findOne(ProductSku, {
+          where: { id: productSkuId, tenantId },
+        });
+        if (!sku) throw new Error("product sku not found");
+        if (inactive) {
+          await manager.delete(ProductSkuBarcode, {
+            id: change.entityId,
+            tenantId,
+          });
+        } else {
+          const existing = await manager.findOne(ProductSkuBarcode, {
+            where: { id: change.entityId, tenantId },
+          });
+          const row =
+            existing ??
+            manager.create(ProductSkuBarcode, { id: change.entityId, tenantId });
+          Object.assign(row, {
+            productSkuId,
+            barcode: String(p.barcode ?? row.barcode ?? ""),
+            quantityMultiplier: String(
+              p.quantityMultiplier ?? row.quantityMultiplier ?? 1,
+            ),
+            status: String(p.status ?? row.status ?? "active"),
+          });
+          await manager.save(row);
+        }
+        const first = await manager.findOne(ProductSkuBarcode, {
+          where: { tenantId, productSkuId, status: "active" },
+          order: { createdAt: "ASC" },
+        });
+        await manager.update(
+          ProductSku,
+          { id: productSkuId, tenantId },
+          { barcode: first?.barcode ?? null },
+        );
+        break;
+      }
       case "vendor": {
         const existing = await manager.findOne(Vendor, {
           where: { id: change.entityId, tenantId },
         });
         const row = existing ?? manager.create(Vendor, { id: change.entityId, tenantId });
         Object.assign(row, {
-          name: String(p.name ?? row.name ?? ""),
+          name: normalizeStoredText(String(p.name ?? row.name ?? "")),
           vendorCode: String(p.vendorCode ?? row.vendorCode ?? ""),
           groupId: (p.groupId as string | null | undefined) ?? row.groupId ?? null,
           address: (p.address as string | null | undefined) ?? row.address ?? null,
@@ -651,7 +703,9 @@ export class SyncService {
                 tenantId,
                 vendorId: change.entityId,
                 contactType: String(contact.contactType ?? "PRIMARY"),
-                name: (contact.name as string | null) ?? null,
+                name: contact.name
+                  ? normalizeStoredText(String(contact.name))
+                  : null,
                 phone: (contact.phone as string | null) ?? null,
                 email: (contact.email as string | null) ?? null,
               }),
@@ -833,11 +887,15 @@ export class SyncService {
         (p.voucherNumber as string | null | undefined) ?? row.voucherNumber ?? null,
       subtotal: String(p.subtotal ?? row.subtotal ?? 0),
       discount: String(p.discount ?? row.discount ?? 0),
-      tax: String(p.tax ?? row.tax ?? 0),
-      otherCharges: String(p.otherCharges ?? row.otherCharges ?? 0),
+      tax: String(p.saleTax ?? p.tax ?? row.tax ?? 0),
+      advTax: String(p.advTax ?? row.advTax ?? 0),
+      gst: String(p.gst ?? row.gst ?? 0),
+      incentive: String(p.incentive ?? row.incentive ?? 0),
+      shelfRent: String(p.shelfRent ?? row.shelfRent ?? 0),
+      otherCharges: "0",
       returnCredit: String(p.returnCredit ?? row.returnCredit ?? 0),
       total: String(p.total ?? row.total ?? 0),
-      notes: String(p.notes ?? row.notes ?? ""),
+      notes: "",
     });
     if (!row.purchaseOrderId) throw new Error("purchase order not found");
     await manager.save(row);
@@ -874,8 +932,14 @@ export class SyncService {
     if (isNewPost && row.status === "POSTED" && items.length > 0) {
       await this.applyReceiptAvgCost(manager, tenantId, entityId, items, {
         headerDiscount: Number(row.discount ?? 0),
-        tax: Number(row.tax ?? 0),
-        otherCharges: Number(row.otherCharges ?? 0),
+        costCharges: goodsReceiptCostCharges({
+          saleTax: Number(row.tax ?? 0),
+          advTax: Number(row.advTax ?? 0),
+          gst: Number(row.gst ?? 0),
+        }),
+        costCredits: goodsReceiptCostCredits({
+          incentive: Number(row.incentive ?? 0),
+        }),
       });
     }
     if (Array.isArray(p.returnAdjustments)) {
@@ -926,7 +990,7 @@ export class SyncService {
     tenantId: string,
     receiptId: string,
     items: Array<Record<string, unknown>>,
-    voucher: { headerDiscount: number; tax: number; otherCharges: number },
+    voucher: { headerDiscount: number; costCharges: number; costCredits: number },
   ): Promise<void> {
     const totalReceivedQty = items.reduce((sum, item) => {
       const qty = Number(item.receivedQuantity ?? 0);
@@ -943,7 +1007,7 @@ export class SyncService {
       const received = Number(item.receivedQuantity ?? 0);
       const bonus = Number(item.bonusQuantity ?? 0);
       const billedDelta = roundMoney4(received * unitsPer);
-      const stockDelta = roundMoney4((received + bonus) * unitsPer);
+      const stockDelta = roundMoney4(received * unitsPer + bonus);
       if (stockDelta <= 0) continue;
 
       let state = running.get(productSkuId);
@@ -983,8 +1047,8 @@ export class SyncService {
           Number(item.discountPercent ?? 0),
           totalReceivedQty,
           voucher.headerDiscount,
-          voucher.tax,
-          voucher.otherCharges,
+          voucher.costCharges,
+          voucher.costCredits,
         );
         const newCost = roundMoney4(netUnitCost / unitsPer);
         state.cost = weightedAvgUnitCost(
@@ -1111,11 +1175,18 @@ export class SyncService {
   ): Promise<void> {
     const id = String(payload.id);
     const tenantId = String(payload.tenantId);
+    const normalized = { ...payload };
+    if (typeof normalized.name === "string") {
+      normalized.name = normalizeStoredText(normalized.name);
+    }
+    if (typeof normalized.description === "string") {
+      normalized.description = normalizeOptionalStoredText(normalized.description);
+    }
     const existing = await manager.findOne(entity, {
       where: { id, tenantId },
     });
     const row = existing ?? manager.create(entity, { id, tenantId });
-    Object.assign(row, payload);
+    Object.assign(row, normalized);
     if (inactive && "status" in row) {
       (row as { status: string }).status = "inactive";
     }

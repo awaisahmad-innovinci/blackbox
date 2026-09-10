@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { EntityStatus } from "@blackbox/shared";
+import { normalizeStoredText } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -13,6 +14,10 @@ import {
 import { loadWarehouse } from "@renderer/lib/local-db/entity-source";
 import { useSession } from "@renderer/lib/session/context";
 import { syncNow } from "@renderer/lib/sync/sync-status";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
 
 export function WarehouseFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -68,7 +73,7 @@ export function WarehouseFormPage() {
     setSaving(true);
     try {
       const body = {
-        name: name.trim(),
+        name: normalizeStoredText(name),
         code: code.trim(),
         location: location.trim() || null,
         status,
@@ -85,10 +90,14 @@ export function WarehouseFormPage() {
         navigate("/warehouses");
         return;
       }
-      if (isEdit && id) {
-        await warehousesApi.update(id, body);
-      } else {
-        await warehousesApi.create(body);
+      const saved =
+        isEdit && id
+          ? await warehousesApi.update(id, body)
+          : await warehousesApi.create(body);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
       }
       navigate("/warehouses");
     } catch (err: unknown) {
@@ -110,7 +119,7 @@ export function WarehouseFormPage() {
           operation: "DELETE",
           payload: {
             id,
-            name,
+            name: normalizeStoredText(name),
             code,
             location: location.trim() || null,
             status: "inactive",
@@ -120,7 +129,12 @@ export function WarehouseFormPage() {
         navigate("/warehouses");
         return;
       }
-      await warehousesApi.deactivate(id);
+      const saved = await warehousesApi.deactivate(id);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
+      }
       navigate("/warehouses");
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to deactivate warehouse"));
@@ -135,7 +149,7 @@ export function WarehouseFormPage() {
     setSaving(true);
     try {
       const body = {
-        name: name.trim(),
+        name: normalizeStoredText(name),
         code: code.trim(),
         location: location.trim() || null,
         status: "active" as const,
@@ -151,7 +165,12 @@ export function WarehouseFormPage() {
         navigate("/warehouses");
         return;
       }
-      await warehousesApi.update(id, body);
+      const saved = await warehousesApi.update(id, body);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
+      }
       navigate("/warehouses");
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to activate warehouse"));
@@ -209,13 +228,14 @@ export function WarehouseFormPage() {
         </div>
       ) : null}
 
-      <section className="grid max-w-xl gap-4">
+      <FormEnterNav className="grid max-w-xl gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="name">Name *</Label>
           <Input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onBlur={(e) => setName(normalizeStoredText(e.target.value))}
             autoFocus
             disabled={readOnly}
           />
@@ -244,6 +264,7 @@ export function WarehouseFormPage() {
             <select
               id="status"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={status}
               onChange={(e) => setStatus(e.target.value as EntityStatus)}
               disabled={readOnly}
@@ -253,7 +274,7 @@ export function WarehouseFormPage() {
             </select>
           </div>
         ) : null}
-      </section>
+      </FormEnterNav>
 
       <div className="flex flex-wrap gap-2">
         {canWrite ? (

@@ -9,6 +9,8 @@ import type {
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
+  InventoryOutListQuery,
+  PaginatedInventoryOuts,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
@@ -129,8 +131,17 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<PaginatedGoodsReceipts>,
     listPoNumbers: () =>
       ipcRenderer.invoke("localDb:listPoNumbers") as Promise<string[]>,
+    listSkuCodes: () =>
+      ipcRenderer.invoke("localDb:listSkuCodes") as Promise<string[]>,
     listReceiptNumbers: () =>
       ipcRenderer.invoke("localDb:listReceiptNumbers") as Promise<string[]>,
+    listOutNumbers: () =>
+      ipcRenderer.invoke("localDb:listOutNumbers") as Promise<string[]>,
+    listInventoryOuts: (query?: InventoryOutListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listInventoryOuts",
+        query,
+      ) as Promise<PaginatedInventoryOuts>,
     getDashboardSummary: () =>
       ipcRenderer.invoke(
         "localDb:getDashboardSummary",
@@ -227,6 +238,20 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:lookupSkuByBarcode",
         barcode,
       ) as Promise<SkuBarcodeLookupResult | null>,
+    lookupSkuByCode: (sku: string) =>
+      ipcRenderer.invoke(
+        "localDb:lookupSkuByCode",
+        sku,
+      ) as Promise<SkuBarcodeLookupResult | null>,
+    listSkuBarcodes: (skuId: string) =>
+      ipcRenderer.invoke(
+        "localDb:listSkuBarcodes",
+        skuId,
+      ) as Promise<import("@blackbox/shared").SkuBarcode[]>,
+    upsertSkuBarcode: (row: import("@blackbox/shared").SkuBarcode) =>
+      ipcRenderer.invoke("localDb:upsertSkuBarcode", row),
+    deleteSkuBarcode: (id: string, productSkuId: string) =>
+      ipcRenderer.invoke("localDb:deleteSkuBarcode", id, productSkuId),
     getPurchaseOrder: (id: string) =>
       ipcRenderer.invoke(
         "localDb:getPurchaseOrder",
@@ -267,6 +292,17 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:lastPurchaseCost",
         vendorId,
         productSkuId,
+      ) as Promise<number>,
+    vendorReturnableQuantity: (
+      vendorId: string,
+      productSkuId: string,
+      warehouseId: string,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:vendorReturnableQuantity",
+        vendorId,
+        productSkuId,
+        warehouseId,
       ) as Promise<number>,
     inventoryInOutReport: (dateFrom: string, dateTo: string) =>
       ipcRenderer.invoke(

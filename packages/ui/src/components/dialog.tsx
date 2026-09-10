@@ -6,7 +6,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@blackbox/ui/lib/utils"
 import { Button } from "@blackbox/ui/components/button"
-import { handleEnterToNextField } from "@blackbox/ui/lib/form-keyboard"
+import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard"
 
 function Dialog({
   ...props
@@ -78,7 +78,7 @@ function DialogContent({
           onInteractOutside?.(event)
         }}
         onKeyDown={(event) => {
-          handleEnterToNextField(event)
+          handleEnterNavKeyDown(event)
           onKeyDown?.(event)
         }}
         {...props}

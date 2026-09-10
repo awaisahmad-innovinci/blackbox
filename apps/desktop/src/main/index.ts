@@ -9,6 +9,7 @@ import type {
   GoodsReceiptListQuery,
   InventoryMovementListItem,
   InventoryOutDetail,
+  InventoryOutListQuery,
   ProductDetail,
   ProductListQuery,
   ProductSkuDetail,
@@ -85,6 +86,8 @@ import {
   getSkuProfileLocal,
   getSkuByBarcodeLocal,
   lookupSkuByBarcodeLocal,
+  lookupSkuByCodeLocal,
+  listSkuCodesLocal,
   getVendorSkuLocal,
   searchSkusLocal,
   listInventoryInOutReportLocal,
@@ -92,6 +95,11 @@ import {
   getVendorProfileLocal,
   listVendorSkusLocal,
 } from "./db/entity-get-local";
+import {
+  deleteSkuBarcodeLocal,
+  listSkuBarcodesLocal,
+  upsertSkuBarcodeLocal,
+} from "./db/sku-barcodes-local";
 import {
   getDashboardSummaryLocal,
   listBrandsLocal,
@@ -103,6 +111,8 @@ import {
   listGoodsReceiptsLocal,
   listPoNumbersLocal,
   listReceiptNumbersLocal,
+  listOutNumbersLocal,
+  listInventoryOutsLocal,
   listVendorGroupsLocal,
   getVendorGroupLocal,
   listUnitsLocal,
@@ -112,6 +122,7 @@ import {
   listVendorReturnsLocal,
   listPendingVendorReturnsLocal,
   lastPurchaseCostLocal,
+  vendorReturnableQuantityLocal,
 } from "./db/queries-local";
 import {
   getOrCreateFingerprint,
@@ -343,8 +354,15 @@ function registerIpc(): void {
       listGoodsReceiptsLocal(query),
   );
   ipcMain.handle("localDb:listPoNumbers", () => listPoNumbersLocal());
+  ipcMain.handle("localDb:listSkuCodes", () => listSkuCodesLocal());
   ipcMain.handle("localDb:listReceiptNumbers", () =>
     listReceiptNumbersLocal(),
+  );
+  ipcMain.handle("localDb:listOutNumbers", () => listOutNumbersLocal());
+  ipcMain.handle(
+    "localDb:listInventoryOuts",
+    (_event, query: InventoryOutListQuery = {}) =>
+      listInventoryOutsLocal(query),
   );
   ipcMain.handle("localDb:getDashboardSummary", () =>
     getDashboardSummaryLocal(),
@@ -438,6 +456,24 @@ function registerIpc(): void {
   ipcMain.handle("localDb:lookupSkuByBarcode", (_event, barcode: string) =>
     lookupSkuByBarcodeLocal(barcode),
   );
+  ipcMain.handle("localDb:lookupSkuByCode", (_event, sku: string) =>
+    lookupSkuByCodeLocal(sku),
+  );
+  ipcMain.handle("localDb:listSkuBarcodes", (_event, skuId: string) =>
+    listSkuBarcodesLocal(skuId),
+  );
+  ipcMain.handle(
+    "localDb:upsertSkuBarcode",
+    (_event, row: import("@blackbox/shared").SkuBarcode) => {
+      upsertSkuBarcodeLocal(row);
+    },
+  );
+  ipcMain.handle(
+    "localDb:deleteSkuBarcode",
+    (_event, id: string, productSkuId: string) => {
+      deleteSkuBarcodeLocal(id, productSkuId);
+    },
+  );
   ipcMain.handle("localDb:getPurchaseOrder", (_event, id: string) =>
     getPurchaseOrderLocal(id),
   );
@@ -465,6 +501,16 @@ function registerIpc(): void {
     "localDb:lastPurchaseCost",
     (_event, vendorId: string, productSkuId: string) =>
       lastPurchaseCostLocal(vendorId, productSkuId),
+  );
+  ipcMain.handle(
+    "localDb:vendorReturnableQuantity",
+    (
+      _event,
+      vendorId: string,
+      productSkuId: string,
+      warehouseId: string,
+    ) =>
+      vendorReturnableQuantityLocal(vendorId, productSkuId, warehouseId),
   );
   ipcMain.handle(
     "localDb:inventoryInOutReport",

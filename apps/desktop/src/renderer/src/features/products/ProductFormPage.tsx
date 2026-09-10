@@ -1,7 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Brand, Category, EntityStatus, ProductType } from "@blackbox/shared";
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS } from "@blackbox/shared";
+import {
+  normalizeOptionalStoredText,
+  normalizeStoredText,
+} from "@blackbox/shared";
+import { FORM_FIELD_FULL, FORM_GRID } from "@renderer/lib/form-layout";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
+import { FormSelectWithAction } from "@renderer/components/form-select-with-action";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -15,6 +25,14 @@ import {
 } from "@renderer/lib/local-db/entity-source";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import {
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_SAVE,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
+import type { TaxonomyKind } from "@renderer/features/taxonomy/create-taxonomy";
 
 export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +50,30 @@ export function ProductFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
+  const [taxonomyDialog, setTaxonomyDialog] = useState<{
+    kind: TaxonomyKind;
+    returnFocusTo: string;
+  } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function onTaxonomyCreated(row: Brand | Category) {
+    if (taxonomyDialog?.kind === "brand") {
+      setBrands((prev) =>
+        prev.some((b) => b.id === row.id) ? prev : [...prev, row as Brand],
+      );
+      setBrandId(row.id);
+    } else if (taxonomyDialog?.kind === "category") {
+      setCategories((prev) =>
+        prev.some((c) => c.id === row.id) ? prev : [...prev, row as Category],
+      );
+      setCategoryId(row.id);
+    }
+    setTaxonomyDialog(null);
+  }
+
+  usePageKeyboard({
+    onSave: () => formRef.current?.requestSubmit(),
+  });
 
   useEffect(() => {
     void loadBrands("active")
@@ -86,12 +128,14 @@ export function ProductFormPage() {
     setSaving(true);
     setError(null);
 
+    const normalizedName = normalizeStoredText(name);
+    const normalizedDescription = normalizeOptionalStoredText(description);
     const body = {
-      name: name.trim(),
+      name: normalizedName,
       brandId,
       categoryId,
       productType,
-      description: description.trim(),
+      description: normalizedDescription,
       status,
     };
 
@@ -100,14 +144,14 @@ export function ProductFormPage() {
         const localId = isEdit && id ? id : crypto.randomUUID();
         const local = {
           id: localId,
-          name: name.trim(),
+          name: normalizedName,
           productCode: isEdit ? "" : `LOCAL-${localId.slice(0, 8)}`,
           brandId,
           brandName: brands.find((b) => b.id === brandId)?.name ?? "",
           categoryId,
           categoryName: categories.find((c) => c.id === categoryId)?.name ?? "",
           productType,
-          description: description.trim(),
+          description: normalizedDescription,
           imagePath: null,
           status,
           totalOnHand: 0,
@@ -124,7 +168,10 @@ export function ProductFormPage() {
         });
         void syncNow();
         setSaving(false);
-        navigate(`/products/${localId}`, { state: { product: local } });
+        navigate(`/products/${localId}`, {
+          state: { product: local },
+          replace: true,
+        });
         return;
       } catch (err: unknown) {
         setSaving(false);
@@ -143,14 +190,14 @@ export function ProductFormPage() {
         const localId = crypto.randomUUID();
         const local = {
           id: localId,
-          name: name.trim(),
+          name: normalizedName,
           productCode: `LOCAL-${localId.slice(0, 8)}`,
           brandId,
           brandName: "",
           categoryId,
           categoryName: "",
           productType,
-          description: description.trim(),
+          description: normalizedDescription,
           imagePath: null,
           status,
           totalOnHand: 0,
@@ -160,17 +207,18 @@ export function ProductFormPage() {
           updatedAt: new Date().toISOString(),
         };
         try {
-          await window.blackbox.localDb?.upsertProduct(local);
-          await window.blackbox.sync.enqueue({
-            stream: "master_data",
+          await commitLocalChange({
             entityType: "product",
             entityId: localId,
-            operation: "UPSERT",
+            operation: status === "inactive" ? "DELETE" : "UPSERT",
             payload: local,
-            baseEntityVersion: 0,
           });
+          void syncNow();
           setSaving(false);
-          navigate(`/products/${localId}`, { state: { product: local } });
+          navigate(`/products/${localId}`, {
+            state: { product: local },
+            replace: true,
+          });
           return;
         } catch {
           /* fall through */
@@ -194,6 +242,7 @@ export function ProductFormPage() {
         product: saved,
         cacheWarning: localCacheWarning ? true : undefined,
       },
+      replace: true,
     });
   }
 
@@ -202,7 +251,7 @@ export function ProductFormPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {isEdit ? "Edit Product" : "Add Product"}
@@ -221,14 +270,15 @@ export function ProductFormPage() {
         </div>
       ) : null}
 
-      <form onSubmit={onSubmit} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
+      <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
+        <FormEnterNav className={FORM_GRID}>
+          <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
             <Label htmlFor="name">Name *</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={(e) => setName(normalizeStoredText(e.target.value))}
               required
             />
           </div>
@@ -237,6 +287,7 @@ export function ProductFormPage() {
             <select
               id="type"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={productType}
               onChange={(e) => setProductType(e.target.value as ProductType)}
             >
@@ -252,6 +303,7 @@ export function ProductFormPage() {
             <select
               id="status"
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              {...formSelectPickerProps()}
               value={status}
               onChange={(e) => setStatus(e.target.value as EntityStatus)}
             >
@@ -259,50 +311,57 @@ export function ProductFormPage() {
               <option value="inactive">Inactive</option>
             </select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="brand">Brand *</Label>
-            <select
-              id="brand"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              required
-            >
-              <option value="">Select brand…</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="category">Category *</Label>
-            <select
-              id="category"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              required
-            >
-              <option value="">Select category…</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FormSelectWithAction
+            id="brand"
+            label="Brand *"
+            actionLabel="+ New brand"
+            onAction={() =>
+              setTaxonomyDialog({ kind: "brand", returnFocusTo: "brand" })
+            }
+            {...formSelectPickerProps()}
+            value={brandId}
+            onChange={(e) => setBrandId(e.target.value)}
+            required
+          >
+            <option value="">Select brand…</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
+          <FormSelectWithAction
+            id="category"
+            label="Category *"
+            actionLabel="+ New category"
+            onAction={() =>
+              setTaxonomyDialog({ kind: "category", returnFocusTo: "category" })
+            }
+            {...formSelectPickerProps()}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            required
+          >
+            <option value="">Select category…</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onBlur={(e) =>
+                setDescription(normalizeOptionalStoredText(e.target.value))
+              }
               rows={3}
             />
           </div>
-        </div>
+        </FormEnterNav>
 
         <div className="flex gap-3">
           <Button type="submit" disabled={saving}>
@@ -317,6 +376,18 @@ export function ProductFormPage() {
           </Button>
         </div>
       </form>
+
+      <KeyboardHints hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SAVE]} />
+
+      {taxonomyDialog ? (
+        <AddTaxonomyDialog
+          open
+          kind={taxonomyDialog.kind}
+          returnFocusTo={taxonomyDialog.returnFocusTo}
+          onClose={() => setTaxonomyDialog(null)}
+          onCreated={onTaxonomyCreated}
+        />
+      ) : null}
     </div>
   );
 }

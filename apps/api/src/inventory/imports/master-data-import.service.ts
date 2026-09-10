@@ -5,6 +5,8 @@ import {
   PAYMENT_TERMS,
   PRODUCT_TYPES,
   UNIT_TYPES,
+  normalizeOptionalStoredText,
+  normalizeStoredText,
 } from "@blackbox/shared";
 import type {
   MasterDataImportError,
@@ -59,6 +61,7 @@ const HEADERS = {
     "units_per_purchase_unit",
     "cost_price",
     "selling_price",
+    "selling_price_per_purchase_unit",
     "reorder_level",
     "minimum_stock_level",
     "maximum_stock_level",
@@ -139,6 +142,7 @@ const REQUIRED: Record<ImportFile, readonly CsvColumn[]> = {
     "units_per_purchase_unit",
     "cost_price",
     "selling_price",
+    "selling_price_per_purchase_unit",
     "reorder_level",
     "minimum_stock_level",
     "track_inventory",
@@ -482,9 +486,10 @@ export class MasterDataImportService {
     }
     for (const row of files["07_product_skus.csv"]) {
       for (const column of [
-        "cost_price",
-        "selling_price",
-        "reorder_level",
+    "cost_price",
+    "selling_price",
+    "selling_price_per_purchase_unit",
+    "reorder_level",
         "minimum_stock_level",
       ] as const) {
         this.number(row, column, errors, { min: 0 });
@@ -596,19 +601,26 @@ export class MasterDataImportService {
       }
     }
     const unitNames = new Set(existingUnits.map((item) => item.abbreviation));
-    const brandNames = new Set(existingBrands.map((item) => item.name));
-    const categoryNames = new Set(existingCategories.map((item) => item.name));
-    const groupNames = new Set(existingGroups.map((item) => item.name));
+    const brandNames = new Set(
+      existingBrands.map((item) => normalizeStoredText(item.name)),
+    );
+    const categoryNames = new Set(
+      existingCategories.map((item) => normalizeStoredText(item.name)),
+    );
+    const groupNames = new Set(
+      existingGroups.map((item) => normalizeStoredText(item.name)),
+    );
     const productKeys = new Set(productByImportKey.keys());
     const skuNames = new Set(existingSkus.map((item) => item.sku));
     const vendorCodes = new Set(existingVendors.map((item) => item.vendorCode));
     for (const row of files["01_units.csv"])
       unitNames.add(row.values.abbreviation);
-    for (const row of files["02_brands.csv"]) brandNames.add(row.values.name);
+    for (const row of files["02_brands.csv"])
+      brandNames.add(normalizeStoredText(row.values.name));
     for (const row of files["03_categories.csv"])
-      categoryNames.add(row.values.name);
+      categoryNames.add(normalizeStoredText(row.values.name));
     for (const row of files["05_vendor_groups.csv"])
-      groupNames.add(row.values.name);
+      groupNames.add(normalizeStoredText(row.values.name));
     for (const row of files["06_products.csv"])
       productKeys.add(row.values.import_key);
     for (const row of files["07_product_skus.csv"])
@@ -617,8 +629,8 @@ export class MasterDataImportService {
       vendorCodes.add(row.values.vendor_code);
 
     for (const row of files["06_products.csv"]) {
-      this.reference(row, "brand_name", brandNames, errors);
-      this.reference(row, "category_name", categoryNames, errors);
+      this.nameReference(row, "brand_name", brandNames, errors);
+      this.nameReference(row, "category_name", categoryNames, errors);
     }
     for (const row of files["07_product_skus.csv"]) {
       this.reference(row, "product_import_key", productKeys, errors);
@@ -661,7 +673,7 @@ export class MasterDataImportService {
       }
     }
     for (const row of files["08_vendors.csv"]) {
-      this.reference(row, "group_name", groupNames, errors, true);
+      this.nameReference(row, "group_name", groupNames, errors, true);
     }
     for (const row of files["09_vendor_skus.csv"]) {
       this.reference(row, "vendor_code", vendorCodes, errors);
@@ -693,7 +705,7 @@ export class MasterDataImportService {
         manager.create(Unit, { tenantId, abbreviation: value.abbreviation });
       const created = !item.id;
       Object.assign(item, {
-        name: value.name,
+        name: normalizeStoredText(value.name),
         type: value.type,
         status: value.status,
       });
@@ -737,7 +749,7 @@ export class MasterDataImportService {
         manager.create(Warehouse, { tenantId, code: value.code });
       const created = !item.id;
       Object.assign(item, {
-        name: value.name,
+        name: normalizeStoredText(value.name),
         location: value.location || null,
         status: value.status,
       });
@@ -776,11 +788,11 @@ export class MasterDataImportService {
       const created = !item.id;
       Object.assign(item, {
         importKey: value.import_key,
-        name: value.name,
+        name: normalizeStoredText(value.name),
         brandId: brands.get(value.brand_name.toLowerCase())!.id,
         categoryId: categories.get(value.category_name.toLowerCase())!.id,
         productType: value.product_type,
-        description: value.description,
+        description: normalizeOptionalStoredText(value.description),
         status: value.status,
       });
       const saved = await manager.save(item);
@@ -801,7 +813,7 @@ export class MasterDataImportService {
       Object.assign(item, {
         productId: products.get(value.product_import_key)!.id,
         barcode: value.barcode || null,
-        variantName: value.variant_name,
+        variantName: normalizeStoredText(value.variant_name),
         sizeValue: value.size_value || null,
         sizeUnit: value.size_unit || null,
         baseUnitId: value.base_unit_abbreviation
@@ -813,6 +825,7 @@ export class MasterDataImportService {
         unitsPerPurchaseUnit: value.units_per_purchase_unit,
         costPrice: value.cost_price,
         sellingPrice: value.selling_price,
+        sellingPricePerPurchaseUnit: value.selling_price_per_purchase_unit || null,
         reorderLevel: value.reorder_level,
         minimumStockLevel: value.minimum_stock_level,
         maximumStockLevel: value.maximum_stock_level || null,
@@ -834,7 +847,7 @@ export class MasterDataImportService {
         manager.create(Vendor, { tenantId, vendorCode: value.vendor_code });
       const created = !item.id;
       Object.assign(item, {
-        name: value.name,
+        name: normalizeStoredText(value.name),
         groupId: value.group_name
           ? groups.get(value.group_name.toLowerCase())!.id
           : null,
@@ -868,7 +881,7 @@ export class MasterDataImportService {
               tenantId,
               vendorId: saved.id,
               contactType,
-              name: name || null,
+              name: name ? normalizeStoredText(name) : null,
               phone: phone || null,
               email: email || null,
             }),
@@ -936,8 +949,8 @@ export class MasterDataImportService {
       item.tenantId = tenantId;
       const created = !item.id;
       Object.assign(item, {
-        name: value.name,
-        description: value.description,
+        name: normalizeStoredText(value.name),
+        description: normalizeOptionalStoredText(value.description),
         status: value.status,
       });
       const saved = await manager.save(entity, item);
@@ -990,6 +1003,20 @@ export class MasterDataImportService {
       } else {
         seen.set(key, row);
       }
+    }
+  }
+
+  private nameReference(
+    row: CsvRow,
+    column: CsvColumn,
+    values: Set<string>,
+    errors: MasterDataImportError[],
+    optional = false,
+  ): void {
+    const value = row.values[column];
+    if (optional && !value) return;
+    if (!values.has(normalizeStoredText(value))) {
+      errors.push(this.rowError(row, column, `Reference not found: ${value}`));
     }
   }
 

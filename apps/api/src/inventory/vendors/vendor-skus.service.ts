@@ -64,7 +64,14 @@ export class VendorSkusService {
           OR LOWER(sku.variant_name) LIKE :term
           OR LOWER(sku.sku) LIKE :term
           OR LOWER(COALESCE(sku.barcode, '')) LIKE :term
-          OR LOWER(COALESCE(vs.vendor_sku_code, '')) LIKE :term)`,
+          OR LOWER(COALESCE(vs.vendor_sku_code, '')) LIKE :term
+          OR EXISTS (
+            SELECT 1 FROM product_sku_barcodes b
+            WHERE b.product_sku_id = sku.id
+              AND b.tenant_id = sku.tenant_id
+              AND b.status = 'active'
+              AND LOWER(b.barcode) LIKE :term
+          ))`,
         { term },
       );
     }

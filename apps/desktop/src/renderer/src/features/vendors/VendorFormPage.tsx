@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   CreateVendorRequest,
@@ -17,11 +17,15 @@ import {
   livePhone11DigitError,
   personNameError,
   phone11DigitError,
+  normalizeStoredText,
 } from "@blackbox/shared";
+import { FORM_FIELD_FULL, FORM_GRID } from "@renderer/lib/form-layout";
+import { FormSelectWithAction } from "@renderer/components/form-select-with-action";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
+import { handleEnterPickerFocus } from "@blackbox/ui/lib/form-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { vendorsApi } from "@renderer/lib/api/vendors";
@@ -30,6 +34,14 @@ import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { allocateVendorCode } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
+import {
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_SAVE,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
+import type { TaxonomyKind } from "@renderer/features/taxonomy/create-taxonomy";
 
 type ContactForm = {
   name: string;
@@ -55,7 +67,6 @@ type FormState = {
   creditLimit: string;
   paymentTerms: PaymentTerms | "";
   taxNumber: string;
-  notes: string;
 };
 
 const emptyContact = (): ContactForm => ({ name: "", phone: "", email: "" });
@@ -79,7 +90,6 @@ function blankForm(): FormState {
     creditLimit: "",
     paymentTerms: "",
     taxNumber: "",
-    notes: "",
   };
 }
 
@@ -98,7 +108,7 @@ function contactFromDetail(
 function toContactInput(c: ContactForm): VendorContactInput | undefined {
   if (!c.name.trim() && !c.phone.trim() && !c.email.trim()) return undefined;
   return {
-    name: c.name.trim() || null,
+    name: c.name.trim() ? normalizeStoredText(c.name) : null,
     phone: c.phone.trim() || null,
     email: c.email.trim() || null,
   };
@@ -146,6 +156,9 @@ function ContactFields({
             value={value.name}
             aria-invalid={Boolean(shown.name)}
             onChange={(e) => onChange({ ...value, name: e.target.value })}
+            onBlur={(e) =>
+              onChange({ ...value, name: normalizeStoredText(e.target.value) })
+            }
           />
           {shown.name ? (
             <p className="text-destructive text-xs">{shown.name}</p>
@@ -196,6 +209,17 @@ export function VendorFormPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [createTaxonomyKind, setCreateTaxonomyKind] =
+    useState<TaxonomyKind | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  function onVendorGroupCreated(row: VendorGroup) {
+    setGroups((prev) =>
+      prev.some((g) => g.id === row.id) ? prev : [...prev, row],
+    );
+    setForm((prev) => ({ ...prev, groupId: row.id }));
+    setCreateTaxonomyKind(null);
+  }
 
   useEffect(() => {
     void vendorGroupsApi.list().then(setGroups).catch(() => undefined);
@@ -209,6 +233,14 @@ export function VendorFormPage() {
       setForm((prev) => ({ ...prev, vendorCode: code }));
     });
   }, [isEdit, user?.tenantName]);
+
+  useEffect(() => {
+    if (loading || isEdit) return;
+    requestAnimationFrame(() => {
+      nameRef.current?.focus();
+      nameRef.current?.select();
+    });
+  }, [loading, isEdit]);
 
   useEffect(() => {
     if (!id) return;
@@ -237,7 +269,6 @@ export function VendorFormPage() {
             detail.creditLimit == null ? "" : String(detail.creditLimit),
           paymentTerms: detail.paymentTerms ?? "",
           taxNumber: detail.taxNumber ?? "",
-          notes: detail.notes ?? "",
         });
       })
       .catch((err: unknown) => {
@@ -330,18 +361,18 @@ export function VendorFormPage() {
       vendorCode = await allocateVendorCode(user?.tenantName ?? "");
     }
     const body: CreateVendorRequest = {
-      name: form.name.trim(),
+      name: normalizeStoredText(form.name),
       ...(isEdit || vendorCode ? { vendorCode } : {}),
       groupId: form.groupId || null,
       status: form.status,
       primaryContact: {
-        name: form.primaryContact.name.trim(),
+        name: normalizeStoredText(form.primaryContact.name),
         phone: form.primaryContact.phone.trim(),
         email: form.primaryContact.email.trim() || null,
       },
       otherContact: toContactInput(form.otherContact),
       managerContact: {
-        name: form.managerContact.name.trim(),
+        name: normalizeStoredText(form.managerContact.name),
         phone: form.managerContact.phone.trim(),
         email: form.managerContact.email.trim() || null,
       },
@@ -355,7 +386,7 @@ export function VendorFormPage() {
       creditLimit: form.creditLimit ? Number(form.creditLimit) : null,
       paymentTerms: form.paymentTerms || null,
       taxNumber: form.taxNumber.trim() || null,
-      notes: form.notes.trim(),
+      notes: "",
     };
 
     let saved: VendorDetail;
@@ -372,7 +403,7 @@ export function VendorFormPage() {
           contacts.push({
             id: crypto.randomUUID(),
             contactType: type,
-            name: c.name.trim() || null,
+            name: c.name.trim() ? normalizeStoredText(c.name) : null,
             phone: c.phone.trim() || null,
             email: c.email.trim() || null,
           });
@@ -412,6 +443,7 @@ export function VendorFormPage() {
         setSaving(false);
         navigate(`/vendors/${localId}`, {
           state: { vendor: saved, flash: "Vendor created successfully." },
+          replace: true,
         });
         return;
       }
@@ -446,12 +478,17 @@ export function VendorFormPage() {
     });
   }
 
+  usePageKeyboard({
+    onSave: () => void onSave(),
+    enabled: !loading,
+  });
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {isEdit ? "Edit Vendor" : "Add Vendor"}
@@ -472,12 +509,17 @@ export function VendorFormPage() {
 
       <section className="space-y-4">
         <h2 className="text-lg font-medium">Vendor Information</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Vendor Name *</Label>
+        <div className={FORM_GRID}>
+          <div className={`space-y-1.5 ${FORM_FIELD_FULL}`}>
+            <Label htmlFor="vendor-name">Vendor Name *</Label>
             <Input
+              ref={nameRef}
+              id="vendor-name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onBlur={(e) =>
+                setForm({ ...form, name: normalizeStoredText(e.target.value) })
+              }
             />
             {fieldErrors.name ? (
               <p className="text-destructive text-xs">{fieldErrors.name}</p>
@@ -504,26 +546,30 @@ export function VendorFormPage() {
               <p className="text-destructive text-xs">{fieldErrors.vendorCode}</p>
             ) : null}
           </div>
-          <div className="space-y-1.5">
-            <Label>Vendor Group</Label>
-            <select
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              value={form.groupId}
-              onChange={(e) => setForm({ ...form, groupId: e.target.value })}
-            >
-              <option value="">Select group</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FormSelectWithAction
+            id="group"
+            label="Vendor Group"
+            actionLabel="+ New group"
+            onAction={() => setCreateTaxonomyKind("vendor_group")}
+            data-enter-picker=""
+            value={form.groupId}
+            onFocus={handleEnterPickerFocus}
+            onChange={(e) => setForm({ ...form, groupId: e.target.value })}
+          >
+            <option value="">Select group</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </FormSelectWithAction>
           <div className="space-y-1.5">
             <Label>Status</Label>
             <select
+              data-enter-picker=""
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               value={form.status}
+              onFocus={handleEnterPickerFocus}
               onChange={(e) =>
                 setForm({ ...form, status: e.target.value as EntityStatus })
               }
@@ -585,7 +631,7 @@ export function VendorFormPage() {
             onChange={(e) => setForm({ ...form, address: e.target.value })}
           />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={FORM_GRID}>
           <div className="space-y-1.5">
             <Label>City</Label>
             <Input
@@ -619,7 +665,7 @@ export function VendorFormPage() {
 
       <section className="space-y-4">
         <h2 className="text-lg font-medium">Commercial Information</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={FORM_GRID}>
           <div className="space-y-1.5">
             <Label>Sales Target</Label>
             <Input
@@ -645,8 +691,10 @@ export function VendorFormPage() {
           <div className="space-y-1.5">
             <Label>Payment Terms</Label>
             <select
+              data-enter-picker=""
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               value={form.paymentTerms}
+              onFocus={handleEnterPickerFocus}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -667,16 +715,14 @@ export function VendorFormPage() {
             <Input
               value={form.taxNumber}
               onChange={(e) => setForm({ ...form, taxNumber: e.target.value })}
+              data-enter-submit=""
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                void onSave();
+              }}
             />
           </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Notes</Label>
-          <Textarea
-            rows={3}
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          />
         </div>
       </section>
 
@@ -692,6 +738,18 @@ export function VendorFormPage() {
           {saving ? "Saving…" : isEdit ? "Save Changes" : "Save Vendor"}
         </Button>
       </div>
+
+      <KeyboardHints hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SAVE]} />
+
+      {createTaxonomyKind ? (
+        <AddTaxonomyDialog
+          open
+          kind={createTaxonomyKind}
+          returnFocusTo="group"
+          onClose={() => setCreateTaxonomyKind(null)}
+          onCreated={onVendorGroupCreated}
+        />
+      ) : null}
     </div>
   );
 }

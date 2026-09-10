@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import type { VendorDetail, VendorSku } from "@blackbox/shared";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import type { ProductDetail, ProductListItem, VendorDetail, VendorSku } from "@blackbox/shared";
 import { PAYMENT_TERMS_LABELS } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { BackButton } from "@renderer/app/BackButton";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { ApiError } from "@renderer/lib/api/client";
 import { loadVendorProfile } from "@renderer/lib/local-db/entity-source";
+import { AddProductDialog } from "@renderer/features/products/AddProductDialog";
+import { AddProductSkuDialog } from "@renderer/features/products/AddProductSkuDialog";
+import { AddVendorSkuDialog } from "./AddVendorSkuDialog";
 
 function contactBlock(
   detail: VendorDetail,
@@ -36,6 +40,35 @@ export function VendorProfilePage() {
   const [skus, setSkus] = useState<VendorSku[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(flash ?? null);
+  const [addSkuOpen, setAddSkuOpen] = useState(false);
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  const [createSkuProduct, setCreateSkuProduct] =
+    useState<ProductListItem | null>(null);
+  const createSkuFromNewProductRef = useRef(false);
+
+  function productDetailToListItem(product: ProductDetail): ProductListItem {
+    return {
+      id: product.id,
+      name: product.name,
+      productCode: product.productCode,
+      brandId: product.brandId,
+      brandName: product.brandName,
+      categoryId: product.categoryId,
+      categoryName: product.categoryName,
+      productType: product.productType,
+      status: product.status,
+      skuCount: 0,
+      totalAvailable: 0,
+      supplierCount: 0,
+    };
+  }
+
+  function onVendorSkuAdded(row: VendorSku, cacheWarning: boolean) {
+    setSkus((prev) => (prev.some((s) => s.id === row.id) ? prev : [...prev, row]));
+    if (cacheWarning) {
+      setMessage("SKU saved; local cache update failed.");
+    }
+  }
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -85,7 +118,7 @@ export function VendorProfilePage() {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <BackButton />
+          <BackButton to="/vendors" />
           <h1 className="mt-2 text-2xl font-semibold tracking-tight uppercase">
             {vendor.name}
           </h1>
@@ -186,20 +219,16 @@ export function VendorProfilePage() {
             <dt className="text-muted-foreground">Tax Number</dt>
             <dd className="font-medium">{vendor.taxNumber || "—"}</dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="text-muted-foreground">Notes</dt>
-            <dd className="whitespace-pre-wrap font-medium">
-              {vendor.notes || "—"}
-            </dd>
-          </div>
         </dl>
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Supplied SKUs</h2>
-        <p className="text-muted-foreground text-sm">
-          View only. Link vendors from the product profile (Add Supplier).
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-medium">Supplied SKUs</h2>
+          <Button size="sm" onClick={() => setAddSkuOpen(true)}>
+            + Add SKU
+          </Button>
+        </div>
         <div className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
@@ -223,14 +252,17 @@ export function VendorProfilePage() {
                 </tr>
               ) : (
                 skus.map((row) => (
-                  <tr key={row.id} className="border-border border-t">
+                  <ListTableRow
+                    key={row.id}
+                    onActivate={() => navigate(`/skus/${row.productSkuId}`)}
+                  >
                     <td className="px-4 py-3">
-                      <Link
+                      <ListTableLink
                         to={`/skus/${row.productSkuId}`}
                         className="text-primary hover:underline"
                       >
                         {row.productName}
-                      </Link>
+                      </ListTableLink>
                     </td>
                     <td className="px-4 py-3">{row.variantName || "—"}</td>
                     <td className="px-4 py-3">{row.sku}</td>
@@ -238,7 +270,7 @@ export function VendorProfilePage() {
                     <td className="px-4 py-3 tabular-nums">
                       {row.minimumOrderQuantity}
                     </td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -250,6 +282,65 @@ export function VendorProfilePage() {
         <h2 className="text-lg font-medium">Purchase Orders</h2>
         <p className="text-muted-foreground text-sm">Coming in a later phase.</p>
       </section>
+
+      <AddVendorSkuDialog
+        open={addSkuOpen && !createSkuProduct && !createProductOpen}
+        vendor={vendor}
+        existingProductSkuIds={skus.map((s) => s.productSkuId)}
+        onClose={() => setAddSkuOpen(false)}
+        onLinked={(row, cacheWarning) => {
+          setAddSkuOpen(false);
+          onVendorSkuAdded(row, cacheWarning);
+          if (!cacheWarning) {
+            setMessage("SKU linked to vendor.");
+          }
+        }}
+        onStartCreateProduct={(product) => {
+          createSkuFromNewProductRef.current = false;
+          setCreateSkuProduct(product);
+        }}
+        onStartCreateNewProduct={() => setCreateProductOpen(true)}
+      />
+
+      <AddProductDialog
+        open={createProductOpen}
+        onClose={() => setCreateProductOpen(false)}
+        onCreated={(product, cacheWarning) => {
+          setCreateProductOpen(false);
+          createSkuFromNewProductRef.current = true;
+          setCreateSkuProduct(productDetailToListItem(product));
+          if (cacheWarning) {
+            setMessage("Product saved; local cache update failed.");
+          }
+        }}
+      />
+
+      {createSkuProduct ? (
+        <AddProductSkuDialog
+          open
+          productId={createSkuProduct.id}
+          productName={createSkuProduct.name}
+          linkToVendor={vendor}
+          onClose={() => setCreateSkuProduct(null)}
+          onCreated={() => {}}
+          onVendorSkuLinked={(row, cacheWarning) => {
+            const fromNewProduct = createSkuFromNewProductRef.current;
+            createSkuFromNewProductRef.current = false;
+            setCreateSkuProduct(null);
+            setAddSkuOpen(false);
+            onVendorSkuAdded(row, cacheWarning);
+            setMessage(
+              cacheWarning
+                ? fromNewProduct
+                  ? "Product and SKU created and linked; local cache update failed."
+                  : "SKU created and linked; local cache update failed."
+                : fromNewProduct
+                  ? "Product and SKU created and linked to vendor."
+                  : "SKU created and linked to vendor.",
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -14,7 +14,9 @@ import type {
   ReceivingLineDraft,
 } from "@blackbox/shared";
 import {
-  buildReceivedAtIso,
+  goodsReceiptCostCharges,
+  goodsReceiptCostCredits,
+  goodsReceiptGrandTotal,
   landedUnitByQuantity,
   lineTotalAfterDiscount,
   roundMoney4,
@@ -348,7 +350,7 @@ export class GoodsReceiptsService {
         subtotal = round4(subtotal + lineTotal);
         const billedDelta = round4(item.receivedQuantity * unitsPer);
         const stockDelta = round4(
-          (item.receivedQuantity + bonusQuantity) * unitsPer,
+          item.receivedQuantity * unitsPer + bonusQuantity,
         );
 
         builtLines.push({
@@ -371,8 +373,17 @@ export class GoodsReceiptsService {
       }
 
       const discount = dto.discount ?? 0;
-      const tax = dto.tax ?? 0;
-      const otherCharges = dto.otherCharges ?? 0;
+      const saleTax = dto.saleTax ?? dto.tax ?? 0;
+      const advTax = dto.advTax ?? 0;
+      const gst = dto.gst ?? 0;
+      const incentive = dto.incentive ?? 0;
+      const shelfRent = dto.shelfRent ?? 0;
+      const costCharges = goodsReceiptCostCharges({
+        saleTax,
+        advTax,
+        gst,
+      });
+      const costCredits = goodsReceiptCostCredits({ incentive });
       if (discount < 0) {
         throw new BadRequestException("Discount must be >= 0");
       }
@@ -393,8 +404,8 @@ export class GoodsReceiptsService {
           toNum(line.discountPercent),
           totalReceivedQty,
           discount,
-          tax,
-          otherCharges,
+          costCharges,
+          costCredits,
         );
       }
 
@@ -405,13 +416,19 @@ export class GoodsReceiptsService {
         po.vendorId,
         adjustments,
       );
-      const total = Math.max(
-        0,
-        round4(subtotal - discount + tax + otherCharges - returnCredit),
-      );
+      const total = goodsReceiptGrandTotal({
+        subtotal,
+        discount,
+        saleTax,
+        advTax,
+        gst,
+        incentive,
+        shelfRent,
+        returnCredit,
+      });
 
       const receiptNumber = await allocateReceiptNumber(manager, tenantId);
-      const receivedAt = new Date(buildReceivedAtIso(dto.receiptDate));
+      const receivedAt = new Date();
 
       const receipt = await manager.getRepository(GoodsReceipt).save(
         manager.getRepository(GoodsReceipt).create({
@@ -425,11 +442,15 @@ export class GoodsReceiptsService {
           voucherNumber: dto.voucherNumber?.trim() || null,
           subtotal: String(subtotal),
           discount: String(discount),
-          tax: String(tax),
-          otherCharges: String(otherCharges),
+          tax: String(saleTax),
+          advTax: String(advTax),
+          gst: String(gst),
+          incentive: String(incentive),
+          shelfRent: String(shelfRent),
+          otherCharges: "0",
           returnCredit: String(returnCredit),
           total: String(total),
-          notes: dto.notes?.trim() ?? "",
+          notes: "",
         }),
       );
 
@@ -602,6 +623,11 @@ export class GoodsReceiptsService {
       voucherNumber: receipt.voucherNumber,
       subtotal: toNum(receipt.subtotal),
       discount: toNum(receipt.discount),
+      saleTax: toNum(receipt.tax),
+      advTax: toNum(receipt.advTax),
+      gst: toNum(receipt.gst),
+      incentive: toNum(receipt.incentive),
+      shelfRent: toNum(receipt.shelfRent),
       tax: toNum(receipt.tax),
       otherCharges: toNum(receipt.otherCharges),
       returnCredit: toNum(receipt.returnCredit),
@@ -684,7 +710,7 @@ export class GoodsReceiptsService {
 
       if (adj.settlement === "REPLACE") {
         const unitsPer = toNum(line.unitsPerPurchaseUnit) || 1;
-        const stockDelta = round4(toNum(line.quantity) * unitsPer);
+        const stockDelta = round4(toNum(line.quantity));
         if (stockDelta > 0) {
           const productSkuRepo = manager.getRepository(ProductSku);
           const productSku = await productSkuRepo.findOne({

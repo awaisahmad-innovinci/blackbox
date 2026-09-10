@@ -20,6 +20,7 @@ import {
   ProductSku,
   Warehouse,
 } from "../../db/entities";
+import { allocateOutNumber } from "../common/allocate-document-number";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { CreateInventoryOutDto } from "./dto/inventory-out.dto";
 import { ListInventoryOutQueryDto } from "./dto/list-inventory-out-query.dto";
@@ -150,7 +151,7 @@ export class InventoryOutService {
         throw new BadRequestException("Warehouse not found or inactive");
       }
 
-      const outNumber = await this.nextOutNumber(manager, tenantId);
+      const outNumber = await allocateOutNumber(manager, tenantId);
       const outDate =
         dto.outDate?.trim() || new Date().toISOString().slice(0, 10);
       const notes = dto.notes?.trim() ?? "";
@@ -340,27 +341,4 @@ export class InventoryOutService {
     };
   }
 
-  private async nextOutNumber(
-    manager: EntityManager,
-    tenantId: string,
-  ): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `IO-${year}-`;
-    const latest = await manager
-      .getRepository(InventoryOut)
-      .createQueryBuilder("io")
-      .where("io.tenant_id = :tenantId", { tenantId })
-      .andWhere("io.out_number LIKE :prefix", { prefix: `${prefix}%` })
-      .orderBy("io.out_number", "DESC")
-      .setLock("pessimistic_write")
-      .getOne();
-
-    let seq = 1;
-    if (latest?.outNumber) {
-      const part = latest.outNumber.slice(prefix.length);
-      const n = Number(part);
-      if (!Number.isNaN(n)) seq = n + 1;
-    }
-    return `${prefix}${String(seq).padStart(6, "0")}`;
-  }
 }

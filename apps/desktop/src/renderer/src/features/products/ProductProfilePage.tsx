@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   ProductDetail,
   ProductSkuDetail,
@@ -10,9 +10,15 @@ import type {
 import { PRODUCT_TYPE_LABELS } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { BackButton } from "@renderer/app/BackButton";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { productsApi } from "@renderer/lib/api/products";
 import { loadProductProfile } from "@renderer/lib/local-db/entity-source";
+import {
+  commitLocalChange,
+  isDeviceBound,
+} from "@renderer/lib/local-db/local-write";
+import { syncNow } from "@renderer/lib/sync/sync-status";
 import { AddProductSkuDialog } from "./AddProductSkuDialog";
 import { AddProductSupplierDialog } from "./AddProductSupplierDialog";
 
@@ -67,7 +73,25 @@ export function ProductProfilePage() {
     if (!id || !product) return;
     if (!window.confirm(`Deactivate ${product.name}?`)) return;
     setBusy(true);
+    setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: ProductDetail = {
+          ...product,
+          status: "inactive",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "product",
+          entityId: id,
+          operation: "DELETE",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setProduct(updated);
+        return;
+      }
       const updated = await productsApi.deactivate(id);
       setProduct(updated);
       try {
@@ -90,7 +114,25 @@ export function ProductProfilePage() {
     }
     if (!window.confirm(`Activate ${product.name}?`)) return;
     setBusy(true);
+    setError(null);
     try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: ProductDetail = {
+          ...product,
+          status: "active",
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "product",
+          entityId: id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setProduct(updated);
+        return;
+      }
       const updated = await productsApi.update(id, {
         name: product.name,
         brandId: product.brandId,
@@ -142,7 +184,7 @@ export function ProductProfilePage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <BackButton />
+          <BackButton to="/products" />
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">
             {product.name}
           </h1>
@@ -251,14 +293,17 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 skus.map((s) => (
-                  <tr key={s.id} className="border-border border-t">
+                  <ListTableRow
+                    key={s.id}
+                    onActivate={() => navigate(`/skus/${s.id}`)}
+                  >
                     <td className="px-4 py-3">
-                      <Link
+                      <ListTableLink
                         to={`/skus/${s.id}`}
                         className="text-primary hover:underline"
                       >
                         {s.variantName || "—"}
-                      </Link>
+                      </ListTableLink>
                       {skusMissingSupplier.has(s.id) ? (
                         <div className="text-amber-700 dark:text-amber-400 mt-1 text-xs">
                           Needs supplier
@@ -270,7 +315,7 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3 tabular-nums">{s.costPrice}</td>
                     <td className="px-4 py-3 tabular-nums">{s.sellingPrice}</td>
                     <td className="px-4 py-3 capitalize">{s.status}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -317,14 +362,17 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 suppliers.map((s) => (
-                  <tr key={s.vendorSkuId} className="border-border border-t">
+                  <ListTableRow
+                    key={s.vendorSkuId}
+                    onActivate={() => navigate(`/vendors/${s.vendorId}`)}
+                  >
                     <td className="px-4 py-3">
-                      <Link
+                      <ListTableLink
                         to={`/vendors/${s.vendorId}`}
                         className="text-primary hover:underline"
                       >
                         {s.vendorName}
-                      </Link>
+                      </ListTableLink>
                     </td>
                     <td className="px-4 py-3">
                       {s.variantName} · {s.sku}
@@ -335,7 +383,7 @@ export function ProductProfilePage() {
                     </td>
                     <td className="px-4 py-3">{s.leadTimeDays}d</td>
                     <td className="px-4 py-3">{s.isPreferred ? "Yes" : "No"}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -368,9 +416,8 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 inventory.map((row) => (
-                  <tr
+                  <ListTableRow
                     key={`${row.warehouseId}-${row.productSkuId}`}
-                    className="border-border border-t"
                   >
                     <td className="px-4 py-3">{row.warehouseName}</td>
                     <td className="px-4 py-3">
@@ -385,7 +432,7 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3 tabular-nums">
                       {row.quantityAvailable}
                     </td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -419,7 +466,7 @@ export function ProductProfilePage() {
                 </tr>
               ) : (
                 movements.map((m) => (
-                  <tr key={m.id} className="border-border border-t">
+                  <ListTableRow key={m.id}>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {new Date(m.createdAt).toLocaleString()}
                     </td>
@@ -430,7 +477,7 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3">{m.movementType}</td>
                     <td className="px-4 py-3 tabular-nums">{m.quantity}</td>
                     <td className="px-4 py-3">{m.reason || "—"}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               )}
             </tbody>
@@ -442,7 +489,6 @@ export function ProductProfilePage() {
         open={skuOpen}
         productId={product.id}
         productName={product.name}
-        existingSkuCodes={skus.map((s) => s.sku)}
         onClose={() => setSkuOpen(false)}
         onCreated={(row, cacheWarning) => {
           setSkuOpen(false);
@@ -469,6 +515,7 @@ export function ProductProfilePage() {
             : skus.filter((s) => s.status === "active")
         }
         lockedSkuId={lockedSupplierSkuId}
+        existingSuppliers={suppliers}
         onClose={() => {
           if (lockedSupplierSkuId) {
             setNeedsSupplierSkuIds((prev) =>

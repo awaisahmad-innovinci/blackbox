@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { EntityStatus, VendorGroup, VendorListItem, VendorListQuery } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
@@ -12,7 +12,19 @@ import {
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
-import { useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
+import {
+  KEYBOARD_HINT_LIST_ROWS,
+  KEYBOARD_HINT_NEW,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import {
+  FILTER_SELECT_CLASS,
+  filterSelectProps,
+  ListFilterNav,
+} from "@renderer/components/list-filter-nav";
+import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   ListPagination,
@@ -33,12 +45,22 @@ export function VendorsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useBarcodeScanTarget({
     kind: "search",
     enabled: true,
+    inputRef: searchRef,
     onScan: setSearch,
   });
+
+  usePageKeyboard({
+    onNew: () => navigate("/vendors/new"),
+  });
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,16 +143,18 @@ export function VendorsListPage() {
         <Button onClick={() => navigate("/vendors/new")}>+ Add Vendor</Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <ListFilterNav>
         <Input
+          ref={searchRef}
+          {...barcodeScanInputProps()}
           className="max-w-xs"
           placeholder="Search vendors..."
-          data-barcode-scan=""
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={status}
           onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
         >
@@ -139,7 +163,8 @@ export function VendorsListPage() {
           <option value="inactive">Inactive</option>
         </select>
         <select
-          className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          className={FILTER_SELECT_CLASS}
+          {...filterSelectProps()}
           value={groupId}
           onChange={(e) => setGroupId(e.target.value)}
         >
@@ -150,7 +175,7 @@ export function VendorsListPage() {
             </option>
           ))}
         </select>
-      </div>
+      </ListFilterNav>
 
       {error ? (
         <div
@@ -197,17 +222,17 @@ export function VendorsListPage() {
             ) : null}
             {!loading
               ? items.map((v) => (
-                  <tr
+                  <ListTableRow
                     key={v.id}
-                    className="border-border hover:bg-muted/30 border-t"
+                    onActivate={() => navigate(`/vendors/${v.id}`)}
                   >
                     <td className="px-4 py-3 font-medium">
-                      <Link
+                      <ListTableLink
                         to={`/vendors/${v.id}`}
                         className="text-primary hover:underline"
                       >
                         {v.name}
-                      </Link>
+                      </ListTableLink>
                     </td>
                     <td className="px-4 py-3">{v.vendorCode}</td>
                     <td className="px-4 py-3">{v.groupName ?? "—"}</td>
@@ -216,7 +241,7 @@ export function VendorsListPage() {
                     <td className="px-4 py-3">{v.city ?? "—"}</td>
                     <td className="px-4 py-3 tabular-nums">{v.suppliedSkuCount}</td>
                     <td className="px-4 py-3 capitalize">{v.status}</td>
-                  </tr>
+                  </ListTableRow>
                 ))
               : null}
           </tbody>
@@ -233,6 +258,7 @@ export function VendorsListPage() {
           setPage(1);
         }}
       />
+      <KeyboardHints hints={[KEYBOARD_HINT_NEW, KEYBOARD_HINT_LIST_ROWS]} />
     </div>
   );
 }

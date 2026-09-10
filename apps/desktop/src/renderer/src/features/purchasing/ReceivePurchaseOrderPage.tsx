@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   GoodsReceiptDetail,
@@ -12,18 +12,31 @@ import type {
 } from "@blackbox/shared";
 import {
   buildReceivedAtIso,
+  goodsReceiptCostCharges,
+  goodsReceiptCostCredits,
+  goodsReceiptGrandTotal,
   landedUnitByQuantity,
   lineTotalAfterDiscount,
   roundMoney4,
   VENDOR_RETURN_REASON_LABELS,
 } from "@blackbox/shared";
+import { FORM_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { Textarea } from "@blackbox/ui/textarea";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
+import {
+  KEYBOARD_HINT_ENTER,
+  KEYBOARD_HINT_SAVE,
+  KeyboardHints,
+} from "@renderer/components/keyboard-hints";
+import {
+  FormEnterNav,
+  formSelectPickerProps,
+} from "@renderer/components/form-enter-nav";
+import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
@@ -189,9 +202,7 @@ async function persistReturnSettlementsLocal(
     touchedReturnIds.add(line.vendorReturnId);
 
     if (choice !== "REPLACE") continue;
-    const unitsPer =
-      line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
-    const stockDelta = line.quantity * unitsPer;
+    const stockDelta = line.quantity;
     if (!(stockDelta > 0)) continue;
     const movementId = crypto.randomUUID();
     const avg = await window.blackbox?.localDb?.applyPurchaseAvgCost(
@@ -272,25 +283,18 @@ export function ReceivePurchaseOrderPage() {
     null,
   );
   const [lines, setLines] = useState<DraftLine[]>([]);
-  const [receiptDate, setReceiptDate] = useState(todayIso());
   const [voucherNumber, setVoucherNumber] = useState("");
-  const [notes, setNotes] = useState("");
+  const [saleTax, setSaleTax] = useState("0");
+  const [advTax, setAdvTax] = useState("0");
+  const [gst, setGst] = useState("0");
+  const [incentive, setIncentive] = useState("0");
+  const [shelfRent, setShelfRent] = useState("0");
   const [discount, setDiscount] = useState("0");
-  const [tax, setTax] = useState("0");
-  const [otherCharges, setOtherCharges] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [success, setSuccess] = useState<GoodsReceiptDetail | null>(null);
-
-  function focusFirstReceiveQty() {
-    requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLInputElement>("[data-receive-qty]");
-      el?.focus();
-      el?.select();
-    });
-  }
 
   const [priceEdit, setPriceEdit] = useState<{
     productLabel: string;
@@ -307,6 +311,8 @@ export function ReceivePurchaseOrderPage() {
   const [returnSettlements, setReturnSettlements] = useState<
     Record<string, ReturnSettlementChoice>
   >({});
+  const firstReceiveQtyRef = useRef<HTMLInputElement>(null);
+  const firstSettlementRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -341,6 +347,17 @@ export function ReceivePurchaseOrderPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (loading || success) return;
+    requestAnimationFrame(() => {
+      if (pendingReturns.length > 0) {
+        firstSettlementRef.current?.focus();
+      } else if (lines.length > 0) {
+        firstReceiveQtyRef.current?.focus();
+      }
+    });
+  }, [loading, success, pendingReturns.length, lines.length]);
 
   useEffect(() => {
     if (!header?.vendorId) {
@@ -383,8 +400,24 @@ export function ReceivePurchaseOrderPage() {
   const discountPct = Number(discount) || 0;
   const discountAmount =
     Math.round(((subtotal * discountPct) / 100) * 10000) / 10000;
-  const taxN = Number(tax) || 0;
-  const otherN = Number(otherCharges) || 0;
+  const saleTaxN = Number(saleTax) || 0;
+  const advTaxN = Number(advTax) || 0;
+  const gstN = Number(gst) || 0;
+  const incentiveN = Number(incentive) || 0;
+  const shelfRentN = Number(shelfRent) || 0;
+  const costCharges = useMemo(
+    () =>
+      goodsReceiptCostCharges({
+        saleTax: saleTaxN,
+        advTax: advTaxN,
+        gst: gstN,
+      }),
+    [saleTaxN, advTaxN, gstN],
+  );
+  const costCredits = useMemo(
+    () => goodsReceiptCostCredits({ incentive: incentiveN }),
+    [incentiveN],
+  );
   const returnCredit = useMemo(
     () =>
       roundMoney4(
@@ -397,9 +430,28 @@ export function ReceivePurchaseOrderPage() {
       ),
     [pendingReturns, returnSettlements],
   );
-  const grandTotal = Math.max(
-    0,
-    roundMoney4(subtotal - discountAmount + taxN + otherN - returnCredit),
+  const grandTotal = useMemo(
+    () =>
+      goodsReceiptGrandTotal({
+        subtotal,
+        discount: discountAmount,
+        saleTax: saleTaxN,
+        advTax: advTaxN,
+        gst: gstN,
+        incentive: incentiveN,
+        shelfRent: shelfRentN,
+        returnCredit,
+      }),
+    [
+      subtotal,
+      discountAmount,
+      saleTaxN,
+      advTaxN,
+      gstN,
+      incentiveN,
+      shelfRentN,
+      returnCredit,
+    ],
   );
   const returnAdjustments = useMemo(
     () => buildReturnAdjustments(pendingReturns, returnSettlements),
@@ -419,42 +471,41 @@ export function ReceivePurchaseOrderPage() {
     );
   }
 
-  function requestConfirm() {
-    if (!id || !header) return;
+  function validateReceive(): boolean {
+    if (!id || !header) return false;
     for (const line of lines) {
       if (line.receiveQuantity < 0) {
         setError("Received quantity must be >= 0");
-        return;
+        return false;
       }
       if (line.receiveQuantity > line.orderedQuantity) {
         setError(
           "Received quantity cannot be greater than ordered quantity.",
         );
-        return;
+        return false;
       }
       if (line.bonusQuantity < 0) {
-        setError("Bonus / sample quantity must be >= 0");
-        return;
+        setError("FOC (pcs) must be >= 0");
+        return false;
       }
       if (line.receivingUnitCost < 0) {
         setError("Receiving unit cost must be >= 0");
-        return;
+        return false;
       }
       if (line.discountPercent < 0 || line.discountPercent > 100) {
         setError("Line discount % must be between 0 and 100");
-        return;
+        return false;
       }
     }
     if (discountPct < 0 || discountPct > 100) {
       setError("Discount % must be between 0 and 100");
-      return;
+      return false;
     }
     if (totalReceiveQty <= 0) {
       setError("You cannot receive with 0 quantity.");
-      return;
+      return false;
     }
-    setError(null);
-    setConfirmOpen(true);
+    return true;
   }
 
   async function executeConfirm() {
@@ -477,15 +528,20 @@ export function ReceivePurchaseOrderPage() {
           warehouseId: header.warehouseId,
           warehouseName: header.warehouseName,
           status: "POSTED",
-          receivedAt: buildReceivedAtIso(receiptDate),
+          receivedAt: buildReceivedAtIso(todayIso()),
           voucherNumber: voucherNumber.trim() || null,
           subtotal,
           discount: discountAmount,
-          tax: taxN,
-          otherCharges: otherN,
+          saleTax: saleTaxN,
+          advTax: advTaxN,
+          gst: gstN,
+          incentive: incentiveN,
+          shelfRent: shelfRentN,
+          tax: saleTaxN,
+          otherCharges: 0,
           returnCredit,
           total: grandTotal,
-          notes: notes.trim(),
+          notes: "",
           items: lines.map((l) => ({
             id: crypto.randomUUID(),
             purchaseOrderItemId: l.purchaseOrderItemId,
@@ -543,7 +599,7 @@ export function ReceivePurchaseOrderPage() {
             line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
           const billedDelta = line.receiveQuantity * unitsPer;
           const stockDelta =
-            (line.receiveQuantity + line.bonusQuantity) * unitsPer;
+            line.receiveQuantity * unitsPer + line.bonusQuantity;
           if (!(stockDelta > 0)) continue;
           const movementId = crypto.randomUUID();
           if (billedDelta > 0) {
@@ -553,8 +609,8 @@ export function ReceivePurchaseOrderPage() {
               line.discountPercent,
               totalReceivedQty,
               discountAmount,
-              taxN,
-              otherN,
+              costCharges,
+              costCredits,
             );
             const avg = await window.blackbox?.localDb?.applyPurchaseAvgCost(
               line.productSkuId,
@@ -623,12 +679,13 @@ export function ReceivePurchaseOrderPage() {
         );
       }
       const receipt = await goodsReceiptsApi.createReceipt(id, {
-        receiptDate,
         voucherNumber: voucherNumber.trim() || null,
-        notes: notes.trim(),
         discount: discountAmount,
-        tax: taxN,
-        otherCharges: otherN,
+        saleTax: saleTaxN,
+        advTax: advTaxN,
+        gst: gstN,
+        incentive: incentiveN,
+        shelfRent: shelfRentN,
         returnAdjustments:
           returnAdjustments.length > 0 ? returnAdjustments : undefined,
         items: lines.map((l) => ({
@@ -656,6 +713,15 @@ export function ReceivePurchaseOrderPage() {
     }
   }
 
+  usePageKeyboard({
+    enabled: !loading && !success && Boolean(header),
+    onSave: () => {
+      if (saving || totalReceiveQty <= 0) return;
+      if (!validateReceive()) return;
+      setConfirmOpen(true);
+    },
+  });
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
@@ -663,7 +729,7 @@ export function ReceivePurchaseOrderPage() {
   if (success) {
     return (
       <PrintDocument>
-        <div className="mx-auto max-w-xl space-y-6">
+        <div className="space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">
@@ -739,7 +805,7 @@ export function ReceivePurchaseOrderPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           Receive Purchase Order
@@ -759,7 +825,7 @@ export function ReceivePurchaseOrderPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <section className={FORM_GRID}>
         <div className="space-y-1.5">
           <Label>Purchase Order</Label>
           <Input value={header.poNumber} disabled />
@@ -774,11 +840,7 @@ export function ReceivePurchaseOrderPage() {
         </div>
         <div className="space-y-1.5">
           <Label>Receipt date</Label>
-          <Input
-            type="date"
-            value={receiptDate}
-            onChange={(e) => setReceiptDate(e.target.value)}
-          />
+          <Input type="date" value={todayIso()} disabled readOnly />
         </div>
         <div className="space-y-1.5">
           <Label>Voucher number</Label>
@@ -790,196 +852,199 @@ export function ReceivePurchaseOrderPage() {
         </div>
       </section>
 
-      {pendingReturns.length > 0 ? (
+      <FormEnterNav className="space-y-6">
+        {pendingReturns.length > 0 ? (
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-medium">Pending returns</h2>
+              <p className="text-muted-foreground text-sm">
+                Open vendor returns for {header.vendorName}. Choose how to settle
+                each line on this receipt.
+              </p>
+            </div>
+            <div className="border-border overflow-x-auto rounded-lg border">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted/50 text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Return</th>
+                    <th className="px-3 py-2 font-medium">Product</th>
+                    <th className="px-3 py-2 font-medium">Reason</th>
+                    <th className="px-3 py-2 font-medium">Qty</th>
+                    <th className="px-3 py-2 font-medium">Purchase cost</th>
+                    <th className="px-3 py-2 font-medium">Amount</th>
+                    <th className="px-3 py-2 font-medium">Settlement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingReturns.map((line, index) => (
+                    <tr key={line.vendorReturnItemId} className="border-border border-t">
+                      <td className="px-3 py-2">{line.returnNumber}</td>
+                      <td className="px-3 py-2">
+                        {line.productName}
+                        <div className="text-muted-foreground text-xs">
+                          {line.sku}
+                          {line.variantName ? ` · ${line.variantName}` : ""}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {VENDOR_RETURN_REASON_LABELS[line.reason]}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.quantity.toLocaleString()} pcs
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.unitCost.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.lineTotal.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          ref={index === 0 ? firstSettlementRef : undefined}
+                          className="border-input bg-background h-8 min-w-[8rem] rounded-md border px-2 text-sm"
+                          {...formSelectPickerProps()}
+                          value={
+                            returnSettlements[line.vendorReturnItemId] ?? ""
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value as ReturnSettlementChoice;
+                            setReturnSettlements((prev) => ({
+                              ...prev,
+                              [line.vendorReturnItemId]: value,
+                            }));
+                          }}
+                        >
+                          <option value="">Skip</option>
+                          <option value="CASHBACK">Cashback</option>
+                          <option value="REPLACE">Replace</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+
         <section className="space-y-3">
-          <div>
-            <h2 className="text-lg font-medium">Pending returns</h2>
-            <p className="text-muted-foreground text-sm">
-              Open vendor returns for {header.vendorName}. Choose how to settle
-              each line on this receipt.
-            </p>
-          </div>
+          <h2 className="text-lg font-medium">Items</h2>
           <div className="border-border overflow-x-auto rounded-lg border">
             <table className="w-full text-left text-sm">
               <thead className="bg-muted/50 text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Return</th>
                   <th className="px-3 py-2 font-medium">Product</th>
-                  <th className="px-3 py-2 font-medium">Reason</th>
-                  <th className="px-3 py-2 font-medium">Qty</th>
-                  <th className="px-3 py-2 font-medium">Purchase cost</th>
-                  <th className="px-3 py-2 font-medium">Amount</th>
-                  <th className="px-3 py-2 font-medium">Settlement</th>
+                  <th className="px-3 py-2 font-medium">SKU</th>
+                  <th className="px-3 py-2 font-medium">Ordered</th>
+                  <th className="px-3 py-2 font-medium">Receive qty</th>
+                  <th className="px-3 py-2 font-medium">FOC (pcs)</th>
+                  <th className="px-3 py-2 font-medium">PO price</th>
+                  <th className="px-3 py-2 font-medium">Sale price</th>
+                  <th className="px-3 py-2 font-medium">Discount %</th>
+                  <th className="px-3 py-2 font-medium">Total</th>
+                  <th className="px-3 py-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
-                {pendingReturns.map((line) => (
-                  <tr
-                    key={line.vendorReturnItemId}
-                    className="border-border border-t"
-                  >
-                    <td className="px-3 py-2">{line.returnNumber}</td>
-                    <td className="px-3 py-2">
-                      {line.productName}
-                      <div className="text-muted-foreground text-xs">
-                        {line.sku}
-                        {line.variantName ? ` · ${line.variantName}` : ""}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      {VENDOR_RETURN_REASON_LABELS[line.reason]}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {line.quantity} {line.purchaseUnitName || ""}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {line.unitCost.toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {line.lineTotal.toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        className="border-input bg-background h-8 min-w-[8rem] rounded-md border px-2 text-sm"
-                        value={
-                          returnSettlements[line.vendorReturnItemId] ?? ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value as ReturnSettlementChoice;
-                          setReturnSettlements((prev) => ({
-                            ...prev,
-                            [line.vendorReturnItemId]: value,
-                          }));
-                        }}
-                      >
-                        <option value="">Skip</option>
-                        <option value="CASHBACK">Cashback</option>
-                        <option value="REPLACE">Replace</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
+                {lines.map((line, index) => (
+                    <tr key={line.purchaseOrderItemId} className="border-border border-t">
+                      <td className="px-3 py-2">
+                        {line.productName}
+                        <div className="text-muted-foreground text-xs">
+                          {line.variantName || "—"}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">{line.sku}</td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.orderedQuantity} {line.purchaseUnitName || ""}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          ref={index === 0 ? firstReceiveQtyRef : undefined}
+                          className="h-8 w-24"
+                          value={String(line.receiveQuantity)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              receiveQuantity: Number.isNaN(n)
+                                ? line.receiveQuantity
+                                : n,
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-24"
+                          value={String(line.bonusQuantity)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              bonusQuantity: Number.isNaN(n)
+                                ? line.bonusQuantity
+                                : n,
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.receivingUnitCost.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.currentSellingPrice.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-20"
+                          value={String(line.discountPercent)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              discountPercent: Number.isNaN(n)
+                                ? line.discountPercent
+                                : n,
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {lineTotalAfterDiscount(
+                          line.receiveQuantity,
+                          line.receivingUnitCost,
+                          line.discountPercent,
+                        ).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        {line.vendorSkuId ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setPriceEdit({
+                                productLabel: `${line.productName} · ${line.sku}`,
+                                currentPrice: line.receivingUnitCost,
+                                currentSellingPrice: line.currentSellingPrice,
+                                purchaseOrderItemId: line.purchaseOrderItemId,
+                                purchaseUnitName: line.purchaseUnitName,
+                                unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+                              })
+                            }
+                          >
+                            Update SKU Price
+                          </Button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
         </section>
-      ) : null}
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Items</h2>
-        <div className="border-border overflow-x-auto rounded-lg border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted/50 text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Product</th>
-                <th className="px-3 py-2 font-medium">SKU</th>
-                <th className="px-3 py-2 font-medium">Ordered</th>
-                <th className="px-3 py-2 font-medium">Receive qty</th>
-                <th className="px-3 py-2 font-medium">Bonus / Sample</th>
-                <th className="px-3 py-2 font-medium">PO price</th>
-                <th className="px-3 py-2 font-medium">Discount %</th>
-                <th className="px-3 py-2 font-medium">Total</th>
-                <th className="px-3 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                  <tr
-                    key={line.purchaseOrderItemId}
-                    className="border-border border-t"
-                  >
-                    <td className="px-3 py-2">
-                      {line.productName}
-                      <div className="text-muted-foreground text-xs">
-                        {line.variantName || "—"}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">{line.sku}</td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {line.orderedQuantity} {line.purchaseUnitName || ""}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        className="h-8 w-24"
-                        data-no-barcode-scan=""
-                        data-receive-qty=""
-                        value={String(line.receiveQuantity)}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          updateLine(line.purchaseOrderItemId, {
-                            receiveQuantity: Number.isNaN(n)
-                              ? line.receiveQuantity
-                              : n,
-                          });
-                        }}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        className="h-8 w-24"
-                        data-no-barcode-scan=""
-                        value={String(line.bonusQuantity)}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          updateLine(line.purchaseOrderItemId, {
-                            bonusQuantity: Number.isNaN(n)
-                              ? line.bonusQuantity
-                              : n,
-                          });
-                        }}
-                      />
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {line.receivingUnitCost.toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        className="h-8 w-20"
-                        value={String(line.discountPercent)}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          updateLine(line.purchaseOrderItemId, {
-                            discountPercent: Number.isNaN(n)
-                              ? line.discountPercent
-                              : n,
-                          });
-                        }}
-                      />
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {lineTotalAfterDiscount(
-                        line.receiveQuantity,
-                        line.receivingUnitCost,
-                        line.discountPercent,
-                      ).toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2">
-                      {line.vendorSkuId ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setPriceEdit({
-                              productLabel: `${line.productName} · ${line.sku}`,
-                              currentPrice: line.receivingUnitCost,
-                              currentSellingPrice: line.currentSellingPrice,
-                              purchaseOrderItemId: line.purchaseOrderItemId,
-                              purchaseUnitName: line.purchaseUnitName,
-                              unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
-                            })
-                          }
-                        >
-                          Update SKU Price
-                        </Button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      </FormEnterNav>
 
       <section className="grid max-w-sm gap-3 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6">
@@ -1002,21 +1067,48 @@ export function ReceivePurchaseOrderPage() {
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
-          <Label htmlFor="tax">Tax</Label>
+          <Label htmlFor="sale-tax">Sale tax</Label>
           <Input
-            id="tax"
+            id="sale-tax"
             className="h-8 w-28"
-            value={tax}
-            onChange={(e) => setTax(e.target.value)}
+            value={saleTax}
+            onChange={(e) => setSaleTax(e.target.value)}
           />
         </div>
         <div className="flex items-center justify-between gap-6">
-          <Label htmlFor="other">Other charges</Label>
+          <Label htmlFor="adv-tax">Adv tax</Label>
           <Input
-            id="other"
+            id="adv-tax"
             className="h-8 w-28"
-            value={otherCharges}
-            onChange={(e) => setOtherCharges(e.target.value)}
+            value={advTax}
+            onChange={(e) => setAdvTax(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-6">
+          <Label htmlFor="gst">GST</Label>
+          <Input
+            id="gst"
+            className="h-8 w-28"
+            value={gst}
+            onChange={(e) => setGst(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-6">
+          <Label htmlFor="incentive">Incentive</Label>
+          <Input
+            id="incentive"
+            className="h-8 w-28"
+            value={incentive}
+            onChange={(e) => setIncentive(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-6">
+          <Label htmlFor="shelf-rent">Shelf rent</Label>
+          <Input
+            id="shelf-rent"
+            className="h-8 w-28"
+            value={shelfRent}
+            onChange={(e) => setShelfRent(e.target.value)}
           />
         </div>
         {returnCredit > 0 ? (
@@ -1033,21 +1125,14 @@ export function ReceivePurchaseOrderPage() {
         </div>
       </section>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea
-          id="notes"
-          rows={3}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </div>
-
       <div className="flex flex-wrap gap-3">
         <Button
           type="button"
           disabled={saving || totalReceiveQty <= 0}
-          onClick={() => requestConfirm()}
+          onClick={() => {
+            if (!validateReceive()) return;
+            setConfirmOpen(true);
+          }}
         >
           {saving ? "Confirming…" : "Confirm Receiving"}
         </Button>
@@ -1059,6 +1144,8 @@ export function ReceivePurchaseOrderPage() {
           Cancel
         </Button>
       </div>
+
+      <KeyboardHints hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SAVE]} />
 
       {priceEdit ? (
         <UpdateVendorSkuPriceDialog
@@ -1087,39 +1174,32 @@ export function ReceivePurchaseOrderPage() {
         />
       ) : null}
 
-      {header ? (
-        <ConfirmDialog
-          open={confirmOpen}
-          onOpenChange={(open) => {
-            setConfirmOpen(open);
-            if (!open) focusFirstReceiveQty();
-          }}
-          title="Confirm Receiving Voucher?"
-          description={
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Confirm Receiving Voucher?"
+        description={
+          header ? (
             <>
-              PO: {header.poNumber}
-              <br />
-              Vendor: {header.vendorName}
-              <br />
-              Warehouse: {header.warehouseName}
-              <br />
-              Items: {lines.length}
-              <br />
-              Discount: {discountPct}% ({discountAmount.toLocaleString()})
-              <br />
-              Return credit: {returnCredit.toLocaleString()}
-              <br />
-              Total: {grandTotal.toLocaleString()}
+              <p>PO: {header.poNumber}</p>
+              <p>Vendor: {header.vendorName}</p>
+              <p>Warehouse: {header.warehouseName}</p>
+              <p>Items: {lines.length}</p>
+              <p>
+                Discount: {discountPct}% ({discountAmount.toLocaleString()})
+              </p>
+              <p>Return credit: {returnCredit.toLocaleString()}</p>
+              <p>Total: {grandTotal.toLocaleString()}</p>
             </>
-          }
-          confirmLabel="Confirm Receiving"
-          loading={saving}
-          onConfirm={async () => {
-            setConfirmOpen(false);
-            await executeConfirm();
-          }}
-        />
-      ) : null}
+          ) : null
+        }
+        confirmLabel="Confirm Receiving"
+        loading={saving}
+        onConfirm={async () => {
+          await executeConfirm();
+          setConfirmOpen(false);
+        }}
+      />
     </div>
   );
 }
