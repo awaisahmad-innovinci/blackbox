@@ -24,6 +24,8 @@ import type {
   VendorReturnListQuery,
   VendorReturnStatus,
   PaginatedVendorReturns,
+  InventoryOutListQuery,
+  PaginatedInventoryOuts,
   WarehouseListItem,
 } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
@@ -810,6 +812,7 @@ export function listPendingVendorReturnsLocal(
   return rows.map((r) => {
     const quantity = Number(r.quantity ?? 0);
     const unitCost = Number(r.unitCost ?? 0);
+    const unitsPer = Number(r.unitsPerPurchaseUnit ?? 1) || 1;
     return {
       vendorReturnItemId: String(r.vendorReturnItemId),
       vendorReturnId: String(r.vendorReturnId),
@@ -822,9 +825,9 @@ export function listPendingVendorReturnsLocal(
       reason: r.reason as import("@blackbox/shared").VendorReturnReason,
       quantity,
       unitCost,
-      lineTotal: Math.round(quantity * unitCost * 10000) / 10000,
+      lineTotal: Math.round((quantity / unitsPer) * unitCost * 10000) / 10000,
       purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
-      unitsPerPurchaseUnit: Number(r.unitsPerPurchaseUnit ?? 1) || 1,
+      unitsPerPurchaseUnit: unitsPer,
     };
   });
 }
@@ -877,6 +880,69 @@ export function lastPurchaseCostLocal(
   return Number(fromVs?.unitCost ?? 0);
 }
 
+export function vendorReturnableQuantityLocal(
+  vendorId: string,
+  productSkuId: string,
+  warehouseId: string,
+): number {
+  const db = getLocalDb();
+  const receivedRow = db
+    .prepare(
+      `select coalesce(sum(
+         i.received_quantity * coalesce(i.units_per_purchase_unit, 1)
+         + coalesce(i.bonus_quantity, 0)
+       ), 0) as receivedBase
+       from goods_receipt_items i
+       inner join goods_receipts g on g.id = i.goods_receipt_id
+       where i.tenant_id = @tenantId
+         and i.product_sku_id = @productSkuId
+         and g.vendor_id = @vendorId
+         and g.warehouse_id = @warehouseId
+         and g.status = 'POSTED'`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      productSkuId,
+      vendorId,
+      warehouseId,
+    }) as { receivedBase: number };
+  const returnedRow = db
+    .prepare(
+      `select coalesce(sum(i.quantity), 0) as returnedBase
+       from vendor_return_items i
+       inner join vendor_returns vr on vr.id = i.vendor_return_id
+       where i.tenant_id = @tenantId
+         and i.product_sku_id = @productSkuId
+         and vr.vendor_id = @vendorId
+         and vr.warehouse_id = @warehouseId`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      productSkuId,
+      vendorId,
+      warehouseId,
+    }) as { returnedBase: number };
+  const stockRow = db
+    .prepare(
+      `select coalesce(quantity_available, 0) as warehouseBase
+       from inventory_stock
+       where tenant_id = @tenantId
+         and product_sku_id = @productSkuId
+         and warehouse_id = @warehouseId`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      productSkuId,
+      warehouseId,
+    }) as { warehouseBase: number } | undefined;
+
+  const receivedBase = Number(receivedRow.receivedBase ?? 0);
+  const returnedBase = Number(returnedRow.returnedBase ?? 0);
+  const warehouseBase = Number(stockRow?.warehouseBase ?? 0);
+  const net = Math.max(0, receivedBase - returnedBase);
+  return Math.min(warehouseBase, net);
+}
+
 export function listPoNumbersLocal(): string[] {
   const db = getLocalDb();
   const rows = db
@@ -895,4 +961,103 @@ export function listReceiptNumbersLocal(): string[] {
     )
     .all({ tenantId: DEMO_STORE_TENANT_ID }) as Array<{ receiptNumber: string }>;
   return rows.map((r) => String(r.receiptNumber));
+}
+
+export function listOutNumbersLocal(): string[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select out_number as outNumber from inventory_outs where tenant_id = @tenantId`,
+    )
+    .all({ tenantId: DEMO_STORE_TENANT_ID }) as Array<{ outNumber: string }>;
+  return rows.map((r) => String(r.outNumber));
+}
+
+export function listInventoryOutsLocal(
+  query: InventoryOutListQuery = {},
+): PaginatedInventoryOuts {
+  const db = getLocalDb();
+  const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
+  const search = query.search?.trim().toLowerCase() ?? "";
+  const warehouseId = query.warehouseId ?? "";
+  const dateFrom = query.dateFrom ?? "";
+  const dateTo = query.dateTo ?? "";
+
+  const where = `
+    io.tenant_id = @tenantId
+    and (@warehouseId = '' or io.warehouse_id = @warehouseId)
+    and (@dateFrom = '' or io.out_date >= @dateFrom)
+    and (@dateTo = '' or io.out_date <= @dateTo)
+    and (
+      @search = ''
+      or lower(io.out_number) like '%' || @search || '%'
+      or lower(coalesce(io.reference, '')) like '%' || @search || '%'
+    )
+  `;
+
+  const params = {
+    tenantId: DEMO_STORE_TENANT_ID,
+    warehouseId,
+    dateFrom,
+    dateTo,
+    search,
+    limit: pageSize,
+    offset,
+  };
+
+  const total = (
+    db
+      .prepare(`select count(*) as cnt from inventory_outs io where ${where}`)
+      .get(params) as { cnt: number }
+  ).cnt;
+
+  const rows = db
+    .prepare(
+      `select
+         io.id,
+         io.out_number as outNumber,
+         io.warehouse_id as warehouseId,
+         coalesce(w.name, '—') as warehouseName,
+         io.out_date as outDate,
+         io.reference,
+         io.status,
+         io.total,
+         (
+           select count(*) from inventory_out_items i
+           where i.inventory_out_id = io.id and i.tenant_id = io.tenant_id
+         ) as itemCount
+       from inventory_outs io
+       left join warehouses w on w.id = io.warehouse_id
+       where ${where}
+       order by io.out_date desc, io.created_at desc
+       limit @limit offset @offset`,
+    )
+    .all(params) as Array<{
+    id: string;
+    outNumber: string;
+    warehouseId: string;
+    warehouseName: string;
+    outDate: string;
+    reference: string | null;
+    status: string;
+    total: number;
+    itemCount: number;
+  }>;
+
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      outNumber: row.outNumber,
+      warehouseId: row.warehouseId,
+      warehouseName: row.warehouseName,
+      outDate: row.outDate.slice(0, 10),
+      reference: row.reference,
+      status: row.status as PaginatedInventoryOuts["items"][number]["status"],
+      total: Number(row.total),
+      itemCount: Number(row.itemCount),
+    })),
+    total,
+    page,
+    pageSize,
+  };
 }

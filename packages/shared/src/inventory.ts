@@ -1200,14 +1200,30 @@ export interface InventoryMovementListItem {
   productSkuId: string;
   sku: string;
   variantName: string;
+  productId?: string;
+  productName?: string;
   warehouseId: string;
   warehouseName: string;
   movementType: InventoryMovementType;
   quantity: number;
   referenceType: string | null;
   referenceId: string | null;
+  vendorId?: string | null;
+  vendorName?: string | null;
   reason: string;
   createdAt: string;
+}
+
+export type InventoryInOutDirection = "both" | "in" | "out";
+
+export interface InventoryInOutReportClientFilters {
+  direction: InventoryInOutDirection;
+  productSkuIds: string[];
+  productIds: string[];
+  vendorIds: string[];
+  warehouseId: string;
+  qtyMin: string;
+  qtyMax: string;
 }
 
 export interface InventoryMovementListQuery {

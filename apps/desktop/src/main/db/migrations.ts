@@ -781,6 +781,14 @@ where barcode is not null and trim(barcode) != ''
       }
     },
   },
+  {
+    id: "016_vendor_return_qty_pcs",
+    sql: `
+update vendor_return_items
+set quantity = quantity * units_per_purchase_unit
+where units_per_purchase_unit > 0;
+`,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

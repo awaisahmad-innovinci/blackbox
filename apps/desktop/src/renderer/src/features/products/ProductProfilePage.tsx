@@ -515,6 +515,7 @@ export function ProductProfilePage() {
             : skus.filter((s) => s.status === "active")
         }
         lockedSkuId={lockedSupplierSkuId}
+        existingSuppliers={suppliers}
         onClose={() => {
           if (lockedSupplierSkuId) {
             setNeedsSupplierSkuIds((prev) =>

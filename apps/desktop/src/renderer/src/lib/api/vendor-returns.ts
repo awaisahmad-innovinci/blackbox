@@ -48,4 +48,14 @@ export const vendorReturnsApi = {
       `/vendor-returns/last-purchase-cost?${sp.toString()}`,
     );
   },
+  returnableQuantity(
+    vendorId: string,
+    productSkuId: string,
+    warehouseId: string,
+  ): Promise<{ quantityAvailable: number }> {
+    const sp = new URLSearchParams({ vendorId, productSkuId, warehouseId });
+    return apiFetch<{ quantityAvailable: number }>(
+      `/vendor-returns/returnable-quantity?${sp.toString()}`,
+    );
+  },
 };

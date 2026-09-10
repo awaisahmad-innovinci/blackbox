@@ -710,7 +710,7 @@ export class GoodsReceiptsService {
 
       if (adj.settlement === "REPLACE") {
         const unitsPer = toNum(line.unitsPerPurchaseUnit) || 1;
-        const stockDelta = round4(toNum(line.quantity) * unitsPer);
+        const stockDelta = round4(toNum(line.quantity));
         if (stockDelta > 0) {
           const productSkuRepo = manager.getRepository(ProductSku);
           const productSku = await productSkuRepo.findOne({

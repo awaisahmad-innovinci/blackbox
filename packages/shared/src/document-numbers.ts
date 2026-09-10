@@ -60,6 +60,10 @@ export function receiptNumberPrefix(initials: string): string {
   return `${initials}-PV-`;
 }
 
+export function outNumberPrefix(initials: string): string {
+  return `${initials}-IO-`;
+}
+
 export function nextVendorCode(
   businessName: string,
   existingVendorCodes: string[],
@@ -87,6 +91,16 @@ export function nextReceiptNumber(
   return nextSequentialCode(
     receiptNumberPrefix(businessInitials(businessName)),
     existingReceiptNumbers,
+  );
+}
+
+export function nextOutNumber(
+  businessName: string,
+  existingOutNumbers: string[],
+): string {
+  return nextSequentialCode(
+    outNumberPrefix(businessInitials(businessName)),
+    existingOutNumbers,
   );
 }
 

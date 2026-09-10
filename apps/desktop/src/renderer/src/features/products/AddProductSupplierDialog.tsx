@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   ProductSkuDetail,
+  ProductSupplierRow,
   VendorListItem,
   VendorSku,
 } from "@blackbox/shared";
@@ -51,6 +52,7 @@ export function AddProductSupplierDialog({
   open,
   skus,
   lockedSkuId,
+  existingSuppliers,
   onClose,
   onCreated,
 }: {
@@ -58,6 +60,7 @@ export function AddProductSupplierDialog({
   skus: ProductSkuDetail[];
   /** When set, SKU is fixed (required first supplier after Add SKU). */
   lockedSkuId?: string | null;
+  existingSuppliers?: ProductSupplierRow[];
   onClose: () => void;
   onCreated: (row: VendorSku, cacheWarning: boolean) => void;
 }) {
@@ -69,6 +72,7 @@ export function AddProductSupplierDialog({
   );
   const [purchaseUnitId, setPurchaseUnitId] = useState("");
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
+  const [purchasePrice, setPurchasePrice] = useState("");
   const [moq, setMoq] = useState("1");
   const [leadTimeDays, setLeadTimeDays] = useState("0");
   const [isPreferred, setIsPreferred] = useState(false);
@@ -90,6 +94,7 @@ export function AddProductSupplierDialog({
     const packaging = packagingFromSku(sku);
     setPurchaseUnitId(packaging.purchaseUnitId);
     setUnitsPerPurchaseUnit(packaging.unitsPerPurchaseUnit);
+    setPurchasePrice(String(purchasePriceFromSku(sku)));
   }, [open, productSkuId, skus]);
 
   useEffect(() => {
@@ -117,6 +122,7 @@ export function AddProductSupplierDialog({
     setSelectedVendor(null);
     setPurchaseUnitId(packaging.purchaseUnitId);
     setUnitsPerPurchaseUnit(packaging.unitsPerPurchaseUnit);
+    setPurchasePrice(String(purchasePriceFromSku(sku)));
     setMoq("1");
     setLeadTimeDays("0");
     setIsPreferred(false);
@@ -129,9 +135,16 @@ export function AddProductSupplierDialog({
   const selectedSku = productSkuId
     ? skus.find((s) => s.id === productSkuId)
     : undefined;
-  const computedPurchasePrice = selectedSku
-    ? purchasePriceFromSku(selectedSku)
-    : null;
+
+  const linkedVendorIds = useMemo(
+    () =>
+      new Set(
+        existingSuppliers
+          ?.filter((s) => s.productSkuId === productSkuId)
+          .map((s) => s.vendorId) ?? [],
+      ),
+    [existingSuppliers, productSkuId],
+  );
 
   async function onSave() {
     if (!productSkuId) {
@@ -142,11 +155,19 @@ export function AddProductSupplierDialog({
       setError("Select a vendor");
       return;
     }
+    if (linkedVendorIds.has(selectedVendor.id)) {
+      setError("This vendor is already linked to this SKU");
+      return;
+    }
     if (!selectedSku) {
       setError("Select a SKU first");
       return;
     }
-    const price = purchasePriceFromSku(selectedSku);
+    const price = Number(purchasePrice);
+    if (Number.isNaN(price) || price < 0) {
+      setError("Purchase price must be a non-negative number");
+      return;
+    }
     const unitsPerUnit = Number(unitsPerPurchaseUnit);
     if (Number.isNaN(unitsPerUnit) || unitsPerUnit <= 0) {
       setError("Units per purchase unit must be greater than zero");
@@ -301,17 +322,30 @@ export function AddProductSupplierDialog({
                 />
               </div>
               <ul className="border-border max-h-40 divide-y overflow-y-auto rounded-md border">
-                {vendors.map((v) => (
-                  <ListPickRow
-                    key={v.id}
-                    onActivate={() => setSelectedVendor(v)}
-                  >
-                    <div className="px-3 py-2 text-sm">
-                      <div className="font-medium">{v.name}</div>
-                      <div className="text-muted-foreground">{v.vendorCode}</div>
-                    </div>
-                  </ListPickRow>
-                ))}
+                {vendors.map((v) => {
+                  const alreadyLinked = linkedVendorIds.has(v.id);
+                  return (
+                    <ListPickRow
+                      key={v.id}
+                      disabled={alreadyLinked}
+                      onActivate={() => {
+                        if (!alreadyLinked) setSelectedVendor(v);
+                      }}
+                    >
+                      <div className="px-3 py-2 text-sm">
+                        <div className="font-medium">
+                          {v.name}
+                          {alreadyLinked ? (
+                            <span className="text-muted-foreground ml-2 text-xs font-normal">
+                              Already linked
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="text-muted-foreground">{v.vendorCode}</div>
+                      </div>
+                    </ListPickRow>
+                  );
+                })}
               </ul>
               <KeyboardHints hints={[KEYBOARD_HINT_PICK_ROWS]} />
             </>
@@ -345,13 +379,17 @@ export function AddProductSupplierDialog({
                   *
                 </Label>
                 <Input
-                  value={
-                    computedPurchasePrice != null
-                      ? String(computedPurchasePrice)
-                      : "—"
-                  }
-                  disabled
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={purchasePrice}
+                  onChange={(e) => setPurchasePrice(e.target.value)}
+                  autoFocus
                 />
+                <p className="text-muted-foreground text-xs">
+                  Defaults from SKU cost; change if this vendor&apos;s price
+                  differs.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Purchase unit</Label>
@@ -376,7 +414,6 @@ export function AddProductSupplierDialog({
                 <Input
                   value={moq}
                   onChange={(e) => setMoq(e.target.value)}
-                  autoFocus
                 />
               </div>
               <div className="space-y-1.5">

@@ -232,6 +232,8 @@ export type {
   InventoryInOutReportBucket,
   InventoryInOutReportDay,
   InventoryInOutReport,
+  InventoryInOutDirection,
+  InventoryInOutReportClientFilters,
   MasterDataImportFile,
   MasterDataImportError,
   MasterDataImportFileResult,
@@ -284,9 +286,11 @@ export {
   vendorCodePrefix,
   poNumberPrefix,
   receiptNumberPrefix,
+  outNumberPrefix,
   nextVendorCode,
   nextPoNumber,
   nextReceiptNumber,
+  nextOutNumber,
   nextSkuCodeForProduct,
 } from "./document-numbers";
 export {
@@ -304,6 +308,30 @@ export {
   landedUnitByQuantity,
   lineTotalForScan,
 } from "./inventory";
+export {
+  DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS,
+  matchesInventoryInOutMovement,
+  applyInventoryInOutReportFilters,
+} from "./inventory-in-out-report-filters";
+export {
+  buildInventoryInOutReportCsv,
+  escapeCsvField,
+  inventoryInOutReportCsvFilename,
+} from "./inventory-in-out-report-csv";
+export {
+  DEFAULT_INVENTORY_IN_OUT_PERIOD,
+  lastDayOfMonth,
+  isSingleDayRange,
+  resolveInventoryInOutReportRange,
+  aggregateInOutByMonth,
+  aggregateInOutByYear,
+  dailySummaryRows,
+} from "./inventory-in-out-report-period";
+export type {
+  InventoryInOutPeriodMode,
+  InventoryInOutPeriodInput,
+  InventoryInOutPeriodSummaryRow,
+} from "./inventory-in-out-report-period";
 export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
 export const PAYMENT_TERMS = paymentTermsList;
 export const PAYMENT_TERMS_LABELS = paymentTermsLabels;

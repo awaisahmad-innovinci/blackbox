@@ -11,6 +11,7 @@ import { CategoryFormPage } from "./features/categories/CategoryFormPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { InventoryInOutReportPage } from "./features/inventory/InventoryInOutReportPage";
 import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
+import { InventoryOutListPage } from "./features/inventory/InventoryOutListPage";
 import { InventoryOutPage } from "./features/inventory/InventoryOutPage";
 import { VendorReturnDetailPage } from "./features/inventory/VendorReturnDetailPage";
 import { VendorReturnFormPage } from "./features/inventory/VendorReturnFormPage";
@@ -87,7 +88,8 @@ function AuthenticatedApp() {
             path="inventory/reports"
             element={<InventoryInOutReportPage />}
           />
-          <Route path="inventory/out" element={<InventoryOutPage />} />
+          <Route path="inventory/out" element={<InventoryOutListPage />} />
+          <Route path="inventory/out/new" element={<InventoryOutPage />} />
           <Route
             path="inventory/out/:id"
             element={<InventoryOutDetailPage />}

@@ -9,6 +9,7 @@ import type {
   GoodsReceiptListQuery,
   InventoryMovementListItem,
   InventoryOutDetail,
+  InventoryOutListQuery,
   ProductDetail,
   ProductListQuery,
   ProductSkuDetail,
@@ -110,6 +111,8 @@ import {
   listGoodsReceiptsLocal,
   listPoNumbersLocal,
   listReceiptNumbersLocal,
+  listOutNumbersLocal,
+  listInventoryOutsLocal,
   listVendorGroupsLocal,
   getVendorGroupLocal,
   listUnitsLocal,
@@ -119,6 +122,7 @@ import {
   listVendorReturnsLocal,
   listPendingVendorReturnsLocal,
   lastPurchaseCostLocal,
+  vendorReturnableQuantityLocal,
 } from "./db/queries-local";
 import {
   getOrCreateFingerprint,
@@ -354,6 +358,12 @@ function registerIpc(): void {
   ipcMain.handle("localDb:listReceiptNumbers", () =>
     listReceiptNumbersLocal(),
   );
+  ipcMain.handle("localDb:listOutNumbers", () => listOutNumbersLocal());
+  ipcMain.handle(
+    "localDb:listInventoryOuts",
+    (_event, query: InventoryOutListQuery = {}) =>
+      listInventoryOutsLocal(query),
+  );
   ipcMain.handle("localDb:getDashboardSummary", () =>
     getDashboardSummaryLocal(),
   );
@@ -491,6 +501,16 @@ function registerIpc(): void {
     "localDb:lastPurchaseCost",
     (_event, vendorId: string, productSkuId: string) =>
       lastPurchaseCostLocal(vendorId, productSkuId),
+  );
+  ipcMain.handle(
+    "localDb:vendorReturnableQuantity",
+    (
+      _event,
+      vendorId: string,
+      productSkuId: string,
+      warehouseId: string,
+    ) =>
+      vendorReturnableQuantityLocal(vendorId, productSkuId, warehouseId),
   );
   ipcMain.handle(
     "localDb:inventoryInOutReport",

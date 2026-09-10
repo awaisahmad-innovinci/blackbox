@@ -17,6 +17,7 @@ import {
   LastPurchaseCostQueryDto,
   ListVendorReturnsQueryDto,
   PendingVendorReturnsQueryDto,
+  ReturnableQuantityQueryDto,
 } from "./dto/vendor-return.dto";
 import { VendorReturnsService } from "./vendor-returns.service";
 
@@ -50,6 +51,17 @@ export class VendorReturnsController {
     return this.vendorReturns.lastPurchaseCost(
       query.vendorId,
       query.productSkuId,
+    );
+  }
+
+  @Get("returnable-quantity")
+  returnableQuantity(
+    @Query() query: ReturnableQuantityQueryDto,
+  ): Promise<{ quantityAvailable: number }> {
+    return this.vendorReturns.returnableQuantity(
+      query.vendorId,
+      query.productSkuId,
+      query.warehouseId,
     );
   }
 
