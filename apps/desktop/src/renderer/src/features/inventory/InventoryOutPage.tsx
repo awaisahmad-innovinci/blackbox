@@ -37,6 +37,8 @@ import {
   loadSkuByBarcode,
   loadWarehouses,
 } from "@renderer/lib/local-db/entity-source";
+import { allocateOutNumber } from "@renderer/lib/document-numbers";
+import { useSession } from "@renderer/lib/session/context";
 import {
   AddInventoryOutItemDialog,
   type DraftOutLine,
@@ -92,6 +94,7 @@ function quantityHint(line: DraftOutLine): string | null {
 
 export function InventoryOutPage() {
   const navigate = useNavigate();
+  const { user } = useSession();
 
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
@@ -226,6 +229,7 @@ export function InventoryOutPage() {
       if (await isDeviceBound()) {
         const localId = crypto.randomUUID();
         const now = new Date().toISOString();
+        const outNumber = await allocateOutNumber(user?.tenantName ?? "");
         const warehouseName =
           warehouses.find((w) => w.id === warehouseId)?.name ?? "";
         const items = lines.map((l) => ({
@@ -241,7 +245,7 @@ export function InventoryOutPage() {
         }));
         const detail: InventoryOutDetail = {
           id: localId,
-          outNumber: `LOCAL-${localId.slice(0, 8)}`,
+          outNumber,
           warehouseId,
           warehouseName,
           outDate,
@@ -351,7 +355,7 @@ export function InventoryOutPage() {
             >
               View detail
             </Button>
-            <Button variant="ghost" onClick={() => navigate("/")}>
+            <Button variant="ghost" onClick={() => navigate("/inventory/out")}>
               Back
             </Button>
           </div>
@@ -620,7 +624,11 @@ export function InventoryOutPage() {
       </section>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => navigate("/")}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate("/inventory/out")}
+        >
           Cancel
         </Button>
         <Button

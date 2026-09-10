@@ -202,9 +202,7 @@ async function persistReturnSettlementsLocal(
     touchedReturnIds.add(line.vendorReturnId);
 
     if (choice !== "REPLACE") continue;
-    const unitsPer =
-      line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
-    const stockDelta = line.quantity * unitsPer;
+    const stockDelta = line.quantity;
     if (!(stockDelta > 0)) continue;
     const movementId = crypto.randomUUID();
     const avg = await window.blackbox?.localDb?.applyPurchaseAvgCost(
@@ -892,7 +890,7 @@ export function ReceivePurchaseOrderPage() {
                         {VENDOR_RETURN_REASON_LABELS[line.reason]}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.quantity} {line.purchaseUnitName || ""}
+                        {line.quantity.toLocaleString()} pcs
                       </td>
                       <td className="px-3 py-2 tabular-nums">
                         {line.unitCost.toLocaleString()}

@@ -952,17 +952,25 @@ export function listInventoryInOutReportLocal(
          m.product_sku_id as productSkuId,
          s.sku,
          s.variant_name as variantName,
+         p.id as productId,
+         p.name as productName,
          m.warehouse_id as warehouseId,
          w.name as warehouseName,
          m.movement_type as movementType,
          m.quantity,
          m.reference_type as referenceType,
          m.reference_id as referenceId,
+         gr.vendor_id as vendorId,
+         v.name as vendorName,
          coalesce(m.reason, '') as reason,
          m.created_at as createdAt
        from inventory_movements m
        inner join product_skus s on s.id = m.product_sku_id
+       inner join products p on p.id = s.product_id
        inner join warehouses w on w.id = m.warehouse_id
+       left join goods_receipts gr
+         on m.reference_type = 'goods_receipt' and m.reference_id = gr.id
+       left join vendors v on v.id = gr.vendor_id
        where m.tenant_id = ?
          and m.movement_type in ('PURCHASE_RECEIPT', 'INVENTORY_OUT')
          and date(m.created_at) >= ?
@@ -981,12 +989,16 @@ export function listInventoryInOutReportLocal(
       productSkuId: String(r.productSkuId),
       sku: String(r.sku),
       variantName: String(r.variantName ?? ""),
+      productId: r.productId != null ? String(r.productId) : undefined,
+      productName: r.productName != null ? String(r.productName) : undefined,
       warehouseId: String(r.warehouseId),
       warehouseName: String(r.warehouseName ?? ""),
       movementType: r.movementType as InventoryMovementType,
       quantity: num(r.quantity),
       referenceType: (r.referenceType as string | null) ?? null,
       referenceId: (r.referenceId as string | null) ?? null,
+      vendorId: r.vendorId != null ? String(r.vendorId) : null,
+      vendorName: r.vendorName != null ? String(r.vendorName) : null,
       reason: String(r.reason ?? ""),
       createdAt: String(r.createdAt),
     };
@@ -1443,6 +1455,7 @@ export function getVendorReturnLocal(id: string): VendorReturnDetail | null {
     items: items.map((r) => {
       const quantity = num(r.quantity);
       const unitCost = num(r.unitCost);
+      const unitsPer = num(r.unitsPerPurchaseUnit, 1) || 1;
       return {
         id: String(r.id),
         productSkuId: String(r.productSkuId),
@@ -1453,10 +1466,11 @@ export function getVendorReturnLocal(id: string): VendorReturnDetail | null {
         barcode: (r.barcode as string | null) ?? null,
         purchaseUnitId: (r.purchaseUnitId as string | null) ?? null,
         purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
-        unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1) || 1,
+        unitsPerPurchaseUnit: unitsPer,
         quantity,
         unitCost,
-        lineTotal: Math.round(quantity * unitCost * 10000) / 10000,
+        lineTotal:
+          Math.round((quantity / unitsPer) * unitCost * 10000) / 10000,
         reason: r.reason as VendorReturnReason,
         settlement: (r.settlement as VendorReturnSettlement | null) ?? null,
         goodsReceiptId: (r.goodsReceiptId as string | null) ?? null,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { VendorReturnReason, VendorSku } from "@blackbox/shared";
+import type { SellUnit, VendorReturnReason, VendorSku } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -12,8 +12,11 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import {
   loadLastPurchaseCost,
+  loadSkuProfile,
+  loadVendorReturnableQuantity,
   loadVendorSkus,
 } from "@renderer/lib/local-db/entity-source";
+import { returnLineTotalFromPcs } from "./vendor-return-line";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   KEYBOARD_HINT_PICK_ROWS,
@@ -31,6 +34,9 @@ export type DraftReturnLine = {
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
+  baseUnitName: string | null;
+  sellUnit: SellUnit;
+  lastScanMultiplier?: number;
   quantityAvailable: number;
   quantity: number;
   unitCost: number;
@@ -38,9 +44,19 @@ export type DraftReturnLine = {
   lineTotal: number;
 };
 
-export function toDraftReturnLine(row: VendorSku, unitCost: number): DraftReturnLine {
+export function toDraftReturnLine(
+  row: VendorSku,
+  unitCost: number,
+  options?: {
+    baseUnitName?: string | null;
+    sellUnit?: SellUnit;
+    quantityPcs?: number;
+    lastScanMultiplier?: number;
+  },
+): DraftReturnLine {
   const unitsPer =
     row.unitsPerPurchaseUnit > 0 ? row.unitsPerPurchaseUnit : 1;
+  const quantity = options?.quantityPcs ?? 0;
   return {
     productSkuId: row.productSkuId,
     vendorSkuId: row.id,
@@ -51,11 +67,14 @@ export function toDraftReturnLine(row: VendorSku, unitCost: number): DraftReturn
     purchaseUnitId: row.purchaseUnitId,
     purchaseUnitName: row.purchaseUnitName,
     unitsPerPurchaseUnit: unitsPer,
+    baseUnitName: options?.baseUnitName ?? null,
+    sellUnit: options?.sellUnit ?? "pc",
+    lastScanMultiplier: options?.lastScanMultiplier,
     quantityAvailable: row.quantityAvailable ?? 0,
-    quantity: 0,
+    quantity,
     unitCost,
     reason: "EXPIRED",
-    lineTotal: 0,
+    lineTotal: returnLineTotalFromPcs(quantity, unitsPer, unitCost),
   };
 }
 
@@ -97,7 +116,19 @@ export function AddVendorReturnItemDialog({
     if (!open || !vendorId || !warehouseId) return;
     const t = setTimeout(() => {
       void loadVendorSkus(vendorId, query, warehouseId)
-        .then(setResults)
+        .then(async (rows) => {
+          const withReturnable = await Promise.all(
+            rows.map(async (row) => ({
+              ...row,
+              quantityAvailable: await loadVendorReturnableQuantity(
+                vendorId,
+                row.productSkuId,
+                warehouseId,
+              ),
+            })),
+          );
+          setResults(withReturnable);
+        })
         .catch(() => setResults([]));
     }, 200);
     return () => clearTimeout(t);
@@ -166,7 +197,10 @@ export function AddVendorReturnItemDialog({
           } catch {
             /* fallback to purchasePrice */
           }
-          return toDraftReturnLine(row, unitCost);
+          const profile = await loadSkuProfile(row.productSkuId);
+          return toDraftReturnLine(row, unitCost, {
+            baseUnitName: profile.sku.baseUnitName ?? null,
+          });
         }),
       );
       onAddMany(lines);
@@ -193,8 +227,8 @@ export function AddVendorReturnItemDialog({
         </DialogHeader>
 
         <p className="text-muted-foreground text-sm">
-          Select one or more SKUs with available stock. They are added with
-          quantity 0 — enter quantities and reasons in the return items table.
+          Select one or more SKUs with returnable stock. They are added with
+          quantity 0 — enter quantities in pieces in the return items table.
         </p>
 
         <div className="space-y-3">
@@ -273,9 +307,8 @@ export function AddVendorReturnItemDialog({
                           {r.barcode ? ` · ${r.barcode}` : ""}
                         </span>
                         <span className="text-muted-foreground block tabular-nums">
-                          Cost {r.purchasePrice.toLocaleString()} ·{" "}
-                          {r.purchaseUnitName || "—"} · Available{" "}
-                          {(r.quantityAvailable ?? 0).toLocaleString()}
+                          Cost {r.purchasePrice.toLocaleString()} · Returnable{" "}
+                          {(r.quantityAvailable ?? 0).toLocaleString()} pcs
                         </span>
                       </span>
                     </ListPickRow>

@@ -124,7 +124,7 @@ export function VendorReturnDetailPage() {
                     {VENDOR_RETURN_REASON_LABELS[item.reason]}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.quantity} {item.purchaseUnitName || ""}
+                    {item.quantity.toLocaleString()} pcs
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {item.unitCost.toLocaleString()}

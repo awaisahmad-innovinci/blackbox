@@ -10,6 +10,8 @@ import type {
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
+  InventoryOutListQuery,
+  PaginatedInventoryOuts,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
@@ -122,6 +124,10 @@ declare global {
         listPoNumbers: () => Promise<string[]>;
         listSkuCodes: () => Promise<string[]>;
         listReceiptNumbers: () => Promise<string[]>;
+        listOutNumbers: () => Promise<string[]>;
+        listInventoryOuts: (
+          query?: InventoryOutListQuery,
+        ) => Promise<PaginatedInventoryOuts>;
         getDashboardSummary: () => Promise<DashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
@@ -198,6 +204,11 @@ declare global {
         lastPurchaseCost: (
           vendorId: string,
           productSkuId: string,
+        ) => Promise<number>;
+        vendorReturnableQuantity: (
+          vendorId: string,
+          productSkuId: string,
+          warehouseId: string,
         ) => Promise<number>;
         inventoryInOutReport: (
           dateFrom: string,

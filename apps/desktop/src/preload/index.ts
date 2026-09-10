@@ -9,6 +9,8 @@ import type {
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
+  InventoryOutListQuery,
+  PaginatedInventoryOuts,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
@@ -133,6 +135,13 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:listSkuCodes") as Promise<string[]>,
     listReceiptNumbers: () =>
       ipcRenderer.invoke("localDb:listReceiptNumbers") as Promise<string[]>,
+    listOutNumbers: () =>
+      ipcRenderer.invoke("localDb:listOutNumbers") as Promise<string[]>,
+    listInventoryOuts: (query?: InventoryOutListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listInventoryOuts",
+        query,
+      ) as Promise<PaginatedInventoryOuts>,
     getDashboardSummary: () =>
       ipcRenderer.invoke(
         "localDb:getDashboardSummary",
@@ -283,6 +292,17 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:lastPurchaseCost",
         vendorId,
         productSkuId,
+      ) as Promise<number>,
+    vendorReturnableQuantity: (
+      vendorId: string,
+      productSkuId: string,
+      warehouseId: string,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:vendorReturnableQuantity",
+        vendorId,
+        productSkuId,
+        warehouseId,
       ) as Promise<number>,
     inventoryInOutReport: (dateFrom: string, dateTo: string) =>
       ipcRenderer.invoke(
