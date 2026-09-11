@@ -395,6 +395,7 @@ export class ProductsService {
       .createQueryBuilder("vs")
       .innerJoinAndSelect("vs.productSku", "s")
       .innerJoinAndSelect("vs.vendor", "v")
+      .leftJoinAndSelect("vs.purchaseUnit", "unit")
       .where("vs.tenant_id = :tenantId", { tenantId })
       .andWhere("s.product_id = :productId", { productId })
       .andWhere("vs.status = :status", { status: "active" })
@@ -414,6 +415,10 @@ export class ProductsService {
       minimumOrderQuantity: toNum(vs.minimumOrderQuantity),
       leadTimeDays: vs.leadTimeDays,
       isPreferred: vs.isPreferred,
+      purchaseUnitName: vs.purchaseUnit
+        ? `${vs.purchaseUnit.name} (${vs.purchaseUnit.abbreviation})`
+        : null,
+      unitsPerPurchaseUnit: toNum(vs.unitsPerPurchaseUnit),
     }));
   }
 

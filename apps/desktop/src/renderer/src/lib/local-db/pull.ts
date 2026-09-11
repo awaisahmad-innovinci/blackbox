@@ -95,6 +95,170 @@ async function paginateAll<T>(
   return items;
 }
 
+type LocalDbBridge = ReturnType<typeof requireLocalDb>;
+type ProgressReporter = (
+  phase: SyncPhase,
+  done: number,
+  total: number,
+  message: string,
+) => void;
+
+async function pullProductsSection(
+  localDb: LocalDbBridge,
+  report: ProgressReporter,
+): Promise<void> {
+  const productList = await paginateAll((page, pageSize) =>
+    productsApi.list({ page, pageSize }),
+  );
+  report("products", 0, Math.max(productList.length, 1), "Syncing products…");
+  const details: ProductDetail[] = [];
+  const skus: ProductSkuDetail[] = [];
+
+  for (let i = 0; i < productList.length; i += 1) {
+    const id = productList[i]!.id;
+    const [detail, productSkus] = await Promise.all([
+      productsApi.get(id),
+      productsApi.listSkus(id),
+    ]);
+    details.push(detail);
+    skus.push(...productSkus);
+    report(
+      "products",
+      i + 1,
+      productList.length,
+      `Syncing products… ${i + 1}/${productList.length}`,
+    );
+
+    if (details.length >= 25) {
+      await localDb.upsertProducts(details.splice(0, details.length));
+    }
+    if (skus.length >= 50) {
+      await localDb.upsertProductSkus(skus.splice(0, skus.length));
+    }
+  }
+  if (details.length > 0) await localDb.upsertProducts(details);
+  if (skus.length > 0) await localDb.upsertProductSkus(skus);
+  if (productList.length === 0) {
+    report("products", 1, 1, "No products to sync");
+  }
+}
+
+async function pullVendorsSection(
+  localDb: LocalDbBridge,
+  report: ProgressReporter,
+): Promise<void> {
+  const vendorList = await paginateAll((page, pageSize) =>
+    vendorsApi.list({ status: "all", page, pageSize }),
+  );
+  report("vendors", 0, Math.max(vendorList.length, 1), "Syncing vendors…");
+  const details: VendorDetail[] = [];
+  const links: VendorSku[] = [];
+
+  for (let i = 0; i < vendorList.length; i += 1) {
+    const id = vendorList[i]!.id;
+    const [detail, vendorLinks] = await Promise.all([
+      vendorsApi.get(id),
+      vendorSkusApi.listByVendor(id),
+    ]);
+    details.push(detail);
+    links.push(...vendorLinks);
+    report(
+      "vendors",
+      i + 1,
+      vendorList.length,
+      `Syncing vendors… ${i + 1}/${vendorList.length}`,
+    );
+
+    if (details.length >= 25) {
+      await localDb.upsertVendors(details.splice(0, details.length));
+    }
+    if (links.length >= 50) {
+      await localDb.upsertVendorSkus(links.splice(0, links.length));
+    }
+  }
+  if (details.length > 0) await localDb.upsertVendors(details);
+  if (links.length > 0) await localDb.upsertVendorSkus(links);
+  if (vendorList.length === 0) {
+    report("vendors", 1, 1, "No vendors to sync");
+  }
+}
+
+export async function runMasterDataImportPull(
+  importedFiles: string[],
+  onProgress?: (progress: SyncProgress) => void,
+): Promise<{ lastSyncedAt: string }> {
+  const localDb = requireLocalDb();
+  const files = new Set(importedFiles);
+  const report: ProgressReporter = (phase, done, total, message) => {
+    onProgress?.({ phase, done, total, message });
+  };
+
+  try {
+    if (files.has("01_units.csv")) {
+      report("reference", 0, 1, "Syncing units…");
+      await localDb.upsertUnits(await unitsApi.list());
+      report("reference", 1, 1, "Units saved");
+    }
+    if (files.has("02_brands.csv")) {
+      report("reference", 0, 1, "Syncing brands…");
+      await localDb.upsertBrands(await brandsApi.list({ status: "all" }));
+      report("reference", 1, 1, "Brands saved");
+    }
+    if (files.has("03_categories.csv")) {
+      report("reference", 0, 1, "Syncing categories…");
+      await localDb.upsertCategories(await categoriesApi.list({ status: "all" }));
+      report("reference", 1, 1, "Categories saved");
+    }
+    if (files.has("04_warehouses.csv")) {
+      report("reference", 0, 1, "Syncing warehouses…");
+      await localDb.upsertWarehouses(await warehousesApi.list({ status: "all" }));
+      report("reference", 1, 1, "Warehouses saved");
+    }
+    if (files.has("05_vendor_groups.csv")) {
+      report("reference", 0, 1, "Syncing vendor groups…");
+      await localDb.upsertVendorGroups(
+        await vendorGroupsApi.list({ status: "all" }),
+      );
+      report("reference", 1, 1, "Vendor groups saved");
+    }
+  } catch (err: unknown) {
+    if (err instanceof SyncPullError) throw err;
+    throw new SyncPullError(
+      "reference",
+      getApiErrorMessage(err, "Failed to sync imported reference data"),
+    );
+  }
+
+  if (files.has("06_products.csv") || files.has("07_product_skus.csv")) {
+    try {
+      await pullProductsSection(localDb, report);
+    } catch (err: unknown) {
+      if (err instanceof SyncPullError) throw err;
+      throw new SyncPullError(
+        "products",
+        getApiErrorMessage(err, "Failed to sync products"),
+      );
+    }
+  }
+
+  if (files.has("08_vendors.csv") || files.has("09_vendor_skus.csv")) {
+    try {
+      await pullVendorsSection(localDb, report);
+    } catch (err: unknown) {
+      if (err instanceof SyncPullError) throw err;
+      throw new SyncPullError(
+        "vendors",
+        getApiErrorMessage(err, "Failed to sync vendors"),
+      );
+    }
+  }
+
+  const lastSyncedAt = new Date().toISOString();
+  await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);
+  report("done", 1, 1, "Import sync complete");
+  return { lastSyncedAt };
+}
+
 export async function runFullPull(
   onProgress?: (progress: SyncProgress) => void,
 ): Promise<{ lastSyncedAt: string }> {

@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { NavDropdownMenuItem } from "@renderer/components/nav-dropdown-menu-item";
 import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
 import type { TaxonomyKind } from "@renderer/lib/app-nav-keyboard";
+import { notifyTaxonomyCreated } from "@renderer/lib/taxonomy-created-sync";
 import {
   APP_NAV_SECTIONS,
   appNavShortcutLabel,
@@ -311,8 +312,20 @@ export function AppShell() {
         <AddTaxonomyDialog
           open
           kind={globalTaxonomyKind}
+          returnFocusTo={
+            globalTaxonomyKind === "brand"
+              ? "brand"
+              : globalTaxonomyKind === "category"
+                ? "category"
+                : globalTaxonomyKind === "vendor_group"
+                  ? "group"
+                  : undefined
+          }
           onClose={() => setGlobalTaxonomyKind(null)}
-          onCreated={() => setGlobalTaxonomyKind(null)}
+          onCreated={(row) => {
+            notifyTaxonomyCreated({ kind: globalTaxonomyKind, row });
+            setGlobalTaxonomyKind(null);
+          }}
         />
       ) : null}
     </div>

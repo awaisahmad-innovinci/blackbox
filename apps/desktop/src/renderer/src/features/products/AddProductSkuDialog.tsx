@@ -227,12 +227,12 @@ export function AddProductSkuDialog({
           : null,
       costPrice:
         form.costPrice.trim() || attempted
-          ? requiredNonNegative(form.costPrice, "Cost price")
+          ? requiredNonNegative(form.costPrice, "Cost price/pc")
           : null,
       marginPercent: optionalNonNegativeMargin(form.marginPercent),
       sellingPrice:
         form.sellingPrice.trim() || attempted
-          ? requiredNonNegative(form.sellingPrice, "Selling price") ||
+          ? requiredNonNegative(form.sellingPrice, "Selling price/pc") ||
             sellingGreaterThanCost(form.costPrice, form.sellingPrice)
           : null,
     }),
@@ -245,9 +245,9 @@ export function AddProductSkuDialog({
     !requiredSelect(form.baseUnitId, "Base unit") &&
     !requiredSelect(form.purchaseUnitId, "Purchase unit") &&
     !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
-    !requiredNonNegative(form.costPrice, "Cost price") &&
+    !requiredNonNegative(form.costPrice, "Cost price/pc") &&
     !optionalNonNegativeMargin(form.marginPercent) &&
-    !requiredNonNegative(form.sellingPrice, "Selling price") &&
+    !requiredNonNegative(form.sellingPrice, "Selling price/pc") &&
     !sellingGreaterThanCost(form.costPrice, form.sellingPrice) &&
     !duplicateLookup &&
     !barcodeChecking;
@@ -275,7 +275,7 @@ export function AddProductSkuDialog({
       }
     }
     if (nums.sellingPrice <= nums.costPrice) {
-      setError("Selling price must be greater than cost price");
+      setError("Selling price/pc must be greater than cost price/pc");
       return;
     }
 
@@ -507,18 +507,6 @@ export function AddProductSkuDialog({
               <p className="text-destructive text-xs">{fieldErrors.variantName}</p>
             ) : null}
           </div>
-          <div className="space-y-1.5">
-            <Label>SKU</Label>
-            <Input value={form.sku} readOnly disabled />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Size value</Label>
-            <Input
-              value={form.sizeValue}
-              onChange={(e) => setField("sizeValue", e.target.value)}
-              placeholder="1"
-            />
-          </div>
           <div className={`${FORM_DIALOG_FIELD_FULL}`}>
             <BarcodeAssignRow
               ref={barcodeRowRef}
@@ -526,6 +514,7 @@ export function AddProductSkuDialog({
               checking={barcodeChecking}
               layer="dialog"
               buttonLabel="short"
+              returnFocusTo="sku-size-value"
               onApply={async (code) => {
                 if (duplicateLookup) {
                   setDuplicateLookup(null);
@@ -533,6 +522,19 @@ export function AddProductSkuDialog({
                 }
                 await applyBarcode(code);
               }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>SKU</Label>
+            <Input value={form.sku} readOnly disabled />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="sku-size-value">Size value</Label>
+            <Input
+              id="sku-size-value"
+              value={form.sizeValue}
+              onChange={(e) => setField("sizeValue", e.target.value)}
+              placeholder="1"
             />
           </div>
           <div className="space-y-1.5">
@@ -599,7 +601,7 @@ export function AddProductSkuDialog({
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Cost price *</Label>
+            <Label>Cost price/pc *</Label>
             <Input
               value={form.costPrice}
               aria-invalid={Boolean(fieldErrors.costPrice)}
@@ -622,7 +624,7 @@ export function AddProductSkuDialog({
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label>Selling price *</Label>
+            <Label>Selling price/pc *</Label>
             <Input
               value={form.sellingPrice}
               aria-invalid={Boolean(fieldErrors.sellingPrice)}
