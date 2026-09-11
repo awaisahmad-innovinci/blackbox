@@ -12,7 +12,6 @@ import type {
   MasterDataImportError,
   MasterDataImportResult,
 } from "@blackbox/shared";
-import AdmZip from "adm-zip";
 import { parse } from "csv-parse/sync";
 import { DataSource, EntityManager } from "typeorm";
 import {
@@ -32,7 +31,6 @@ import { FixedTenantContext } from "../common/fixed-tenant.context";
 type ImportFile = (typeof MASTER_DATA_IMPORT_FILES)[number];
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
 
 const HEADERS = {
   "01_units.csv": ["abbreviation", "name", "type", "status"],
@@ -182,23 +180,32 @@ export class MasterDataImportService {
     if (!uploads || uploads.length === 0) {
       this.fail([
         this.uploadError(
-          'Upload one ZIP package in field "file", or one to nine CSV files in field "files"',
+          'Upload exactly one master-data CSV file in field "files"',
         ),
       ]);
     }
-    const oversized = uploads.find((upload) => upload.size > MAX_UPLOAD_BYTES);
-    if (oversized) {
+    if (uploads.length > 1) {
+      this.fail([
+        this.uploadError("Upload exactly one master-data CSV file"),
+      ]);
+    }
+    const upload = uploads[0]!;
+    const uploadName = this.baseName(upload.originalname).toLowerCase();
+    if (upload.fieldname === "file" || uploadName.endsWith(".zip")) {
+      this.fail([
+        this.uploadError("ZIP uploads are not supported. Upload one CSV file."),
+      ]);
+    }
+    if (upload.size > MAX_UPLOAD_BYTES) {
       this.fail([
         this.uploadError(
-          `Each uploaded file must not exceed 10 MB: ${this.baseName(oversized.originalname)}`,
+          `Uploaded file must not exceed 10 MB: ${this.baseName(upload.originalname)}`,
         ),
       ]);
     }
 
     const errors: MasterDataImportError[] = [];
-    const buffers = this.isArchiveUpload(uploads)
-      ? this.readArchive(uploads[0]!.buffer, errors)
-      : this.readCsvUploads(uploads, errors);
+    const buffers = this.readCsvUploads(uploads, errors);
     if (!buffers) this.fail(errors);
     const selectedFiles = MASTER_DATA_IMPORT_FILES.filter(
       (name) => buffers[name] !== undefined,
@@ -209,7 +216,7 @@ export class MasterDataImportService {
     if (errors.length > 0) this.fail(errors);
 
     const counts = await this.dataSource.transaction((manager) =>
-      this.validateReferencesAndImport(manager, files),
+      this.validateReferencesAndImport(manager, files, selectedFiles),
     );
     const results = selectedFiles.map((name) => ({
       file: name,
@@ -226,141 +233,28 @@ export class MasterDataImportService {
     };
   }
 
-  private isArchiveUpload(uploads: Express.Multer.File[]): boolean {
-    if (uploads.length !== 1) return false;
-    const upload = uploads[0]!;
-    return (
-      upload.fieldname === "file" ||
-      this.baseName(upload.originalname).toLowerCase().endsWith(".zip")
-    );
-  }
-
   private readCsvUploads(
     uploads: Express.Multer.File[],
     errors: MasterDataImportError[],
   ): FileBuffers | null {
+    if (uploads.length !== 1) {
+      errors.push(this.uploadError("Upload exactly one master-data CSV file"));
+      return null;
+    }
+
     const expected = new Set<string>(MASTER_DATA_IMPORT_FILES);
     const buffers = {} as FileBuffers;
-    const seen = new Set<string>();
-    let totalSize = 0;
-
-    for (const upload of uploads) {
-      const raw = upload.originalname;
-      const name = this.baseName(raw);
-      if (raw !== name || name.includes("\0") || name === "..") {
-        errors.push(
-          this.uploadError(`File names must not contain a path: ${raw}`),
-        );
-        continue;
-      }
-      if (!expected.has(name)) {
-        errors.push(this.uploadError(`Unexpected file: ${name}`));
-      } else if (seen.has(name)) {
-        errors.push(this.uploadError(`Duplicate file: ${name}`));
-      } else {
-        seen.add(name);
-        buffers[name as ImportFile] = upload.buffer;
-      }
-      totalSize += upload.size;
-    }
-    if (totalSize > MAX_UNCOMPRESSED_BYTES) {
-      errors.push(this.uploadError("Upload exceeds the 50 MB safety limit"));
-    }
-    return errors.length === 0 ? buffers : null;
-  }
-
-  private readArchive(
-    buffer: Buffer,
-    errors: MasterDataImportError[],
-  ): FileBuffers | null {
-    if (
-      buffer.length < 4 ||
-      buffer[0] !== 0x50 ||
-      buffer[1] !== 0x4b ||
-      !(
-        (buffer[2] === 0x03 && buffer[3] === 0x04) ||
-        (buffer[2] === 0x05 && buffer[3] === 0x06) ||
-        (buffer[2] === 0x07 && buffer[3] === 0x08)
-      )
-    ) {
-      errors.push(this.uploadError("Uploaded file is not a valid ZIP archive"));
-      return null;
-    }
-
-    let zip: AdmZip;
-    try {
-      zip = new AdmZip(buffer);
-    } catch {
-      errors.push(this.uploadError("Uploaded file is not a valid ZIP archive"));
-      return null;
-    }
-
-    let entries;
-    try {
-      entries = zip.getEntries();
-    } catch {
-      errors.push(this.uploadError("Unable to read ZIP archive"));
-      return null;
-    }
-    const expected = new Set<string>(MASTER_DATA_IMPORT_FILES);
-    const seen = new Set<string>();
-    let totalSize = 0;
-
-    for (const entry of entries) {
-      const name = entry.entryName;
-      const unixType = (entry.attr >>> 16) & 0o170000;
-      if (
-        entry.isDirectory ||
-        !entry.rawEntryName.equals(Buffer.from(name, "utf8")) ||
-        name.includes("/") ||
-        name.includes("\\") ||
-        name.includes("\0") ||
-        unixType === 0o120000
-      ) {
-        errors.push(
-          this.uploadError(
-            `Archive entries must be regular files at the ZIP root: ${name}`,
-          ),
-        );
-        continue;
-      }
-      if (!expected.has(name)) {
-        errors.push(this.uploadError(`Unexpected archive file: ${name}`));
-      } else if (seen.has(name)) {
-        errors.push(this.uploadError(`Duplicate archive file: ${name}`));
-      } else {
-        seen.add(name);
-      }
-      if ((entry.header.flags & 1) !== 0) {
-        errors.push(this.uploadError(`Encrypted file is not allowed: ${name}`));
-      }
-      totalSize += entry.header.size;
-    }
-    for (const name of MASTER_DATA_IMPORT_FILES) {
-      if (!seen.has(name)) {
-        errors.push(this.uploadError(`Missing archive file: ${name}`));
-      }
-    }
-    if (entries.length !== MASTER_DATA_IMPORT_FILES.length) {
+    const upload = uploads[0]!;
+    const raw = upload.originalname;
+    const name = this.baseName(raw);
+    if (raw !== name || name.includes("\0") || name === "..") {
       errors.push(
-        this.uploadError("Archive must contain exactly the nine CSV files"),
+        this.uploadError(`File names must not contain a path: ${raw}`),
       );
-    }
-    if (totalSize > MAX_UNCOMPRESSED_BYTES) {
-      errors.push(
-        this.uploadError("Archive expands beyond the 50 MB safety limit"),
-      );
-    }
-    if (errors.length > 0) return null;
-
-    const buffers = {} as FileBuffers;
-    for (const name of MASTER_DATA_IMPORT_FILES) {
-      const entry = entries.find((candidate) => candidate.entryName === name)!;
-      try {
-        buffers[name] = entry.getData();
-      } catch {
-        errors.push(this.uploadError(`Unable to extract ${name}`));
-      }
+    } else if (!expected.has(name)) {
+      errors.push(this.uploadError(`Unexpected file: ${name}`));
+    } else {
+      buffers[name as ImportFile] = upload.buffer;
     }
     return errors.length === 0 ? buffers : null;
   }
@@ -537,12 +431,106 @@ export class MasterDataImportService {
     );
   }
 
-  private async validateReferencesAndImport(
+  private entityLoadsForFiles(
+    selectedFiles: ImportFile[],
+  ): Set<
+    | "units"
+    | "brands"
+    | "categories"
+    | "warehouses"
+    | "groups"
+    | "products"
+    | "skus"
+    | "vendors"
+    | "vendorSkus"
+  > {
+    const need = new Set<
+      | "units"
+      | "brands"
+      | "categories"
+      | "warehouses"
+      | "groups"
+      | "products"
+      | "skus"
+      | "vendors"
+      | "vendorSkus"
+    >();
+    for (const file of selectedFiles) {
+      switch (file) {
+        case "01_units.csv":
+          need.add("units");
+          break;
+        case "02_brands.csv":
+          need.add("brands");
+          break;
+        case "03_categories.csv":
+          need.add("categories");
+          break;
+        case "04_warehouses.csv":
+          need.add("warehouses");
+          break;
+        case "05_vendor_groups.csv":
+          need.add("groups");
+          break;
+        case "06_products.csv":
+          need.add("products");
+          need.add("brands");
+          need.add("categories");
+          break;
+        case "07_product_skus.csv":
+          need.add("skus");
+          need.add("products");
+          need.add("units");
+          break;
+        case "08_vendors.csv":
+          need.add("vendors");
+          need.add("groups");
+          break;
+        case "09_vendor_skus.csv":
+          need.add("vendorSkus");
+          need.add("vendors");
+          need.add("skus");
+          need.add("units");
+          break;
+      }
+    }
+    return need;
+  }
+
+  private async loadExistingEntities(
     manager: EntityManager,
-    files: ParsedFiles,
-  ): Promise<FileCounts> {
-    const tenantId = this.fixedTenant.tenantId;
-    const [
+    tenantId: string,
+    selectedFiles: ImportFile[],
+  ) {
+    const need = this.entityLoadsForFiles(selectedFiles);
+    const existingUnits = need.has("units")
+      ? await manager.find(Unit, { where: { tenantId } })
+      : [];
+    const existingBrands = need.has("brands")
+      ? await manager.find(Brand, { where: { tenantId } })
+      : [];
+    const existingCategories = need.has("categories")
+      ? await manager.find(Category, { where: { tenantId } })
+      : [];
+    const existingWarehouses = need.has("warehouses")
+      ? await manager.find(Warehouse, { where: { tenantId } })
+      : [];
+    const existingGroups = need.has("groups")
+      ? await manager.find(VendorGroup, { where: { tenantId } })
+      : [];
+    const existingProducts = need.has("products")
+      ? await manager.find(Product, { where: { tenantId } })
+      : [];
+    const existingSkus = need.has("skus")
+      ? await manager.find(ProductSku, { where: { tenantId } })
+      : [];
+    const existingVendors = need.has("vendors")
+      ? await manager.find(Vendor, { where: { tenantId } })
+      : [];
+    const existingVendorSkus = need.has("vendorSkus")
+      ? await manager.find(VendorSku, { where: { tenantId } })
+      : [];
+    return {
       existingUnits,
       existingBrands,
       existingCategories,
@@ -552,17 +540,26 @@ export class MasterDataImportService {
       existingSkus,
       existingVendors,
       existingVendorSkus,
-    ] = await Promise.all([
-      manager.find(Unit, { where: { tenantId } }),
-      manager.find(Brand, { where: { tenantId } }),
-      manager.find(Category, { where: { tenantId } }),
-      manager.find(Warehouse, { where: { tenantId } }),
-      manager.find(VendorGroup, { where: { tenantId } }),
-      manager.find(Product, { where: { tenantId } }),
-      manager.find(ProductSku, { where: { tenantId } }),
-      manager.find(Vendor, { where: { tenantId } }),
-      manager.find(VendorSku, { where: { tenantId } }),
-    ]);
+    };
+  }
+
+  private async validateReferencesAndImport(
+    manager: EntityManager,
+    files: ParsedFiles,
+    selectedFiles: ImportFile[],
+  ): Promise<FileCounts> {
+    const tenantId = this.fixedTenant.tenantId;
+    const {
+      existingUnits,
+      existingBrands,
+      existingCategories,
+      existingWarehouses,
+      existingGroups,
+      existingProducts,
+      existingSkus,
+      existingVendors,
+      existingVendorSkus,
+    } = await this.loadExistingEntities(manager, tenantId, selectedFiles);
 
     const errors: MasterDataImportError[] = [];
     const productByImportKey = new Map(
@@ -698,109 +695,143 @@ export class MasterDataImportService {
     const units = new Map(
       existingUnits.map((item) => [item.abbreviation, item]),
     );
-    for (const row of files["01_units.csv"]) {
-      const value = row.values;
-      const item =
-        units.get(value.abbreviation) ??
-        manager.create(Unit, { tenantId, abbreviation: value.abbreviation });
-      const created = !item.id;
-      Object.assign(item, {
-        name: normalizeStoredText(value.name),
-        type: value.type,
-        status: value.status,
-      });
-      const saved = await manager.save(item);
-      units.set(saved.abbreviation, saved);
-      counts[row.file][created ? "created" : "updated"]++;
+    if (files["01_units.csv"].length > 0) {
+      const unitRows = files["01_units.csv"];
+      const toSave: Unit[] = [];
+      for (const row of unitRows) {
+        const value = row.values;
+        const item =
+          units.get(value.abbreviation) ??
+          manager.create(Unit, { tenantId, abbreviation: value.abbreviation });
+        const created = !item.id;
+        Object.assign(item, {
+          name: normalizeStoredText(value.name),
+          type: value.type,
+          status: value.status,
+        });
+        toSave.push(item);
+        counts[row.file][created ? "created" : "updated"]++;
+      }
+      const saved = await manager.save(toSave);
+      for (const item of saved) {
+        units.set(item.abbreviation, item);
+      }
     }
 
-    const brands = await this.upsertNamed(
-      manager,
-      Brand,
-      existingBrands,
-      files["02_brands.csv"],
-      counts,
-      tenantId,
+    let brands = new Map(
+      existingBrands.map((item) => [item.name.toLowerCase(), item]),
     );
-    const categories = await this.upsertNamed(
-      manager,
-      Category,
-      existingCategories,
-      files["03_categories.csv"],
-      counts,
-      tenantId,
+    if (files["02_brands.csv"].length > 0) {
+      brands = await this.upsertNamed(
+        manager,
+        Brand,
+        existingBrands,
+        files["02_brands.csv"],
+        counts,
+        tenantId,
+      );
+    }
+
+    let categories = new Map(
+      existingCategories.map((item) => [item.name.toLowerCase(), item]),
     );
-    const groups = await this.upsertNamed(
-      manager,
-      VendorGroup,
-      existingGroups,
-      files["05_vendor_groups.csv"],
-      counts,
-      tenantId,
+    if (files["03_categories.csv"].length > 0) {
+      categories = await this.upsertNamed(
+        manager,
+        Category,
+        existingCategories,
+        files["03_categories.csv"],
+        counts,
+        tenantId,
+      );
+    }
+
+    let groups = new Map(
+      existingGroups.map((item) => [item.name.toLowerCase(), item]),
     );
+    if (files["05_vendor_groups.csv"].length > 0) {
+      groups = await this.upsertNamed(
+        manager,
+        VendorGroup,
+        existingGroups,
+        files["05_vendor_groups.csv"],
+        counts,
+        tenantId,
+      );
+    }
 
     const warehouses = new Map(
       existingWarehouses.map((item) => [item.code, item]),
     );
-    for (const row of files["04_warehouses.csv"]) {
-      const value = row.values;
-      const item =
-        warehouses.get(value.code) ??
-        manager.create(Warehouse, { tenantId, code: value.code });
-      const created = !item.id;
-      Object.assign(item, {
-        name: normalizeStoredText(value.name),
-        location: value.location || null,
-        status: value.status,
-      });
-      const saved = await manager.save(item);
-      warehouses.set(saved.code, saved);
-      counts[row.file][created ? "created" : "updated"]++;
-    }
-
-    for (const [importKey, product] of productByImportKey) {
-      if (!product.importKey) {
-        product.importKey = importKey;
-        await manager.save(product);
+    if (files["04_warehouses.csv"].length > 0) {
+      const warehouseRows = files["04_warehouses.csv"];
+      const toSave: Warehouse[] = [];
+      for (const row of warehouseRows) {
+        const value = row.values;
+        const item =
+          warehouses.get(value.code) ??
+          manager.create(Warehouse, { tenantId, code: value.code });
+        const created = !item.id;
+        Object.assign(item, {
+          name: normalizeStoredText(value.name),
+          location: value.location || null,
+          status: value.status,
+        });
+        toSave.push(item);
+        counts[row.file][created ? "created" : "updated"]++;
+      }
+      const saved = await manager.save(toSave);
+      for (const item of saved) {
+        warehouses.set(item.code, item);
       }
     }
 
-    const newProductCount = files["06_products.csv"].filter(
-      (row) => !productByImportKey.has(row.values.import_key),
-    ).length;
-    const productCodes = await this.nextProductCodes(
-      manager,
-      tenantId,
-      newProductCount,
-    );
-    let productCodeIndex = 0;
     const products = productByImportKey;
-    for (const row of files["06_products.csv"]) {
-      const value = row.values;
-      const item =
-        products.get(value.import_key) ??
-        manager.create(Product, {
-          tenantId,
+    if (files["06_products.csv"].length > 0) {
+      for (const [importKey, product] of productByImportKey) {
+        if (!product.importKey) {
+          product.importKey = importKey;
+          await manager.save(product);
+        }
+      }
+
+      const newProductCount = files["06_products.csv"].filter(
+        (row) => !productByImportKey.has(row.values.import_key),
+      ).length;
+      const productCodes = await this.nextProductCodes(
+        manager,
+        tenantId,
+        newProductCount,
+      );
+      let productCodeIndex = 0;
+      for (const row of files["06_products.csv"]) {
+        const value = row.values;
+        const item =
+          products.get(value.import_key) ??
+          manager.create(Product, {
+            tenantId,
+            importKey: value.import_key,
+            productCode: productCodes[productCodeIndex++]!,
+            imagePath: null,
+          });
+        const created = !item.id;
+        Object.assign(item, {
           importKey: value.import_key,
-          productCode: productCodes[productCodeIndex++]!,
-          imagePath: null,
+          name: normalizeStoredText(value.name),
+          brandId: brands.get(value.brand_name.toLowerCase())!.id,
+          categoryId: categories.get(value.category_name.toLowerCase())!.id,
+          productType: value.product_type,
+          description: normalizeOptionalStoredText(value.description),
+          status: value.status,
         });
-      const created = !item.id;
-      Object.assign(item, {
-        importKey: value.import_key,
-        name: normalizeStoredText(value.name),
-        brandId: brands.get(value.brand_name.toLowerCase())!.id,
-        categoryId: categories.get(value.category_name.toLowerCase())!.id,
-        productType: value.product_type,
-        description: normalizeOptionalStoredText(value.description),
-        status: value.status,
-      });
-      const saved = await manager.save(item);
-      products.set(value.import_key, saved);
-      counts[row.file][created ? "created" : "updated"]++;
+        const saved = await manager.save(item);
+        products.set(value.import_key, saved);
+        counts[row.file][created ? "created" : "updated"]++;
+      }
     }
 
     const skus = new Map(existingSkus.map((item) => [item.sku, item]));
+    if (files["07_product_skus.csv"].length > 0) {
     for (const row of files["07_product_skus.csv"]) {
       const value = row.values;
       const item =
@@ -836,10 +867,12 @@ export class MasterDataImportService {
       skus.set(saved.sku, saved);
       counts[row.file][created ? "created" : "updated"]++;
     }
+    }
 
     const vendors = new Map(
       existingVendors.map((item) => [item.vendorCode, item]),
     );
+    if (files["08_vendors.csv"].length > 0) {
     for (const row of files["08_vendors.csv"]) {
       const value = row.values;
       const item =
@@ -891,6 +924,7 @@ export class MasterDataImportService {
       vendors.set(saved.vendorCode, saved);
       counts[row.file][created ? "created" : "updated"]++;
     }
+    }
 
     const vendorSkuByKey = new Map(
       existingVendorSkus.map((item) => [
@@ -898,6 +932,7 @@ export class MasterDataImportService {
         item,
       ]),
     );
+    if (files["09_vendor_skus.csv"].length > 0) {
     for (const row of files["09_vendor_skus.csv"]) {
       const value = row.values;
       const vendor = vendors.get(value.vendor_code)!;
@@ -927,6 +962,7 @@ export class MasterDataImportService {
       const saved = await manager.save(item);
       vendorSkuByKey.set(key, saved);
       counts[row.file][created ? "created" : "updated"]++;
+    }
     }
     return counts;
   }

@@ -20,6 +20,7 @@ import {
   useBarcodeScanTarget,
   type BarcodeScanLayer,
 } from "@renderer/lib/barcode-scan";
+import { focusFormSelect } from "@renderer/lib/focus-form-select";
 
 export function ScanBarcodePanel({
   open,
@@ -33,6 +34,7 @@ export function ScanBarcodePanel({
   confirmLabel = "OK",
   clearAfterComplete = false,
   closeAfterComplete = false,
+  returnFocusTo,
   onComplete,
 }: {
   open: boolean;
@@ -46,6 +48,7 @@ export function ScanBarcodePanel({
   confirmLabel?: string;
   clearAfterComplete?: boolean;
   closeAfterComplete?: boolean;
+  returnFocusTo?: string;
   onComplete: (code: string) => void | Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +76,7 @@ export function ScanBarcodePanel({
     }
     if (closeAfterComplete) {
       onOpenChange(false);
+      if (returnFocusTo) focusFormSelect(returnFocusTo);
     }
   }
 
@@ -89,7 +93,12 @@ export function ScanBarcodePanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="fixed top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2">
+      <DialogContent
+        className="fixed top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2"
+        onCloseAutoFocus={(event) => {
+          if (returnFocusTo) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -148,9 +157,17 @@ export const BarcodeAssignRow = forwardRef<
     onApply: (code: string) => void | Promise<void>;
     layer?: BarcodeScanLayer;
     buttonLabel?: "default" | "short";
+    returnFocusTo?: string;
   }
 >(function BarcodeAssignRow(
-  { value, checking = false, onApply, layer = "dialog", buttonLabel = "default" },
+  {
+    value,
+    checking = false,
+    onApply,
+    layer = "dialog",
+    buttonLabel = "default",
+    returnFocusTo,
+  },
   ref,
 ) {
   const [scanOpen, setScanOpen] = useState(false);
@@ -198,6 +215,7 @@ export const BarcodeAssignRow = forwardRef<
         allowEmpty
         confirmLabel="OK"
         closeAfterComplete
+        returnFocusTo={returnFocusTo}
         description="Scan, type, then press Enter or OK. Leave empty and OK to clear."
         onComplete={onApply}
       />

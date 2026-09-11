@@ -238,10 +238,13 @@ export function listProductSuppliersLocal(
          vs.purchase_price as purchasePrice,
          vs.minimum_order_quantity as minimumOrderQuantity,
          vs.lead_time_days as leadTimeDays,
-         vs.is_preferred as isPreferred
+         vs.is_preferred as isPreferred,
+         pu.name as purchaseUnitName,
+         vs.units_per_purchase_unit as unitsPerPurchaseUnit
        from vendor_skus vs
        inner join product_skus s on s.id = vs.product_sku_id
        inner join vendors v on v.id = vs.vendor_id
+       left join units pu on pu.id = vs.purchase_unit_id
        where s.product_id = ? and vs.tenant_id = ? and vs.status = 'active'
        order by v.name collate nocase, s.sku collate nocase`,
     )
@@ -258,6 +261,8 @@ export function listProductSuppliersLocal(
     minimumOrderQuantity: num(r.minimumOrderQuantity),
     leadTimeDays: num(r.leadTimeDays),
     isPreferred: Boolean(r.isPreferred),
+    purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
+    unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit),
   }));
 }
 
@@ -669,7 +674,8 @@ export function listSkuSuppliersLocal(skuId: string): SkuSupplier[] {
          vs.minimum_order_quantity as minimumOrderQuantity,
          vs.lead_time_days as leadTimeDays,
          vs.is_preferred as isPreferred,
-         pu.name as purchaseUnitName
+         pu.name as purchaseUnitName,
+         vs.units_per_purchase_unit as unitsPerPurchaseUnit
        from vendor_skus vs
        inner join vendors v on v.id = vs.vendor_id
        left join units pu on pu.id = vs.purchase_unit_id
@@ -687,6 +693,7 @@ export function listSkuSuppliersLocal(skuId: string): SkuSupplier[] {
     leadTimeDays: num(r.leadTimeDays),
     isPreferred: Boolean(r.isPreferred),
     purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
+    unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit),
   }));
 }
 

@@ -171,25 +171,25 @@ Rules: `0 < qty ≤ quantity_available` in the selected warehouse; movements sto
 
 ## Master-data CSV import
 
-The Dashboard **Upload Old Data** action accepts any one-to-nine template CSV
-files directly, or one complete ZIP containing all nine (maximum 10 MB per file):
+The Dashboard **Upload Old Data** action accepts **exactly one** template CSV
+per request (maximum 10 MB):
 
 | Method | Path | Notes |
 |--------|------|-------|
-| `POST` | `/inventory-imports/master-data` | Multipart field `files` (one-to-nine CSVs) or `file` (one complete ZIP); atomically imports the supplied master data |
+| `POST` | `/inventory-imports/master-data` | Multipart field `files` with one master-data CSV; atomically imports that file |
 
 The user templates are checked into
 [`docs/import-templates/master-data/`](import-templates/master-data/). Give that
-folder to users; the app does not download templates. Users can upload only the
-file they changed, or select a related subset. Filenames and headers must remain
-unchanged. ZIP uploads must contain all nine files at the archive root; unused
-files in a ZIP stay header-only.
+folder to users; the app does not download templates. Upload one file at a time
+in dependency order. Filenames and headers must remain unchanged. ZIP and
+multi-file uploads are rejected.
 
 Import order: units → brands → categories → warehouses → vendor groups →
 products → product SKUs → vendors/contacts → vendor-SKU pricing. References use
-the natural keys documented in the template README and may resolve from either
-the same upload or existing tenant data. `06_products.csv` defines a permanent,
-tenant-unique `import_key`; SKU rows refer to it with `product_import_key`.
+the natural keys documented in the template README and must resolve from
+existing tenant data when not present in the uploaded file. `06_products.csv`
+defines a permanent, tenant-unique `import_key`; SKU rows refer to it with
+`product_import_key`.
 
 Allowed values:
 
@@ -201,12 +201,12 @@ Allowed values:
 
 Rows are upserted by stable keys, so repeating an upload updates units, named
 reference data, warehouses, products, SKUs, vendors, and vendor-SKU links rather
-than duplicating them. The API validates all selected files before committing.
-Any file/row error rolls back the selected upload and returns file, line, column,
-and message details.
-After a successful cloud import, desktop automatically runs the existing full
-Sync to refresh SQLite. Historical transactions and opening stock are not part
-of this master-data format.
+than duplicating them. The API validates the uploaded file before committing.
+Any row error rolls back the upload and returns file, line, column, and message
+details.
+After a successful cloud import, desktop automatically syncs only the imported
+entity type(s) into SQLite. Historical transactions and opening stock are not
+part of this master-data format.
 
 ## Desktop
 

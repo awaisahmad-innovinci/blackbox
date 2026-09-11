@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Brand, Category, EntityStatus, ProductType } from "@blackbox/shared";
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS } from "@blackbox/shared";
@@ -33,6 +33,10 @@ import {
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
 import type { TaxonomyKind } from "@renderer/features/taxonomy/create-taxonomy";
+import {
+  type TaxonomyCreatedDetail,
+  useTaxonomyCreatedListener,
+} from "@renderer/lib/taxonomy-created-sync";
 
 export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -70,6 +74,25 @@ export function ProductFormPage() {
     }
     setTaxonomyDialog(null);
   }
+
+  const handleGlobalTaxonomyCreated = useCallback(
+    ({ kind, row }: TaxonomyCreatedDetail) => {
+      if (kind === "brand") {
+        setBrands((prev) =>
+          prev.some((b) => b.id === row.id) ? prev : [...prev, row as Brand],
+        );
+        setBrandId(row.id);
+      } else if (kind === "category") {
+        setCategories((prev) =>
+          prev.some((c) => c.id === row.id) ? prev : [...prev, row as Category],
+        );
+        setCategoryId(row.id);
+      }
+    },
+    [],
+  );
+
+  useTaxonomyCreatedListener(handleGlobalTaxonomyCreated);
 
   usePageKeyboard({
     onSave: () => formRef.current?.requestSubmit(),

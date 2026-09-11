@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { DashboardSummary } from "@blackbox/shared";
+import type { DashboardSummary, MasterDataImportResult } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
 import { Skeleton } from "@blackbox/ui/skeleton";
@@ -20,6 +20,7 @@ import {
 import {
   LAST_FULL_PULL_AT_KEY,
   runFullPull,
+  runMasterDataImportPull,
   SyncPullError,
   type SyncProgress,
 } from "@renderer/lib/local-db/pull";
@@ -246,7 +247,7 @@ export function DashboardPage() {
     }
   }
 
-  async function onMasterDataImported() {
+  async function onMasterDataImported(imported: MasterDataImportResult) {
     if (!localDbStatus?.connected) {
       await loadSummary();
       throw new Error("Local database is not connected.");
@@ -257,10 +258,13 @@ export function DashboardPage() {
       phase: "reference",
       done: 0,
       total: 1,
-      message: "Starting post-import Sync…",
+      message: "Starting post-import sync…",
     });
     try {
-      const result = await runFullPull(setSyncProgress);
+      const result = await runMasterDataImportPull(
+        imported.files.map((file) => file.file),
+        setSyncProgress,
+      );
       setLastSyncedAt(result.lastSyncedAt);
       setSyncProgress({
         phase: "done",

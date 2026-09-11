@@ -15,15 +15,9 @@ export class MasterDataImportApiError extends Error {
 }
 
 export const inventoryImportsApi = {
-  async uploadMasterData(
-    input: File | File[],
-  ): Promise<MasterDataImportResult> {
+  async uploadMasterData(file: File): Promise<MasterDataImportResult> {
     const form = new FormData();
-    if (Array.isArray(input)) {
-      for (const file of input) form.append("files", file);
-    } else {
-      form.append("file", input);
-    }
+    form.append("files", file);
     try {
       return await apiFetch<MasterDataImportResult>(
         "/inventory-imports/master-data",

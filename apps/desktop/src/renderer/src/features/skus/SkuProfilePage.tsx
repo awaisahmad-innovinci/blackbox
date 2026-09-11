@@ -43,6 +43,7 @@ import { sellingFromMargin } from "@renderer/lib/sku-pricing";
 import { loadSkuProfile } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
+import { SupplierPriceCells } from "@renderer/features/inventory/supplier-price-cells";
 import { AddSkuBarcodeDialog } from "./AddSkuBarcodeDialog";
 
 function toProductSkuRow(
@@ -636,7 +637,8 @@ export function SkuProfilePage() {
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Vendor</th>
-                <th className="px-4 py-3 font-medium">Cost</th>
+                <th className="px-4 py-3 font-medium">Price/pc</th>
+                <th className="px-4 py-3 font-medium">Price/box</th>
                 <th className="px-4 py-3 font-medium">MOQ</th>
                 <th className="px-4 py-3 font-medium">Lead Time</th>
                 <th className="px-4 py-3 font-medium">Preferred</th>
@@ -646,7 +648,7 @@ export function SkuProfilePage() {
               {suppliers.length === 0 ? (
                 <tr className="border-border border-t">
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-muted-foreground px-4 py-6 text-center"
                   >
                     No suppliers linked.
@@ -666,7 +668,10 @@ export function SkuProfilePage() {
                         {s.vendorName}
                       </ListTableLink>
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{s.purchasePrice}</td>
+                    <SupplierPriceCells
+                      purchasePrice={s.purchasePrice}
+                      unitsPerPurchaseUnit={s.unitsPerPurchaseUnit}
+                    />
                     <td className="px-4 py-3 tabular-nums">
                       {s.minimumOrderQuantity}
                     </td>

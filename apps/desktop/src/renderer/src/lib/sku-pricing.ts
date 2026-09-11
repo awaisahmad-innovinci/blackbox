@@ -1,4 +1,9 @@
-import { roundMoney4, sellingPriceFromCostMargin } from "@blackbox/shared";
+import {
+  pieceCostFromPurchase,
+  sellingPriceFromCostMargin,
+} from "@blackbox/shared";
+
+export { pieceCostFromPurchase };
 
 export function optionalNonNegativeMargin(value: string): string | null {
   if (!value.trim()) return null;
@@ -28,14 +33,6 @@ export function sellingFromMargin(cost: string, margin: string): string | null {
     return null;
   }
   return String(sellingPriceFromCostMargin(costN, marginN));
-}
-
-export function pieceCostFromPurchase(
-  purchasePrice: number,
-  unitsPerPurchaseUnit: number,
-): number {
-  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
-  return roundMoney4(purchasePrice / unitsPer);
 }
 
 export function sellingFromPurchaseMargin(
