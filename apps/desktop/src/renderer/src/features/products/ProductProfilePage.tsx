@@ -20,12 +20,14 @@ import {
 } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { SupplierPriceCells } from "@renderer/features/inventory/supplier-price-cells";
+import { useConfirm } from "@renderer/components/confirm-provider";
 import { AddProductSkuDialog } from "./AddProductSkuDialog";
 import { AddProductSupplierDialog } from "./AddProductSupplierDialog";
 
 export function ProductProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const location = useLocation();
   const seeded = (
     location.state as { product?: ProductDetail } | null
@@ -72,7 +74,12 @@ export function ProductProfilePage() {
 
   async function onDeactivate() {
     if (!id || !product) return;
-    if (!window.confirm(`Deactivate ${product.name}?`)) return;
+    const ok = await confirm({
+      title: "Deactivate product?",
+      description: `Deactivate ${product.name}?`,
+      confirmLabel: "Deactivate",
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
@@ -113,7 +120,12 @@ export function ProductProfilePage() {
       setError("Cannot activate product without brand and category.");
       return;
     }
-    if (!window.confirm(`Activate ${product.name}?`)) return;
+    const ok = await confirm({
+      title: "Activate product?",
+      description: `Activate ${product.name}?`,
+      confirmLabel: "Activate",
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {

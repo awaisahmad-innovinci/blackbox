@@ -26,7 +26,8 @@ import {
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
-import { confirmRemoveTableLine } from "@renderer/lib/confirm-remove-line";
+import { useConfirm } from "@renderer/components/confirm-provider";
+import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -95,6 +96,7 @@ function quantityHint(line: DraftOutLine): string | null {
 export function InventoryOutPage() {
   const navigate = useNavigate();
   const { user } = useSession();
+  const confirm = useConfirm();
 
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
@@ -594,12 +596,17 @@ export function InventoryOutPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (!confirmRemoveTableLine(line.sku)) return;
-                        setLines((prev) =>
-                          prev.filter(
-                            (l) => l.productSkuId !== line.productSkuId,
-                          ),
-                        );
+                        void (async () => {
+                          const ok = await confirm(
+                            removeTableLineConfirmOptions(line.sku),
+                          );
+                          if (!ok) return;
+                          setLines((prev) =>
+                            prev.filter(
+                              (l) => l.productSkuId !== line.productSkuId,
+                            ),
+                          );
+                        })();
                       }}
                     >
                       Remove

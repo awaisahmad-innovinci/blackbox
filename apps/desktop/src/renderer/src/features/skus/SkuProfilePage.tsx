@@ -44,6 +44,8 @@ import { loadSkuProfile } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { SupplierPriceCells } from "@renderer/features/inventory/supplier-price-cells";
+import { useConfirm } from "@renderer/components/confirm-provider";
+import { wrapDialogOpenChange } from "@renderer/lib/on-dialog-open-change";
 import { AddSkuBarcodeDialog } from "./AddSkuBarcodeDialog";
 
 function toProductSkuRow(
@@ -77,6 +79,7 @@ function toProductSkuRow(
 export function SkuProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [sku, setSku] = useState<SkuDetail | null>(null);
   const [suppliers, setSuppliers] = useState<SkuSupplier[]>([]);
   const [inventory, setInventory] = useState<WarehouseStockRow[]>([]);
@@ -304,11 +307,12 @@ export function SkuProfilePage() {
 
   async function onRemoveBarcode(row: SkuBarcode) {
     if (!id || !sku) return;
-    if (
-      !window.confirm(`Remove barcode ${row.barcode}? It will no longer scan to this SKU.`)
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Remove barcode?",
+      description: `Remove barcode ${row.barcode}? It will no longer scan to this SKU.`,
+      confirmLabel: "Remove",
+    });
+    if (!ok) return;
     try {
       if (await isDeviceBound()) {
         await commitLocalChange({
@@ -351,7 +355,12 @@ export function SkuProfilePage() {
 
   async function onDeactivate() {
     if (!id || !sku) return;
-    if (!window.confirm(`Deactivate SKU ${sku.sku}?`)) return;
+    const ok = await confirm({
+      title: "Deactivate SKU?",
+      description: `Deactivate SKU ${sku.sku}?`,
+      confirmLabel: "Deactivate",
+    });
+    if (!ok) return;
     try {
       if (await isDeviceBound()) {
         const row = toProductSkuRow(sku, "inactive");
@@ -386,7 +395,12 @@ export function SkuProfilePage() {
       setError("Cannot activate SKU without base and purchase units.");
       return;
     }
-    if (!window.confirm(`Activate SKU ${sku.sku}?`)) return;
+    const ok = await confirm({
+      title: "Activate SKU?",
+      description: `Activate SKU ${sku.sku}?`,
+      confirmLabel: "Activate",
+    });
+    if (!ok) return;
     try {
       const active = { ...sku, status: "active" as const };
       if (await isDeviceBound()) {
@@ -685,7 +699,12 @@ export function SkuProfilePage() {
         </div>
       </section>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={wrapDialogOpenChange(setEditOpen, {
+          canClose: () => !saving,
+        })}
+      >
         <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit SKU</DialogTitle>

@@ -11,6 +11,7 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { handleEnterPickerFocus } from "@blackbox/ui/lib/form-keyboard";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
+import { useConfirm } from "@renderer/components/confirm-provider";
 import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import { FormEnterNav } from "@renderer/components/form-enter-nav";
 import {
@@ -20,7 +21,7 @@ import {
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
-import { confirmRemoveTableLine } from "@renderer/lib/confirm-remove-line";
+import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -48,6 +49,7 @@ export function PurchaseOrderFormPage() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
@@ -584,12 +586,17 @@ export function PurchaseOrderFormPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (!confirmRemoveTableLine(line.sku)) return;
-                        setLines((prev) =>
-                          prev.filter(
-                            (l) => l.productSkuId !== line.productSkuId,
-                          ),
-                        );
+                        void (async () => {
+                          const ok = await confirm(
+                            removeTableLineConfirmOptions(line.sku),
+                          );
+                          if (!ok) return;
+                          setLines((prev) =>
+                            prev.filter(
+                              (l) => l.productSkuId !== line.productSkuId,
+                            ),
+                          );
+                        })();
                       }}
                     >
                       Remove

@@ -25,6 +25,11 @@ import {
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { lookupSkuByBarcode } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { handleDialogOpenChange } from "@renderer/lib/on-dialog-open-change";
+import {
+  debugInputFreeze,
+  snapshotModalState,
+} from "@renderer/lib/debug-input-freeze";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 function duplicateBarcodeMessage(row: SkuBarcodeLookupResult): string {
@@ -58,10 +63,22 @@ export function AddSkuBarcodeDialog({
   }
 
   function handleOpenChange(next: boolean) {
-    if (!next) {
-      reset();
-      onClose();
-    }
+    handleDialogOpenChange(
+      next,
+      () => {
+        // #region agent log
+        debugInputFreeze(
+          "C",
+          "AddSkuBarcodeDialog.tsx:close",
+          "AddSkuBarcodeDialog closing",
+          snapshotModalState(),
+        );
+        // #endregion
+        reset();
+        onClose();
+      },
+      !saving,
+    );
   }
 
   const multiplierN = Number(quantityMultiplier);

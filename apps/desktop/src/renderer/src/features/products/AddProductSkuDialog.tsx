@@ -21,6 +21,7 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { handleDialogOpenChange } from "@renderer/lib/on-dialog-open-change";
 import { BarcodeAssignRow, type BarcodeAssignRowHandle } from "@renderer/components/scan-barcode-panel";
 import {
   FormEnterNav,
@@ -468,10 +469,14 @@ export function AddProductSkuDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && !saving) {
-          reset();
-          onClose();
-        }
+        handleDialogOpenChange(
+          next,
+          () => {
+            reset();
+            onClose();
+          },
+          !saving,
+        );
       }}
     >
       <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto lg:max-w-4xl">

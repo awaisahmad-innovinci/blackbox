@@ -22,6 +22,7 @@ import {
   NAV_DROPDOWN_MENUS,
   type NavDropdownId,
 } from "@renderer/lib/app-nav-keyboard";
+import { afterDialogClosed } from "@renderer/lib/on-dialog-open-change";
 import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
 
@@ -62,8 +63,19 @@ export function AppShell() {
     });
 
   useEffect(() => {
-    releaseStuckModalState();
+    releaseStuckModalState({ retry: true });
   }, [location.pathname]);
+
+  function hasOpenModal(): boolean {
+    return (
+      document.querySelector(
+        '[data-slot="dialog-content"][data-state="open"]',
+      ) != null ||
+      document.querySelector(
+        '[data-slot="alert-dialog-content"][data-state="open"]',
+      ) != null
+    );
+  }
 
   function handleNavDropdownChange(id: NavDropdownId, open: boolean) {
     if (open) {
@@ -290,6 +302,9 @@ export function AppShell() {
         className="mx-auto w-full max-w-none flex-1 px-8 py-8 lg:px-10"
         data-enter-nav=""
         onKeyDown={handleEnterNavKeyDown}
+        onMouseDown={() => {
+          if (!hasOpenModal()) afterDialogClosed();
+        }}
       >
         <Outlet />
       </main>
