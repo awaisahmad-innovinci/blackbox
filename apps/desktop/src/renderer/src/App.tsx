@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ConfirmProvider } from "./components/confirm-provider";
 import { AppShell } from "./app/AppShell";
 import { SignInPage } from "./features/auth/SignInPage";
 import { BarcodeScanProvider } from "./lib/barcode-scan";
@@ -37,7 +38,9 @@ import { WarehousesListPage } from "./features/warehouses/WarehousesListPage";
 export default function App() {
   return (
     <SessionProvider>
-      <AuthenticatedApp />
+      <ConfirmProvider>
+        <AuthenticatedApp />
+      </ConfirmProvider>
     </SessionProvider>
   );
 }

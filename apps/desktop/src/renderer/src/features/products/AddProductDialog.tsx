@@ -14,6 +14,7 @@ import {
   formSelectPickerProps,
 } from "@renderer/components/form-enter-nav";
 import { FormSelectWithAction } from "@renderer/components/form-select-with-action";
+import { handleDialogOpenChange } from "@renderer/lib/on-dialog-open-change";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -244,11 +245,15 @@ export function AddProductDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && !saving) {
-          setForm(emptyForm());
-          setError(null);
-          onClose();
-        }
+        handleDialogOpenChange(
+          next,
+          () => {
+            setForm(emptyForm());
+            setError(null);
+            onClose();
+          },
+          !saving,
+        );
       }}
     >
       <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">

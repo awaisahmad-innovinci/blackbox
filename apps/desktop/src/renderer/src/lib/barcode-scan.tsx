@@ -7,6 +7,11 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import {
+  debugInputFreeze,
+  installInputFreezeProbe,
+  snapshotModalState,
+} from "@renderer/lib/debug-input-freeze";
 import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 
 const SCAN_GAP_MS = 40;
@@ -182,6 +187,8 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    installInputFreezeProbe();
+
     let buffer = "";
     let lastAt = 0;
     let wedgeActive = false;
@@ -257,6 +264,18 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
       wedgeActive = true;
       buffer += event.key;
       lastAt = now;
+      // #region agent log
+      debugInputFreeze(
+        "D",
+        "barcode-scan.tsx:wedgePreventDefault",
+        "wedge swallowing printable key",
+        {
+          key: event.key,
+          buffer,
+          ...snapshotModalState(),
+        },
+      );
+      // #endregion
       event.preventDefault();
       event.stopPropagation();
     }
