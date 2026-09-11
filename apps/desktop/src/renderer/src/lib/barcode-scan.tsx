@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 
 const SCAN_GAP_MS = 40;
 const MIN_SCAN_LEN = 3;
@@ -84,6 +85,22 @@ function activeFieldType(): FieldInPath {
   if (isScanField(active)) return "scan";
   if (isEditableField(active)) return "editable";
   return null;
+}
+
+function hasOpenModal(): boolean {
+  return (
+    document.querySelector(
+      '[data-slot="dialog-content"][data-state="open"]',
+    ) != null ||
+    document.querySelector(
+      '[data-slot="alert-dialog-content"][data-state="open"]',
+    ) != null
+  );
+}
+
+function shouldBlockWedgeForModal(event: KeyboardEvent): boolean {
+  if (!hasOpenModal()) return false;
+  return fieldInEventPath(event) !== "scan";
 }
 
 function shouldBailFromWedge(event: KeyboardEvent): boolean {
@@ -188,6 +205,11 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (shouldBlockWedgeForModal(event)) {
+        reset();
+        return;
+      }
+
       const allTargets = [...targetsRef.current.values()];
       const visibleTarget = resolveVisibleTarget(allTargets);
 
@@ -227,7 +249,7 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (shouldBailFromWedge(event)) {
+      if (shouldBailFromWedge(event) || shouldBlockWedgeForModal(event)) {
         reset();
         return;
       }
@@ -239,6 +261,10 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
       event.stopPropagation();
     }
 
+    function onMouseDown(): void {
+      reset();
+    }
+
     function onFocusIn(event: FocusEvent): void {
       const target = event.target;
       if (isEditableField(target) && !isScanField(target)) {
@@ -248,15 +274,18 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
 
     function onHashChange(): void {
       reset();
+      releaseStuckModalState();
     }
 
     document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("mousedown", onMouseDown, true);
     document.addEventListener("focusin", onFocusIn, true);
     window.addEventListener("hashchange", onHashChange);
 
     return () => {
       resetWedgeFn = null;
       document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("mousedown", onMouseDown, true);
       document.removeEventListener("focusin", onFocusIn, true);
       window.removeEventListener("hashchange", onHashChange);
     };
