@@ -20,8 +20,7 @@ import {
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-
-type Selection = { kind: "zip"; file: File } | { kind: "csv"; files: File[] };
+const EXPECTED_FILES = new Set<string>(MASTER_DATA_IMPORT_FILES);
 
 type Props = {
   open: boolean;
@@ -30,54 +29,47 @@ type Props = {
 };
 
 function classify(list: File[]): {
-  selection: Selection | null;
+  selection: File | null;
   message: string | null;
 } {
   if (list.length === 0) return { selection: null, message: null };
 
-  const oversized = list.find((file) => file.size > MAX_UPLOAD_BYTES);
-  if (oversized) {
+  if (list.length > 1) {
     return {
       selection: null,
-      message: `${oversized.name} is larger than 10 MB.`,
+      message: "Select exactly one master-data CSV file.",
     };
   }
 
-  const zips = list.filter((file) => file.name.toLowerCase().endsWith(".zip"));
-  const csvs = list.filter((file) => file.name.toLowerCase().endsWith(".csv"));
-
-  if (zips.length === 1 && list.length === 1) {
-    return { selection: { kind: "zip", file: zips[0]! }, message: null };
-  }
-  if (csvs.length !== list.length) {
+  const file = list[0]!;
+  if (file.size > MAX_UPLOAD_BYTES) {
     return {
       selection: null,
-      message: "Select either the nine CSV files or one ZIP package.",
+      message: `${file.name} is larger than 10 MB.`,
     };
   }
 
-  const expected = new Set<string>(MASTER_DATA_IMPORT_FILES);
-  const known = csvs.filter((file) => expected.has(file.name));
-  const unknown = csvs.filter((file) => !expected.has(file.name));
-  const duplicate = known.find(
-    (file, index) =>
-      known.findIndex((candidate) => candidate.name === file.name) !== index,
-  );
-  if (duplicate) {
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".zip")) {
     return {
       selection: null,
-      message: `Select ${duplicate.name} only once.`,
+      message: "ZIP uploads are not supported. Select one CSV file.",
     };
   }
-  return {
-    selection: { kind: "csv", files: known },
-    message:
-      unknown.length > 0
-        ? `Not part of the template, these are ignored: ${unknown
-            .map((file) => file.name)
-            .join(", ")}`
-        : null,
-  };
+  if (!lowerName.endsWith(".csv")) {
+    return {
+      selection: null,
+      message: "Select a CSV file from the master-data templates.",
+    };
+  }
+  if (!EXPECTED_FILES.has(file.name)) {
+    return {
+      selection: null,
+      message: `Unknown template file: ${file.name}. Use an unchanged filename such as 01_units.csv.`,
+    };
+  }
+
+  return { selection: file, message: null };
 }
 
 export function ImportMasterDataDialog({
@@ -86,26 +78,14 @@ export function ImportMasterDataDialog({
   onImported,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [selection, setSelection] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<MasterDataImportError[]>([]);
   const [result, setResult] = useState<MasterDataImportResult | null>(null);
   const [succeeded, setSucceeded] = useState(false);
 
-  const checklist = useMemo(() => {
-    const present = new Set(
-      selection?.kind === "csv" ? selection.files.map((file) => file.name) : [],
-    );
-    return MASTER_DATA_IMPORT_FILES.map((name) => ({
-      name,
-      present: present.has(name),
-    }));
-  }, [selection]);
-
-  const canUpload =
-    selection?.kind === "zip" ||
-    (selection?.kind === "csv" && selection.files.length > 0);
+  const canUpload = selection != null;
 
   const groupedErrors = useMemo(() => {
     const groups = new Map<string, MasterDataImportError[]>();
@@ -151,11 +131,9 @@ export function ImportMasterDataDialog({
     setResult(null);
     setSucceeded(false);
     try {
-      const imported = await inventoryImportsApi.uploadMasterData(
-        selection.kind === "zip" ? selection.file : selection.files,
-      );
+      const imported = await inventoryImportsApi.uploadMasterData(selection);
       setResult(imported);
-      setMessage("Cloud import complete. Syncing the local database…");
+      setMessage("Cloud import complete. Syncing imported data locally…");
       try {
         await onImported(imported);
         setMessage("File successfully uploaded.");
@@ -193,10 +171,9 @@ export function ImportMasterDataDialog({
         <DialogHeader>
           <DialogTitle>Upload old master data</DialogTitle>
           <DialogDescription>
-            Select one master-data CSV, several CSVs, or one complete ZIP
-            package. Existing records are updated instead of duplicated. The
-            import writes to the cloud database first, then refreshes local
-            SQLite.
+            Select one master-data CSV at a time. Existing records are updated
+            instead of duplicated. The import writes to the cloud database
+            first, then refreshes the matching data in local SQLite.
           </DialogDescription>
         </DialogHeader>
 
@@ -204,10 +181,11 @@ export function ImportMasterDataDialog({
           <div className="border-border bg-muted/30 rounded-lg border px-4 py-3 text-sm">
             <p className="font-medium">Before uploading</p>
             <ul className="text-muted-foreground mt-2 list-disc space-y-1 pl-5 text-xs">
-              <li>Keep selected CSV filenames and headers unchanged.</li>
-              <li>You may upload just one file, such as 01_units.csv.</li>
+              <li>Keep the CSV filename and headers unchanged.</li>
+              <li>Upload one template file per import, such as 01_units.csv.</li>
               <li>
-                Related records must already exist or be uploaded together.
+                Related records must already exist from a previous import
+                (for example, upload units before product SKUs).
               </li>
               <li>Save from Excel as CSV UTF-8, not as XLSX.</li>
               <li>
@@ -218,46 +196,22 @@ export function ImportMasterDataDialog({
           </div>
 
           <label className="block space-y-2 text-sm font-medium">
-            Master-data files
+            Master-data file
             <input
               ref={inputRef}
               className="border-input bg-background block w-full rounded-md border px-3 py-2 text-sm"
               type="file"
-              multiple
-              accept=".zip,.csv,application/zip,text/csv"
+              accept=".csv,text/csv"
               disabled={busy}
               onChange={(event) => onSelect(event.target.files)}
             />
           </label>
 
-          {selection?.kind === "zip" ? (
+          {selection ? (
             <p className="text-muted-foreground text-xs">
-              Selected ZIP: {selection.file.name} (
-              {(selection.file.size / 1024).toFixed(1)} KB)
+              Selected: {selection.name} ({(selection.size / 1024).toFixed(1)}{" "}
+              KB)
             </p>
-          ) : null}
-
-          {selection?.kind === "csv" ? (
-            <div className="border-border rounded-lg border px-4 py-3 text-sm">
-              <p className="font-medium">
-                {selection.files.length} file
-                {selection.files.length === 1 ? "" : "s"} selected
-              </p>
-              <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
-                {checklist.map((item) => (
-                  <p
-                    key={item.name}
-                    className={
-                      item.present
-                        ? "text-muted-foreground"
-                        : "text-muted-foreground/60"
-                    }
-                  >
-                    {item.present ? "Selected" : "Optional"} — {item.name}
-                  </p>
-                ))}
-              </div>
-            </div>
           ) : null}
 
           {message ? (

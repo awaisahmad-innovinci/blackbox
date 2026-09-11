@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Brand, Category, ProductDetail, ProductType } from "@blackbox/shared";
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS } from "@blackbox/shared";
 import {
@@ -32,6 +32,10 @@ import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-w
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
 import type { TaxonomyKind } from "@renderer/features/taxonomy/create-taxonomy";
+import {
+  type TaxonomyCreatedDetail,
+  useTaxonomyCreatedListener,
+} from "@renderer/lib/taxonomy-created-sync";
 
 function emptyForm() {
   return {
@@ -77,6 +81,25 @@ export function AddProductDialog({
     }
     setTaxonomyDialog(null);
   }
+
+  const handleGlobalTaxonomyCreated = useCallback(
+    ({ kind, row }: TaxonomyCreatedDetail) => {
+      if (kind === "brand") {
+        setBrands((prev) =>
+          prev.some((b) => b.id === row.id) ? prev : [...prev, row as Brand],
+        );
+        setForm((prev) => ({ ...prev, brandId: row.id }));
+      } else if (kind === "category") {
+        setCategories((prev) =>
+          prev.some((c) => c.id === row.id) ? prev : [...prev, row as Category],
+        );
+        setForm((prev) => ({ ...prev, categoryId: row.id }));
+      }
+    },
+    [],
+  );
+
+  useTaxonomyCreatedListener(handleGlobalTaxonomyCreated);
 
   useEffect(() => {
     if (!open) return;

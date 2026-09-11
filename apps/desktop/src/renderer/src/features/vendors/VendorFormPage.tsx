@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   CreateVendorRequest,
@@ -42,6 +42,10 @@ import {
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
 import type { TaxonomyKind } from "@renderer/features/taxonomy/create-taxonomy";
+import {
+  type TaxonomyCreatedDetail,
+  useTaxonomyCreatedListener,
+} from "@renderer/lib/taxonomy-created-sync";
 
 type ContactForm = {
   name: string;
@@ -220,6 +224,19 @@ export function VendorFormPage() {
     setForm((prev) => ({ ...prev, groupId: row.id }));
     setCreateTaxonomyKind(null);
   }
+
+  const handleGlobalTaxonomyCreated = useCallback(
+    ({ kind, row }: TaxonomyCreatedDetail) => {
+      if (kind !== "vendor_group") return;
+      setGroups((prev) =>
+        prev.some((g) => g.id === row.id) ? prev : [...prev, row as VendorGroup],
+      );
+      setForm((prev) => ({ ...prev, groupId: row.id }));
+    },
+    [],
+  );
+
+  useTaxonomyCreatedListener(handleGlobalTaxonomyCreated);
 
   useEffect(() => {
     void vendorGroupsApi.list().then(setGroups).catch(() => undefined);

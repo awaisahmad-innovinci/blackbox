@@ -419,6 +419,7 @@ export interface SkuSupplier {
   leadTimeDays: number;
   isPreferred: boolean;
   purchaseUnitName: string | null;
+  unitsPerPurchaseUnit: number;
 }
 
 export interface UnitListItem {
@@ -585,6 +586,14 @@ export function roundMoney4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
+export function pieceCostFromPurchase(
+  purchasePrice: number,
+  unitsPerPurchaseUnit: number,
+): number {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  return roundMoney4(purchasePrice / unitsPer);
+}
+
 /** Markup on cost: cost 100 + margin 40% → 140 */
 export function sellingPriceFromCostMargin(
   cost: number,
@@ -738,6 +747,8 @@ export interface ProductSupplierRow {
   minimumOrderQuantity: number;
   leadTimeDays: number;
   isPreferred: boolean;
+  purchaseUnitName: string | null;
+  unitsPerPurchaseUnit: number;
 }
 
 export interface WarehouseStockRow {

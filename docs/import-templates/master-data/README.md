@@ -1,6 +1,6 @@
 # Blackbox master-data import templates
 
-Fill the CSV files you need without changing filenames or headers, then open Dashboard > Upload Old Data. You may upload one file (for example, only `01_units.csv`) or select several files together. A ZIP containing all nine files at its root is also accepted.
+Fill the CSV files you need without changing filenames or headers, then open Dashboard > Upload Old Data. Upload **one template file per import** (for example, only `01_units.csv`). Import related files in separate uploads after their dependencies exist in the cloud.
 
 How to fill a file:
 1. Open it in Excel, Google Sheets, or LibreOffice. The header row is already correct.
@@ -9,8 +9,8 @@ How to fill a file:
 
 Rules:
 - UTF-8 CSV with a header row.
-- Direct CSV uploads may contain any one-to-nine template files; unselected files are not changed.
-- ZIP uploads are complete packages and must contain all nine files. Keep unused files header-only in a ZIP.
+- Each upload contains exactly one template CSV. Other master-data files are not changed.
+- ZIP and multi-file uploads are not supported.
 - status: active or inactive.
 - unit type: count, weight, volume, length, or other.
 - product_type: STOCK_ITEM, CONSUMABLE, or RESALABLE.
@@ -18,11 +18,11 @@ Rules:
 - booleans: true or false.
 - product import_key is a permanent unique identifier for that product; keep using the same value in future uploads and in 07_product_skus.csv.
 - brand_name, category_name, group_name, unit abbreviations, vendor_code, and sku are references and must match exactly.
-- Referenced records must already exist or be included in the same upload.
+- Referenced records must already exist from a previous import (for example, upload units before product SKUs).
 - primary and manager contact names and phones are required for every vendor.
 - Empty optional values are allowed. Do not add extra files or folders to the upload.
 
-Uploading the same rows again updates the existing records instead of creating duplicates. The upload is atomic: if any selected row is invalid, none of the selected files are imported.
+Uploading the same rows again updates the existing records instead of creating duplicates. The upload is atomic: if any row is invalid, nothing from that file is imported.
 
 ## Example values
 

@@ -9,14 +9,13 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { AnyFilesInterceptor } from "@nestjs/platform-express";
-import { MASTER_DATA_IMPORT_FILES } from "@blackbox/shared";
 import type { MasterDataImportResult } from "@blackbox/shared";
 import type { Response } from "express";
 import { memoryStorage, MulterError } from "multer";
 import { MasterDataImportService } from "./master-data-import.service";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const MAX_UPLOAD_FILES = MASTER_DATA_IMPORT_FILES.length + 1;
+const MAX_UPLOAD_FILES = 1;
 
 @Catch(MulterError)
 class MasterDataUploadExceptionFilter implements ExceptionFilter {
@@ -44,9 +43,9 @@ class MasterDataUploadExceptionFilter implements ExceptionFilter {
       case "LIMIT_FILE_SIZE":
         return "Each uploaded file must not exceed 10 MB";
       case "LIMIT_FILE_COUNT":
-        return `Upload at most ${MAX_UPLOAD_FILES} files`;
+        return "Upload exactly one master-data CSV file";
       case "LIMIT_UNEXPECTED_FILE":
-        return "Upload one ZIP package or one to nine master-data CSV files";
+        return "Upload exactly one master-data CSV file";
       default:
         return error.message;
     }

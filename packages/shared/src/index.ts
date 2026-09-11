@@ -297,6 +297,7 @@ export {
   MASTER_DATA_IMPORT_FILES,
   nextSkuCode,
   roundMoney4,
+  pieceCostFromPurchase,
   sellingPriceFromCostMargin,
   weightedAvgUnitCost,
   clampDiscountPercent,

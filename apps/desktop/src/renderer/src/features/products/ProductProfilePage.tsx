@@ -19,6 +19,7 @@ import {
   isDeviceBound,
 } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
+import { SupplierPriceCells } from "@renderer/features/inventory/supplier-price-cells";
 import { AddProductSkuDialog } from "./AddProductSkuDialog";
 import { AddProductSupplierDialog } from "./AddProductSupplierDialog";
 
@@ -344,7 +345,8 @@ export function ProductProfilePage() {
               <tr>
                 <th className="px-4 py-3 font-medium">Vendor</th>
                 <th className="px-4 py-3 font-medium">SKU</th>
-                <th className="px-4 py-3 font-medium">Price</th>
+                <th className="px-4 py-3 font-medium">Price/pc</th>
+                <th className="px-4 py-3 font-medium">Price/box</th>
                 <th className="px-4 py-3 font-medium">MOQ</th>
                 <th className="px-4 py-3 font-medium">Lead</th>
                 <th className="px-4 py-3 font-medium">Preferred</th>
@@ -354,7 +356,7 @@ export function ProductProfilePage() {
               {suppliers.length === 0 ? (
                 <tr className="border-border border-t">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="text-muted-foreground px-4 py-6 text-center"
                   >
                     No suppliers linked.
@@ -377,7 +379,10 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3">
                       {s.variantName} · {s.sku}
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{s.purchasePrice}</td>
+                    <SupplierPriceCells
+                      purchasePrice={s.purchasePrice}
+                      unitsPerPurchaseUnit={s.unitsPerPurchaseUnit}
+                    />
                     <td className="px-4 py-3 tabular-nums">
                       {s.minimumOrderQuantity}
                     </td>
