@@ -17,10 +17,14 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import {
   barcodeScanInputProps,
+  resetBarcodeWedge,
   useBarcodeScanTarget,
   type BarcodeScanLayer,
 } from "@renderer/lib/barcode-scan";
-import { focusFormSelect } from "@renderer/lib/focus-form-select";
+import {
+  focusFormSelect,
+  hasFocusTarget,
+} from "@renderer/lib/focus-form-select";
 
 export function ScanBarcodePanel({
   open,
@@ -55,13 +59,21 @@ export function ScanBarcodePanel({
   const [draft, setDraft] = useState("");
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      resetBarcodeWedge();
+      return;
+    }
     setDraft(initialValue);
     requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
     });
   }, [open, initialValue]);
+
+  function handleOpenChange(next: boolean): void {
+    if (!next) resetBarcodeWedge();
+    onOpenChange(next);
+  }
 
   async function handleComplete(code: string) {
     if (busy) return;
@@ -75,8 +87,10 @@ export function ScanBarcodePanel({
       });
     }
     if (closeAfterComplete) {
-      onOpenChange(false);
-      if (returnFocusTo) focusFormSelect(returnFocusTo);
+      handleOpenChange(false);
+      if (returnFocusTo && hasFocusTarget(returnFocusTo)) {
+        focusFormSelect(returnFocusTo);
+      }
     }
   }
 
@@ -92,11 +106,13 @@ export function ScanBarcodePanel({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className="fixed top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2"
         onCloseAutoFocus={(event) => {
-          if (returnFocusTo) event.preventDefault();
+          if (returnFocusTo && hasFocusTarget(returnFocusTo)) {
+            event.preventDefault();
+          }
         }}
       >
         <DialogHeader>
@@ -128,7 +144,7 @@ export function ScanBarcodePanel({
             type="button"
             variant="outline"
             disabled={busy}
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Cancel
           </Button>

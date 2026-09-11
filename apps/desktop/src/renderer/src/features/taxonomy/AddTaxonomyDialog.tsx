@@ -16,7 +16,10 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { focusFormSelect } from "@renderer/lib/focus-form-select";
+import {
+  focusFormSelect,
+  hasFocusTarget,
+} from "@renderer/lib/focus-form-select";
 import { createTaxonomy, type TaxonomyKind } from "./create-taxonomy";
 
 const titles: Record<TaxonomyKind, string> = {
@@ -51,7 +54,9 @@ export function AddTaxonomyDialog({
   }, [open, kind]);
 
   function restoreFocus(): void {
-    if (returnFocusTo) focusFormSelect(returnFocusTo);
+    if (returnFocusTo && hasFocusTarget(returnFocusTo)) {
+      focusFormSelect(returnFocusTo);
+    }
   }
 
   function handleClose(): void {
@@ -96,7 +101,9 @@ export function AddTaxonomyDialog({
       <DialogContent
         className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto"
         onCloseAutoFocus={(event) => {
-          if (returnFocusTo) event.preventDefault();
+          if (returnFocusTo && hasFocusTarget(returnFocusTo)) {
+            event.preventDefault();
+          }
         }}
       >
         <DialogHeader>
