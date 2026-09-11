@@ -27,7 +27,8 @@ import {
   KEYBOARD_HINT_SCAN,
   KeyboardHints,
 } from "@renderer/components/keyboard-hints";
-import { confirmRemoveTableLine } from "@renderer/lib/confirm-remove-line";
+import { useConfirm } from "@renderer/components/confirm-provider";
+import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
@@ -64,6 +65,7 @@ function round4(n: number): number {
 
 export function VendorReturnFormPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [vendorId, setVendorId] = useState("");
@@ -302,10 +304,20 @@ export function VendorReturnFormPage() {
       }
     }
 
-    const ok = window.confirm(
-      `Post vendor return?\n\nVendor: ${vendors.find((v) => v.id === vendorId)?.name ?? ""}\nItems: ${lines.length}\nTotal: ${subtotal.toLocaleString()}`,
-    );
-    if (!ok) return;
+    const vendorName =
+      vendors.find((v) => v.id === vendorId)?.name ?? "";
+    const postOk = await confirm({
+      title: "Post vendor return?",
+      description: (
+        <>
+          <p>Vendor: {vendorName}</p>
+          <p>Items: {lines.length}</p>
+          <p>Total: {subtotal.toLocaleString()}</p>
+        </>
+      ),
+      confirmLabel: "Post return",
+    });
+    if (!postOk) return;
 
     setSaving(true);
     try {
@@ -670,12 +682,17 @@ export function VendorReturnFormPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (!confirmRemoveTableLine(line.sku)) return;
-                        setLines((prev) =>
-                          prev.filter(
-                            (l) => l.productSkuId !== line.productSkuId,
-                          ),
-                        );
+                        void (async () => {
+                          const ok = await confirm(
+                            removeTableLineConfirmOptions(line.sku),
+                          );
+                          if (!ok) return;
+                          setLines((prev) =>
+                            prev.filter(
+                              (l) => l.productSkuId !== line.productSkuId,
+                            ),
+                          );
+                        })();
                       }}
                     >
                       Remove

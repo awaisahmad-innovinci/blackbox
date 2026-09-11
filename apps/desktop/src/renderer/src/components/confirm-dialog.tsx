@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
 import {
+  debugInputFreeze,
+  snapshotModalState,
+} from "@renderer/lib/debug-input-freeze";
+import { afterDialogClosed } from "@renderer/lib/on-dialog-open-change";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,8 +34,21 @@ export function ConfirmDialog({
   loading?: boolean;
   onConfirm: () => void | Promise<void>;
 }) {
+  function handleOpenChange(next: boolean): void {
+    // #region agent log
+    debugInputFreeze(
+      "C",
+      "confirm-dialog.tsx:openChange",
+      "ConfirmDialog open change",
+      { next, ...snapshotModalState() },
+    );
+    // #endregion
+    if (!next) afterDialogClosed();
+    onOpenChange(next);
+  }
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

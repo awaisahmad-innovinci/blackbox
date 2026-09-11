@@ -7,6 +7,12 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import {
+  debugInputFreeze,
+  installInputFreezeProbe,
+  snapshotModalState,
+} from "@renderer/lib/debug-input-freeze";
+import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 
 const SCAN_GAP_MS = 40;
 const MIN_SCAN_LEN = 3;
@@ -40,6 +46,13 @@ type BarcodeScanRegistry = {
 
 const BarcodeScanContext = createContext<BarcodeScanRegistry | null>(null);
 
+let resetWedgeFn: (() => void) | null = null;
+
+/** Clear buffered wedge input — call when closing scan dialogs or on navigation. */
+export function resetBarcodeWedge(): void {
+  resetWedgeFn?.();
+}
+
 function isPrintable(event: KeyboardEvent): boolean {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   return event.key.length === 1;
@@ -53,6 +66,7 @@ function isEditableField(
   el: EventTarget | null,
 ): el is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
   if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable) return true;
   if (el instanceof HTMLSelectElement) return !el.disabled;
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
     return !el.disabled && !el.readOnly;
@@ -78,29 +92,44 @@ function activeFieldType(): FieldInPath {
   return null;
 }
 
-function hasActiveDialogBarcodeTarget(targets: RegisteredTarget[]): boolean {
-  return targets.some(
-    (t) =>
-      t.enabled &&
-      t.kind === "barcode" &&
-      t.layer === "dialog" &&
-      targetIsVisible(t),
+function hasOpenModal(): boolean {
+  return (
+    document.querySelector(
+      '[data-slot="dialog-content"][data-state="open"]',
+    ) != null ||
+    document.querySelector(
+      '[data-slot="alert-dialog-content"][data-state="open"]',
+    ) != null
   );
 }
 
-function shouldBailFromWedge(
-  event: KeyboardEvent,
-  options?: { dialogBarcodeActive?: boolean },
-): boolean {
+function shouldBlockWedgeForModal(event: KeyboardEvent): boolean {
+  if (!hasOpenModal()) return false;
+  return fieldInEventPath(event) !== "scan";
+}
+
+function shouldBailFromWedge(event: KeyboardEvent): boolean {
+  if (event.isComposing) return true;
   if (event.repeat) return true;
   if (event.ctrlKey || event.metaKey || event.altKey) return true;
+
   const pathField = fieldInEventPath(event);
   if (pathField === "scan") return true;
-  if (pathField === "editable" && !options?.dialogBarcodeActive) return true;
+  if (pathField === "editable") return true;
+  if (isEditableField(event.target)) return true;
+
   const active = activeFieldType();
   if (active === "scan") return true;
-  if (active === "editable" && !options?.dialogBarcodeActive) return true;
+  if (active === "editable") return true;
+
   return false;
+}
+
+function isInsideOpenDialog(el: HTMLElement | null): boolean {
+  if (!el) return false;
+  const dialog = el.closest('[data-slot="dialog-content"]');
+  if (!(dialog instanceof HTMLElement)) return false;
+  return dialog.getAttribute("data-state") === "open";
 }
 
 function isScanFieldVisible(el: HTMLElement | null): boolean {
@@ -117,7 +146,12 @@ function isScanFieldVisible(el: HTMLElement | null): boolean {
 }
 
 function targetIsVisible(target: RegisteredTarget): boolean {
-  return isScanFieldVisible(target.inputRef?.current ?? null);
+  const el = target.inputRef?.current ?? null;
+  if (!isScanFieldVisible(el)) return false;
+  if (target.layer === "dialog") {
+    return isInsideOpenDialog(el);
+  }
+  return true;
 }
 
 function resolveVisibleTarget(
@@ -153,6 +187,8 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    installInputFreezeProbe();
+
     let buffer = "";
     let lastAt = 0;
     let wedgeActive = false;
@@ -163,22 +199,25 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
       wedgeActive = false;
     }
 
+    resetWedgeFn = reset;
+
     function deliverScan(code: string, target: RegisteredTarget): void {
       target.onScan(code);
       target.onComplete?.(code);
     }
 
     function onKeyDown(event: KeyboardEvent): void {
-      const allTargets = [...targetsRef.current.values()];
-      const wedgeOpts = {
-        dialogBarcodeActive: hasActiveDialogBarcodeTarget(allTargets),
-      };
-
-      if (shouldBailFromWedge(event, wedgeOpts)) {
+      if (shouldBailFromWedge(event)) {
         reset();
         return;
       }
 
+      if (shouldBlockWedgeForModal(event)) {
+        reset();
+        return;
+      }
+
+      const allTargets = [...targetsRef.current.values()];
       const visibleTarget = resolveVisibleTarget(allTargets);
 
       if (!visibleTarget) {
@@ -191,7 +230,7 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
 
       if (event.key === "Enter") {
         if (wedgeActive && buffer.length >= MIN_SCAN_LEN) {
-          if (shouldBailFromWedge(event, wedgeOpts)) {
+          if (shouldBailFromWedge(event)) {
             reset();
             return;
           }
@@ -217,7 +256,7 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (shouldBailFromWedge(event, wedgeOpts)) {
+      if (shouldBailFromWedge(event) || shouldBlockWedgeForModal(event)) {
         reset();
         return;
       }
@@ -225,13 +264,49 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
       wedgeActive = true;
       buffer += event.key;
       lastAt = now;
+      // #region agent log
+      debugInputFreeze(
+        "D",
+        "barcode-scan.tsx:wedgePreventDefault",
+        "wedge swallowing printable key",
+        {
+          key: event.key,
+          buffer,
+          ...snapshotModalState(),
+        },
+      );
+      // #endregion
       event.preventDefault();
       event.stopPropagation();
     }
 
+    function onMouseDown(): void {
+      reset();
+    }
+
+    function onFocusIn(event: FocusEvent): void {
+      const target = event.target;
+      if (isEditableField(target) && !isScanField(target)) {
+        reset();
+      }
+    }
+
+    function onHashChange(): void {
+      reset();
+      releaseStuckModalState();
+    }
+
     document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("focusin", onFocusIn, true);
+    window.addEventListener("hashchange", onHashChange);
+
     return () => {
+      resetWedgeFn = null;
       document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("mousedown", onMouseDown, true);
+      document.removeEventListener("focusin", onFocusIn, true);
+      window.removeEventListener("hashchange", onHashChange);
     };
   }, []);
 
@@ -279,6 +354,11 @@ export function useBarcodeScanTarget({
     registry.register(entry);
     return () => registry.unregister(id);
   }, [registry, kind, layer, enabled, inputRef]);
+
+  useEffect(() => {
+    if (enabled) return;
+    resetBarcodeWedge();
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return;

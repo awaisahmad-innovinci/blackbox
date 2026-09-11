@@ -49,7 +49,16 @@ export function useAppNavKeyboard({
   useEffect(() => {
     if (initialFocusDone.current) return;
     initialFocusDone.current = true;
-    requestAnimationFrame(() => focusNavIndex(0));
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (
+        active === document.body ||
+        active === document.documentElement ||
+        active == null
+      ) {
+        focusNavIndex(0);
+      }
+    });
   }, [focusNavIndex]);
 
   useEffect(() => {
