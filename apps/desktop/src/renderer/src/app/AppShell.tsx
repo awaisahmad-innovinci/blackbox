@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
 import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard";
@@ -22,6 +22,7 @@ import {
   NAV_DROPDOWN_MENUS,
   type NavDropdownId,
 } from "@renderer/lib/app-nav-keyboard";
+import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
 
 const DEVICE_LABEL: Record<string, string> = {
@@ -59,6 +60,10 @@ export function AppShell() {
       setOpenNavDropdown,
       onGlobalTaxonomyShortcut: setGlobalTaxonomyKind,
     });
+
+  useEffect(() => {
+    releaseStuckModalState();
+  }, [location.pathname]);
 
   function handleNavDropdownChange(id: NavDropdownId, open: boolean) {
     if (open) {

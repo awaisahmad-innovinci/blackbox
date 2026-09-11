@@ -20,6 +20,7 @@ import {
   focusFormSelect,
   hasFocusTarget,
 } from "@renderer/lib/focus-form-select";
+import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 import { createTaxonomy, type TaxonomyKind } from "./create-taxonomy";
 
 const titles: Record<TaxonomyKind, string> = {
@@ -47,7 +48,10 @@ export function AddTaxonomyDialog({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      releaseStuckModalState();
+      return;
+    }
     setName("");
     setDescription("");
     setError(null);
@@ -64,6 +68,7 @@ export function AddTaxonomyDialog({
     setDescription("");
     setError(null);
     onClose();
+    releaseStuckModalState();
     restoreFocus();
   }
 

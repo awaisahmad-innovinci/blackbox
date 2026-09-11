@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,8 +30,13 @@ export function ConfirmDialog({
   loading?: boolean;
   onConfirm: () => void | Promise<void>;
 }) {
+  function handleOpenChange(next: boolean): void {
+    if (!next) releaseStuckModalState();
+    onOpenChange(next);
+  }
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

@@ -25,6 +25,7 @@ import {
   focusFormSelect,
   hasFocusTarget,
 } from "@renderer/lib/focus-form-select";
+import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 
 export function ScanBarcodePanel({
   open,
@@ -71,7 +72,10 @@ export function ScanBarcodePanel({
   }, [open, initialValue]);
 
   function handleOpenChange(next: boolean): void {
-    if (!next) resetBarcodeWedge();
+    if (!next) {
+      resetBarcodeWedge();
+      releaseStuckModalState();
+    }
     onOpenChange(next);
   }
 
@@ -186,7 +190,9 @@ export const BarcodeAssignRow = forwardRef<
   },
   ref,
 ) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [draft, setDraft] = useState("");
   const hasBarcode = Boolean(value.trim());
   const actionLabel =
     buttonLabel === "short"
@@ -201,6 +207,44 @@ export const BarcodeAssignRow = forwardRef<
     openScan: () => setScanOpen(true),
   }));
 
+  useEffect(() => {
+    if (!scanOpen) {
+      resetBarcodeWedge();
+      return;
+    }
+    setDraft(value);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+  }, [scanOpen, value]);
+
+  function closeScan(): void {
+    resetBarcodeWedge();
+    releaseStuckModalState();
+    setScanOpen(false);
+  }
+
+  async function handleComplete(code: string) {
+    if (checking) return;
+    await onApply(code.trim());
+    closeScan();
+    if (returnFocusTo && hasFocusTarget(returnFocusTo)) {
+      focusFormSelect(returnFocusTo);
+    }
+  }
+
+  useBarcodeScanTarget({
+    kind: "barcode",
+    layer,
+    enabled: scanOpen,
+    inputRef,
+    onScan: setDraft,
+    onComplete: (code) => {
+      void handleComplete(code);
+    },
+  });
+
   return (
     <div className="space-y-1.5">
       <Label>Barcode</Label>
@@ -213,7 +257,7 @@ export const BarcodeAssignRow = forwardRef<
           variant="outline"
           size="sm"
           className="h-9 shrink-0 whitespace-nowrap"
-          disabled={checking}
+          disabled={checking || scanOpen}
           onClick={() => setScanOpen(true)}
         >
           {actionLabel}
@@ -222,19 +266,47 @@ export const BarcodeAssignRow = forwardRef<
       {checking ? (
         <p className="text-muted-foreground text-xs">Checking barcode…</p>
       ) : null}
-      <ScanBarcodePanel
-        open={scanOpen}
-        onOpenChange={setScanOpen}
-        layer={layer}
-        busy={checking}
-        initialValue={value}
-        allowEmpty
-        confirmLabel="OK"
-        closeAfterComplete
-        returnFocusTo={returnFocusTo}
-        description="Scan, type, then press Enter or OK. Leave empty and OK to clear."
-        onComplete={onApply}
-      />
+      {scanOpen ? (
+        <div className="border-input space-y-2 rounded-md border p-3">
+          <p className="text-muted-foreground text-xs">
+            Scan, type, then press Enter or OK. Leave empty and OK to clear.
+          </p>
+          <Input
+            ref={inputRef}
+            {...barcodeScanInputProps()}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              e.stopPropagation();
+              void handleComplete(draft);
+            }}
+            placeholder="Scan or type barcode"
+            autoComplete="off"
+            disabled={checking}
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={checking}
+              onClick={closeScan}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={checking}
+              onClick={() => void handleComplete(draft)}
+            >
+              {checking ? "Working…" : "OK"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 });
