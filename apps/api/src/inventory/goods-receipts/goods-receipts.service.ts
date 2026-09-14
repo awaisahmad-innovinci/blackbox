@@ -199,7 +199,7 @@ export class GoodsReceiptsService {
     const lines = await this.orderItems.find({
       where: { purchaseOrderId, tenantId },
       relations: {
-        productSku: { product: true },
+        productSku: { product: true, baseUnit: true },
         vendorSku: true,
         purchaseUnit: true,
       },
@@ -225,7 +225,9 @@ export class GoodsReceiptsService {
         vendorSkuCode: line.vendorSku?.vendorSkuCode ?? null,
         purchaseUnitId: line.purchaseUnitId,
         purchaseUnitName: line.purchaseUnit?.name ?? null,
+        baseUnitName: line.productSku?.baseUnit?.name ?? null,
         unitsPerPurchaseUnit: toNum(line.unitsPerPurchaseUnit) || 1,
+        orderUnit: line.orderUnit === "pc" ? "pc" : "box",
         orderedQuantity: toNum(line.quantity),
         poUnitCost: toNum(line.unitCost),
         currentVendorPurchasePrice,

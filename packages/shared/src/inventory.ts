@@ -80,6 +80,7 @@ export const PAYMENT_TERMS = [
   "15_DAYS",
   "30_DAYS",
   "45_DAYS",
+  "BILL_TO_BILL",
   "CUSTOM",
 ] as const;
 export type PaymentTerms = (typeof PAYMENT_TERMS)[number];
@@ -90,6 +91,7 @@ export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
   "15_DAYS": "15 Days",
   "30_DAYS": "30 Days",
   "45_DAYS": "45 Days",
+  BILL_TO_BILL: "Bill to bill",
   CUSTOM: "Custom",
 };
 
@@ -241,6 +243,8 @@ export interface VendorSku {
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
+  /** Base unit label from product SKU (for pc ordering). */
+  baseUnitName?: string | null;
   minimumOrderQuantity: number;
   leadTimeDays: number;
   isPreferred: boolean;
@@ -314,6 +318,94 @@ export interface CreateSkuBarcodeRequest {
 }
 
 export type SellUnit = "pc" | "box";
+export type OrderUnit = SellUnit;
+
+export function toPurchaseQuantity(
+  displayQuantity: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  if (orderUnit === "box") return round4(displayQuantity);
+  return round4(displayQuantity / unitsPer);
+}
+
+export function toDisplayQuantity(
+  purchaseQuantity: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  if (orderUnit === "box") return round4(purchaseQuantity);
+  return round4(purchaseQuantity * unitsPer);
+}
+
+export function displayPurchaseUnitCost(
+  purchasePrice: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  if (orderUnit === "box") return round4(purchasePrice);
+  return pieceCostFromPurchase(purchasePrice, unitsPerPurchaseUnit);
+}
+
+export function defaultOrderUnitForScan(
+  scannedQuantityMultiplier: number,
+  unitsPerPurchaseUnit: number,
+): OrderUnit {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  return scannedQuantityMultiplier >= unitsPer && unitsPer > 1 ? "box" : "pc";
+}
+
+export function lineTotalForPurchase(input: {
+  displayQuantity: number;
+  purchasePrice: number;
+  unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
+}): {
+  purchaseQuantity: number;
+  displayQuantity: number;
+  displayUnitCost: number;
+  lineTotal: number;
+} {
+  const orderUnit = input.orderUnit ?? "box";
+  const purchaseQuantity = toPurchaseQuantity(
+    input.displayQuantity,
+    orderUnit,
+    input.unitsPerPurchaseUnit,
+  );
+  const displayUnitCost = displayPurchaseUnitCost(
+    input.purchasePrice,
+    orderUnit,
+    input.unitsPerPurchaseUnit,
+  );
+  return {
+    purchaseQuantity,
+    displayQuantity: round4(input.displayQuantity),
+    displayUnitCost,
+    lineTotal: round4(purchaseQuantity * input.purchasePrice),
+  };
+}
+
+export function formatPoOrderQuantity(item: {
+  quantity: number;
+  orderUnit?: OrderUnit;
+  unitsPerPurchaseUnit: number;
+  purchaseUnitName?: string | null;
+  baseUnitName?: string | null;
+}): string {
+  const orderUnit = item.orderUnit ?? "box";
+  const displayQty = toDisplayQuantity(
+    item.quantity,
+    orderUnit,
+    item.unitsPerPurchaseUnit,
+  );
+  const unitLabel =
+    orderUnit === "box"
+      ? (item.purchaseUnitName ?? "box")
+      : (item.baseUnitName ?? "pc");
+  return `${displayQty.toLocaleString()} ${unitLabel}`;
+}
 
 export function lineTotalForScan(input: {
   quantityMultiplier: number;
@@ -802,7 +894,9 @@ export interface PurchaseOrderItemRow {
   vendorSkuCode: string | null;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  baseUnitName?: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
   quantity: number;
   unitCost: number;
   discount: number;
@@ -851,6 +945,7 @@ export interface CreatePurchaseOrderItemRequest {
   vendorSkuId: string;
   quantity: number;
   unitCost: number;
+  orderUnit?: OrderUnit;
   discount?: number;
   tax?: number;
 }
@@ -903,7 +998,9 @@ export interface ReceivingLineDraft {
   vendorSkuCode: string | null;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  baseUnitName?: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
   orderedQuantity: number;
   poUnitCost: number;
   currentVendorPurchasePrice: number | null;

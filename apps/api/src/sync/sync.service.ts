@@ -851,6 +851,7 @@ export class SyncService {
             vendorSkuId: (item.vendorSkuId as string | null) ?? null,
             purchaseUnitId: (item.purchaseUnitId as string | null) ?? null,
             unitsPerPurchaseUnit: String(item.unitsPerPurchaseUnit ?? 1),
+            orderUnit: String(item.orderUnit ?? "box"),
             quantity: String(item.quantity ?? 0),
             unitCost: String(item.unitCost ?? 0),
             tax: String(item.tax ?? 0),

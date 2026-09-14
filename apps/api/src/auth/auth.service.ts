@@ -79,6 +79,16 @@ export class AuthService {
   async signupTenant(dto: SignupTenantDto): Promise<AuthResponse> {
     const email = dto.email.trim().toLowerCase();
     const username = dto.username.trim();
+
+    const activeEmailCount = await this.users.count({
+      where: { email, isActive: true },
+    });
+    if (activeEmailCount > 0) {
+      throw new ConflictException(
+        "This email is already registered with an active account.",
+      );
+    }
+
     const passwordHash = await argon2.hash(dto.password);
 
     // Resolve catalog rows by stable permission key — never hard-coded UUIDs.

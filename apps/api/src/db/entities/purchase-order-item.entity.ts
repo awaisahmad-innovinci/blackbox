@@ -45,6 +45,9 @@ export class PurchaseOrderItem {
   })
   unitsPerPurchaseUnit!: string;
 
+  @Column({ name: "order_unit", type: "text", default: "box" })
+  orderUnit!: string;
+
   @Column({ type: "numeric", precision: 14, scale: 4 })
   quantity!: string;
 

@@ -158,6 +158,7 @@ export type {
   CreateVendorSkuRequest,
   UpdateVendorSkuRequest,
   SellUnit,
+  OrderUnit,
   SkuSearchResult,
   SkuBarcode,
   CreateSkuBarcodeRequest,
@@ -308,6 +309,12 @@ export {
   goodsReceiptGrandTotal,
   landedUnitByQuantity,
   lineTotalForScan,
+  toPurchaseQuantity,
+  toDisplayQuantity,
+  displayPurchaseUnitCost,
+  defaultOrderUnitForScan,
+  lineTotalForPurchase,
+  formatPoOrderQuantity,
 } from "./inventory";
 export {
   DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS,

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { VendorSku } from "@blackbox/shared";
+import type { OrderUnit, VendorSku } from "@blackbox/shared";
+import { lineTotalForPurchase } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -26,7 +27,10 @@ export type DraftPoLine = {
   sku: string;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  baseUnitName: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit: OrderUnit;
+  purchasePrice: number;
   quantityAvailable: number;
   quantity: number;
   unitCost: number;
@@ -34,8 +38,26 @@ export type DraftPoLine = {
   lineTotal: number;
 };
 
-export function toDraftPoLine(row: VendorSku): DraftPoLine {
+export function recomputePoLine(
+  line: DraftPoLine,
+  patch: Partial<DraftPoLine> = {},
+): DraftPoLine {
+  const next = { ...line, ...patch };
+  const pricing = lineTotalForPurchase({
+    displayQuantity: next.quantity,
+    purchasePrice: next.purchasePrice,
+    unitsPerPurchaseUnit: next.unitsPerPurchaseUnit,
+    orderUnit: next.orderUnit,
+  });
   return {
+    ...next,
+    unitCost: pricing.displayUnitCost,
+    lineTotal: pricing.lineTotal,
+  };
+}
+
+export function toDraftPoLine(row: VendorSku): DraftPoLine {
+  return recomputePoLine({
     productSkuId: row.productSkuId,
     vendorSkuId: row.id,
     productName: row.productName,
@@ -43,13 +65,16 @@ export function toDraftPoLine(row: VendorSku): DraftPoLine {
     sku: row.sku,
     purchaseUnitId: row.purchaseUnitId,
     purchaseUnitName: row.purchaseUnitName,
+    baseUnitName: row.baseUnitName ?? null,
     unitsPerPurchaseUnit: row.unitsPerPurchaseUnit,
+    orderUnit: "box",
+    purchasePrice: row.purchasePrice,
     quantityAvailable: row.quantityAvailable ?? 0,
     quantity: 0,
     unitCost: row.purchasePrice,
     minimumOrderQuantity: row.minimumOrderQuantity,
     lineTotal: 0,
-  };
+  });
 }
 
 function isDisabled(row: VendorSku, existingSkuIds: string[]): boolean {

@@ -126,6 +126,8 @@ Statuses: `DRAFT` \| `SUBMITTED` \| `PARTIALLY_RECEIVED` \| `RECEIVED` \| `CANCE
 
 Backend recalculates line and header totals. Creating/submitting/cancelling does **not** change inventory. Lines require `vendorSkuId` + `productSkuId`; purchase unit is snapshotted from `vendor_skus`.
 
+Each line accepts optional `orderUnit`: `"box"` (default) or `"pc"`. **Stored values stay in purchase units:** `quantity` is always purchase-unit count (e.g. `0.5` boxes for 5 pcs when `unitsPerPurchaseUnit` is 10), `unitCost` is always per purchase unit (box price). `orderUnit` records how the user entered the line for display/edit. Desktop converts display qty/cost before POST; receiving and stock math use stored purchase-unit `quantity` × `units_per_purchase_unit` unchanged.
+
 ## Goods receipts / receiving (Phase 1)
 
 | Method | Path | Notes |
@@ -196,7 +198,7 @@ Allowed values:
 - `status`: `active`, `inactive`
 - unit `type`: `count`, `weight`, `volume`, `length`, `other`
 - `product_type`: `STOCK_ITEM`, `CONSUMABLE`, `RESALABLE`
-- `payment_terms`: `CASH`, `7_DAYS`, `15_DAYS`, `30_DAYS`, `45_DAYS`, `CUSTOM`
+- `payment_terms`: `CASH`, `7_DAYS`, `15_DAYS`, `30_DAYS`, `45_DAYS`, `BILL_TO_BILL`, `CUSTOM`
 - booleans: `true`, `false`
 
 Rows are upserted by stable keys, so repeating an upload updates units, named

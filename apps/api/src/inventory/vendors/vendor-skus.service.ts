@@ -50,6 +50,7 @@ export class VendorSkusService {
       .innerJoinAndSelect("vs.productSku", "sku")
       .innerJoinAndSelect("sku.product", "product")
       .leftJoinAndSelect("vs.purchaseUnit", "unit")
+      .leftJoinAndSelect("sku.baseUnit", "baseUnit")
       .where("vs.tenant_id = :tenantId", { tenantId })
       .andWhere("vs.vendor_id = :vendorId", { vendorId })
       .andWhere("vs.status = :status", { status: "active" })
@@ -110,6 +111,7 @@ export class VendorSkusService {
       .createQueryBuilder("vs")
       .innerJoinAndSelect("vs.vendor", "vendor")
       .leftJoinAndSelect("vs.purchaseUnit", "unit")
+      .leftJoinAndSelect("sku.baseUnit", "baseUnit")
       .where("vs.tenant_id = :tenantId", { tenantId })
       .andWhere("vs.product_sku_id = :productSkuId", { productSkuId })
       .andWhere("vs.status = :status", { status: "active" })
@@ -259,6 +261,7 @@ export class VendorSkusService {
       .innerJoinAndSelect("vs.productSku", "sku")
       .innerJoinAndSelect("sku.product", "product")
       .leftJoinAndSelect("vs.purchaseUnit", "unit")
+      .leftJoinAndSelect("sku.baseUnit", "baseUnit")
       .where("vs.tenant_id = :tenantId", { tenantId })
       .andWhere("vs.id = :id", { id })
       .getOne();
@@ -281,6 +284,7 @@ export class VendorSkusService {
         ? `${row.purchaseUnit.name} (${row.purchaseUnit.abbreviation})`
         : null,
       unitsPerPurchaseUnit: toNum(row.unitsPerPurchaseUnit),
+      baseUnitName: row.productSku.baseUnit?.name ?? null,
       minimumOrderQuantity: toNum(row.minimumOrderQuantity),
       leadTimeDays: row.leadTimeDays,
       isPreferred: row.isPreferred,

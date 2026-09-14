@@ -789,6 +789,22 @@ set quantity = quantity * units_per_purchase_unit
 where units_per_purchase_unit > 0;
 `,
   },
+  {
+    id: "017_po_item_order_unit",
+    sql: `-- column add applied in after()`,
+    after: (db) => {
+      const itemCols = (
+        db.prepare("pragma table_info(purchase_order_items)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!itemCols.includes("order_unit")) {
+        db.exec(
+          `alter table purchase_order_items add column order_unit text not null default 'box'`,
+        );
+      }
+    },
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

@@ -2,8 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   CreatePurchaseOrderRequest,
+  OrderUnit,
   VendorListItem,
   WarehouseListItem,
+} from "@blackbox/shared";
+import {
+  defaultOrderUnitForScan,
+  displayPurchaseUnitCost,
+  lineTotalForPurchase,
+  toDisplayQuantity,
+  toPurchaseQuantity,
 } from "@blackbox/shared";
 import { FORM_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
@@ -12,8 +20,10 @@ import { Label } from "@blackbox/ui/label";
 import { handleEnterPickerFocus } from "@blackbox/ui/lib/form-keyboard";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { useConfirm } from "@renderer/components/confirm-provider";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
 import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
-import { FormEnterNav } from "@renderer/components/form-enter-nav";
+import { FormEnterNav, formSelectPickerProps } from "@renderer/components/form-enter-nav";
 import {
   KEYBOARD_HINT_ADD,
   KEYBOARD_HINT_ENTER,
@@ -33,9 +43,11 @@ import { allocatePoNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
 import {
   AddPurchaseOrderItemDialog,
+  recomputePoLine,
   toDraftPoLine,
   type DraftPoLine,
 } from "./AddPurchaseOrderItemDialog";
+import { PendingVendorReturnsSection } from "./PendingVendorReturnsSection";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -103,15 +115,22 @@ export function PurchaseOrderFormPage() {
         setError("Already added — update its quantity");
         return;
       }
+      const orderUnit = defaultOrderUnitForScan(
+        result.scannedQuantityMultiplier,
+        match.unitsPerPurchaseUnit,
+      );
+      const displayQty =
+        orderUnit === "box" && match.unitsPerPurchaseUnit > 1
+          ? round4(
+              result.scannedQuantityMultiplier / match.unitsPerPurchaseUnit,
+            )
+          : result.scannedQuantityMultiplier;
       setLines((prev) => [
         ...prev,
-        {
-          ...toDraftPoLine(match),
-          quantity: result.scannedQuantityMultiplier,
-          lineTotal: round4(
-            result.scannedQuantityMultiplier * match.purchasePrice,
-          ),
-        },
+        recomputePoLine(toDraftPoLine(match), {
+          orderUnit,
+          quantity: displayQty,
+        }),
       ]);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Barcode lookup failed"));
@@ -183,21 +202,35 @@ export function PurchaseOrderFormPage() {
         setOrderDate(po.orderDate);
         setExpectedDate(po.expectedDate ?? "");
         setLines(
-          po.items.map((i) => ({
-            productSkuId: i.productSkuId,
-            vendorSkuId: i.vendorSkuId,
-            productName: i.productName,
-            variantName: i.variantName,
-            sku: i.sku,
-            purchaseUnitId: i.purchaseUnitId,
-            purchaseUnitName: i.purchaseUnitName,
-            unitsPerPurchaseUnit: i.unitsPerPurchaseUnit,
-            quantityAvailable: availabilityBySku.get(i.productSkuId) ?? 0,
-            quantity: i.quantity,
-            unitCost: i.unitCost,
-            minimumOrderQuantity: i.minimumOrderQuantity,
-            lineTotal: i.lineTotal,
-          })),
+          po.items.map((i) => {
+            const orderUnit = (i.orderUnit ?? "box") as OrderUnit;
+            return recomputePoLine({
+              productSkuId: i.productSkuId,
+              vendorSkuId: i.vendorSkuId,
+              productName: i.productName,
+              variantName: i.variantName,
+              sku: i.sku,
+              purchaseUnitId: i.purchaseUnitId,
+              purchaseUnitName: i.purchaseUnitName,
+              baseUnitName: i.baseUnitName ?? null,
+              unitsPerPurchaseUnit: i.unitsPerPurchaseUnit,
+              orderUnit,
+              purchasePrice: i.unitCost,
+              quantityAvailable: availabilityBySku.get(i.productSkuId) ?? 0,
+              quantity: toDisplayQuantity(
+                i.quantity,
+                orderUnit,
+                i.unitsPerPurchaseUnit,
+              ),
+              unitCost: displayPurchaseUnitCost(
+                i.unitCost,
+                orderUnit,
+                i.unitsPerPurchaseUnit,
+              ),
+              minimumOrderQuantity: i.minimumOrderQuantity,
+              lineTotal: i.lineTotal,
+            });
+          }),
         );
       })
       .catch((err: unknown) => {
@@ -215,9 +248,8 @@ export function PurchaseOrderFormPage() {
 
   const subtotal = useMemo(
     () =>
-      Math.round(
-        lines.reduce((sum, l) => sum + l.quantity * l.unitCost, 0) * 10000,
-      ) / 10000,
+      Math.round(lines.reduce((sum, l) => sum + l.lineTotal, 0) * 10000) /
+      10000,
     [lines],
   );
 
@@ -239,7 +271,12 @@ export function PurchaseOrderFormPage() {
         setError(`Enter a quantity greater than zero for ${line.sku}`);
         return null;
       }
-      if (submit && line.quantity < line.minimumOrderQuantity) {
+      const purchaseQty = toPurchaseQuantity(
+        line.quantity,
+        line.orderUnit,
+        line.unitsPerPurchaseUnit,
+      );
+      if (submit && purchaseQty < line.minimumOrderQuantity) {
         setError(
           `Minimum order quantity for ${line.sku} is ${line.minimumOrderQuantity} ${line.purchaseUnitName ?? "units"}.`,
         );
@@ -255,12 +292,21 @@ export function PurchaseOrderFormPage() {
       discount: 0,
       tax: 0,
       otherCharges: 0,
-      items: lines.map((l) => ({
-        productSkuId: l.productSkuId,
-        vendorSkuId: l.vendorSkuId,
-        quantity: l.quantity,
-        unitCost: l.unitCost,
-      })),
+      items: lines.map((l) => {
+        const pricing = lineTotalForPurchase({
+          displayQuantity: l.quantity,
+          purchasePrice: l.purchasePrice,
+          unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
+          orderUnit: l.orderUnit,
+        });
+        return {
+          productSkuId: l.productSkuId,
+          vendorSkuId: l.vendorSkuId,
+          quantity: pricing.purchaseQuantity,
+          unitCost: l.purchasePrice,
+          orderUnit: l.orderUnit,
+        };
+      }),
       submit: submit || undefined,
     };
   }
@@ -296,24 +342,34 @@ export function PurchaseOrderFormPage() {
           otherCharges: 0,
           total: subtotal,
           notes: "",
-          items: lines.map((l) => ({
-            id: crypto.randomUUID(),
-            productSkuId: l.productSkuId,
-            vendorSkuId: l.vendorSkuId,
-            productName: l.productName,
-            variantName: l.variantName,
-            sku: l.sku,
-            vendorSkuCode: null,
-            purchaseUnitId: l.purchaseUnitId,
-            purchaseUnitName: l.purchaseUnitName,
-            unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
-            quantity: l.quantity,
-            unitCost: l.unitCost,
-            discount: 0,
-            tax: 0,
-            lineTotal: l.quantity * l.unitCost,
-            minimumOrderQuantity: l.minimumOrderQuantity,
-          })),
+          items: lines.map((l) => {
+            const pricing = lineTotalForPurchase({
+              displayQuantity: l.quantity,
+              purchasePrice: l.purchasePrice,
+              unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
+              orderUnit: l.orderUnit,
+            });
+            return {
+              id: crypto.randomUUID(),
+              productSkuId: l.productSkuId,
+              vendorSkuId: l.vendorSkuId,
+              productName: l.productName,
+              variantName: l.variantName,
+              sku: l.sku,
+              vendorSkuCode: null,
+              purchaseUnitId: l.purchaseUnitId,
+              purchaseUnitName: l.purchaseUnitName,
+              baseUnitName: l.baseUnitName,
+              unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
+              orderUnit: l.orderUnit,
+              quantity: pricing.purchaseQuantity,
+              unitCost: l.purchasePrice,
+              discount: 0,
+              tax: 0,
+              lineTotal: pricing.lineTotal,
+              minimumOrderQuantity: l.minimumOrderQuantity,
+            };
+          }),
           createdAt: now,
           updatedAt: now,
         };
@@ -372,25 +428,38 @@ export function PurchaseOrderFormPage() {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
 
+  const vendorName = vendors.find((v) => v.id === vendorId)?.name;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isEdit ? "Edit Purchase Order" : "Create Purchase Order"}
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Select vendor and warehouse, then add SKUs supplied by that vendor.
-        </p>
-      </div>
-
       {error ? (
         <div
           role="alert"
-          className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
+          className="border-destructive/40 bg-destructive/5 text-destructive no-print rounded-lg border px-4 py-3 text-sm"
         >
           {error}
         </div>
       ) : null}
+
+      <PrintDocument>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isEdit ? poNumber : "Purchase Order"}
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {status.replaceAll("_", " ")} · {orderDate}
+            </p>
+          </div>
+          <div className="no-print">
+            <PrintButton />
+          </div>
+        </div>
+
+        <p className="text-muted-foreground no-print text-sm">
+          {isEdit ? "Edit purchase order" : "Create purchase order"} — select
+          vendor and warehouse, then add SKUs supplied by that vendor.
+        </p>
 
       <section className={FORM_GRID}>
         <div className="space-y-1.5">
@@ -473,7 +542,7 @@ export function PurchaseOrderFormPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-medium">Order items</h2>
-          <div className="flex flex-wrap gap-2">
+          <div className="no-print flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
@@ -494,7 +563,7 @@ export function PurchaseOrderFormPage() {
           </div>
         </div>
         {!vendorId || !warehouseId ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground no-print text-sm">
             {!vendorId
               ? "Select a vendor before adding items."
               : "Select a warehouse before adding items."}
@@ -534,7 +603,34 @@ export function PurchaseOrderFormPage() {
                     </div>
                   </td>
                   <td className="px-3 py-2">{line.sku}</td>
-                  <td className="px-3 py-2">{line.purchaseUnitName || "—"}</td>
+                  <td className="px-3 py-2">
+                    {line.unitsPerPurchaseUnit > 1 ? (
+                      <select
+                        className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                        {...formSelectPickerProps()}
+                        value={line.orderUnit}
+                        onChange={(e) => {
+                          const orderUnit = e.target.value as OrderUnit;
+                          setLines((prev) =>
+                            prev.map((l) =>
+                              l.productSkuId === line.productSkuId
+                                ? recomputePoLine(l, { orderUnit })
+                                : l,
+                            ),
+                          );
+                        }}
+                      >
+                        <option value="pc">{line.baseUnitName ?? "pc"}</option>
+                        <option value="box">
+                          {line.purchaseUnitName ?? "box"}
+                        </option>
+                      </select>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {line.baseUnitName ?? "pc"}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <Input
                       className="h-8 w-24"
@@ -557,20 +653,11 @@ export function PurchaseOrderFormPage() {
                         setLines((prev) =>
                           prev.map((l) =>
                             l.productSkuId === line.productSkuId
-                              ? {
-                                  ...l,
+                              ? recomputePoLine(l, {
                                   quantity: Number.isNaN(quantity)
                                     ? l.quantity
                                     : quantity,
-                                  lineTotal:
-                                    Math.round(
-                                      (Number.isNaN(quantity)
-                                        ? l.quantity
-                                        : quantity) *
-                                        l.unitCost *
-                                        10000,
-                                    ) / 10000,
-                                }
+                                })
                               : l,
                           ),
                         );
@@ -578,13 +665,14 @@ export function PurchaseOrderFormPage() {
                     />
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {(line.quantity * line.unitCost).toLocaleString()}
+                    {line.lineTotal.toLocaleString()}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="no-print px-3 py-2">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
+                      className="no-print"
                       onClick={() => {
                         void (async () => {
                           const ok = await confirm(
@@ -609,14 +697,22 @@ export function PurchaseOrderFormPage() {
         </FormEnterNav>
       </section>
 
+      {vendorId ? (
+        <PendingVendorReturnsSection
+          vendorId={vendorId}
+          vendorName={vendorName}
+        />
+      ) : null}
+
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Total</span>
           <span className="tabular-nums">{subtotal.toLocaleString()}</span>
         </div>
       </section>
+      </PrintDocument>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="no-print flex flex-wrap gap-3">
         <Button
           type="button"
           variant="outline"
@@ -646,14 +742,16 @@ export function PurchaseOrderFormPage() {
         </Button>
       </div>
 
-      <KeyboardHints
-        hints={[
-          KEYBOARD_HINT_ENTER,
-          KEYBOARD_HINT_SCAN,
-          KEYBOARD_HINT_ADD,
-          KEYBOARD_HINT_SAVE,
-        ]}
-      />
+      <div className="no-print">
+        <KeyboardHints
+          hints={[
+            KEYBOARD_HINT_ENTER,
+            KEYBOARD_HINT_SCAN,
+            KEYBOARD_HINT_ADD,
+            KEYBOARD_HINT_SAVE,
+          ]}
+        />
+      </div>
 
       <AddPurchaseOrderItemDialog
         open={itemOpen}

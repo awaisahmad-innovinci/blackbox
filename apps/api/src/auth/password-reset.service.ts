@@ -18,6 +18,13 @@ import type { ResetPasswordDto } from "./dto/reset-password.dto";
 const GENERIC_FORGOT_MESSAGE =
   "If an account exists for this email, we sent a verification code.";
 
+type OwnerLookupSkipReason =
+  | "no_user"
+  | "ambiguous_email"
+  | "user_inactive"
+  | "tenant_inactive"
+  | "not_owner";
+
 @Injectable()
 export class PasswordResetService {
   private readonly logger = new Logger(PasswordResetService.name);
@@ -45,7 +52,11 @@ export class PasswordResetService {
           createdAt: MoreThan(oneHourAgo),
         },
       });
-      if (recentCount < 3) {
+      if (recentCount >= 3) {
+        this.logger.debug(
+          `Password reset rate limit reached for ${email} (${recentCount} in last hour)`,
+        );
+      } else {
         try {
           await this.issueResetCode(user);
         } catch (err: unknown) {
@@ -127,21 +138,47 @@ export class PasswordResetService {
   }
 
   private async findOwnerByEmail(email: string): Promise<User | null> {
-    const rows = await this.users
-      .createQueryBuilder("u")
-      .innerJoin("u.userRoles", "ur")
-      .innerJoin("ur.role", "r")
-      .innerJoin("u.tenant", "t")
-      .where("LOWER(u.email) = :email", { email })
-      .andWhere("u.is_active = true")
-      .andWhere("t.is_active = true")
-      .andWhere("r.key = :ownerKey", { ownerKey: "OWNER" })
-      .getMany();
+    const rows = await this.users.find({
+      where: { email },
+      relations: { tenant: true, userRoles: { role: true } },
+    });
 
     if (rows.length !== 1) {
+      this.logOwnerLookupSkipped(
+        email,
+        rows.length,
+        rows.length === 0 ? "no_user" : "ambiguous_email",
+      );
       return null;
     }
-    return rows[0] ?? null;
+
+    const user = rows[0]!;
+    if (!user.isActive) {
+      this.logOwnerLookupSkipped(email, rows.length, "user_inactive");
+      return null;
+    }
+    if (!user.tenant?.isActive) {
+      this.logOwnerLookupSkipped(email, rows.length, "tenant_inactive");
+      return null;
+    }
+
+    const isOwner = user.userRoles.some((ur) => ur.role.key === "OWNER");
+    if (!isOwner) {
+      this.logOwnerLookupSkipped(email, rows.length, "not_owner");
+      return null;
+    }
+
+    return user;
+  }
+
+  private logOwnerLookupSkipped(
+    email: string,
+    candidateCount: number,
+    reason: OwnerLookupSkipReason,
+  ): void {
+    this.logger.debug(
+      `Owner lookup skipped for ${email}: ${reason} (candidates=${candidateCount})`,
+    );
   }
 
   private hashCode(code: string): string {

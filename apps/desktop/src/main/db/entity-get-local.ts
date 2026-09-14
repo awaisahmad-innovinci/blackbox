@@ -479,11 +479,13 @@ export function listVendorSkusLocal(
          s.variant_name as variantName,
          s.sku,
          s.barcode,
+         bu.name as baseUnitName,
          st.quantity_available as quantityAvailable
        from vendor_skus vs
        inner join product_skus s on s.id = vs.product_sku_id
        inner join products p on p.id = s.product_id
        left join units pu on pu.id = vs.purchase_unit_id
+       left join units bu on bu.id = s.base_unit_id
        left join inventory_stock st
          on st.product_sku_id = vs.product_sku_id
         and st.warehouse_id = @warehouseId
@@ -525,6 +527,7 @@ export function listVendorSkusLocal(
     purchasePrice: num(r.purchasePrice),
     purchaseUnitId: (r.purchaseUnitId as string | null) ?? null,
     purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
+    baseUnitName: (r.baseUnitName as string | null) ?? null,
     unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1),
     minimumOrderQuantity: num(r.minimumOrderQuantity),
     leadTimeDays: num(r.leadTimeDays),
@@ -1110,7 +1113,9 @@ function listPurchaseOrderItemsLocal(purchaseOrderId: string): PurchaseOrderItem
          vs.vendor_sku_code as vendorSkuCode,
          i.purchase_unit_id as purchaseUnitId,
          pu.name as purchaseUnitName,
+         bu.name as baseUnitName,
          i.units_per_purchase_unit as unitsPerPurchaseUnit,
+         i.order_unit as orderUnit,
          i.quantity,
          i.unit_cost as unitCost,
          i.discount,
@@ -1121,6 +1126,7 @@ function listPurchaseOrderItemsLocal(purchaseOrderId: string): PurchaseOrderItem
        left join product_skus s on s.id = i.product_sku_id
        left join products p on p.id = s.product_id
        left join units pu on pu.id = i.purchase_unit_id
+       left join units bu on bu.id = s.base_unit_id
        left join vendor_skus vs on vs.id = i.vendor_sku_id
        where i.purchase_order_id = ? and i.tenant_id = ?
        order by i.created_at, i.id`,
@@ -1136,7 +1142,9 @@ function listPurchaseOrderItemsLocal(purchaseOrderId: string): PurchaseOrderItem
     vendorSkuCode: (r.vendorSkuCode as string | null) ?? null,
     purchaseUnitId: (r.purchaseUnitId as string | null) ?? null,
     purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
+    baseUnitName: (r.baseUnitName as string | null) ?? null,
     unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1),
+    orderUnit: r.orderUnit === "pc" ? "pc" : "box",
     quantity: num(r.quantity),
     unitCost: num(r.unitCost),
     discount: num(r.discount),
@@ -1183,7 +1191,9 @@ export function getReceivingDraftLocal(poId: string): ReceivingDraft | null {
       vendorSkuCode: item.vendorSkuCode,
       purchaseUnitId: item.purchaseUnitId,
       purchaseUnitName: item.purchaseUnitName,
+      baseUnitName: item.baseUnitName ?? null,
       unitsPerPurchaseUnit: item.unitsPerPurchaseUnit,
+      orderUnit: item.orderUnit ?? "box",
       orderedQuantity: item.quantity,
       poUnitCost: item.unitCost,
       currentVendorPurchasePrice: extra?.currentVendorPurchasePrice ?? null,

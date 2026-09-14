@@ -31,7 +31,9 @@ Permission checks use `JwtAuthGuard` + `PermissionsGuard` on other routes (e.g. 
 
 In one DB transaction: create tenant → system roles → `role_permissions` (resolved by **stable permission keys** from the seeded catalog, never hard-coded UUIDs) → OWNER user (Argon2 password hash) → `user_roles`. Then issue access + refresh tokens (refresh stored as SHA-256 hash only).
 
-Duplicate tenant-scoped email/username → `409 Conflict`.
+Before the transaction, if **any** user globally has the same email with **`is_active = true`**, respond with **`409 Conflict`**: **`This email is already registered with an active account.`** If the email exists only on **inactive** users (`is_active = false`), signup is allowed and a new tenant is created.
+
+Duplicate tenant-scoped email/username within the same tenant → **`409 Conflict`** (`Email or username already in use`).
 
 ### Login (`POST /auth/login`)
 
@@ -68,10 +70,15 @@ Revoke matching refresh token by hash; idempotent `{ success: true }`.
 Owner self-service password reset (web sign-in page). Body: `{ "email": "owner@example.com" }`.
 
 - Always responds **`200`** with a generic message: **`If an account exists for this email, we sent a verification code.`** (does not reveal whether the email exists).
-- Sends a **6-digit OTP** only when the email matches **exactly one** active user with the **OWNER** role on an active tenant.
+- Sends a **6-digit OTP** only when the email matches **exactly one** user globally (same rule as login), and that user is **active**, on an **active tenant**, with the **OWNER** role. No email is sent when:
+  - **0 users** match the email
+  - **2+ users** share the same email across tenants (ambiguous)
+  - the sole match is **not OWNER** (e.g. staff created via `/users`)
+  - the user or tenant is **inactive**
+  The API still returns the generic **`200`** message in all cases.
 - OTP is stored as **SHA-256 hash** in `password_reset_codes` (default TTL **10 minutes** via `PASSWORD_RESET_OTP_TTL_SECONDS`).
 - Rate limit: **3 requests per user per hour**.
-- Email via **[Resend](https://resend.com)** when `RESEND_API_KEY` is set; in development without a key, the OTP is logged to the API console.
+- Email via **[Brevo](https://www.brevo.com)** when `BREVO_API_KEY` and `EMAIL_FROM` are set (`EMAIL_SENDER_NAME` optional, default `Blackbox`); in development without a key, the OTP is logged to the API console.
 
 ### Reset password (`POST /auth/reset-password`)
 
