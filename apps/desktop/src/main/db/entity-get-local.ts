@@ -4,6 +4,8 @@ import type {
   GoodsReceiptStatus,
   InventoryMovementType,
   InventoryOutDetail,
+  InventoryOutReturnDetail,
+  InventoryOutReturnStatus,
   InventoryOutStatus,
   InventoryInOutReport,
   InventoryMovementListItem,
@@ -1365,7 +1367,7 @@ export function getInventoryOutLocal(id: string): InventoryOutDetail | null {
          s.barcode,
          i.quantity,
          i.unit_cost as unitCost
-       from inventory_out_items i
+       from inventory_out_lines i
        left join product_skus s on s.id = i.product_sku_id
        left join products p on p.id = s.product_id
        where i.inventory_out_id = ? and i.tenant_id = ?
@@ -1491,6 +1493,82 @@ export function getVendorReturnLocal(id: string): VendorReturnDetail | null {
         reason: r.reason as VendorReturnReason,
         settlement: (r.settlement as VendorReturnSettlement | null) ?? null,
         goodsReceiptId: (r.goodsReceiptId as string | null) ?? null,
+      };
+    }),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  };
+}
+
+export function getInventoryOutReturnLocal(
+  id: string,
+): InventoryOutReturnDetail | null {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select
+         r.id,
+         r.return_number as returnNumber,
+         r.warehouse_id as warehouseId,
+         coalesce(w.name, '') as warehouseName,
+         r.return_date as returnDate,
+         coalesce(r.notes, '') as notes,
+         r.status,
+         r.subtotal,
+         r.total,
+         r.created_at as createdAt,
+         r.updated_at as updatedAt
+       from inventory_out_returns r
+       left join warehouses w on w.id = r.warehouse_id
+       where r.id = ? and r.tenant_id = ?`,
+    )
+    .get(id, DEMO_STORE_TENANT_ID) as Record<string, unknown> | undefined;
+  if (!row) return null;
+
+  const items = db
+    .prepare(
+      `select
+         i.id,
+         i.product_sku_id as productSkuId,
+         coalesce(p.name, '') as productName,
+         coalesce(s.variant_name, '') as variantName,
+         coalesce(s.sku, '') as sku,
+         s.barcode,
+         i.quantity,
+         i.unit_cost as unitCost,
+         i.inventory_out_item_id as inventoryOutItemId
+       from inventory_out_return_items i
+       left join product_skus s on s.id = i.product_sku_id
+       left join products p on p.id = s.product_id
+       where i.inventory_out_return_id = ? and i.tenant_id = ?
+       order by i.created_at, i.id`,
+    )
+    .all(id, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
+
+  return {
+    id: String(row.id),
+    returnNumber: String(row.returnNumber),
+    warehouseId: String(row.warehouseId),
+    warehouseName: String(row.warehouseName ?? ""),
+    returnDate: String(row.returnDate),
+    notes: String(row.notes ?? ""),
+    status: row.status as InventoryOutReturnStatus,
+    subtotal: num(row.subtotal),
+    total: num(row.total),
+    items: items.map((r) => {
+      const quantity = num(r.quantity);
+      const unitCost = num(r.unitCost);
+      return {
+        id: String(r.id),
+        productSkuId: String(r.productSkuId),
+        productName: String(r.productName ?? ""),
+        variantName: String(r.variantName ?? ""),
+        sku: String(r.sku ?? ""),
+        barcode: (r.barcode as string | null) ?? null,
+        quantity,
+        unitCost,
+        lineTotal: Math.round(quantity * unitCost * 10000) / 10000,
+        inventoryOutItemId: (r.inventoryOutItemId as string | null) ?? null,
       };
     }),
     createdAt: String(row.createdAt),

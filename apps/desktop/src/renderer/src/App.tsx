@@ -14,6 +14,9 @@ import { InventoryInOutReportPage } from "./features/inventory/InventoryInOutRep
 import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
 import { InventoryOutListPage } from "./features/inventory/InventoryOutListPage";
 import { InventoryOutPage } from "./features/inventory/InventoryOutPage";
+import { InventoryOutReturnDetailPage } from "./features/inventory/InventoryOutReturnDetailPage";
+import { InventoryOutReturnFormPage } from "./features/inventory/InventoryOutReturnFormPage";
+import { InventoryOutReturnListPage } from "./features/inventory/InventoryOutReturnListPage";
 import { VendorReturnDetailPage } from "./features/inventory/VendorReturnDetailPage";
 import { VendorReturnFormPage } from "./features/inventory/VendorReturnFormPage";
 import { VendorReturnsListPage } from "./features/inventory/VendorReturnsListPage";
@@ -96,6 +99,18 @@ function AuthenticatedApp() {
           <Route
             path="inventory/out/:id"
             element={<InventoryOutDetailPage />}
+          />
+          <Route
+            path="inventory/out-returns"
+            element={<InventoryOutReturnListPage />}
+          />
+          <Route
+            path="inventory/out-returns/new"
+            element={<InventoryOutReturnFormPage />}
+          />
+          <Route
+            path="inventory/out-returns/:id"
+            element={<InventoryOutReturnDetailPage />}
           />
           <Route path="inventory/returns" element={<VendorReturnsListPage />} />
           <Route

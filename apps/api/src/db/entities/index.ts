@@ -30,6 +30,9 @@ import { GoodsReceipt } from "./goods-receipt.entity";
 import { GoodsReceiptItem } from "./goods-receipt-item.entity";
 import { InventoryOut } from "./inventory-out.entity";
 import { InventoryOutItem } from "./inventory-out-item.entity";
+import { InventoryOutLine } from "./inventory-out-line.entity";
+import { InventoryOutReturn } from "./inventory-out-return.entity";
+import { InventoryOutReturnItem } from "./inventory-out-return-item.entity";
 import { VendorReturn } from "./vendor-return.entity";
 import { VendorReturnItem } from "./vendor-return-item.entity";
 import { PasswordResetCode } from "./password-reset-code.entity";
@@ -67,6 +70,9 @@ export const entities = [
   GoodsReceiptItem,
   InventoryOut,
   InventoryOutItem,
+  InventoryOutLine,
+  InventoryOutReturn,
+  InventoryOutReturnItem,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,
@@ -105,6 +111,9 @@ export {
   GoodsReceiptItem,
   InventoryOut,
   InventoryOutItem,
+  InventoryOutLine,
+  InventoryOutReturn,
+  InventoryOutReturnItem,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,

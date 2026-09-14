@@ -4,7 +4,10 @@ import type {
   InventoryInOutReport,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
+  PaginatedInventoryOutReturns,
   PaginatedVendors,
   ProductDetail,
   ProductSkuDetail,
@@ -37,6 +40,7 @@ import { ApiError } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
 import { productsApi } from "@renderer/lib/api/products";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { brandsApi } from "@renderer/lib/api/brands";
@@ -186,6 +190,42 @@ export async function loadInventoryOuts(
     return window.blackbox.localDb.listInventoryOuts(query);
   }
   return inventoryOutApi.list(query);
+}
+
+export async function loadInventoryOutReturns(
+  query: InventoryOutReturnListQuery = {},
+): Promise<PaginatedInventoryOutReturns> {
+  try {
+    const local = await window.blackbox?.localDb?.listInventoryOutReturns?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return inventoryOutReturnsApi.list(query);
+}
+
+export async function loadInventoryOutReturn(
+  id: string,
+): Promise<InventoryOutReturnDetail> {
+  const local = await window.blackbox?.localDb?.getInventoryOutReturn?.(id);
+  if (local) return local;
+  return inventoryOutReturnsApi.get(id);
+}
+
+export async function loadInventoryOutReturnableQuantity(
+  warehouseId: string,
+  productSkuId: string,
+): Promise<{ quantityAvailable: number }> {
+  try {
+    const local = await window.blackbox?.localDb?.inventoryOutReturnableQuantity?.(
+      warehouseId,
+      productSkuId,
+    );
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return inventoryOutReturnsApi.returnableQuantity(warehouseId, productSkuId);
 }
 
 export async function loadVendorReturns(

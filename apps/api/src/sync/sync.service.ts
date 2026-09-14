@@ -39,7 +39,9 @@ import {
   GoodsReceiptItem,
   InventoryMovement,
   InventoryOut,
-  InventoryOutItem,
+  InventoryOutLine,
+  InventoryOutReturn,
+  InventoryOutReturnItem,
   InventoryStock,
   Product,
   ProductSku,
@@ -58,6 +60,7 @@ import {
   VendorSku,
   Warehouse,
 } from "../db/entities";
+import { applyInventoryOutBalanceDelta } from "../inventory/inventory-out/inventory-out-balance";
 import type { SyncChangeInputDto, SyncPushDto } from "./dto/sync.dto";
 
 const RETENTION_DAYS = 90;
@@ -758,6 +761,10 @@ export class SyncService {
         await this.upsertInventoryOut(manager, tenantId, change.entityId, p);
         break;
       }
+      case "inventory_out_return": {
+        await this.upsertInventoryOutReturn(manager, tenantId, change.entityId, p);
+        break;
+      }
       case "vendor_return": {
         await this.upsertVendorReturn(manager, tenantId, change.entityId, p);
         break;
@@ -791,6 +798,14 @@ export class SyncService {
     }
     if (entityType === "inventory_out") {
       const row = await manager.findOne(InventoryOut, {
+        where: { id: entityId, tenantId },
+      });
+      if (row && row.status === "POSTED") {
+        return { status: row.status };
+      }
+    }
+    if (entityType === "inventory_out_return") {
+      const row = await manager.findOne(InventoryOutReturn, {
         where: { id: entityId, tenantId },
       });
       if (row && row.status === "POSTED") {
@@ -1149,21 +1164,95 @@ export class SyncService {
     if (!row.warehouseId) throw new Error("warehouse not found");
     await manager.save(row);
     if (Array.isArray(p.items)) {
-      await manager.delete(InventoryOutItem, {
+      await manager.delete(InventoryOutLine, {
         inventoryOutId: entityId,
         tenantId,
       });
       for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const unitCost = Number(item.unitCost ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
         await manager.save(
-          manager.create(InventoryOutItem, {
+          manager.create(InventoryOutLine, {
             id: String(item.id ?? randomUUID()),
             tenantId,
             inventoryOutId: entityId,
-            productSkuId: String(item.productSkuId ?? ""),
-            quantity: String(item.quantity ?? 0),
-            unitCost: String(item.unitCost ?? 0),
+            productSkuId,
+            quantity: String(qty),
+            unitCost: String(unitCost),
           }),
         );
+        if (productSkuId && qty > 0) {
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            qty,
+            unitCost,
+          );
+        }
+      }
+    }
+  }
+
+  private async upsertInventoryOutReturn(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await manager.findOne(InventoryOutReturn, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(InventoryOutReturn, { id: entityId, tenantId });
+    Object.assign(row, {
+      returnNumber: String(
+        p.returnNumber ?? row.returnNumber ?? `SYNC-${entityId.slice(0, 8)}`,
+      ),
+      warehouseId: String(p.warehouseId ?? row.warehouseId ?? ""),
+      returnDate: String(
+        p.returnDate ?? row.returnDate ?? new Date().toISOString().slice(0, 10),
+      ),
+      notes: String(p.notes ?? row.notes ?? ""),
+      status: String(p.status ?? row.status ?? "POSTED"),
+      subtotal: String(p.subtotal ?? row.subtotal ?? 0),
+      total: String(p.total ?? row.total ?? 0),
+    });
+    if (!row.warehouseId) throw new Error("warehouse not found");
+    await manager.save(row);
+    if (Array.isArray(p.items)) {
+      await manager.delete(InventoryOutReturnItem, {
+        inventoryOutReturnId: entityId,
+        tenantId,
+      });
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const unitCost = Number(item.unitCost ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
+        await manager.save(
+          manager.create(InventoryOutReturnItem, {
+            id: String(item.id ?? randomUUID()),
+            tenantId,
+            inventoryOutReturnId: entityId,
+            productSkuId,
+            inventoryOutItemId: (item.inventoryOutItemId as string | null) ?? null,
+            quantity: String(qty),
+            unitCost: String(unitCost),
+          }),
+        );
+        if (productSkuId && qty > 0) {
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            -qty,
+            unitCost,
+          );
+        }
       }
     }
   }

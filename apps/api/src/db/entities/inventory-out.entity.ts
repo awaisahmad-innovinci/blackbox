@@ -10,7 +10,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from "typeorm";
-import { InventoryOutItem } from "./inventory-out-item.entity";
+import { InventoryOutLine } from "./inventory-out-line.entity";
 import { Tenant } from "./tenant.entity";
 import { Warehouse } from "./warehouse.entity";
 
@@ -63,6 +63,6 @@ export class InventoryOut {
   @JoinColumn({ name: "warehouse_id" })
   warehouse!: Warehouse;
 
-  @OneToMany(() => InventoryOutItem, (item) => item.inventoryOut)
-  items!: InventoryOutItem[];
+  @OneToMany(() => InventoryOutLine, (line) => line.inventoryOut)
+  lines!: InventoryOutLine[];
 }

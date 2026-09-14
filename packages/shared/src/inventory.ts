@@ -15,6 +15,7 @@ export const INVENTORY_MOVEMENT_TYPES = [
   "TRANSFER_OUT",
   "RETURN",
   "INVENTORY_OUT",
+  "INVENTORY_OUT_RETURN",
 ] as const;
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 
@@ -1198,6 +1199,77 @@ export interface InventoryOutListQuery {
 
 export interface PaginatedInventoryOuts {
   items: InventoryOutListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const INVENTORY_OUT_RETURN_STATUSES = ["POSTED", "CANCELLED"] as const;
+export type InventoryOutReturnStatus =
+  (typeof INVENTORY_OUT_RETURN_STATUSES)[number];
+
+export interface CreateInventoryOutReturnItemRequest {
+  productSkuId: string;
+  quantity: number;
+}
+
+export interface CreateInventoryOutReturnRequest {
+  warehouseId: string;
+  returnDate?: string;
+  notes?: string;
+  items: CreateInventoryOutReturnItemRequest[];
+}
+
+export interface InventoryOutReturnItemRow {
+  id: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+  inventoryOutItemId: string | null;
+}
+
+export interface InventoryOutReturnDetail {
+  id: string;
+  returnNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  notes: string;
+  status: InventoryOutReturnStatus;
+  subtotal: number;
+  total: number;
+  items: InventoryOutReturnItemRow[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryOutReturnListItem {
+  id: string;
+  returnNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  status: InventoryOutReturnStatus;
+  total: number;
+  itemCount: number;
+}
+
+export interface InventoryOutReturnListQuery {
+  search?: string;
+  warehouseId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedInventoryOutReturns {
+  items: InventoryOutReturnListItem[];
   total: number;
   page: number;
   pageSize: number;

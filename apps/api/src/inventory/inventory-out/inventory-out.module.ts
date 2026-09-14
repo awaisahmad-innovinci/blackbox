@@ -3,7 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   InventoryMovement,
   InventoryOut,
-  InventoryOutItem,
+  InventoryOutLine,
   InventoryStock,
   ProductSku,
   Warehouse,
@@ -15,7 +15,7 @@ import { InventoryOutService } from "./inventory-out.service";
   imports: [
     TypeOrmModule.forFeature([
       InventoryOut,
-      InventoryOutItem,
+      InventoryOutLine,
       InventoryStock,
       InventoryMovement,
       ProductSku,

@@ -151,6 +151,19 @@ Rules: one POSTED receipt per PO; `0 ≤ receivedQty ≤ orderedQty`; inventory 
 
 Rules: `0 < qty ≤ quantity_available` in the selected warehouse; movements store **positive** qty with type `INVENTORY_OUT`; do **not** change `product_skus.cost_price` on outbound. Out numbers: `IO-YYYY-######`. Snapshot `unit_cost` from avg cost at post. Line total = qty × avg cost; **no discount/tax** so `subtotal === total`. Desktop bill has a trailing barcode scan row (Enter adds/increments qty by 1).
 
+**POS balance:** `inventory_out_items` holds one row per `(warehouse, product_sku)` — net quantity currently out at POS. Document lines live in `inventory_out_lines`. Re-outting the same SKU adds to the same balance row.
+
+## Inventory out returns
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/inventory-out-returns` | Atomic: return header + history lines + decrease POS balance + `INVENTORY_OUT_RETURN` movements + stock increase |
+| `GET` | `/inventory-out-returns` | Paginated list (`search`, `warehouseId`, `dateFrom`, `dateTo`, `page`, `pageSize`) |
+| `GET` | `/inventory-out-returns/returnable-quantity?warehouseId=&productSkuId=` | Max returnable qty (= current POS out balance) |
+| `GET` | `/inventory-out-returns/:id` | Read-only return detail |
+
+Rules: `0 < return qty ≤` current POS out balance for that warehouse + SKU. Return numbers: `IOR-YYYY-######`. History rows in `inventory_out_return_items`.
+
 ## Inventory movements
 
 | Method | Path | Notes |

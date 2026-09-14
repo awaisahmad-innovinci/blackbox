@@ -14,6 +14,7 @@ import {
   GoodsReceipt,
   InventoryMovement,
   InventoryOut,
+  InventoryOutReturn,
   Product,
   ProductSku,
   ProductSkuBarcode,
@@ -42,6 +43,7 @@ const ENTITY_TYPES = new Map<EntityTarget<object>, SyncEntityType>([
   [PurchaseOrder, "purchase_order"],
   [GoodsReceipt, "goods_receipt"],
   [InventoryOut, "inventory_out"],
+  [InventoryOutReturn, "inventory_out_return"],
   [VendorReturn, "vendor_return"],
   [InventoryMovement, "inventory_movement"],
 ]);

@@ -11,7 +11,10 @@ import type {
   InventoryMovementListItem,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
+  PaginatedInventoryOutReturns,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
@@ -102,6 +105,12 @@ declare global {
         upsertInventoryOuts: (
           rows: InventoryOutDetail[],
         ) => Promise<{ ok: true }>;
+        upsertInventoryOutReturn: (
+          detail: InventoryOutReturnDetail,
+        ) => Promise<{ ok: true }>;
+        upsertInventoryOutReturns: (
+          rows: InventoryOutReturnDetail[],
+        ) => Promise<{ ok: true }>;
         upsertVendorReturn: (
           detail: VendorReturnDetail,
         ) => Promise<{ ok: true }>;
@@ -125,9 +134,23 @@ declare global {
         listSkuCodes: () => Promise<string[]>;
         listReceiptNumbers: () => Promise<string[]>;
         listOutNumbers: () => Promise<string[]>;
+        listOutReturnNumbers: () => Promise<string[]>;
         listInventoryOuts: (
           query?: InventoryOutListQuery,
         ) => Promise<PaginatedInventoryOuts>;
+        listInventoryOutReturns: (
+          query?: InventoryOutReturnListQuery,
+        ) => Promise<PaginatedInventoryOutReturns>;
+        inventoryOutReturnableQuantity: (
+          warehouseId: string,
+          productSkuId: string,
+        ) => Promise<{ quantityAvailable: number }>;
+        applyInventoryOutBalanceDelta: (
+          warehouseId: string,
+          productSkuId: string,
+          deltaQty: number,
+          unitCost: number,
+        ) => Promise<{ ok: true }>;
         getDashboardSummary: () => Promise<DashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
@@ -194,6 +217,9 @@ declare global {
         getReceivingDraft: (poId: string) => Promise<ReceivingDraft | null>;
         getGoodsReceipt: (id: string) => Promise<GoodsReceiptDetail | null>;
         getInventoryOut: (id: string) => Promise<InventoryOutDetail | null>;
+        getInventoryOutReturn: (
+          id: string,
+        ) => Promise<InventoryOutReturnDetail | null>;
         listVendorReturns: (
           query?: VendorReturnListQuery,
         ) => Promise<PaginatedVendorReturns>;

@@ -68,6 +68,15 @@ export function InventoryOutDetailPage() {
         </div>
         <div className="no-print flex flex-wrap gap-2">
           <PrintButton />
+          {detail.status === "POSTED" ? (
+            <Button
+              onClick={() =>
+                navigate("/inventory/out-returns/new", { state: { fromOut: detail } })
+              }
+            >
+              Return inventory
+            </Button>
+          ) : null}
           <Button variant="ghost" onClick={() => navigate("/inventory/out")}>
             Back
           </Button>

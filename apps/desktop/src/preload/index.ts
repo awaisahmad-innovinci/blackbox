@@ -10,7 +10,10 @@ import type {
   InventoryMovementListItem,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
+  PaginatedInventoryOutReturns,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
@@ -106,6 +109,16 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:upsertInventoryOut", detail) as Promise<Ok>,
     upsertInventoryOuts: (rows: InventoryOutDetail[]) =>
       ipcRenderer.invoke("localDb:upsertInventoryOuts", rows) as Promise<Ok>,
+    upsertInventoryOutReturn: (detail: InventoryOutReturnDetail) =>
+      ipcRenderer.invoke(
+        "localDb:upsertInventoryOutReturn",
+        detail,
+      ) as Promise<Ok>,
+    upsertInventoryOutReturns: (rows: InventoryOutReturnDetail[]) =>
+      ipcRenderer.invoke(
+        "localDb:upsertInventoryOutReturns",
+        rows,
+      ) as Promise<Ok>,
     upsertVendorReturn: (detail: VendorReturnDetail) =>
       ipcRenderer.invoke("localDb:upsertVendorReturn", detail) as Promise<Ok>,
     upsertVendorReturns: (rows: VendorReturnDetail[]) =>
@@ -137,11 +150,37 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:listReceiptNumbers") as Promise<string[]>,
     listOutNumbers: () =>
       ipcRenderer.invoke("localDb:listOutNumbers") as Promise<string[]>,
+    listOutReturnNumbers: () =>
+      ipcRenderer.invoke("localDb:listOutReturnNumbers") as Promise<string[]>,
     listInventoryOuts: (query?: InventoryOutListQuery) =>
       ipcRenderer.invoke(
         "localDb:listInventoryOuts",
         query,
       ) as Promise<PaginatedInventoryOuts>,
+    listInventoryOutReturns: (query?: InventoryOutReturnListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listInventoryOutReturns",
+        query,
+      ) as Promise<PaginatedInventoryOutReturns>,
+    inventoryOutReturnableQuantity: (warehouseId: string, productSkuId: string) =>
+      ipcRenderer.invoke(
+        "localDb:inventoryOutReturnableQuantity",
+        warehouseId,
+        productSkuId,
+      ) as Promise<{ quantityAvailable: number }>,
+    applyInventoryOutBalanceDelta: (
+      warehouseId: string,
+      productSkuId: string,
+      deltaQty: number,
+      unitCost: number,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:applyInventoryOutBalanceDelta",
+        warehouseId,
+        productSkuId,
+        deltaQty,
+        unitCost,
+      ) as Promise<Ok>,
     getDashboardSummary: () =>
       ipcRenderer.invoke(
         "localDb:getDashboardSummary",
@@ -272,6 +311,11 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getInventoryOut",
         id,
       ) as Promise<InventoryOutDetail | null>,
+    getInventoryOutReturn: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getInventoryOutReturn",
+        id,
+      ) as Promise<InventoryOutReturnDetail | null>,
     listVendorReturns: (query?: VendorReturnListQuery) =>
       ipcRenderer.invoke(
         "localDb:listVendorReturns",

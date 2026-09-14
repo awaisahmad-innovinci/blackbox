@@ -1,5 +1,6 @@
 import {
   nextOutNumber,
+  nextOutReturnNumber,
   nextPoNumber,
   nextReceiptNumber,
   nextSkuCodeForProduct,
@@ -7,6 +8,7 @@ import {
 } from "@blackbox/shared";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { loadVendors } from "@renderer/lib/local-db/entity-source";
 
@@ -79,6 +81,28 @@ async function existingOutNumbers(): Promise<string[]> {
   return remote.items.map((o) => o.outNumber);
 }
 
+async function existingOutReturnNumbers(): Promise<string[]> {
+  try {
+    const local = await window.blackbox?.localDb?.listOutReturnNumbers?.();
+    if (local?.length) return local;
+  } catch {
+    /* fall through */
+  }
+  try {
+    const localReturns =
+      await window.blackbox?.localDb?.listInventoryOutReturns?.({
+        pageSize: 500,
+      });
+    if (localReturns?.items.length) {
+      return localReturns.items.map((r) => r.returnNumber);
+    }
+  } catch {
+    /* fall through */
+  }
+  const remote = await inventoryOutReturnsApi.list({ pageSize: 500 });
+  return remote.items.map((r) => r.returnNumber);
+}
+
 async function existingSkuCodes(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listSkuCodes?.();
@@ -109,4 +133,10 @@ export async function allocateReceiptNumber(
 
 export async function allocateOutNumber(tenantName: string): Promise<string> {
   return nextOutNumber(tenantName, await existingOutNumbers());
+}
+
+export async function allocateOutReturnNumber(
+  tenantName: string,
+): Promise<string> {
+  return nextOutReturnNumber(tenantName, await existingOutReturnNumbers());
 }

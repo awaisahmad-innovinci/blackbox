@@ -11,6 +11,7 @@ export const NAV_DROPDOWN_MENUS: Record<NavDropdownId, NavDropdownItem[]> = {
     { label: "Brands", to: "/brands" },
     { label: "Categories", to: "/categories" },
     { label: "Inventory Out", to: "/inventory/out" },
+    { label: "Out Returns", to: "/inventory/out-returns" },
     { label: "Vendor Returns", to: "/inventory/returns" },
     { label: "In / out report", to: "/inventory/reports" },
   ],

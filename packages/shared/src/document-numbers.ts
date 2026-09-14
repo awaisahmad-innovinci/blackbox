@@ -64,6 +64,10 @@ export function outNumberPrefix(initials: string): string {
   return `${initials}-IO-`;
 }
 
+export function outReturnNumberPrefix(initials: string): string {
+  return `${initials}-IR-`;
+}
+
 export function nextVendorCode(
   businessName: string,
   existingVendorCodes: string[],
@@ -101,6 +105,16 @@ export function nextOutNumber(
   return nextSequentialCode(
     outNumberPrefix(businessInitials(businessName)),
     existingOutNumbers,
+  );
+}
+
+export function nextOutReturnNumber(
+  businessName: string,
+  existingReturnNumbers: string[],
+): string {
+  return nextSequentialCode(
+    outReturnNumberPrefix(businessInitials(businessName)),
+    existingReturnNumbers,
   );
 }
 

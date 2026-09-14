@@ -26,10 +26,14 @@ import type {
   PaginatedVendorReturns,
   InventoryOutListQuery,
   PaginatedInventoryOuts,
+  InventoryOutReturnListQuery,
+  PaginatedInventoryOutReturns,
+  InventoryOutReturnStatus,
   WarehouseListItem,
 } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
+import { getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
 
 function pageParams(page?: number, pageSize?: number) {
   const p = page ?? 1;
@@ -973,6 +977,16 @@ export function listOutNumbersLocal(): string[] {
   return rows.map((r) => String(r.outNumber));
 }
 
+export function listOutReturnNumbersLocal(): string[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select return_number as returnNumber from inventory_out_returns where tenant_id = @tenantId`,
+    )
+    .all({ tenantId: DEMO_STORE_TENANT_ID }) as Array<{ returnNumber: string }>;
+  return rows.map((r) => String(r.returnNumber));
+}
+
 export function listInventoryOutsLocal(
   query: InventoryOutListQuery = {},
 ): PaginatedInventoryOuts {
@@ -1023,7 +1037,7 @@ export function listInventoryOutsLocal(
          io.status,
          io.total,
          (
-           select count(*) from inventory_out_items i
+           select count(*) from inventory_out_lines i
            where i.inventory_out_id = io.id and i.tenant_id = io.tenant_id
          ) as itemCount
        from inventory_outs io
@@ -1059,5 +1073,94 @@ export function listInventoryOutsLocal(
     total,
     page,
     pageSize,
+  };
+}
+
+export function listInventoryOutReturnsLocal(
+  query: InventoryOutReturnListQuery = {},
+): PaginatedInventoryOutReturns {
+  const db = getLocalDb();
+  const page = Math.max(1, query.page ?? 1);
+  const pageSize = Math.min(Math.max(1, query.pageSize ?? 25), 100);
+  const offset = (page - 1) * pageSize;
+  const warehouseId = query.warehouseId ?? "";
+  const dateFrom = query.dateFrom ?? "";
+  const dateTo = query.dateTo ?? "";
+  const search = query.search?.trim().toLowerCase() ?? "";
+
+  const where = `
+    r.tenant_id = @tenantId
+    and (@warehouseId = '' or r.warehouse_id = @warehouseId)
+    and (@dateFrom = '' or r.return_date >= @dateFrom)
+    and (@dateTo = '' or r.return_date <= @dateTo)
+    and (@search = '' or lower(r.return_number) like '%' || @search || '%')
+  `;
+
+  const params = {
+    tenantId: DEMO_STORE_TENANT_ID,
+    warehouseId,
+    dateFrom,
+    dateTo,
+    search,
+    limit: pageSize,
+    offset,
+  };
+
+  const total = (
+    db
+      .prepare(`select count(*) as cnt from inventory_out_returns r where ${where}`)
+      .get(params) as { cnt: number }
+  ).cnt;
+
+  const rows = db
+    .prepare(
+      `select
+         r.id,
+         r.return_number as returnNumber,
+         r.warehouse_id as warehouseId,
+         coalesce(w.name, '—') as warehouseName,
+         r.return_date as returnDate,
+         r.status,
+         r.total,
+         (
+           select count(*) from inventory_out_return_items i
+           where i.inventory_out_return_id = r.id and i.tenant_id = r.tenant_id
+         ) as itemCount
+       from inventory_out_returns r
+       left join warehouses w on w.id = r.warehouse_id
+       where ${where}
+       order by r.return_date desc, r.created_at desc
+       limit @limit offset @offset`,
+    )
+    .all(params) as Array<{
+    id: string;
+    returnNumber: string;
+    warehouseId: string;
+    warehouseName: string;
+    returnDate: string;
+    status: string;
+    total: number;
+    itemCount: number;
+  }>;
+
+  return {
+    items: rows.map((r) => ({
+      ...r,
+      status: r.status as InventoryOutReturnStatus,
+      total: Number(r.total),
+      itemCount: Number(r.itemCount),
+    })),
+    total,
+    page,
+    pageSize,
+  };
+}
+
+export function inventoryOutReturnableQuantityLocal(
+  warehouseId: string,
+  productSkuId: string,
+): { quantityAvailable: number } {
+  return {
+    quantityAvailable: getInventoryOutBalanceQtyLocal(warehouseId, productSkuId),
   };
 }

@@ -10,6 +10,8 @@ import type {
   InventoryMovementListItem,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   ProductDetail,
   ProductListQuery,
   ProductSkuDetail,
@@ -40,6 +42,11 @@ import {
   upsertInventoryOutLocal,
   upsertInventoryOutsLocal,
 } from "./db/inventory-out-local";
+import { applyInventoryOutBalanceDeltaLocal } from "./db/inventory-out-balance-local";
+import {
+  upsertInventoryOutReturnLocal,
+  upsertInventoryOutReturnsLocal,
+} from "./db/inventory-out-returns-local";
 import {
   upsertVendorReturnLocal,
   upsertVendorReturnsLocal,
@@ -77,6 +84,7 @@ import {
 import {
   getGoodsReceiptLocal,
   getInventoryOutLocal,
+  getInventoryOutReturnLocal,
   getVendorReturnLocal,
   getProductLocal,
   getProductProfileLocal,
@@ -112,7 +120,9 @@ import {
   listPoNumbersLocal,
   listReceiptNumbersLocal,
   listOutNumbersLocal,
+  listOutReturnNumbersLocal,
   listInventoryOutsLocal,
+  listInventoryOutReturnsLocal,
   listVendorGroupsLocal,
   getVendorGroupLocal,
   listUnitsLocal,
@@ -123,6 +133,7 @@ import {
   listPendingVendorReturnsLocal,
   lastPurchaseCostLocal,
   vendorReturnableQuantityLocal,
+  inventoryOutReturnableQuantityLocal,
 } from "./db/queries-local";
 import {
   getOrCreateFingerprint,
@@ -314,6 +325,20 @@ function registerIpc(): void {
     },
   );
   ipcMain.handle(
+    "localDb:upsertInventoryOutReturns",
+    (_event, rows: InventoryOutReturnDetail[]) => {
+      upsertInventoryOutReturnsLocal(rows);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:upsertInventoryOutReturn",
+    (_event, detail: InventoryOutReturnDetail) => {
+      upsertInventoryOutReturnLocal(detail);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
     "localDb:upsertVendorReturn",
     (_event, detail: VendorReturnDetail) => {
       upsertVendorReturnLocal(detail);
@@ -359,10 +384,41 @@ function registerIpc(): void {
     listReceiptNumbersLocal(),
   );
   ipcMain.handle("localDb:listOutNumbers", () => listOutNumbersLocal());
+  ipcMain.handle("localDb:listOutReturnNumbers", () =>
+    listOutReturnNumbersLocal(),
+  );
   ipcMain.handle(
     "localDb:listInventoryOuts",
     (_event, query: InventoryOutListQuery = {}) =>
       listInventoryOutsLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listInventoryOutReturns",
+    (_event, query: InventoryOutReturnListQuery = {}) =>
+      listInventoryOutReturnsLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:inventoryOutReturnableQuantity",
+    (_event, warehouseId: string, productSkuId: string) =>
+      inventoryOutReturnableQuantityLocal(warehouseId, productSkuId),
+  );
+  ipcMain.handle(
+    "localDb:applyInventoryOutBalanceDelta",
+    (
+      _event,
+      warehouseId: string,
+      productSkuId: string,
+      deltaQty: number,
+      unitCost: number,
+    ) => {
+      applyInventoryOutBalanceDeltaLocal(
+        warehouseId,
+        productSkuId,
+        deltaQty,
+        unitCost,
+      );
+      return { ok: true as const };
+    },
   );
   ipcMain.handle("localDb:getDashboardSummary", () =>
     getDashboardSummaryLocal(),
@@ -485,6 +541,9 @@ function registerIpc(): void {
   );
   ipcMain.handle("localDb:getInventoryOut", (_event, id: string) =>
     getInventoryOutLocal(id),
+  );
+  ipcMain.handle("localDb:getInventoryOutReturn", (_event, id: string) =>
+    getInventoryOutReturnLocal(id),
   );
   ipcMain.handle(
     "localDb:listVendorReturns",

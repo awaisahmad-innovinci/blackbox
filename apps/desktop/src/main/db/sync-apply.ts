@@ -3,6 +3,7 @@ import type {
   Category,
   GoodsReceiptDetail,
   InventoryOutDetail,
+  InventoryOutReturnDetail,
   ProductDetail,
   PurchaseOrderDetail,
   SyncChangeDto,
@@ -40,6 +41,8 @@ import {
 import { upsertPurchaseOrderLocal } from "./purchase-orders-local";
 import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
+import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
+import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
 import { upsertVendorReturnLocal } from "./vendor-returns-local";
 import { getPurchaseOrderLocal } from "./entity-get-local";
 import {
@@ -332,6 +335,13 @@ export function applyChange(change: SyncChangeDto): void {
     return;
   }
   if (change.entityType === "inventory_out") {
+    const db = getLocalDb();
+    const existed = db
+      .prepare(`select 1 from inventory_outs where id = ? limit 1`)
+      .get(change.entityId);
+    const items = Array.isArray(p.items)
+      ? (p.items as InventoryOutDetail["items"])
+      : [];
     upsertInventoryOutLocal({
       id: change.entityId,
       outNumber: str(p.outNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
@@ -343,12 +353,56 @@ export function applyChange(change: SyncChangeDto): void {
       status: str(p.status, "POSTED") as InventoryOutDetail["status"],
       subtotal: Number(p.subtotal ?? 0),
       total: Number(p.total ?? 0),
-      items: Array.isArray(p.items)
-        ? (p.items as InventoryOutDetail["items"])
-        : [],
+      items,
       createdAt: str(p.createdAt, now),
       updatedAt: str(p.updatedAt, now),
     });
+    if (!existed) {
+      const warehouseId = str(p.warehouseId);
+      for (const item of items) {
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          item.quantity,
+          item.unitCost,
+        );
+      }
+    }
+    return;
+  }
+  if (change.entityType === "inventory_out_return") {
+    const db = getLocalDb();
+    const existed = db
+      .prepare(`select 1 from inventory_out_returns where id = ? limit 1`)
+      .get(change.entityId);
+    const items = Array.isArray(p.items)
+      ? (p.items as InventoryOutReturnDetail["items"])
+      : [];
+    upsertInventoryOutReturnLocal({
+      id: change.entityId,
+      returnNumber: str(p.returnNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
+      warehouseId: str(p.warehouseId),
+      warehouseName: str(p.warehouseName),
+      returnDate: str(p.returnDate, now.slice(0, 10)),
+      notes: str(p.notes),
+      status: str(p.status, "POSTED") as InventoryOutReturnDetail["status"],
+      subtotal: Number(p.subtotal ?? 0),
+      total: Number(p.total ?? 0),
+      items,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+    if (!existed) {
+      const warehouseId = str(p.warehouseId);
+      for (const item of items) {
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          -item.quantity,
+          item.unitCost,
+        );
+      }
+    }
     return;
   }
   if (change.entityType === "vendor_return") {

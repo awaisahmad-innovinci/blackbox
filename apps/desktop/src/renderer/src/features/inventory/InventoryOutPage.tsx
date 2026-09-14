@@ -306,6 +306,14 @@ export function InventoryOutPage() {
 
       try {
         await window.blackbox?.localDb?.upsertInventoryOut(detail);
+        for (const item of detail.items) {
+          await window.blackbox?.localDb?.applyInventoryOutBalanceDelta?.(
+            detail.warehouseId,
+            item.productSkuId,
+            item.quantity,
+            item.unitCost,
+          );
+        }
       } catch {
         /* optional cache */
       }

@@ -10,7 +10,6 @@ import {
   Unique,
   UpdateDateColumn,
 } from "typeorm";
-import { InventoryOut } from "./inventory-out.entity";
 import { InventoryOutReturnItem } from "./inventory-out-return-item.entity";
 import { Tenant } from "./tenant.entity";
 import { Warehouse } from "./warehouse.entity";
@@ -21,7 +20,6 @@ import { Warehouse } from "./warehouse.entity";
   "returnNumber",
 ])
 @Index("inventory_out_returns_tenant_id_idx", ["tenantId"])
-@Index("inventory_out_returns_inventory_out_id_idx", ["inventoryOutId"])
 @Index("inventory_out_returns_warehouse_id_idx", ["warehouseId"])
 export class InventoryOutReturn {
   @PrimaryGeneratedColumn("uuid")
@@ -32,9 +30,6 @@ export class InventoryOutReturn {
 
   @Column({ name: "return_number", type: "text" })
   returnNumber!: string;
-
-  @Column({ name: "inventory_out_id", type: "uuid" })
-  inventoryOutId!: string;
 
   @Column({ name: "warehouse_id", type: "uuid" })
   warehouseId!: string;
@@ -48,6 +43,12 @@ export class InventoryOutReturn {
   @Column({ type: "text", default: "POSTED" })
   status!: string;
 
+  @Column({ type: "numeric", precision: 14, scale: 4, default: 0 })
+  subtotal!: string;
+
+  @Column({ type: "numeric", precision: 14, scale: 4, default: 0 })
+  total!: string;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 
@@ -57,10 +58,6 @@ export class InventoryOutReturn {
   @ManyToOne(() => Tenant, { onDelete: "CASCADE" })
   @JoinColumn({ name: "tenant_id" })
   tenant!: Tenant;
-
-  @ManyToOne(() => InventoryOut, { onDelete: "RESTRICT" })
-  @JoinColumn({ name: "inventory_out_id" })
-  inventoryOut!: InventoryOut;
 
   @ManyToOne(() => Warehouse, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "warehouse_id" })
