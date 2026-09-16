@@ -1052,6 +1052,81 @@ where units_per_purchase_unit > 0;
       ensureInventoryOutReturnItemsNullableBalanceLink(db);
     },
   },
+  {
+    id: "021_sales",
+    sql: `
+      create table if not exists sales (
+        id text primary key,
+        tenant_id text not null,
+        sale_number text not null,
+        warehouse_id text not null,
+        status text not null default 'POSTED',
+        subtotal real not null default 0,
+        gst_rate real not null default 0,
+        gst_amount real not null default 0,
+        sales_tax_rate real not null default 0,
+        sales_tax_amount real not null default 0,
+        total real not null default 0,
+        device_id text,
+        posted_by text,
+        posted_at text,
+        notes text not null default '',
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text,
+        unique (tenant_id, sale_number)
+      );
+      create index if not exists sales_tenant_id_idx on sales (tenant_id);
+      create index if not exists sales_warehouse_id_idx on sales (warehouse_id);
+      create index if not exists sales_posted_at_idx on sales (posted_at);
+
+      create table if not exists sale_lines (
+        id text primary key,
+        tenant_id text not null,
+        sale_id text not null,
+        product_sku_id text not null,
+        quantity real not null,
+        unit_price real not null default 0,
+        line_total real not null default 0,
+        sell_unit text not null default 'pc',
+        barcode text,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists sale_lines_tenant_id_idx on sale_lines (tenant_id);
+      create index if not exists sale_lines_sale_id_idx on sale_lines (sale_id);
+      create index if not exists sale_lines_product_sku_id_idx on sale_lines (product_sku_id);
+
+      create table if not exists sale_payments (
+        id text primary key,
+        tenant_id text not null,
+        sale_id text not null,
+        method text not null,
+        amount real not null,
+        reference text not null default '',
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists sale_payments_tenant_id_idx on sale_payments (tenant_id);
+      create index if not exists sale_payments_sale_id_idx on sale_payments (sale_id);
+    `,
+  },
+  {
+    id: "022_sales_receipt_fields",
+    sql: `
+      alter table sales add column customer_name text not null default 'CASH SALES CUSTOMER';
+      alter table sales add column posted_by_name text;
+    `,
+  },
+  {
+    id: "023_sales_cash_tendered",
+    sql: `alter table sales add column cash_tendered real;`,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

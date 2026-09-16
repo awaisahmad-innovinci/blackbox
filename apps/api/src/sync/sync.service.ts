@@ -40,8 +40,12 @@ import {
   InventoryMovement,
   InventoryOut,
   InventoryOutLine,
+  InventoryOutItem,
   InventoryOutReturn,
   InventoryOutReturnItem,
+  Sale,
+  SaleLine,
+  SalePayment,
   InventoryStock,
   Product,
   ProductSku,
@@ -147,19 +151,73 @@ export class SyncService {
       };
     }
 
+    const foreignOrigin =
+      "(c.origin_device_id IS NULL OR c.origin_device_id != :deviceId)";
+
+    const firstForeignRaw = await this.changes
+      .createQueryBuilder("c")
+      .select("MIN(c.seq)", "minSeq")
+      .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+      .andWhere("c.stream = :stream", { stream })
+      .andWhere("c.seq > :cursor", { cursor })
+      .andWhere(foreignOrigin, { deviceId: device.id })
+      .getRawOne<{ minSeq: string | null }>();
+
+    const firstForeignSeq = firstForeignRaw?.minSeq
+      ? Number(firstForeignRaw.minSeq)
+      : null;
+
+    if (firstForeignSeq === null || !Number.isFinite(firstForeignSeq)) {
+      const maxRaw = await this.changes
+        .createQueryBuilder("c")
+        .select("MAX(c.seq)", "maxSeq")
+        .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+        .andWhere("c.stream = :stream", { stream })
+        .andWhere("c.seq > :cursor", { cursor })
+        .getRawOne<{ maxSeq: string | null }>();
+      const maxSeq = maxRaw?.maxSeq ? Number(maxRaw.maxSeq) : cursor;
+      const nextCursor = String(
+        Number.isFinite(maxSeq) && maxSeq > cursor ? maxSeq : cursor,
+      );
+
+      await this.upsertCursor(user.tenantId, device.id, stream, String(cursor));
+      await this.touchDevice(device.id, user.tenantId, null);
+
+      return {
+        changes: [],
+        nextCursor,
+        hasMore: false,
+        serverSeq: String(serverHead),
+      };
+    }
+
     const rows = await this.changes
       .createQueryBuilder("c")
       .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
       .andWhere("c.stream = :stream", { stream })
-      .andWhere("c.seq > :cursor", { cursor })
+      .andWhere("c.seq >= :firstForeignSeq", { firstForeignSeq })
+      .andWhere(foreignOrigin, { deviceId: device.id })
       .orderBy("c.seq", "ASC")
       .take(limit + 1)
       .getMany();
 
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
+    const hasMoreInPage = rows.length > limit;
+    const page = hasMoreInPage ? rows.slice(0, limit) : rows;
     const nextCursor =
       page.length > 0 ? String(page[page.length - 1]!.seq) : String(cursor);
+
+    let hasMore = hasMoreInPage;
+    if (!hasMore && page.length > 0) {
+      const lastSeq = page[page.length - 1]!.seq;
+      const moreForeign = await this.changes
+        .createQueryBuilder("c")
+        .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+        .andWhere("c.stream = :stream", { stream })
+        .andWhere("c.seq > :lastSeq", { lastSeq })
+        .andWhere(foreignOrigin, { deviceId: device.id })
+        .getCount();
+      hasMore = moreForeign > 0;
+    }
 
     await this.upsertCursor(user.tenantId, device.id, stream, String(cursor));
     await this.touchDevice(device.id, user.tenantId, null);
@@ -765,6 +823,10 @@ export class SyncService {
         await this.upsertInventoryOutReturn(manager, tenantId, change.entityId, p);
         break;
       }
+      case "sale": {
+        await this.upsertSale(manager, tenantId, change.entityId, p);
+        break;
+      }
       case "vendor_return": {
         await this.upsertVendorReturn(manager, tenantId, change.entityId, p);
         break;
@@ -809,6 +871,14 @@ export class SyncService {
         where: { id: entityId, tenantId },
       });
       if (row && row.status === "POSTED") {
+        return { status: row.status };
+      }
+    }
+    if (entityType === "sale") {
+      const row = await manager.findOne(Sale, {
+        where: { id: entityId, tenantId },
+      });
+      if (row && (row.status === "POSTED" || row.status === "VOID")) {
         return { status: row.status };
       }
     }
@@ -1253,6 +1323,130 @@ export class SyncService {
             unitCost,
           );
         }
+      }
+    }
+  }
+
+  private async upsertSale(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await manager.findOne(Sale, {
+      where: { id: entityId, tenantId },
+    });
+    const row = existing ?? manager.create(Sale, { id: entityId, tenantId });
+    const prevStatus = row.status;
+    Object.assign(row, {
+      saleNumber: String(
+        p.saleNumber ?? row.saleNumber ?? `SYNC-${entityId.slice(0, 8)}`,
+      ),
+      warehouseId: String(p.warehouseId ?? row.warehouseId ?? ""),
+      status: String(p.status ?? row.status ?? "POSTED"),
+      subtotal: String(p.subtotal ?? row.subtotal ?? 0),
+      gstRate: String(p.gstRate ?? row.gstRate ?? 0),
+      gstAmount: String(p.gstAmount ?? row.gstAmount ?? 0),
+      salesTaxRate: String(p.salesTaxRate ?? row.salesTaxRate ?? 0),
+      salesTaxAmount: String(p.salesTaxAmount ?? row.salesTaxAmount ?? 0),
+      total: String(p.total ?? row.total ?? 0),
+      deviceId: (p.deviceId as string | null | undefined) ?? row.deviceId ?? null,
+      postedBy: (p.postedBy as string | null | undefined) ?? row.postedBy ?? null,
+      postedAt: p.postedAt ? new Date(String(p.postedAt)) : row.postedAt,
+      customerName: String(
+        p.customerName ?? row.customerName ?? "CASH SALES CUSTOMER",
+      ),
+      postedByName:
+        (p.postedByName as string | null | undefined) ?? row.postedByName ?? null,
+      cashTendered:
+        p.cashTendered != null && p.cashTendered !== ""
+          ? String(p.cashTendered)
+          : row.cashTendered,
+      notes: String(p.notes ?? row.notes ?? ""),
+    });
+    if (!row.warehouseId) throw new Error("warehouse not found");
+    await manager.save(row);
+
+    if (Array.isArray(p.items)) {
+      await manager.delete(SaleLine, { saleId: entityId, tenantId });
+      await manager.delete(SalePayment, { saleId: entityId, tenantId });
+
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
+        const unitPrice = Number(item.unitPrice ?? 0);
+        await manager.save(
+          manager.create(SaleLine, {
+            id: String(item.id ?? randomUUID()),
+            tenantId,
+            saleId: entityId,
+            productSkuId,
+            quantity: String(qty),
+            unitPrice: String(unitPrice),
+            lineTotal: String(item.lineTotal ?? qty * unitPrice),
+            sellUnit: String(item.sellUnit ?? "pc"),
+            barcode: (item.barcode as string | null | undefined) ?? null,
+          }),
+        );
+
+        if (
+          productSkuId &&
+          qty > 0 &&
+          row.status === "POSTED" &&
+          prevStatus !== "POSTED"
+        ) {
+          const balance = await manager.findOne(InventoryOutItem, {
+            where: { tenantId, warehouseId: row.warehouseId, productSkuId },
+          });
+          const unitCost = balance
+            ? Number(balance.unitCost ?? 0)
+            : unitPrice;
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            -qty,
+            unitCost,
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(p.payments)) {
+      for (const payment of p.payments as Array<Record<string, unknown>>) {
+        await manager.save(
+          manager.create(SalePayment, {
+            id: String(payment.id ?? randomUUID()),
+            tenantId,
+            saleId: entityId,
+            method: String(payment.method ?? "CASH"),
+            amount: String(payment.amount ?? 0),
+            reference: String(payment.reference ?? ""),
+          }),
+        );
+      }
+    }
+
+    if (row.status === "VOID" && prevStatus === "POSTED" && Array.isArray(p.items)) {
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
+        if (!productSkuId || !(qty > 0)) continue;
+        const balance = await manager.findOne(InventoryOutItem, {
+          where: { tenantId, warehouseId: row.warehouseId, productSkuId },
+        });
+        const unitCost = balance
+          ? Number(balance.unitCost ?? 0)
+          : Number(item.unitPrice ?? 0);
+        await applyInventoryOutBalanceDelta(
+          manager,
+          tenantId,
+          row.warehouseId,
+          productSkuId,
+          qty,
+          unitCost,
+        );
       }
     }
   }

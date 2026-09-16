@@ -369,9 +369,6 @@ export function InventoryOutReturnFormPage() {
         >
           Add item
         </Button>
-        <Button type="button" disabled={saving || lines.length === 0} onClick={() => void onConfirm()}>
-          {saving ? "Posting…" : "Post return"}
-        </Button>
       </div>
 
       <KeyboardHints hints={[KEYBOARD_HINT_SCAN, KEYBOARD_HINT_ADD]} />
@@ -458,6 +455,16 @@ export function InventoryOutReturnFormPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          disabled={saving || lines.length === 0}
+          onClick={() => void onConfirm()}
+        >
+          {saving ? "Posting…" : "Post return"}
+        </Button>
       </div>
 
       <AddInventoryOutReturnItemDialog

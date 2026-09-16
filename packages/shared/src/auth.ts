@@ -8,6 +8,8 @@ export interface AuthUser {
   tenantId: string;
   /** Store / business display name (tenant.name). */
   tenantName?: string;
+  /** Formatted business address from onboarding location (receipt header). */
+  businessAddress?: string;
   email: string;
   username: string;
   fullName: string;
@@ -44,6 +46,8 @@ export interface LoginRequest {
   client: AuthClient;
   /** Desktop machine fingerprint; bound to JWT deviceId when provided. */
   fingerprint?: string;
+  /** When migrating from a legacy random fingerprint, the stable OS machine id hash. */
+  stableFingerprint?: string;
   deviceName?: string;
 }
 

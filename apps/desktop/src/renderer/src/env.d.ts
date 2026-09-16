@@ -18,6 +18,7 @@ import type {
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
+  PaginatedSales,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -25,6 +26,8 @@ import type {
   ProductSupplierRow,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  SaleDetail,
+  SaleListQuery,
   ReceivingDraft,
   SkuBarcode,
   SkuBarcodeLookupResult,
@@ -111,6 +114,21 @@ declare global {
         upsertInventoryOutReturns: (
           rows: InventoryOutReturnDetail[],
         ) => Promise<{ ok: true }>;
+        upsertSale: (detail: SaleDetail) => Promise<{ ok: true }>;
+        upsertSaleDraft: (detail: SaleDetail) => Promise<{ ok: true }>;
+        deleteSaleDraft: (id: string) => Promise<{ ok: boolean }>;
+        countDraftSales: () => Promise<number>;
+        getDraftSaleReservedQty: (
+          warehouseId: string,
+          productSkuId: string,
+          excludeSaleId?: string | null,
+        ) => Promise<number>;
+        getPosAvailableForSale: (
+          warehouseId: string,
+          productSkuId: string,
+          excludeSaleId?: string | null,
+        ) => Promise<number>;
+        upsertSales: (rows: SaleDetail[]) => Promise<{ ok: true }>;
         upsertVendorReturn: (
           detail: VendorReturnDetail,
         ) => Promise<{ ok: true }>;
@@ -135,12 +153,15 @@ declare global {
         listReceiptNumbers: () => Promise<string[]>;
         listOutNumbers: () => Promise<string[]>;
         listOutReturnNumbers: () => Promise<string[]>;
+        listSaleNumbers: () => Promise<string[]>;
+        listHoldNumbers: () => Promise<string[]>;
         listInventoryOuts: (
           query?: InventoryOutListQuery,
         ) => Promise<PaginatedInventoryOuts>;
         listInventoryOutReturns: (
           query?: InventoryOutReturnListQuery,
         ) => Promise<PaginatedInventoryOutReturns>;
+        listSales: (query?: SaleListQuery) => Promise<PaginatedSales>;
         inventoryOutReturnableQuantity: (
           warehouseId: string,
           productSkuId: string,
@@ -203,6 +224,8 @@ declare global {
         getSkuByBarcode: (
           barcode: string,
           warehouseId: string,
+          balanceSource?: "stock" | "pos",
+          excludeDraftSaleId?: string | null,
         ) => Promise<SkuSearchResult | null>;
         lookupSkuByBarcode: (
           barcode: string,
@@ -220,6 +243,7 @@ declare global {
         getInventoryOutReturn: (
           id: string,
         ) => Promise<InventoryOutReturnDetail | null>;
+        getSale: (id: string) => Promise<SaleDetail | null>;
         listVendorReturns: (
           query?: VendorReturnListQuery,
         ) => Promise<PaginatedVendorReturns>;
@@ -243,6 +267,8 @@ declare global {
       };
       identity?: {
         getFingerprint: () => Promise<string>;
+        getStableFingerprint: () => Promise<string | null>;
+        persistFingerprint: (fingerprint: string) => Promise<{ ok: true }>;
         get: () => Promise<{
           tenantId: string;
           deviceId: string;

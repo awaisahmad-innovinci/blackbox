@@ -143,32 +143,49 @@ export class PasswordResetService {
       relations: { tenant: true, userRoles: { role: true } },
     });
 
-    if (rows.length !== 1) {
-      this.logOwnerLookupSkipped(
-        email,
-        rows.length,
-        rows.length === 0 ? "no_user" : "ambiguous_email",
-      );
-      return null;
+    const eligible = rows.filter((user) => this.isEligibleOwner(user));
+
+    if (eligible.length === 1) {
+      return eligible[0]!;
     }
 
-    const user = rows[0]!;
-    if (!user.isActive) {
-      this.logOwnerLookupSkipped(email, rows.length, "user_inactive");
-      return null;
-    }
-    if (!user.tenant?.isActive) {
-      this.logOwnerLookupSkipped(email, rows.length, "tenant_inactive");
-      return null;
-    }
+    this.logOwnerLookupSkipped(
+      email,
+      eligible.length > 1 ? eligible.length : rows.length,
+      eligible.length > 1
+        ? "ambiguous_email"
+        : this.deriveOwnerSkipReason(rows),
+    );
+    return null;
+  }
 
-    const isOwner = user.userRoles.some((ur) => ur.role.key === "OWNER");
-    if (!isOwner) {
-      this.logOwnerLookupSkipped(email, rows.length, "not_owner");
-      return null;
-    }
+  private isEligibleOwner(user: User): boolean {
+    return (
+      user.isActive &&
+      user.tenant?.isActive === true &&
+      user.userRoles.some((ur) => ur.role.key === "OWNER")
+    );
+  }
 
-    return user;
+  private deriveOwnerSkipReason(rows: User[]): OwnerLookupSkipReason {
+    if (rows.length === 0) {
+      return "no_user";
+    }
+    if (rows.every((user) => !user.isActive)) {
+      return "user_inactive";
+    }
+    const active = rows.filter((user) => user.isActive);
+    if (active.every((user) => !user.tenant?.isActive)) {
+      return "tenant_inactive";
+    }
+    if (
+      active.every(
+        (user) => !user.userRoles.some((ur) => ur.role.key === "OWNER"),
+      )
+    ) {
+      return "not_owner";
+    }
+    return "ambiguous_email";
   }
 
   private logOwnerLookupSkipped(

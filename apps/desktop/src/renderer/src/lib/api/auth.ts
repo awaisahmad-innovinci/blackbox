@@ -24,6 +24,8 @@ export async function desktopLogin(
   password: string,
 ): Promise<DesktopLoginResult> {
   const fingerprint = await window.blackbox?.identity?.getFingerprint();
+  const stableFingerprint =
+    await window.blackbox?.identity?.getStableFingerprint();
   const payload: LoginRequest = {
     identifier,
     password,
@@ -31,12 +33,23 @@ export async function desktopLogin(
     fingerprint,
     deviceName: "Desktop",
   };
+  if (
+    stableFingerprint &&
+    fingerprint &&
+    stableFingerprint !== fingerprint
+  ) {
+    payload.stableFingerprint = stableFingerprint;
+  }
   const res = await apiFetch<AuthResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
     skipAuth: true,
   });
   setAuthTokens(res.tokens.accessToken, res.tokens.refreshToken);
+
+  if (stableFingerprint && stableFingerprint !== fingerprint) {
+    await window.blackbox?.identity?.persistFingerprint(stableFingerprint);
+  }
 
   const claims = parseJwt(res.tokens.accessToken);
   const tenantId = claims.tenantId ?? res.user.tenantId;

@@ -19,11 +19,16 @@ export const skusApi = {
     const query = params.toString() ? `?${params.toString()}` : "";
     return apiFetch<SkuSearchResult[]>(`/skus${query}`);
   },
-  byBarcode(barcode: string, warehouseId: string): Promise<SkuSearchResult> {
+  byBarcode(
+    barcode: string,
+    warehouseId: string,
+    options?: { balance?: "stock" | "pos" },
+  ): Promise<SkuSearchResult> {
     const params = new URLSearchParams({
       barcode: barcode.trim(),
       warehouseId,
     });
+    if (options?.balance === "pos") params.set("balance", "pos");
     return apiFetch<SkuSearchResult>(`/skus/by-barcode?${params.toString()}`);
   },
   lookupByBarcode(barcode: string): Promise<SkuBarcodeLookupResult> {

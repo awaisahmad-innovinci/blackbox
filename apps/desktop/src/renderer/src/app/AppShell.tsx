@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
 import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard";
@@ -17,11 +17,15 @@ import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog
 import type { TaxonomyKind } from "@renderer/lib/app-nav-keyboard";
 import { notifyTaxonomyCreated } from "@renderer/lib/taxonomy-created-sync";
 import {
-  APP_NAV_SECTIONS,
-  appNavShortcutLabel,
   NAV_DROPDOWN_MENUS,
+  appNavShortcutLabel,
+  visibleNavSections,
   type NavDropdownId,
 } from "@renderer/lib/app-nav-keyboard";
+import {
+  defaultRouteForUser,
+  isRouteAllowed,
+} from "@renderer/lib/sales-access";
 import { afterDialogClosed } from "@renderer/lib/on-dialog-open-change";
 import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
@@ -48,6 +52,11 @@ export function AppShell() {
   const location = useLocation();
   const { user, offline, deviceState, signOut } = useSession();
   const sync = useSyncStatus();
+  const permissions = user?.permissions ?? [];
+  const sections = useMemo(
+    () => visibleNavSections(permissions),
+    [permissions],
+  );
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [openNavDropdown, setOpenNavDropdown] = useState<NavDropdownId | null>(
@@ -57,6 +66,7 @@ export function AppShell() {
     useState<TaxonomyKind | null>(null);
   const { activeIndex, setNavRef, handleMenubarKeyDown, onNavFocus } =
     useAppNavKeyboard({
+      sections,
       openNavDropdown,
       setOpenNavDropdown,
       onGlobalTaxonomyShortcut: setGlobalTaxonomyKind,
@@ -65,6 +75,12 @@ export function AppShell() {
   useEffect(() => {
     releaseStuckModalState({ retry: true });
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isRouteAllowed(location.pathname, permissions)) {
+      navigate(defaultRouteForUser(permissions), { replace: true });
+    }
+  }, [location.pathname, navigate, permissions]);
 
   function hasOpenModal(): boolean {
     return (
@@ -98,12 +114,7 @@ export function AppShell() {
     location.pathname.startsWith("/purchase-orders") ||
     location.pathname.startsWith("/purchasing") ||
     location.pathname.startsWith("/goods-receipts");
-
-  const dashboardSection = APP_NAV_SECTIONS[0]!;
-  const warehousesSection = APP_NAV_SECTIONS[1]!;
-  const inventorySection = APP_NAV_SECTIONS[2]!;
-  const purchasingSection = APP_NAV_SECTIONS[3]!;
-  const vendorsSection = APP_NAV_SECTIONS[4]!;
+  const salesActive = location.pathname.startsWith("/sales");
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
@@ -118,124 +129,84 @@ export function AppShell() {
             className="flex items-center gap-1"
             onKeyDown={handleMenubarKeyDown}
           >
-            <NavLink
-              ref={setNavRef(0)}
-              to={dashboardSection.to}
-              end
-              role="menuitem"
-              tabIndex={activeIndex === 0 ? 0 : -1}
-              aria-keyshortcuts={appNavShortcutLabel(dashboardSection.shortcut)}
-              title={`${dashboardSection.label} (${appNavShortcutLabel(dashboardSection.shortcut)})`}
-              onFocus={() => onNavFocus(0)}
-              className={({ isActive }) => navItemClass(isActive)}
-            >
-              {dashboardSection.label}
-            </NavLink>
-            <NavLink
-              ref={setNavRef(1)}
-              to={warehousesSection.to}
-              role="menuitem"
-              tabIndex={activeIndex === 1 ? 0 : -1}
-              aria-keyshortcuts={appNavShortcutLabel(warehousesSection.shortcut)}
-              title={`${warehousesSection.label} (${appNavShortcutLabel(warehousesSection.shortcut)})`}
-              onFocus={() => onNavFocus(1)}
-              className={({ isActive }) => navItemClass(isActive)}
-            >
-              {warehousesSection.label}
-            </NavLink>
-            <DropdownMenu
-              open={openNavDropdown === "inventory"}
-              onOpenChange={(open) => handleNavDropdownChange("inventory", open)}
-            >
-              <DropdownMenuTrigger
-                ref={setNavRef(2)}
-                role="menuitem"
-                tabIndex={activeIndex === 2 ? 0 : -1}
-                aria-keyshortcuts={appNavShortcutLabel(inventorySection.shortcut)}
-                title={`${inventorySection.label} (${appNavShortcutLabel(inventorySection.shortcut)})`}
-                onFocus={() => onNavFocus(2)}
-                className={navItemClass(inventoryActive)}
-              >
-                {inventorySection.label}
-                <span className="text-[10px] opacity-70" aria-hidden>
-                  ▼
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {NAV_DROPDOWN_MENUS.inventory.map((item, index) => (
-                  <NavDropdownMenuItem
-                    key={item.to}
-                    index={index}
-                    label={item.label}
-                    onSelect={() => navigate(item.to)}
-                  />
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu
-              open={openNavDropdown === "purchasing"}
-              onOpenChange={(open) => handleNavDropdownChange("purchasing", open)}
-            >
-              <DropdownMenuTrigger
-                ref={setNavRef(3)}
-                role="menuitem"
-                tabIndex={activeIndex === 3 ? 0 : -1}
-                aria-keyshortcuts={appNavShortcutLabel(purchasingSection.shortcut)}
-                title={`${purchasingSection.label} (${appNavShortcutLabel(purchasingSection.shortcut)})`}
-                onFocus={() => onNavFocus(3)}
-                className={navItemClass(purchasingActive)}
-              >
-                {purchasingSection.label}
-                <span className="text-[10px] opacity-70" aria-hidden>
-                  ▼
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {NAV_DROPDOWN_MENUS.purchasing.map((item, index) => (
-                  <NavDropdownMenuItem
-                    key={item.to}
-                    index={index}
-                    label={item.label}
-                    onSelect={() => navigate(item.to)}
-                  />
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu
-              open={openNavDropdown === "vendors"}
-              onOpenChange={(open) => handleNavDropdownChange("vendors", open)}
-            >
-              <DropdownMenuTrigger
-                ref={setNavRef(4)}
-                role="menuitem"
-                tabIndex={activeIndex === 4 ? 0 : -1}
-                aria-keyshortcuts={appNavShortcutLabel(
-                  vendorsSection.shortcut,
-                  vendorsSection.requireCtrl,
-                )}
-                title={`${vendorsSection.label} (${appNavShortcutLabel(
-                  vendorsSection.shortcut,
-                  vendorsSection.requireCtrl,
-                )})`}
-                onFocus={() => onNavFocus(4)}
-                className={navItemClass(vendorsActive)}
-              >
-                {vendorsSection.label}
-                <span className="text-[10px] opacity-70" aria-hidden>
-                  ▼
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {NAV_DROPDOWN_MENUS.vendors.map((item, index) => (
-                  <NavDropdownMenuItem
-                    key={item.to}
-                    index={index}
-                    label={item.label}
-                    onSelect={() => navigate(item.to)}
-                  />
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {sections.map((section, index) => {
+              if (section.kind === "link") {
+                const active =
+                  section.id === "dashboard"
+                    ? location.pathname === "/"
+                    : section.id === "sale"
+                      ? salesActive
+                      : location.pathname.startsWith(section.to);
+                return (
+                  <NavLink
+                    key={section.id}
+                    ref={setNavRef(index)}
+                    to={section.to}
+                    end={section.id === "dashboard"}
+                    role="menuitem"
+                    tabIndex={activeIndex === index ? 0 : -1}
+                    aria-keyshortcuts={appNavShortcutLabel(section.shortcut)}
+                    title={`${section.label} (${appNavShortcutLabel(section.shortcut)})`}
+                    onFocus={() => onNavFocus(index)}
+                    className={({ isActive }) =>
+                      navItemClass(isActive || active)
+                    }
+                  >
+                    {section.label}
+                  </NavLink>
+                );
+              }
+
+              const dropdownActive =
+                section.dropdownId === "inventory"
+                  ? inventoryActive
+                  : section.dropdownId === "purchasing"
+                    ? purchasingActive
+                    : vendorsActive;
+
+              return (
+                <DropdownMenu
+                  key={section.id}
+                  open={openNavDropdown === section.dropdownId}
+                  onOpenChange={(open) =>
+                    handleNavDropdownChange(section.dropdownId, open)
+                  }
+                >
+                  <DropdownMenuTrigger
+                    ref={setNavRef(index)}
+                    role="menuitem"
+                    tabIndex={activeIndex === index ? 0 : -1}
+                    aria-keyshortcuts={appNavShortcutLabel(
+                      section.shortcut,
+                      "requireCtrl" in section ? section.requireCtrl : false,
+                    )}
+                    title={`${section.label} (${appNavShortcutLabel(
+                      section.shortcut,
+                      "requireCtrl" in section ? section.requireCtrl : false,
+                    )})`}
+                    onFocus={() => onNavFocus(index)}
+                    className={navItemClass(dropdownActive)}
+                  >
+                    {section.label}
+                    <span className="text-[10px] opacity-70" aria-hidden>
+                      ▼
+                    </span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {NAV_DROPDOWN_MENUS[section.dropdownId].map(
+                      (item, menuIndex) => (
+                        <NavDropdownMenuItem
+                          key={item.to}
+                          index={menuIndex}
+                          label={item.label}
+                          onSelect={() => navigate(item.to)}
+                        />
+                      ),
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            })}
           </nav>
 
           <div className="ml-auto flex items-center gap-3">

@@ -17,6 +17,7 @@ import type {
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
+  PaginatedSales,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -24,6 +25,8 @@ import type {
   ProductSupplierRow,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  SaleDetail,
+  SaleListQuery,
   ReceivingDraft,
   SkuBarcodeLookupResult,
   SkuDetail,
@@ -119,6 +122,38 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:upsertInventoryOutReturns",
         rows,
       ) as Promise<Ok>,
+    upsertSale: (detail: SaleDetail) =>
+      ipcRenderer.invoke("localDb:upsertSale", detail) as Promise<Ok>,
+    upsertSaleDraft: (detail: SaleDetail) =>
+      ipcRenderer.invoke("localDb:upsertSaleDraft", detail) as Promise<Ok>,
+    deleteSaleDraft: (id: string) =>
+      ipcRenderer.invoke("localDb:deleteSaleDraft", id) as Promise<{ ok: boolean }>,
+    countDraftSales: () =>
+      ipcRenderer.invoke("localDb:countDraftSales") as Promise<number>,
+    getDraftSaleReservedQty: (
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:getDraftSaleReservedQty",
+        warehouseId,
+        productSkuId,
+        excludeSaleId,
+      ) as Promise<number>,
+    getPosAvailableForSale: (
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:getPosAvailableForSale",
+        warehouseId,
+        productSkuId,
+        excludeSaleId,
+      ) as Promise<number>,
+    upsertSales: (rows: SaleDetail[]) =>
+      ipcRenderer.invoke("localDb:upsertSales", rows) as Promise<Ok>,
     upsertVendorReturn: (detail: VendorReturnDetail) =>
       ipcRenderer.invoke("localDb:upsertVendorReturn", detail) as Promise<Ok>,
     upsertVendorReturns: (rows: VendorReturnDetail[]) =>
@@ -152,6 +187,10 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:listOutNumbers") as Promise<string[]>,
     listOutReturnNumbers: () =>
       ipcRenderer.invoke("localDb:listOutReturnNumbers") as Promise<string[]>,
+    listSaleNumbers: () =>
+      ipcRenderer.invoke("localDb:listSaleNumbers") as Promise<string[]>,
+    listHoldNumbers: () =>
+      ipcRenderer.invoke("localDb:listHoldNumbers") as Promise<string[]>,
     listInventoryOuts: (query?: InventoryOutListQuery) =>
       ipcRenderer.invoke(
         "localDb:listInventoryOuts",
@@ -162,6 +201,8 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listInventoryOutReturns",
         query,
       ) as Promise<PaginatedInventoryOutReturns>,
+    listSales: (query?: SaleListQuery) =>
+      ipcRenderer.invoke("localDb:listSales", query) as Promise<PaginatedSales>,
     inventoryOutReturnableQuantity: (warehouseId: string, productSkuId: string) =>
       ipcRenderer.invoke(
         "localDb:inventoryOutReturnableQuantity",
@@ -266,11 +307,18 @@ contextBridge.exposeInMainWorld("blackbox", {
         q,
         warehouseId,
       ) as Promise<SkuSearchResult[]>,
-    getSkuByBarcode: (barcode: string, warehouseId: string) =>
+    getSkuByBarcode: (
+      barcode: string,
+      warehouseId: string,
+      balanceSource?: "stock" | "pos",
+      excludeDraftSaleId?: string | null,
+    ) =>
       ipcRenderer.invoke(
         "localDb:getSkuByBarcode",
         barcode,
         warehouseId,
+        balanceSource,
+        excludeDraftSaleId,
       ) as Promise<SkuSearchResult | null>,
     lookupSkuByBarcode: (barcode: string) =>
       ipcRenderer.invoke(
@@ -316,6 +364,8 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getInventoryOutReturn",
         id,
       ) as Promise<InventoryOutReturnDetail | null>,
+    getSale: (id: string) =>
+      ipcRenderer.invoke("localDb:getSale", id) as Promise<SaleDetail | null>,
     listVendorReturns: (query?: VendorReturnListQuery) =>
       ipcRenderer.invoke(
         "localDb:listVendorReturns",
@@ -358,6 +408,14 @@ contextBridge.exposeInMainWorld("blackbox", {
   identity: {
     getFingerprint: () =>
       ipcRenderer.invoke("identity:getFingerprint") as Promise<string>,
+    getStableFingerprint: () =>
+      ipcRenderer.invoke("identity:getStableFingerprint") as Promise<
+        string | null
+      >,
+    persistFingerprint: (fingerprint: string) =>
+      ipcRenderer.invoke("identity:persistFingerprint", fingerprint) as Promise<{
+        ok: true;
+      }>,
     get: () =>
       ipcRenderer.invoke("identity:get") as Promise<{
         tenantId: string;

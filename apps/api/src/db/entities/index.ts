@@ -33,6 +33,9 @@ import { InventoryOutItem } from "./inventory-out-item.entity";
 import { InventoryOutLine } from "./inventory-out-line.entity";
 import { InventoryOutReturn } from "./inventory-out-return.entity";
 import { InventoryOutReturnItem } from "./inventory-out-return-item.entity";
+import { Sale } from "./sale.entity";
+import { SaleLine } from "./sale-line.entity";
+import { SalePayment } from "./sale-payment.entity";
 import { VendorReturn } from "./vendor-return.entity";
 import { VendorReturnItem } from "./vendor-return-item.entity";
 import { PasswordResetCode } from "./password-reset-code.entity";
@@ -73,6 +76,9 @@ export const entities = [
   InventoryOutLine,
   InventoryOutReturn,
   InventoryOutReturnItem,
+  Sale,
+  SaleLine,
+  SalePayment,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,
@@ -114,6 +120,9 @@ export {
   InventoryOutLine,
   InventoryOutReturn,
   InventoryOutReturnItem,
+  Sale,
+  SaleLine,
+  SalePayment,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,

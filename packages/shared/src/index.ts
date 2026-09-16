@@ -298,13 +298,37 @@ export {
   receiptNumberPrefix,
   outNumberPrefix,
   outReturnNumberPrefix,
+  saleNumberPrefix,
   nextVendorCode,
   nextPoNumber,
   nextReceiptNumber,
   nextOutNumber,
   nextOutReturnNumber,
+  nextHoldNumber,
+  nextSaleNumber,
   nextSkuCodeForProduct,
 } from "./document-numbers";
+export type {
+  SaleStatus,
+  SalePaymentMethod,
+  SalePaymentRow,
+  SaleLineRow,
+  SaleDetail,
+  SaleListItem,
+  SaleListQuery,
+  PaginatedSales,
+  CreateSaleLineRequest,
+  CreateSalePaymentRequest,
+  CreateSaleRequest,
+} from "./sales";
+export {
+  SALE_STATUSES,
+  SALE_PAYMENT_METHODS,
+  DEFAULT_SALE_CUSTOMER_NAME,
+  maxCashTender,
+  saleBillTotals,
+  saleLineTotal,
+} from "./sales";
 export {
   MASTER_DATA_IMPORT_FILES,
   nextSkuCode,

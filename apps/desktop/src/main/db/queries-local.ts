@@ -29,6 +29,9 @@ import type {
   InventoryOutReturnListQuery,
   PaginatedInventoryOutReturns,
   InventoryOutReturnStatus,
+  PaginatedSales,
+  SaleListQuery,
+  SaleStatus,
   WarehouseListItem,
 } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
@@ -1162,5 +1165,111 @@ export function inventoryOutReturnableQuantityLocal(
 ): { quantityAvailable: number } {
   return {
     quantityAvailable: getInventoryOutBalanceQtyLocal(warehouseId, productSkuId),
+  };
+}
+
+export function listHoldNumbersLocal(): string[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select sale_number as saleNumber from sales
+       where tenant_id = @tenantId and status = 'DRAFT' and sync_status = 'local'`,
+    )
+    .all({ tenantId: DEMO_STORE_TENANT_ID }) as Array<{ saleNumber: string }>;
+  return rows.map((r) => String(r.saleNumber));
+}
+
+export function listSaleNumbersLocal(): string[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select sale_number as saleNumber from sales where tenant_id = @tenantId`,
+    )
+    .all({ tenantId: DEMO_STORE_TENANT_ID }) as Array<{ saleNumber: string }>;
+  return rows.map((r) => String(r.saleNumber));
+}
+
+export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
+  const db = getLocalDb();
+  const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
+  const search = query.search?.trim().toLowerCase() ?? "";
+  const warehouseId = query.warehouseId ?? "";
+  const status = query.status ?? "";
+  const dateFrom = query.dateFrom ?? "";
+  const dateTo = query.dateTo ?? "";
+
+  const where = `
+    s.tenant_id = @tenantId
+    and (@warehouseId = '' or s.warehouse_id = @warehouseId)
+    and (@status = '' or s.status = @status)
+    and (@dateFrom = '' or s.posted_at >= @dateFrom)
+    and (@dateTo = '' or s.posted_at <= @dateTo || 'T23:59:59.999Z')
+    and (@search = '' or lower(s.sale_number) like '%' || @search || '%')
+  `;
+
+  const params = {
+    tenantId: DEMO_STORE_TENANT_ID,
+    warehouseId,
+    status,
+    dateFrom,
+    dateTo,
+    search,
+    limit: pageSize,
+    offset,
+  };
+
+  const total = (
+    db.prepare(`select count(*) as cnt from sales s where ${where}`).get(params) as {
+      cnt: number;
+    }
+  ).cnt;
+
+  const rows = db
+    .prepare(
+      `select
+         s.id,
+         s.sale_number as saleNumber,
+         s.warehouse_id as warehouseId,
+         coalesce(w.name, '—') as warehouseName,
+         s.status,
+         s.total,
+         s.posted_at as postedAt,
+         (
+           select count(*) from sale_lines l
+           where l.sale_id = s.id and l.tenant_id = s.tenant_id
+         ) as itemCount
+       from sales s
+       left join warehouses w on w.id = s.warehouse_id
+       where ${where}
+       order by
+         case when s.status = 'DRAFT' then s.updated_at else coalesce(s.posted_at, s.created_at) end desc,
+         s.created_at desc
+       limit @limit offset @offset`,
+    )
+    .all(params) as Array<{
+    id: string;
+    saleNumber: string;
+    warehouseId: string;
+    warehouseName: string;
+    status: string;
+    total: number;
+    postedAt: string | null;
+    itemCount: number;
+  }>;
+
+  return {
+    items: rows.map((r) => ({
+      id: r.id,
+      saleNumber: r.saleNumber,
+      warehouseId: r.warehouseId,
+      warehouseName: r.warehouseName,
+      status: r.status as SaleStatus,
+      total: Number(r.total),
+      itemCount: Number(r.itemCount),
+      postedAt: r.postedAt,
+    })),
+    total,
+    page,
+    pageSize,
   };
 }

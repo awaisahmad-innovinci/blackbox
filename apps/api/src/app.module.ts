@@ -13,6 +13,7 @@ import { PermissionsCatalogModule } from "./permissions/permissions-catalog.modu
 import { RbacModule } from "./rbac/rbac.module";
 import { RolesModule } from "./roles/roles.module";
 import { SyncModule } from "./sync/sync.module";
+import { SalesModule } from "./sales/sales.module";
 import { TenantsModule } from "./tenants/tenants.module";
 import { UsersModule } from "./users/users.module";
 
@@ -32,6 +33,7 @@ import { UsersModule } from "./users/users.module";
     DevicesModule,
     InventoryModule,
     SyncModule,
+    SalesModule,
   ],
   controllers: [AppController],
   providers: [

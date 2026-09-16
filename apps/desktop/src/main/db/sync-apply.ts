@@ -6,6 +6,7 @@ import type {
   InventoryOutReturnDetail,
   ProductDetail,
   PurchaseOrderDetail,
+  SaleDetail,
   SyncChangeDto,
   SyncEntityType,
   SyncOperation,
@@ -17,6 +18,7 @@ import type {
 } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
+import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import {
   enqueueOutbox,
   recordApplied,
@@ -43,6 +45,7 @@ import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
 import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
 import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
+import { upsertSaleLocal } from "./sales-local";
 import { upsertVendorReturnLocal } from "./vendor-returns-local";
 import { getPurchaseOrderLocal } from "./entity-get-local";
 import {
@@ -400,6 +403,82 @@ export function applyChange(change: SyncChangeDto): void {
           item.productSkuId,
           -item.quantity,
           item.unitCost,
+        );
+      }
+    }
+    return;
+  }
+  if (change.entityType === "sale") {
+    const db = getLocalDb();
+    const existing = db
+      .prepare(`select status from sales where id = ? limit 1`)
+      .get(change.entityId) as { status: string } | undefined;
+    const prevStatus = existing?.status;
+    const items = Array.isArray(p.items) ? (p.items as SaleDetail["items"]) : [];
+    const payments = Array.isArray(p.payments)
+      ? (p.payments as SaleDetail["payments"])
+      : [];
+    const status = str(p.status, "POSTED") as SaleDetail["status"];
+    const warehouseId = str(p.warehouseId);
+
+    upsertSaleLocal({
+      id: change.entityId,
+      saleNumber: str(p.saleNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
+      warehouseId,
+      warehouseName: str(p.warehouseName),
+      status,
+      subtotal: Number(p.subtotal ?? 0),
+      gstRate: Number(p.gstRate ?? 0),
+      gstAmount: Number(p.gstAmount ?? 0),
+      salesTaxRate: Number(p.salesTaxRate ?? 0),
+      salesTaxAmount: Number(p.salesTaxAmount ?? 0),
+      total: Number(p.total ?? 0),
+      notes: str(p.notes),
+      customerName: str(p.customerName, "CASH SALES CUSTOMER"),
+      cashTendered:
+        p.cashTendered != null && p.cashTendered !== ""
+          ? Number(p.cashTendered)
+          : null,
+      deviceId: (p.deviceId as string | null) ?? null,
+      postedBy: (p.postedBy as string | null) ?? null,
+      postedByName: (p.postedByName as string | null) ?? null,
+      postedAt: (p.postedAt as string | null) ?? null,
+      items,
+      payments,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+
+    if (status === "POSTED" && prevStatus !== "POSTED") {
+      for (const item of items) {
+        const balanceRow = db
+          .prepare(
+            `select unit_cost as unitCost from inventory_out_items
+             where tenant_id = @tenantId and warehouse_id = @warehouseId
+               and product_sku_id = @productSkuId`,
+          )
+          .get({
+            tenantId: DEMO_STORE_TENANT_ID,
+            warehouseId,
+            productSkuId: item.productSkuId,
+          }) as { unitCost: number } | undefined;
+        const unitCost = balanceRow ? Number(balanceRow.unitCost) : item.unitPrice;
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          -item.quantity,
+          unitCost,
+        );
+      }
+    }
+
+    if (status === "VOID" && prevStatus === "POSTED") {
+      for (const item of items) {
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          item.quantity,
+          item.unitPrice,
         );
       }
     }

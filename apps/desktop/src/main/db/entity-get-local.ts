@@ -25,6 +25,9 @@ import type {
   SkuSearchResult,
   SkuSupplier,
   StockMovementRow,
+  SaleDetail,
+  SalePaymentMethod,
+  SaleStatus,
   VendorContact,
   VendorContactType,
   VendorDetail,
@@ -42,6 +45,8 @@ import {
   findSkuIdByBarcodeLocal,
   listSkuBarcodesLocal,
 } from "./sku-barcodes-local";
+import { getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
+import { getDraftSaleReservedQtyLocal } from "./sales-local";
 
 function num(value: unknown, fallback = 0): number {
   const n = Number(value);
@@ -819,6 +824,8 @@ export function searchSkusLocal(
 export function getSkuByBarcodeLocal(
   barcode: string,
   warehouseId: string,
+  balanceSource: "stock" | "pos" = "stock",
+  excludeDraftSaleId?: string | null,
 ): SkuSearchResult | null {
   const code = barcode.trim();
   if (!code || !warehouseId) return null;
@@ -858,8 +865,22 @@ export function getSkuByBarcodeLocal(
     | Record<string, unknown>
     | undefined;
   if (!row) return null;
+
+  const quantityAvailable =
+    balanceSource === "pos"
+      ? Math.max(
+          0,
+          getInventoryOutBalanceQtyLocal(warehouseId, match.skuId) -
+            getDraftSaleReservedQtyLocal(
+              warehouseId,
+              match.skuId,
+              excludeDraftSaleId,
+            ),
+        )
+      : num(row.quantityAvailable);
+
   return {
-    ...mapSkuSearchRow(row, warehouseId),
+    ...mapSkuSearchRow({ ...row, quantityAvailable }, warehouseId),
     scannedQuantityMultiplier: match.quantityMultiplier,
     unitsPerPurchaseUnit: num(row.unitsPerPurchaseUnit, 1),
     baseUnitName: (row.baseUnitName as string | null) ?? null,
@@ -1571,6 +1592,117 @@ export function getInventoryOutReturnLocal(
         inventoryOutItemId: (r.inventoryOutItemId as string | null) ?? null,
       };
     }),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  };
+}
+
+export function getSaleLocal(id: string): SaleDetail | null {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select
+         s.id,
+         s.sale_number as saleNumber,
+         s.warehouse_id as warehouseId,
+         coalesce(w.name, '') as warehouseName,
+         s.status,
+         s.subtotal,
+         s.gst_rate as gstRate,
+         s.gst_amount as gstAmount,
+         s.sales_tax_rate as salesTaxRate,
+         s.sales_tax_amount as salesTaxAmount,
+         s.total,
+         s.device_id as deviceId,
+         s.posted_by as postedBy,
+         s.posted_at as postedAt,
+         coalesce(s.customer_name, 'CASH SALES CUSTOMER') as customerName,
+         s.posted_by_name as postedByName,
+         s.cash_tendered as cashTendered,
+         coalesce(s.notes, '') as notes,
+         s.created_at as createdAt,
+         s.updated_at as updatedAt
+       from sales s
+       left join warehouses w on w.id = s.warehouse_id
+       where s.id = ? and s.tenant_id = ?`,
+    )
+    .get(id, DEMO_STORE_TENANT_ID) as Record<string, unknown> | undefined;
+  if (!row) return null;
+
+  const items = db
+    .prepare(
+      `select
+         l.id,
+         l.product_sku_id as productSkuId,
+         coalesce(p.name, '') as productName,
+         coalesce(sk.variant_name, '') as variantName,
+         coalesce(sk.sku, '') as sku,
+         l.barcode,
+         l.quantity,
+         l.unit_price as unitPrice,
+         l.line_total as lineTotal,
+         l.sell_unit as sellUnit
+       from sale_lines l
+       left join product_skus sk on sk.id = l.product_sku_id
+       left join products p on p.id = sk.product_id
+       where l.sale_id = ? and l.tenant_id = ?
+       order by l.created_at, l.id`,
+    )
+    .all(id, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
+
+  const payments = db
+    .prepare(
+      `select
+         id,
+         method,
+         amount,
+         coalesce(reference, '') as reference
+       from sale_payments
+       where sale_id = ? and tenant_id = ?
+       order by created_at, id`,
+    )
+    .all(id, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
+
+  return {
+    id: String(row.id),
+    saleNumber: String(row.saleNumber),
+    warehouseId: String(row.warehouseId),
+    warehouseName: String(row.warehouseName ?? ""),
+    status: row.status as SaleStatus,
+    subtotal: num(row.subtotal),
+    gstRate: num(row.gstRate),
+    gstAmount: num(row.gstAmount),
+    salesTaxRate: num(row.salesTaxRate),
+    salesTaxAmount: num(row.salesTaxAmount),
+    total: num(row.total),
+    deviceId: (row.deviceId as string | null) ?? null,
+    postedBy: (row.postedBy as string | null) ?? null,
+    postedAt: (row.postedAt as string | null) ?? null,
+    customerName: String(row.customerName ?? "CASH SALES CUSTOMER"),
+    postedByName: (row.postedByName as string | null) ?? null,
+    cashTendered:
+      row.cashTendered != null && row.cashTendered !== ""
+        ? num(row.cashTendered)
+        : null,
+    notes: String(row.notes ?? ""),
+    items: items.map((r) => ({
+      id: String(r.id),
+      productSkuId: String(r.productSkuId),
+      productName: String(r.productName ?? ""),
+      variantName: String(r.variantName ?? ""),
+      sku: String(r.sku ?? ""),
+      barcode: (r.barcode as string | null) ?? null,
+      quantity: num(r.quantity),
+      unitPrice: num(r.unitPrice),
+      lineTotal: num(r.lineTotal),
+      sellUnit: (r.sellUnit as "pc" | "box") ?? "pc",
+    })),
+    payments: payments.map((r) => ({
+      id: String(r.id),
+      method: r.method as SalePaymentMethod,
+      amount: num(r.amount),
+      reference: String(r.reference ?? ""),
+    })),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
   };

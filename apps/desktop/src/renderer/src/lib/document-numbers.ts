@@ -1,14 +1,17 @@
 import {
+  nextHoldNumber,
   nextOutNumber,
   nextOutReturnNumber,
   nextPoNumber,
   nextReceiptNumber,
+  nextSaleNumber,
   nextSkuCodeForProduct,
   nextVendorCode,
 } from "@blackbox/shared";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
+import { salesApi } from "@renderer/lib/api/sales";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { loadVendors } from "@renderer/lib/local-db/entity-source";
 
@@ -139,4 +142,54 @@ export async function allocateOutReturnNumber(
   tenantName: string,
 ): Promise<string> {
   return nextOutReturnNumber(tenantName, await existingOutReturnNumbers());
+}
+
+async function existingSaleNumbers(): Promise<string[]> {
+  try {
+    const local = await window.blackbox?.localDb?.listSaleNumbers?.();
+    if (local?.length) return local;
+  } catch {
+    /* fall through */
+  }
+  try {
+    const localSales = await window.blackbox?.localDb?.listSales?.({
+      pageSize: 500,
+    });
+    if (localSales?.items.length) {
+      return localSales.items.map((s) => s.saleNumber);
+    }
+  } catch {
+    /* fall through */
+  }
+  const remote = await salesApi.list({ pageSize: 500 });
+  return remote.items.map((s) => s.saleNumber);
+}
+
+export async function allocateSaleNumber(tenantName: string): Promise<string> {
+  return nextSaleNumber(tenantName, await existingSaleNumbers());
+}
+
+async function existingHoldNumbers(): Promise<string[]> {
+  try {
+    const local = await window.blackbox?.localDb?.listHoldNumbers?.();
+    if (local?.length) return local;
+  } catch {
+    /* fall through */
+  }
+  try {
+    const localSales = await window.blackbox?.localDb?.listSales?.({
+      status: "DRAFT",
+      pageSize: 500,
+    });
+    if (localSales?.items.length) {
+      return localSales.items.map((s) => s.saleNumber);
+    }
+  } catch {
+    /* fall through */
+  }
+  return [];
+}
+
+export async function allocateHoldNumber(tenantName: string): Promise<string> {
+  return nextHoldNumber(tenantName, await existingHoldNumbers());
 }

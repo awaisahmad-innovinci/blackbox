@@ -29,6 +29,7 @@ export const NAV_DROPDOWN_MENUS: Record<NavDropdownId, NavDropdownItem[]> = {
 
 export type AppNavSectionId =
   | "dashboard"
+  | "sale"
   | "warehouses"
   | "inventory"
   | "purchasing"
@@ -41,6 +42,14 @@ export const APP_NAV_SECTIONS = [
     shortcut: "d",
     kind: "link",
     to: "/",
+  },
+  {
+    id: "sale",
+    label: "Sale",
+    shortcut: "s",
+    kind: "link",
+    to: "/sales/new",
+    requiresPermission: "sales.write",
   },
   {
     id: "warehouses",
@@ -185,4 +194,27 @@ export function matchNavDropdownItem(
 
   event.preventDefault();
   return item.to;
+}
+
+export function visibleNavSections(permissions: string[]) {
+  const cashierOnly =
+    permissions.includes("sales.write") &&
+    !permissions.some((p) =>
+      ["products.", "inventory.", "warehouses.", "purchasing.", "vendors."].some(
+        (prefix) => p.startsWith(prefix),
+      ),
+    );
+
+  if (cashierOnly) {
+    return APP_NAV_SECTIONS.filter(
+      (s) => s.id === "dashboard" || s.id === "sale",
+    );
+  }
+
+  return APP_NAV_SECTIONS.filter((section) => {
+    if ("requiresPermission" in section) {
+      return permissions.includes(section.requiresPermission);
+    }
+    return true;
+  });
 }

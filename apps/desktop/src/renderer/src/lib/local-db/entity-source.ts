@@ -8,7 +8,10 @@ import type {
   InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
   PaginatedInventoryOutReturns,
+  PaginatedSales,
   PaginatedVendors,
+  SaleDetail,
+  SaleListQuery,
   ProductDetail,
   ProductSkuDetail,
   ProductSupplierRow,
@@ -41,6 +44,7 @@ import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
+import { salesApi } from "@renderer/lib/api/sales";
 import { productsApi } from "@renderer/lib/api/products";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { brandsApi } from "@renderer/lib/api/brands";
@@ -210,6 +214,24 @@ export async function loadInventoryOutReturn(
   const local = await window.blackbox?.localDb?.getInventoryOutReturn?.(id);
   if (local) return local;
   return inventoryOutReturnsApi.get(id);
+}
+
+export async function loadSales(
+  query: SaleListQuery = {},
+): Promise<PaginatedSales> {
+  try {
+    const local = await window.blackbox?.localDb?.listSales?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return salesApi.list(query);
+}
+
+export async function loadSale(id: string): Promise<SaleDetail> {
+  const local = await window.blackbox?.localDb?.getSale?.(id);
+  if (local) return local;
+  return salesApi.get(id);
 }
 
 export async function loadInventoryOutReturnableQuantity(
@@ -541,17 +563,78 @@ export async function resolveVendorReturnScan(
 export async function loadSkuByBarcode(
   barcode: string,
   warehouseId: string,
+  options?: { balance?: "stock" | "pos"; excludeDraftSaleId?: string | null },
 ): Promise<SkuSearchResult> {
+  const balance = options?.balance ?? "stock";
+  const excludeDraftSaleId = options?.excludeDraftSaleId ?? null;
   try {
     const local = await window.blackbox?.localDb?.getSkuByBarcode?.(
       barcode,
       warehouseId,
+      balance,
+      excludeDraftSaleId,
     );
     if (local) return local;
   } catch {
     /* fall through to API */
   }
-  return skusApi.byBarcode(barcode, warehouseId);
+  const remote = await skusApi.byBarcode(barcode, warehouseId, options);
+  if (balance === "pos") {
+    try {
+      const reserved = await window.blackbox?.localDb?.getDraftSaleReservedQty?.(
+        warehouseId,
+        remote.id,
+        excludeDraftSaleId,
+      );
+      if (reserved && reserved > 0) {
+        return {
+          ...remote,
+          quantityAvailable: Math.max(
+            0,
+            (remote.quantityAvailable ?? 0) - reserved,
+          ),
+        };
+      }
+    } catch {
+      /* ignore reservation adjustment */
+    }
+  }
+  return remote;
+}
+
+export async function loadPosAvailableForSale(
+  warehouseId: string,
+  productSkuId: string,
+  excludeDraftSaleId?: string | null,
+): Promise<number> {
+  try {
+    const local = await window.blackbox?.localDb?.getPosAvailableForSale?.(
+      warehouseId,
+      productSkuId,
+      excludeDraftSaleId ?? null,
+    );
+    if (local != null) return local;
+  } catch {
+    /* fall through */
+  }
+
+  const { quantityAvailable } = await loadInventoryOutReturnableQuantity(
+    warehouseId,
+    productSkuId,
+  );
+  try {
+    const reserved = await window.blackbox?.localDb?.getDraftSaleReservedQty?.(
+      warehouseId,
+      productSkuId,
+      excludeDraftSaleId ?? null,
+    );
+    if (reserved && reserved > 0) {
+      return Math.max(0, quantityAvailable - reserved);
+    }
+  } catch {
+    /* ignore reservation adjustment */
+  }
+  return quantityAvailable;
 }
 
 export async function lookupSkuByCode(

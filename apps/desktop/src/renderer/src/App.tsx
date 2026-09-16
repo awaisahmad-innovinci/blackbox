@@ -37,6 +37,10 @@ import { VendorProfilePage } from "./features/vendors/VendorProfilePage";
 import { VendorsListPage } from "./features/vendors/VendorsListPage";
 import { WarehouseFormPage } from "./features/warehouses/WarehouseFormPage";
 import { WarehousesListPage } from "./features/warehouses/WarehousesListPage";
+import { HeldSalesPage } from "./features/sales/HeldSalesPage";
+import { SalePage } from "./features/sales/SalePage";
+import { SaleDetailPage } from "./features/sales/SaleDetailPage";
+import { SalesListPage } from "./features/sales/SalesListPage";
 
 export default function App() {
   return (
@@ -150,6 +154,11 @@ function AuthenticatedApp() {
           <Route path="warehouses" element={<WarehousesListPage />} />
           <Route path="warehouses/new" element={<WarehouseFormPage />} />
           <Route path="warehouses/:id/edit" element={<WarehouseFormPage />} />
+          <Route path="sales" element={<SalesListPage />} />
+          <Route path="sales/held" element={<HeldSalesPage />} />
+          <Route path="sales/new/:draftId" element={<SalePage />} />
+          <Route path="sales/new" element={<SalePage />} />
+          <Route path="sales/:id" element={<SaleDetailPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

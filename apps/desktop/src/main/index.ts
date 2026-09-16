@@ -17,6 +17,8 @@ import type {
   ProductSkuDetail,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  SaleDetail,
+  SaleListQuery,
   UnitListItem,
   VendorDetail,
   VendorGroup,
@@ -47,6 +49,15 @@ import {
   upsertInventoryOutReturnLocal,
   upsertInventoryOutReturnsLocal,
 } from "./db/inventory-out-returns-local";
+import {
+  countDraftSalesLocal,
+  deleteSaleDraftLocal,
+  getDraftSaleReservedQtyLocal,
+  getPosAvailableForSaleLocal,
+  upsertSaleDraftLocal,
+  upsertSaleLocal,
+  upsertSalesLocal,
+} from "./db/sales-local";
 import {
   upsertVendorReturnLocal,
   upsertVendorReturnsLocal,
@@ -85,6 +96,7 @@ import {
   getGoodsReceiptLocal,
   getInventoryOutLocal,
   getInventoryOutReturnLocal,
+  getSaleLocal,
   getVendorReturnLocal,
   getProductLocal,
   getProductProfileLocal,
@@ -121,8 +133,11 @@ import {
   listReceiptNumbersLocal,
   listOutNumbersLocal,
   listOutReturnNumbersLocal,
+  listHoldNumbersLocal,
+  listSaleNumbersLocal,
   listInventoryOutsLocal,
   listInventoryOutReturnsLocal,
+  listSalesLocal,
   listVendorGroupsLocal,
   getVendorGroupLocal,
   listUnitsLocal,
@@ -137,6 +152,8 @@ import {
 } from "./db/queries-local";
 import {
   getOrCreateFingerprint,
+  getStableMachineFingerprint,
+  persistFingerprint,
   readIdentity,
   writeIdentity,
   type DeviceIdentity,
@@ -339,6 +356,44 @@ function registerIpc(): void {
     },
   );
   ipcMain.handle(
+    "localDb:upsertSales",
+    (_event, rows: SaleDetail[]) => {
+      upsertSalesLocal(rows);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle("localDb:upsertSale", (_event, detail: SaleDetail) => {
+    upsertSaleLocal(detail);
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:upsertSaleDraft", (_event, detail: SaleDetail) => {
+    upsertSaleDraftLocal(detail);
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:deleteSaleDraft", (_event, id: string) => ({
+    ok: deleteSaleDraftLocal(id),
+  }));
+  ipcMain.handle("localDb:countDraftSales", () => countDraftSalesLocal());
+  ipcMain.handle(
+    "localDb:getDraftSaleReservedQty",
+    (
+      _event,
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) =>
+      getDraftSaleReservedQtyLocal(warehouseId, productSkuId, excludeSaleId),
+  );
+  ipcMain.handle(
+    "localDb:getPosAvailableForSale",
+    (
+      _event,
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) => getPosAvailableForSaleLocal(warehouseId, productSkuId, excludeSaleId),
+  );
+  ipcMain.handle(
     "localDb:upsertVendorReturn",
     (_event, detail: VendorReturnDetail) => {
       upsertVendorReturnLocal(detail);
@@ -387,6 +442,8 @@ function registerIpc(): void {
   ipcMain.handle("localDb:listOutReturnNumbers", () =>
     listOutReturnNumbersLocal(),
   );
+  ipcMain.handle("localDb:listSaleNumbers", () => listSaleNumbersLocal());
+  ipcMain.handle("localDb:listHoldNumbers", () => listHoldNumbersLocal());
   ipcMain.handle(
     "localDb:listInventoryOuts",
     (_event, query: InventoryOutListQuery = {}) =>
@@ -396,6 +453,10 @@ function registerIpc(): void {
     "localDb:listInventoryOutReturns",
     (_event, query: InventoryOutReturnListQuery = {}) =>
       listInventoryOutReturnsLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listSales",
+    (_event, query: SaleListQuery = {}) => listSalesLocal(query),
   );
   ipcMain.handle(
     "localDb:inventoryOutReturnableQuantity",
@@ -506,8 +567,19 @@ function registerIpc(): void {
   );
   ipcMain.handle(
     "localDb:getSkuByBarcode",
-    (_event, barcode: string, warehouseId: string) =>
-      getSkuByBarcodeLocal(barcode, warehouseId),
+    (
+      _event,
+      barcode: string,
+      warehouseId: string,
+      balanceSource?: "stock" | "pos",
+      excludeDraftSaleId?: string | null,
+    ) =>
+      getSkuByBarcodeLocal(
+        barcode,
+        warehouseId,
+        balanceSource ?? "stock",
+        excludeDraftSaleId,
+      ),
   );
   ipcMain.handle("localDb:lookupSkuByBarcode", (_event, barcode: string) =>
     lookupSkuByBarcodeLocal(barcode),
@@ -545,6 +617,7 @@ function registerIpc(): void {
   ipcMain.handle("localDb:getInventoryOutReturn", (_event, id: string) =>
     getInventoryOutReturnLocal(id),
   );
+  ipcMain.handle("localDb:getSale", (_event, id: string) => getSaleLocal(id));
   ipcMain.handle(
     "localDb:listVendorReturns",
     (_event, query?: VendorReturnListQuery) => listVendorReturnsLocal(query),
@@ -578,6 +651,13 @@ function registerIpc(): void {
   );
 
   ipcMain.handle("identity:getFingerprint", () => getOrCreateFingerprint());
+  ipcMain.handle("identity:getStableFingerprint", () =>
+    getStableMachineFingerprint(),
+  );
+  ipcMain.handle("identity:persistFingerprint", (_event, fingerprint: string) => {
+    persistFingerprint(fingerprint);
+    return { ok: true as const };
+  });
   ipcMain.handle("identity:get", () => readIdentity());
   ipcMain.handle(
     "identity:bind",
