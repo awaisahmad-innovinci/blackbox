@@ -15,6 +15,12 @@ export interface AuthUser {
   fullName: string;
   /** Effective permission keys resolved from User → Role → Permission. */
   permissions: Permission[];
+  /** When true, POS requires manager Authy before removing a sale line. */
+  requireManagerApprovalRemoveSaleLine?: boolean;
+  /** When true, POS requires manager Authy before opening a cashier till. */
+  requireManagerApprovalTillOpen?: boolean;
+  /** When true, POS requires manager Authy before collecting cash from a till. */
+  requireManagerApprovalTillWithdraw?: boolean;
 }
 
 export interface AuthTokens {

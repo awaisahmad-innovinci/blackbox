@@ -28,6 +28,12 @@ import {
 } from "@renderer/lib/sales-access";
 import { afterDialogClosed } from "@renderer/lib/on-dialog-open-change";
 import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
+import { TotpEnrollDialog } from "@renderer/features/auth/TotpEnrollDialog";
+import {
+  canEnrollTotp,
+  refreshSupervisorTotpCache,
+  totpApi,
+} from "@renderer/lib/api/totp";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
 
 const DEVICE_LABEL: Record<string, string> = {
@@ -64,6 +70,10 @@ export function AppShell() {
   );
   const [globalTaxonomyKind, setGlobalTaxonomyKind] =
     useState<TaxonomyKind | null>(null);
+  const [totpEnrollOpen, setTotpEnrollOpen] = useState(false);
+  const [totpResetOpen, setTotpResetOpen] = useState(false);
+  const [totpBusy, setTotpBusy] = useState(false);
+  const supervisorCapable = user ? canEnrollTotp(user) : false;
   const { activeIndex, setNavRef, handleMenubarKeyDown, onNavFocus } =
     useAppNavKeyboard({
       sections,
@@ -75,6 +85,26 @@ export function AppShell() {
   useEffect(() => {
     releaseStuckModalState({ retry: true });
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!user || offline || !supervisorCapable) return;
+    if (sessionStorage.getItem("blackbox.totp.enroll.dismissed") === "1") {
+      return;
+    }
+    void (async () => {
+      try {
+        const status = await totpApi.status();
+        if (!status.enrolled) setTotpEnrollOpen(true);
+      } catch {
+        /* offline or API unavailable */
+      }
+    })();
+  }, [user, offline, supervisorCapable]);
+
+  useEffect(() => {
+    if (!user || offline) return;
+    void refreshSupervisorTotpCache();
+  }, [user, offline]);
 
   useEffect(() => {
     if (!isRouteAllowed(location.pathname, permissions)) {
@@ -243,6 +273,19 @@ export function AppShell() {
                   </p>
                 </div>
                 <DropdownMenuSeparator />
+                {supervisorCapable && !offline ? (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() => setTotpEnrollOpen(true)}
+                    >
+                      Set up Authy
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setTotpResetOpen(true)}>
+                      Reset Authy
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
                 <DropdownMenuItem onSelect={() => void syncNow()}>
                   Sync now
                 </DropdownMenuItem>
@@ -319,6 +362,39 @@ export function AppShell() {
           }}
         />
       ) : null}
+
+      <TotpEnrollDialog
+        open={totpEnrollOpen}
+        onOpenChange={(open) => {
+          setTotpEnrollOpen(open);
+          if (!open) {
+            sessionStorage.setItem("blackbox.totp.enroll.dismissed", "1");
+          }
+        }}
+        onEnrolled={() => {
+          sessionStorage.removeItem("blackbox.totp.enroll.dismissed");
+        }}
+      />
+
+      <ConfirmDialog
+        open={totpResetOpen}
+        onOpenChange={setTotpResetOpen}
+        title="Reset Authy?"
+        description="Existing Authy codes will stop working on this device until you scan a new QR code."
+        confirmLabel="Reset Authy"
+        loading={totpBusy}
+        onConfirm={async () => {
+          setTotpBusy(true);
+          try {
+            await totpApi.resetSelf();
+            await window.blackbox?.totp?.replaceSupervisorCache([]);
+            setTotpResetOpen(false);
+            setTotpEnrollOpen(true);
+          } finally {
+            setTotpBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

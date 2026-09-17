@@ -298,6 +298,9 @@ export class AuthService {
           userPermissions,
           tenant.name,
           await this.getBusinessAddress(user.tenantId),
+          tenant.requireManagerApprovalRemoveSaleLine,
+          tenant.requireManagerApprovalTillOpen,
+          tenant.requireManagerApprovalTillWithdraw,
         ),
         tokens: {
           accessToken,
@@ -339,6 +342,9 @@ export class AuthService {
       userPermissions,
       tenant.name,
       await this.getBusinessAddress(user.tenantId),
+      tenant.requireManagerApprovalRemoveSaleLine,
+      tenant.requireManagerApprovalTillOpen,
+      tenant.requireManagerApprovalTillWithdraw,
     );
   }
 
@@ -451,6 +457,9 @@ export class AuthService {
         userPermissions,
         tenant?.name,
         businessAddress,
+        tenant?.requireManagerApprovalRemoveSaleLine,
+        tenant?.requireManagerApprovalTillOpen,
+        tenant?.requireManagerApprovalTillWithdraw,
       ),
       tokens: {
         accessToken,
@@ -548,6 +557,9 @@ export class AuthService {
     perms: Permission[],
     tenantName?: string,
     businessAddress?: string,
+    requireManagerApprovalRemoveSaleLine?: boolean,
+    requireManagerApprovalTillOpen?: boolean,
+    requireManagerApprovalTillWithdraw?: boolean,
   ): AuthUser {
     return {
       id: user.id,
@@ -558,6 +570,9 @@ export class AuthService {
       username: user.username,
       fullName: user.fullName,
       permissions: perms,
+      requireManagerApprovalRemoveSaleLine,
+      requireManagerApprovalTillOpen,
+      requireManagerApprovalTillWithdraw,
     };
   }
 

@@ -20,6 +20,9 @@ export const PERMISSIONS = [
   "sales.read",
   "sales.write",
   "sales.void",
+  "till.read",
+  "till.manage",
+  "activity.read",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -42,6 +45,9 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   "sales.read": "View sales bills and receipts",
   "sales.write": "Create and post sales bills",
   "sales.void": "Void posted sales bills",
+  "till.read": "View own cash till session",
+  "till.manage": "Approve, withdraw, and reopen cashier tills",
+  "activity.read": "View POS activity and approval log",
 };
 
 export function isPermission(value: string): value is Permission {

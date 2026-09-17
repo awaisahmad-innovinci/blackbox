@@ -93,6 +93,13 @@ export type {
 } from "./auth";
 export { SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE } from "./auth";
 export type {
+  TotpEnrollStartResponse,
+  TotpStatusResponse,
+  TotpSupervisorCacheEntry,
+  TotpSupervisorCacheResponse,
+  TotpVerifySupervisorCodeResult,
+} from "./totp";
+export type {
   DeviceStatus,
   Device,
   DeviceUser,
@@ -139,6 +146,7 @@ export type {
   PurchaseOrderStatus,
   GoodsReceiptStatus,
   DashboardSummary,
+  CashierDashboardSummary,
   VendorContactType,
   PaymentTerms,
   VendorContactInput,
@@ -329,6 +337,43 @@ export {
   saleBillTotals,
   saleLineTotal,
 } from "./sales";
+export type {
+  TillNoteDenomination,
+  TillStatus,
+  TillNoteCounts,
+  TillSessionDetail,
+  TillListItem,
+  OpenTillRequest,
+  WithdrawTillRequest,
+  ReopenTillRequest,
+  CollectTillCashByAmountRequest,
+} from "./till";
+export {
+  TILL_NOTE_DENOMINATIONS,
+  TILL_MAX_EXTRA_CASH,
+  TILL_WARNING_EXTRA_CASH,
+  TILL_STATUSES,
+  TILL_CLOSE_REASON_CASHIER_CLOSED,
+  computeTillDenominationTotal,
+  tillMaxLimit,
+  tillWarningThreshold,
+  isTillNearLimit,
+  tillRemainingHeadroom,
+  emptyTillNotes,
+  validateTillOpeningBalance,
+  validateTillOpeningBalanceAmount,
+} from "./till";
+export type {
+  ActivityLogEventType,
+  ActivityLogItem,
+  ActivityLogListQuery,
+  PaginatedActivityLogs,
+  CreateActivityLogRequest,
+} from "./activity-log";
+export {
+  ACTIVITY_LOG_EVENT_TYPES,
+  ACTIVITY_LOG_EVENT_LABELS,
+} from "./activity-log";
 export {
   MASTER_DATA_IMPORT_FILES,
   nextSkuCode,

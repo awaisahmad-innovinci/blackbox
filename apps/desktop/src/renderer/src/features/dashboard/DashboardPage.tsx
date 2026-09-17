@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import type { DashboardSummary, MasterDataImportResult } from "@blackbox/shared";
+import type {
+  CashierDashboardSummary,
+  DashboardSummary,
+  MasterDataImportResult,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
 import { Skeleton } from "@blackbox/ui/skeleton";
@@ -24,6 +28,8 @@ import {
   SyncPullError,
   type SyncProgress,
 } from "@renderer/lib/local-db/pull";
+import { useSession } from "@renderer/lib/session/context";
+import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { ImportMasterDataDialog } from "./ImportMasterDataDialog";
 import { DeviceSessionCard } from "./DeviceSessionCard";
 import {
@@ -56,6 +62,38 @@ const CARDS: {
   },
 ];
 
+const CASHIER_CARDS: {
+  key: keyof CashierDashboardSummary;
+  label: string;
+  hint: string;
+  format: "money" | "count";
+}[] = [
+  {
+    key: "totalSalesAmount",
+    label: "Total sales (today)",
+    hint: "Posted sales total for today",
+    format: "money",
+  },
+  {
+    key: "cashReceivedAmount",
+    label: "Cash received (today)",
+    hint: "Cash payments posted today",
+    format: "money",
+  },
+  {
+    key: "cardPaymentsAmount",
+    label: "Card payments (today)",
+    hint: "Card payments posted today",
+    format: "money",
+  },
+  {
+    key: "heldBillsCount",
+    label: "Held bills",
+    hint: "Your held bills on this device",
+    format: "count",
+  },
+];
+
 function formatSyncedAt(iso: string): string {
   try {
     return new Date(iso).toLocaleString();
@@ -66,7 +104,11 @@ function formatSyncedAt(iso: string): string {
 
 export function DashboardPage() {
   const dataVersion = useSyncDataVersion();
+  const { user } = useSession();
+  const { cashierOnly } = useSalesAccess();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [cashierSummary, setCashierSummary] =
+    useState<CashierDashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
@@ -93,10 +135,30 @@ export function DashboardPage() {
     try {
       const mode = await resolveDataSourceMode();
       setDataSource(mode);
-      if (mode === "local" && window.blackbox?.localDb?.getDashboardSummary) {
+      if (cashierOnly && user?.id) {
+        if (
+          mode === "local" &&
+          window.blackbox?.localDb?.getCashierDashboardSummary
+        ) {
+          setCashierSummary(
+            await window.blackbox.localDb.getCashierDashboardSummary(user.id),
+          );
+        } else {
+          setCashierSummary({
+            date: new Date().toISOString().slice(0, 10),
+            totalSalesAmount: 0,
+            cashReceivedAmount: 0,
+            cardPaymentsAmount: 0,
+            heldBillsCount: 0,
+          });
+        }
+        setSummary(null);
+      } else if (mode === "local" && window.blackbox?.localDb?.getDashboardSummary) {
         setSummary(await window.blackbox.localDb.getDashboardSummary());
+        setCashierSummary(null);
       } else {
         setSummary(await dashboardApi.getSummary());
+        setCashierSummary(null);
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -109,7 +171,7 @@ export function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cashierOnly, user?.id]);
 
   useEffect(() => {
     void loadSummary();
@@ -294,27 +356,39 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Demo Store inventory overview.
+            {cashierOnly
+              ? "Today's sales summary."
+              : "Demo Store inventory overview."}
           </p>
-          <p className="text-muted-foreground mt-1 text-xs">
-            {dataSource === "local" ? "Showing local data" : "Showing API data"}
-          </p>
+          {cashierOnly && cashierSummary ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              {new Date(`${cashierSummary.date}T12:00:00`).toLocaleDateString()}
+            </p>
+          ) : (
+            <p className="text-muted-foreground mt-1 text-xs">
+              {dataSource === "local" ? "Showing local data" : "Showing API data"}
+            </p>
+          )}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={syncing}
-          onClick={() => setImportOpen(true)}
-        >
-          Upload Old Data
-        </Button>
+        {!cashierOnly ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={syncing}
+            onClick={() => setImportOpen(true)}
+          >
+            Upload Old Data
+          </Button>
+        ) : null}
       </div>
 
-      <ImportMasterDataDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImported={onMasterDataImported}
-      />
+      {!cashierOnly ? (
+        <ImportMasterDataDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImported={onMasterDataImported}
+        />
+      ) : null}
 
       <DeviceSessionCard />
 
@@ -384,25 +458,47 @@ export function DashboardPage() {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {CARDS.map((card) => (
-          <Card key={card.key} className="gap-3 py-5">
-            <CardHeader className="px-5 pb-0">
-              <CardTitle className="text-muted-foreground text-sm font-medium">
-                {card.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-5">
-              {loading ? (
-                <Skeleton className="h-9 w-16" />
-              ) : (
-                <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                  {summary?.[card.key] ?? "—"}
-                </p>
-              )}
-              <p className="text-muted-foreground mt-1 text-xs">{card.hint}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {cashierOnly
+          ? CASHIER_CARDS.map((card) => (
+              <Card key={card.key} className="gap-3 py-5">
+                <CardHeader className="px-5 pb-0">
+                  <CardTitle className="text-muted-foreground text-sm font-medium">
+                    {card.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-5">
+                  {loading ? (
+                    <Skeleton className="h-9 w-24" />
+                  ) : (
+                    <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                      {card.format === "money"
+                        ? `Rs ${(cashierSummary?.[card.key] ?? 0).toLocaleString()}`
+                        : (cashierSummary?.[card.key] ?? "—")}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground mt-1 text-xs">{card.hint}</p>
+                </CardContent>
+              </Card>
+            ))
+          : CARDS.map((card) => (
+              <Card key={card.key} className="gap-3 py-5">
+                <CardHeader className="px-5 pb-0">
+                  <CardTitle className="text-muted-foreground text-sm font-medium">
+                    {card.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-5">
+                  {loading ? (
+                    <Skeleton className="h-9 w-16" />
+                  ) : (
+                    <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                      {summary?.[card.key] ?? "—"}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground mt-1 text-xs">{card.hint}</p>
+                </CardContent>
+              </Card>
+            ))}
       </div>
 
       <KeyboardHints hints={[KEYBOARD_HINT_APP_NAV]} />

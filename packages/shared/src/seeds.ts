@@ -24,7 +24,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "sales.read",
     "sales.write",
     "sales.void",
+    "till.read",
+    "till.manage",
+    "activity.read",
+    "warehouses.write",
   ],
   WAREHOUSE_MANAGER: ["desktop.access", "sync.use"],
-  CASHIER: ["desktop.access", "sync.use", "sales.read", "sales.write"],
+  CASHIER: ["desktop.access", "sync.use", "sales.write", "till.read"],
 };

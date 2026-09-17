@@ -7,6 +7,7 @@ import type {
   ProductDetail,
   PurchaseOrderDetail,
   SaleDetail,
+  TillSessionDetail,
   SyncChangeDto,
   SyncEntityType,
   SyncOperation,
@@ -46,6 +47,7 @@ import { upsertInventoryOutLocal } from "./inventory-out-local";
 import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
 import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
 import { upsertSaleLocal } from "./sales-local";
+import { upsertTillSessionLocal } from "./till-local";
 import { upsertVendorReturnLocal } from "./vendor-returns-local";
 import { getPurchaseOrderLocal } from "./entity-get-local";
 import {
@@ -482,6 +484,36 @@ export function applyChange(change: SyncChangeDto): void {
         );
       }
     }
+    return;
+  }
+  if (change.entityType === "till_session") {
+    upsertTillSessionLocal({
+      id: change.entityId,
+      userId: str(p.userId),
+      userName: str(p.userName),
+      status: str(p.status, "OPEN") as TillSessionDetail["status"],
+      note10: Number(p.note10 ?? 0),
+      note20: Number(p.note20 ?? 0),
+      note50: Number(p.note50 ?? 0),
+      note100: Number(p.note100 ?? 0),
+      note500: Number(p.note500 ?? 0),
+      note1000: Number(p.note1000 ?? 0),
+      note5000: Number(p.note5000 ?? 0),
+      openingTotal: Number(p.openingTotal ?? 0),
+      openingBalance: Number(p.openingBalance ?? 0),
+      currentCashBalance: Number(p.currentCashBalance ?? 0),
+      maxCashLimit: Number(p.maxCashLimit ?? 0),
+      openedAt: (p.openedAt as string | null | undefined) ?? null,
+      closedAt: (p.closedAt as string | null | undefined) ?? null,
+      approvedByUserId: (p.approvedByUserId as string | null | undefined) ?? null,
+      approvedByName: (p.approvedByName as string | null | undefined) ?? null,
+      approvedAt: (p.approvedAt as string | null | undefined) ?? null,
+      reopenedByUserId: (p.reopenedByUserId as string | null | undefined) ?? null,
+      reopenedByName: (p.reopenedByName as string | null | undefined) ?? null,
+      closeReason: (p.closeReason as string | null | undefined) ?? null,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
     return;
   }
   if (change.entityType === "vendor_return") {

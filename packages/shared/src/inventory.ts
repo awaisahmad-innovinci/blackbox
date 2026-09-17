@@ -121,6 +121,16 @@ export interface DashboardSummary {
   recentReceipts: number;
 }
 
+/** POS cashier dashboard — today's sales metrics from local device data. */
+export interface CashierDashboardSummary {
+  /** Local calendar date (YYYY-MM-DD). */
+  date: string;
+  totalSalesAmount: number;
+  cashReceivedAmount: number;
+  cardPaymentsAmount: number;
+  heldBillsCount: number;
+}
+
 export interface VendorContactInput {
   name?: string | null;
   phone?: string | null;

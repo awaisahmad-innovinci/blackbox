@@ -2,6 +2,7 @@
 
 import type {
   Brand,
+  CashierDashboardSummary,
   Category,
   DashboardSummary,
   EntityStatus,
@@ -28,6 +29,12 @@ import type {
   PurchaseOrderListQuery,
   SaleDetail,
   SaleListQuery,
+  OpenTillRequest,
+  ReopenTillRequest,
+  TillListItem,
+  TillSessionDetail,
+  TillStatus,
+  WithdrawTillRequest,
   ReceivingDraft,
   SkuBarcode,
   SkuBarcodeLookupResult,
@@ -162,6 +169,82 @@ declare global {
           query?: InventoryOutReturnListQuery,
         ) => Promise<PaginatedInventoryOutReturns>;
         listSales: (query?: SaleListQuery) => Promise<PaginatedSales>;
+        getCurrentTill: (userId: string) => Promise<TillSessionDetail | null>;
+        getLatestTillSession: (userId: string) => Promise<TillSessionDetail | null>;
+        listTills: (query?: {
+          status?: TillStatus;
+          userId?: string;
+        }) => Promise<TillListItem[]>;
+        openTill: (input: {
+          userId: string;
+          userName: string;
+          body: OpenTillRequest;
+          requireApproval: boolean;
+        }) => Promise<TillSessionDetail>;
+        approveTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+        }) => Promise<TillSessionDetail>;
+        withdrawTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+          body: WithdrawTillRequest;
+        }) => Promise<TillSessionDetail>;
+        collectCashTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+          body: WithdrawTillRequest;
+        }) => Promise<TillSessionDetail>;
+        collectCashByAmount: (input: {
+          userId: string;
+          userName: string;
+          amount: number;
+          supervisorUserId?: string;
+          collectedByName?: string;
+        }) => Promise<TillSessionDetail>;
+        closeTill: (input: {
+          userId: string;
+          userName: string;
+        }) => Promise<TillSessionDetail>;
+        reopenTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+          body: ReopenTillRequest;
+        }) => Promise<TillSessionDetail>;
+        upsertTillSession: (detail: TillSessionDetail) => Promise<{ ok: true }>;
+        assertTillCanPostSale: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          cashPaymentTotal: number;
+        }) => Promise<{ ok: true }>;
+        applyTillCashFromSale: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          cashPaymentTotal: number;
+        }) => Promise<{ ok: true }>;
+        appendPendingActivityLog: (input: {
+          id: string;
+          payload: import("@blackbox/shared").CreateActivityLogRequest;
+        }) => Promise<{ ok: true }>;
+        appendLocalActivityLog: (
+          item: import("@blackbox/shared").ActivityLogItem,
+        ) => Promise<{ ok: true }>;
+        listLocalActivityLogs: (
+          query?: import("@blackbox/shared").ActivityLogListQuery,
+        ) => Promise<import("@blackbox/shared").PaginatedActivityLogs>;
+        markActivityLogSynced: (id: string) => Promise<{ ok: true }>;
+        listPendingActivityLogs: () => Promise<
+          Array<{
+            id: string;
+            payload: import("@blackbox/shared").CreateActivityLogRequest;
+            createdAt: string;
+          }>
+        >;
+        deletePendingActivityLog: (id: string) => Promise<{ ok: true }>;
         inventoryOutReturnableQuantity: (
           warehouseId: string,
           productSkuId: string,
@@ -173,6 +256,9 @@ declare global {
           unitCost: number,
         ) => Promise<{ ok: true }>;
         getDashboardSummary: () => Promise<DashboardSummary>;
+        getCashierDashboardSummary: (
+          userId: string,
+        ) => Promise<CashierDashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
         listCategories: (status?: EntityStatus | "all") => Promise<Category[]>;
@@ -304,6 +390,20 @@ declare global {
         pendingCount: () => Promise<number>;
         enqueue: (input: unknown) => Promise<{ changeId: string }>;
         commit: (input: unknown) => Promise<{ changeId: string }>;
+      };
+      totp?: {
+        verifySupervisorCode: (
+          code: string,
+        ) => Promise<import("@blackbox/shared").TotpVerifySupervisorCodeResult>;
+        replaceSupervisorCache: (
+          entries: Array<{
+            userId: string;
+            secretBase32: string;
+            displayName: string;
+          }>,
+        ) => Promise<{ ok: true }>;
+        listSupervisorUsers: () => Promise<string[]>;
+        hasSupervisorCache: () => Promise<boolean>;
       };
     };
   }

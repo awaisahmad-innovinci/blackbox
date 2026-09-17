@@ -10,6 +10,8 @@ import {
 } from "@nestjs/common";
 import type { PaginatedSales, SaleDetail } from "@blackbox/shared";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import type { TenantContext } from "../common/tenant-context";
+import { CurrentUser } from "../common/current-user.decorator";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
 import { CreateSaleDto, ListSalesQueryDto } from "./dto/sale.dto";
@@ -34,8 +36,11 @@ export class SalesController {
 
   @Post()
   @RequirePermissions("sales.write")
-  create(@Body() dto: CreateSaleDto): Promise<SaleDetail> {
-    return this.sales.create(dto);
+  create(
+    @Body() dto: CreateSaleDto,
+    @CurrentUser() user: TenantContext,
+  ): Promise<SaleDetail> {
+    return this.sales.create(dto, user);
   }
 
   @Post(":id/void")

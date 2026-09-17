@@ -35,6 +35,27 @@ export class Tenant {
   @Column({ name: "onboarding_completed_at", type: "timestamptz", nullable: true })
   onboardingCompletedAt!: Date | null;
 
+  @Column({
+    name: "require_manager_approval_remove_sale_line",
+    type: "boolean",
+    default: true,
+  })
+  requireManagerApprovalRemoveSaleLine!: boolean;
+
+  @Column({
+    name: "require_manager_approval_till_open",
+    type: "boolean",
+    default: true,
+  })
+  requireManagerApprovalTillOpen!: boolean;
+
+  @Column({
+    name: "require_manager_approval_till_withdraw",
+    type: "boolean",
+    default: true,
+  })
+  requireManagerApprovalTillWithdraw!: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

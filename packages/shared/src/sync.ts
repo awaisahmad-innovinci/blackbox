@@ -37,7 +37,9 @@ export type PurchasingEntityType =
   | "inventory_out"
   | "inventory_out_return"
   | "vendor_return"
-  | "sale";
+  | "sale"
+  | "till_session"
+  | "till_withdrawal";
 
 export type SyncEntityType =
   | MasterDataEntityType
@@ -130,7 +132,9 @@ export function streamForEntity(entityType: SyncEntityType): SyncStream {
     entityType === "inventory_out" ||
     entityType === "inventory_out_return" ||
     entityType === "vendor_return" ||
-    entityType === "sale"
+    entityType === "sale" ||
+    entityType === "till_session" ||
+    entityType === "till_withdrawal"
   ) {
     return "purchasing";
   }

@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { Sale, SaleLine, SalePayment } from "../db/entities";
 import { InventoryCommonModule } from "../inventory/common/inventory-common.module";
 import { RbacModule } from "../rbac/rbac.module";
+import { TillsModule } from "../tills/tills.module";
 import { SalesController } from "./sales.controller";
 import { SalesService } from "./sales.service";
 
@@ -10,6 +11,7 @@ import { SalesService } from "./sales.service";
   imports: [
     InventoryCommonModule,
     RbacModule,
+    TillsModule,
     TypeOrmModule.forFeature([Sale, SaleLine, SalePayment]),
   ],
   controllers: [SalesController],

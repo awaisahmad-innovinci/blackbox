@@ -39,6 +39,17 @@ export class TenantsService {
       throw new NotFoundException("Tenant not found");
     }
     tenant.name = dto.name.trim();
+    if (dto.requireManagerApprovalRemoveSaleLine !== undefined) {
+      tenant.requireManagerApprovalRemoveSaleLine =
+        dto.requireManagerApprovalRemoveSaleLine;
+    }
+    if (dto.requireManagerApprovalTillOpen !== undefined) {
+      tenant.requireManagerApprovalTillOpen = dto.requireManagerApprovalTillOpen;
+    }
+    if (dto.requireManagerApprovalTillWithdraw !== undefined) {
+      tenant.requireManagerApprovalTillWithdraw =
+        dto.requireManagerApprovalTillWithdraw;
+    }
     await this.tenants.save(tenant);
     return toTenantResponse(tenant);
   }

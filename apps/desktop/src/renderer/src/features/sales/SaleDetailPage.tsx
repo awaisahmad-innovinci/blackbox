@@ -11,6 +11,7 @@ import { loadSale } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
+import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import { SaleThermalReceipt } from "./sale-thermal-receipt";
 import { useSession } from "@renderer/lib/session/context";
 
@@ -19,6 +20,7 @@ export function SaleDetailPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { user } = useSession();
+  const permissions = user?.permissions ?? [];
   const { canReadList, canVoid, canWrite } = useSalesAccess();
   const [detail, setDetail] = useState<SaleDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,8 +29,10 @@ export function SaleDetailPage() {
   const [discarding, setDiscarding] = useState(false);
 
   useEffect(() => {
-    if (!canReadList && !canWrite) navigate("/sales/new", { replace: true });
-  }, [canReadList, canWrite, navigate]);
+    if (!canReadList && !canWrite) {
+      navigate(defaultRouteForUser(permissions), { replace: true });
+    }
+  }, [canReadList, canWrite, navigate, permissions]);
 
   useEffect(() => {
     if (!id) return;

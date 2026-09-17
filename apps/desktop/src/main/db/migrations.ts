@@ -1127,6 +1127,116 @@ where units_per_purchase_unit > 0;
     id: "023_sales_cash_tendered",
     sql: `alter table sales add column cash_tendered real;`,
   },
+  {
+    id: "024_supervisor_totp",
+    sql: `
+      create table if not exists supervisor_totp (
+        user_id text primary key,
+        tenant_id text not null,
+        secret_base32 text not null,
+        updated_at text not null default (datetime('now'))
+      );
+      create index if not exists supervisor_totp_tenant_id_idx
+        on supervisor_totp (tenant_id);
+    `,
+  },
+  {
+    id: "025_till_sessions",
+    sql: `
+      create table if not exists till_sessions (
+        id text primary key,
+        tenant_id text not null,
+        user_id text not null,
+        user_name text not null default '',
+        status text not null,
+        note_10 integer not null default 0,
+        note_20 integer not null default 0,
+        note_50 integer not null default 0,
+        note_100 integer not null default 0,
+        note_500 integer not null default 0,
+        note_1000 integer not null default 0,
+        note_5000 integer not null default 0,
+        opening_total real not null default 0,
+        opening_balance real not null default 0,
+        current_cash_balance real not null default 0,
+        max_cash_limit real not null default 0,
+        opened_at text,
+        closed_at text,
+        approved_by_user_id text,
+        approved_by_name text,
+        approved_at text,
+        reopened_by_user_id text,
+        reopened_by_name text,
+        close_reason text,
+        created_at text not null,
+        updated_at text not null
+      );
+      create index if not exists till_sessions_tenant_id_idx on till_sessions (tenant_id);
+      create index if not exists till_sessions_user_id_idx on till_sessions (user_id);
+      create index if not exists till_sessions_status_idx on till_sessions (status);
+
+      create table if not exists till_withdrawals (
+        id text primary key,
+        tenant_id text not null,
+        till_session_id text not null,
+        withdrawn_by_user_id text not null,
+        withdrawn_by_name text not null default '',
+        note_10 integer not null default 0,
+        note_20 integer not null default 0,
+        note_50 integer not null default 0,
+        note_100 integer not null default 0,
+        note_500 integer not null default 0,
+        note_1000 integer not null default 0,
+        note_5000 integer not null default 0,
+        withdrawal_total real not null default 0,
+        created_at text not null
+      );
+      create index if not exists till_withdrawals_tenant_id_idx on till_withdrawals (tenant_id);
+      create index if not exists till_withdrawals_till_session_id_idx on till_withdrawals (till_session_id);
+    `,
+  },
+  {
+    id: "026_till_withdrawal_kind",
+    sql: `
+      alter table till_withdrawals add column kind text not null default 'full';
+    `,
+  },
+  {
+    id: "027_activity_log_pending",
+    sql: `
+      create table if not exists activity_log_pending (
+        id text primary key,
+        payload text not null,
+        created_at text not null
+      );
+    `,
+  },
+  {
+    id: "028_supervisor_totp_display_name",
+    sql: `
+      alter table supervisor_totp add column display_name text not null default '';
+    `,
+  },
+  {
+    id: "029_activity_logs_local",
+    sql: `
+      create table if not exists activity_logs (
+        id text primary key,
+        event_type text not null,
+        actor_user_id text not null,
+        actor_name text not null,
+        supervisor_user_id text,
+        supervisor_name text,
+        subject_user_id text,
+        subject_name text,
+        summary text not null,
+        metadata text not null default '{}',
+        created_at text not null,
+        synced_at text
+      );
+      create index if not exists activity_logs_created_at_idx on activity_logs (created_at desc);
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

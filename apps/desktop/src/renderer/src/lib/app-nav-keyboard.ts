@@ -1,3 +1,5 @@
+import { isCashierOnlyNav } from "./sales-access";
+
 export type NavDropdownId = "inventory" | "purchasing" | "vendors";
 
 export type NavDropdownItem = { label: string; to: string };
@@ -30,6 +32,7 @@ export const NAV_DROPDOWN_MENUS: Record<NavDropdownId, NavDropdownItem[]> = {
 export type AppNavSectionId =
   | "dashboard"
   | "sale"
+  | "activity"
   | "warehouses"
   | "inventory"
   | "purchasing"
@@ -50,6 +53,14 @@ export const APP_NAV_SECTIONS = [
     kind: "link",
     to: "/sales/new",
     requiresPermission: "sales.write",
+  },
+  {
+    id: "activity",
+    label: "Activity",
+    shortcut: "a",
+    kind: "link",
+    to: "/activity",
+    requiresPermission: "activity.read",
   },
   {
     id: "warehouses",
@@ -197,21 +208,16 @@ export function matchNavDropdownItem(
 }
 
 export function visibleNavSections(permissions: string[]) {
-  const cashierOnly =
-    permissions.includes("sales.write") &&
-    !permissions.some((p) =>
-      ["products.", "inventory.", "warehouses.", "purchasing.", "vendors."].some(
-        (prefix) => p.startsWith(prefix),
-      ),
-    );
-
-  if (cashierOnly) {
+  if (isCashierOnlyNav(permissions)) {
     return APP_NAV_SECTIONS.filter(
       (s) => s.id === "dashboard" || s.id === "sale",
     );
   }
 
   return APP_NAV_SECTIONS.filter((section) => {
+    if (section.id === "sale") {
+      return false;
+    }
     if ("requiresPermission" in section) {
       return permissions.includes(section.requiresPermission);
     }

@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   SaleDetail,
   SalePaymentMethod,
   SellUnit,
   SkuSearchResult,
+  TillSessionDetail,
   WarehouseListItem,
 } from "@blackbox/shared";
 import {
   DEFAULT_SALE_CUSTOMER_NAME,
+  isTillNearLimit,
   lineTotalForScan,
   maxCashTender,
   saleBillTotals,
+  tillRemainingHeadroom,
 } from "@blackbox/shared";
 import { SaleThermalReceipt } from "./sale-thermal-receipt";
 import { FORM_GRID } from "@renderer/lib/form-layout";
@@ -32,14 +35,22 @@ import {
 } from "@renderer/components/keyboard-hints";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
+import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { loadSkuByBarcode, loadSale, loadWarehouses, loadPosAvailableForSale } from "@renderer/lib/local-db/entity-source";
+import { loadSkuByBarcode, loadSale, loadWarehouses, loadPosAvailableForSale, lookupSkuByBarcode } from "@renderer/lib/local-db/entity-source";
+import {
+  applyTillCashFromSale,
+  assertTillCanPostSale,
+  loadCurrentTill,
+} from "@renderer/lib/local-db/till-source";
 import { AddSaleItemDialog } from "./AddSaleItemDialog";
+import { CollectCashDialog } from "./CollectCashDialog";
 import { allocateHoldNumber, allocateSaleNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
@@ -74,6 +85,7 @@ type DraftPayment = {
 
 const PAYMENT_METHODS: SalePaymentMethod[] = ["CASH", "CARD", "CREDIT"];
 const NO_WAREHOUSE_ERROR = "No active warehouse configured";
+const NOT_ON_BILL_ERROR = "This item is not on the current bill.";
 
 function round4(n: number): number {
   return Math.round(n * 10000) / 10000;
@@ -117,10 +129,15 @@ function paymentMethodLabel(method: SalePaymentMethod): string {
 
 export function SalePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { draftId: routeDraftId } = useParams();
   const { user } = useSession();
-  const { canWrite, canReadList } = useSalesAccess();
+  const { canWrite, canReadList, canReadTill, canManageTill } = useSalesAccess();
   const confirm = useConfirm();
+  const { promptSupervisorTotp } = useSupervisorTotp();
+  const requireTotp = user?.requireManagerApprovalRemoveSaleLine ?? true;
+  const requireTillWithdrawApproval =
+    user?.requireManagerApprovalTillWithdraw ?? true;
 
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -130,6 +147,7 @@ export function SalePage() {
   const [salesTaxRate, setSalesTaxRate] = useState("0");
   const [payments, setPayments] = useState<DraftPayment[]>([]);
   const [scanOpen, setScanOpen] = useState(false);
+  const [removeScanOpen, setRemoveScanOpen] = useState(false);
   const [itemOpen, setItemOpen] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,12 +156,15 @@ export function SalePage() {
   const [loadingDraft, setLoadingDraft] = useState(Boolean(routeDraftId));
   const [heldCount, setHeldCount] = useState(0);
   const [success, setSuccess] = useState<SaleDetail | null>(null);
+  const [tillSession, setTillSession] = useState<TillSessionDetail | null>(null);
+  const [collectDialogOpen, setCollectDialogOpen] = useState(false);
   const editingDraftId = routeDraftId ?? null;
   const holdNumberRef = useRef<string | null>(null);
   const holdInFlightRef = useRef(false);
   const scanQueueRef = useRef<string[]>([]);
   const scanProcessingRef = useRef(false);
   const paymentsTouchedRef = useRef(false);
+  const autoScanPendingRef = useRef(!routeDraftId);
 
   function resetForNewSale() {
     setLines([]);
@@ -161,6 +182,16 @@ export function SalePage() {
   }, [canWrite, navigate]);
 
   useEffect(() => {
+    if (!user?.id || canManageTill) {
+      setTillSession(null);
+      return;
+    }
+    void loadCurrentTill(user.id)
+      .then(setTillSession)
+      .catch(() => undefined);
+  }, [user?.id, canManageTill, success, location.pathname]);
+
+  useEffect(() => {
     void loadWarehouses("active")
       .then((rows) => {
         setWarehouses(rows);
@@ -170,6 +201,17 @@ export function SalePage() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    autoScanPendingRef.current = !routeDraftId;
+  }, [routeDraftId]);
+
+  useEffect(() => {
+    if (!autoScanPendingRef.current) return;
+    if (loadingDraft || success || !warehouseId) return;
+    autoScanPendingRef.current = false;
+    setScanOpen(true);
+  }, [loadingDraft, success, warehouseId]);
 
   useEffect(() => {
     void window.blackbox?.localDb
@@ -401,11 +443,9 @@ export function SalePage() {
       cashTendered: resolvedCashTendered(),
       notes: "",
       deviceId: null,
-      postedBy: options.status === "POSTED" ? (user?.id ?? null) : null,
+      postedBy: user?.id ?? null,
       postedByName:
-        options.status === "POSTED" && resolvedCashierName !== "—"
-          ? resolvedCashierName
-          : null,
+        resolvedCashierName !== "—" ? resolvedCashierName : null,
       postedAt: options.postedAt ?? null,
       items,
       payments: paymentRows,
@@ -550,6 +590,79 @@ export function SalePage() {
     void processScanQueue();
   }
 
+  function findLineByBarcodeOnBill(code: string): DraftSaleLine | null {
+    const trimmed = code.trim();
+    if (!trimmed) return null;
+    return lines.find((line) => line.barcode === trimmed) ?? null;
+  }
+
+  async function resolveLineForRemoveScan(
+    code: string,
+  ): Promise<DraftSaleLine | null> {
+    const direct = findLineByBarcodeOnBill(code);
+    if (direct) return direct;
+
+    const lookup = await lookupSkuByBarcode(code);
+    if (!lookup) return null;
+    return lines.find((line) => line.productSkuId === lookup.id) ?? null;
+  }
+
+  async function removeBillLine(
+    line: DraftSaleLine,
+    options: { confirm: boolean },
+  ): Promise<boolean> {
+    let supervisorUserId: string | null = null;
+    let supervisorDisplayName: string | null = null;
+    if (requireTotp) {
+      const totp = await promptSupervisorTotp();
+      if (!totp.approved) return false;
+      supervisorUserId = totp.supervisorUserId;
+      supervisorDisplayName = totp.supervisorDisplayName;
+    }
+    if (options.confirm) {
+      const ok = await confirm(removeTableLineConfirmOptions(line.sku));
+      if (!ok) return false;
+    }
+    setLines((prev) =>
+      prev.filter((row) => row.productSkuId !== line.productSkuId),
+    );
+    if (user?.id) {
+      const actorName = user.fullName?.trim() || user.username;
+      await logActivityEvent(
+        {
+          eventType: "sale.line_removed",
+          actorUserId: user.id,
+          supervisorUserId,
+          summary: `Removed ${line.sku} from bill`,
+          metadata: {
+            sku: line.sku,
+            productName: line.productName,
+            variantName: line.variantName,
+          },
+        },
+        {
+          actorName,
+          supervisorName: supervisorDisplayName,
+        },
+      );
+    }
+    setError(null);
+    return true;
+  }
+
+  async function onRemoveBarcodeEnter(scannedCode: string) {
+    setError(null);
+    const code = scannedCode.trim();
+    if (!code) return;
+
+    const line = await resolveLineForRemoveScan(code);
+    if (!line) {
+      setError(NOT_ON_BILL_ERROR);
+      return;
+    }
+    await removeBillLine(line, { confirm: false });
+  }
+
   async function onHoldBill() {
     if (!warehouseId || lines.length === 0) return;
     if (holdInFlightRef.current) return;
@@ -602,6 +715,18 @@ export function SalePage() {
     }
   }
 
+  const tillBlocked =
+    !canManageTill &&
+    !loadingDraft &&
+    !success &&
+    tillSession?.status !== "OPEN";
+
+  const tillNearLimit =
+    tillSession != null &&
+    !canManageTill &&
+    !tillBlocked &&
+    isTillNearLimit(tillSession);
+
   async function onConfirm() {
     setError(null);
     if (!warehouseId) {
@@ -615,6 +740,33 @@ export function SalePage() {
           : "Payment amount must match the bill total",
       );
       return;
+    }
+    if (tillBlocked) {
+      setError(
+        tillSession?.status === "CLOSED_LIMIT"
+          ? "Till cash limit reached. Contact a manager to withdraw and reopen."
+          : tillSession?.status === "PENDING_APPROVAL"
+            ? "Till is pending manager approval."
+            : "Open your till before posting sales.",
+      );
+      return;
+    }
+
+    const cashPaymentTotal = postedPaymentRows()
+      .filter((row) => row.method === "CASH")
+      .reduce((sum, row) => sum + row.amount, 0);
+
+    if (user?.id) {
+      try {
+        await assertTillCanPostSale({
+          userId: user.id,
+          skipForManager: canManageTill,
+          cashPaymentTotal,
+        });
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err, "Till is not ready for this sale"));
+        return;
+      }
     }
 
     setSaving(true);
@@ -705,6 +857,34 @@ export function SalePage() {
         }
 
         void syncNow();
+        if (user?.id) {
+          await applyTillCashFromSale({
+            userId: user.id,
+            skipForManager: canManageTill,
+            cashPaymentTotal,
+          });
+          const refreshed = await loadCurrentTill(user.id);
+          setTillSession(refreshed);
+          if (refreshed?.status === "CLOSED_LIMIT") {
+            await logActivityEvent(
+              {
+                eventType: "till.limit_reached",
+                actorUserId: user.id,
+                subjectUserId: user.id,
+                summary: "Till cash limit reached",
+                metadata: {
+                  tillSessionId: refreshed.id,
+                  currentCashBalance: refreshed.currentCashBalance,
+                  maxCashLimit: refreshed.maxCashLimit,
+                },
+              },
+              {
+                actorName: user.fullName?.trim() || user.username,
+                subjectName: user.fullName?.trim() || user.username,
+              },
+            );
+          }
+        }
         setSuccess(detail);
         return;
       }
@@ -757,7 +937,15 @@ export function SalePage() {
       if (!saving && canPost) void onConfirm();
     },
     onScan: () => {
-      if (!warehouseId || scanBusy || itemOpen || success) return;
+      if (
+        !warehouseId ||
+        scanBusy ||
+        itemOpen ||
+        removeScanOpen ||
+        success
+      ) {
+        return;
+      }
       setScanOpen(true);
     },
   });
@@ -780,6 +968,7 @@ export function SalePage() {
             <Button
               variant="outline"
               onClick={() => {
+                autoScanPendingRef.current = true;
                 setSuccess(null);
                 resetForNewSale();
               }}
@@ -841,9 +1030,66 @@ export function SalePage() {
             >
               Past sales
             </Button>
+          ) : canReadTill ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/sales/till")}
+            >
+              My till
+            </Button>
+          ) : null}
+          {!canManageTill && tillSession?.status === "OPEN" ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCollectDialogOpen(true)}
+            >
+              Withdraw cash
+            </Button>
           ) : null}
         </div>
       </div>
+
+      {tillBlocked ? (
+        <div
+          role="alert"
+          className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
+        >
+          {tillSession?.status === "CLOSED_LIMIT"
+            ? "Till cash limit reached. Contact a manager to withdraw and reopen before posting more sales."
+            : tillSession?.status === "PENDING_APPROVAL"
+              ? "Till is pending manager approval."
+              : "Open your till before posting sales."}{" "}
+          <Button
+            type="button"
+            variant="link"
+            className="text-destructive h-auto p-0"
+            onClick={() => navigate("/sales/till")}
+          >
+            Go to My till
+          </Button>
+        </div>
+      ) : null}
+
+      {tillNearLimit ? (
+        <div
+          role="status"
+          className="border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 rounded-lg border px-4 py-3 text-sm"
+        >
+          Till is near the cash limit — Rs{" "}
+          {tillRemainingHeadroom(tillSession!).toLocaleString()} headroom left.
+          Tap Withdraw cash and ask a manager to authorize.{" "}
+          <Button
+            type="button"
+            variant="link"
+            className="text-amber-950 dark:text-amber-100 h-auto p-0"
+            onClick={() => navigate("/sales/till")}
+          >
+            View My till
+          </Button>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="text-destructive text-sm" role="alert">
@@ -867,7 +1113,9 @@ export function SalePage() {
         <Button
           type="button"
           variant="outline"
-          disabled={!warehouseId || itemOpen || scanBusy}
+          disabled={
+            !warehouseId || itemOpen || scanBusy || scanOpen || removeScanOpen
+          }
           onClick={() => setItemOpen(true)}
         >
           Add item
@@ -875,10 +1123,26 @@ export function SalePage() {
         <Button
           type="button"
           variant="outline"
-          disabled={!warehouseId || scanBusy || itemOpen}
+          disabled={
+            !warehouseId || scanBusy || itemOpen || scanOpen || removeScanOpen
+          }
           onClick={() => setScanOpen(true)}
         >
           Scan barcode
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={
+            lines.length === 0 ||
+            scanBusy ||
+            itemOpen ||
+            scanOpen ||
+            removeScanOpen
+          }
+          onClick={() => setRemoveScanOpen(true)}
+        >
+          Remove item
         </Button>
       </div>
 
@@ -944,17 +1208,7 @@ export function SalePage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        void (async () => {
-                          const ok = await confirm(
-                            removeTableLineConfirmOptions(line.sku),
-                          );
-                          if (!ok) return;
-                          setLines((prev) =>
-                            prev.filter(
-                              (row) => row.productSkuId !== line.productSkuId,
-                            ),
-                          );
-                        })();
+                        void removeBillLine(line, { confirm: true });
                       }}
                     >
                       Remove
@@ -1189,6 +1443,15 @@ export function SalePage() {
         onComplete={(code) => onBarcodeEnter(code)}
       />
 
+      <ScanBarcodePanel
+        open={removeScanOpen}
+        onOpenChange={setRemoveScanOpen}
+        title="Remove item"
+        description="Scan the barcode of an item on this bill to remove it."
+        clearAfterComplete
+        onComplete={(code) => void onRemoveBarcodeEnter(code)}
+      />
+
       <AddSaleItemDialog
         open={itemOpen}
         warehouseId={warehouseId}
@@ -1196,6 +1459,18 @@ export function SalePage() {
         onClose={() => setItemOpen(false)}
         onAddMany={onAddManyFromDialog}
       />
+
+      {tillSession && user ? (
+        <CollectCashDialog
+          open={collectDialogOpen}
+          onOpenChange={setCollectDialogOpen}
+          session={tillSession}
+          cashierUserId={user.id}
+          cashierName={user.fullName?.trim() || user.username}
+          requireApproval={requireTillWithdrawApproval}
+          onSuccess={setTillSession}
+        />
+      ) : null}
     </div>
   );
 }

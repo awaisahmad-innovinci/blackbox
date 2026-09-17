@@ -11,6 +11,7 @@ import {
 } from "@renderer/components/keyboard-hints";
 import {
   FILTER_SELECT_CLASS,
+  filterDateProps,
   filterSelectProps,
   ListFilterNav,
 } from "@renderer/components/list-filter-nav";
@@ -22,12 +23,18 @@ import {
   useResetPageOnFilterChange,
 } from "@renderer/components/list-pagination";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
+import { defaultRouteForUser } from "@renderer/lib/sales-access";
+import { useSession } from "@renderer/lib/session/context";
 
 export function SalesListPage() {
   const navigate = useNavigate();
+  const { user } = useSession();
+  const permissions = user?.permissions ?? [];
   const { canReadList, canWrite } = useSalesAccess();
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<SaleListItem[]>([]);
   const [page, setPage] = useState(1);
@@ -38,8 +45,8 @@ export function SalesListPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!canReadList) navigate("/sales/new", { replace: true });
-  }, [canReadList, navigate]);
+    if (!canReadList) navigate(defaultRouteForUser(permissions), { replace: true });
+  }, [canReadList, navigate, permissions]);
 
   useBarcodeScanTarget({
     kind: "search",
@@ -58,7 +65,7 @@ export function SalesListPage() {
       .catch(() => undefined);
   }, []);
 
-  useResetPageOnFilterChange(setPage, [warehouseId, search]);
+  useResetPageOnFilterChange(setPage, [warehouseId, search, dateFrom, dateTo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +74,8 @@ export function SalesListPage() {
       void loadSales({
         warehouseId: warehouseId || undefined,
         search: search.trim() || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         pageSize,
       })
@@ -90,7 +99,7 @@ export function SalesListPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [warehouseId, search, page, pageSize]);
+  }, [warehouseId, search, dateFrom, dateTo, page, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -132,6 +141,20 @@ export function SalesListPage() {
             </option>
           ))}
         </select>
+        <Input
+          type="date"
+          className="w-auto"
+          {...filterDateProps()}
+          value={dateFrom}
+          onChange={(event) => setDateFrom(event.target.value)}
+        />
+        <Input
+          type="date"
+          className="w-auto"
+          {...filterDateProps()}
+          value={dateTo}
+          onChange={(event) => setDateTo(event.target.value)}
+        />
       </ListFilterNav>
 
       {error ? (
@@ -167,7 +190,10 @@ export function SalesListPage() {
               </tr>
             ) : (
               items.map((item) => (
-                <ListTableRow key={item.id}>
+                <ListTableRow
+                  key={item.id}
+                  onActivate={() => navigate(`/sales/${item.id}`)}
+                >
                   <td className="px-4 py-3">
                     <ListTableLink to={`/sales/${item.id}`}>
                       {item.saleNumber}

@@ -7,6 +7,7 @@ import type {
 } from "@blackbox/shared";
 import { SYNC_STREAMS } from "@blackbox/shared";
 import { apiFetch } from "./client";
+import { flushPendingActivityLogs } from "./activity-logs";
 
 export const syncApi = {
   push(stream: SyncStream, changes: SyncChangeInput[]) {
@@ -89,6 +90,8 @@ async function pushOutboxBatch(
 }
 
 export async function runIncrementalSync(): Promise<IncrementalSyncResult> {
+  await flushPendingActivityLogs().catch(() => undefined);
+
   const bridge = window.blackbox?.sync;
   if (!bridge) return { pushed: 0, pulled: 0 };
 

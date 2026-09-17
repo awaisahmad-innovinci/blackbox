@@ -1,5 +1,6 @@
 import type {
   Brand,
+  CashierDashboardSummary,
   Category,
   DashboardSummary,
   EntityStatus,
@@ -572,6 +573,75 @@ export function getDashboardSummaryLocal(): DashboardSummary {
     lowStockItems,
     pendingPurchaseOrders,
     recentReceipts,
+  };
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
+export function getCashierDashboardSummaryLocal(
+  userId: string,
+): CashierDashboardSummary {
+  const db = getLocalDb();
+  const tenantId = DEMO_STORE_TENANT_ID;
+  const todayRow = db
+    .prepare(`select date('now', 'localtime') as d`)
+    .get() as { d: string };
+
+  const saleFilters = `
+    s.tenant_id = @tenantId
+    and s.status = 'POSTED'
+    and s.posted_by = @userId
+    and s.posted_at is not null
+    and date(s.posted_at) = date('now', 'localtime')
+  `;
+
+  const totalSalesRow = db
+    .prepare(
+      `select coalesce(sum(s.total), 0) as amount
+       from sales s
+       where ${saleFilters}`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
+  const cashRow = db
+    .prepare(
+      `select coalesce(sum(sp.amount), 0) as amount
+       from sale_payments sp
+       inner join sales s on s.id = sp.sale_id and s.tenant_id = sp.tenant_id
+       where ${saleFilters}
+         and sp.method = 'CASH'`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
+  const cardRow = db
+    .prepare(
+      `select coalesce(sum(sp.amount), 0) as amount
+       from sale_payments sp
+       inner join sales s on s.id = sp.sale_id and s.tenant_id = sp.tenant_id
+       where ${saleFilters}
+         and sp.method = 'CARD'`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
+  const heldRow = db
+    .prepare(
+      `select count(*) as cnt
+       from sales
+       where tenant_id = @tenantId
+         and status = 'DRAFT'
+         and sync_status = 'local'
+         and posted_by = @userId`,
+    )
+    .get({ tenantId, userId }) as { cnt: number };
+
+  return {
+    date: todayRow.d,
+    totalSalesAmount: roundMoney(Number(totalSalesRow.amount)),
+    cashReceivedAmount: roundMoney(Number(cashRow.amount)),
+    cardPaymentsAmount: roundMoney(Number(cardRow.amount)),
+    heldBillsCount: Number(heldRow.cnt),
   };
 }
 

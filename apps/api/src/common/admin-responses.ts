@@ -13,6 +13,9 @@ export type TenantResponse = {
   currency: string | null;
   onboardingCompleted: boolean;
   onboardingCompletedAt: Date | null;
+  requireManagerApprovalRemoveSaleLine: boolean;
+  requireManagerApprovalTillOpen: boolean;
+  requireManagerApprovalTillWithdraw: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -72,6 +75,10 @@ export function toTenantResponse(tenant: Tenant): TenantResponse {
     currency: tenant.currency,
     onboardingCompleted: tenant.onboardingCompletedAt != null,
     onboardingCompletedAt: tenant.onboardingCompletedAt,
+    requireManagerApprovalRemoveSaleLine:
+      tenant.requireManagerApprovalRemoveSaleLine,
+    requireManagerApprovalTillOpen: tenant.requireManagerApprovalTillOpen,
+    requireManagerApprovalTillWithdraw: tenant.requireManagerApprovalTillWithdraw,
     createdAt: tenant.createdAt,
     updatedAt: tenant.updatedAt,
   };

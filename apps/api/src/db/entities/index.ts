@@ -36,9 +36,13 @@ import { InventoryOutReturnItem } from "./inventory-out-return-item.entity";
 import { Sale } from "./sale.entity";
 import { SaleLine } from "./sale-line.entity";
 import { SalePayment } from "./sale-payment.entity";
+import { TillSession } from "./till-session.entity";
+import { TillWithdrawal } from "./till-withdrawal.entity";
+import { ActivityLog } from "./activity-log.entity";
 import { VendorReturn } from "./vendor-return.entity";
 import { VendorReturnItem } from "./vendor-return-item.entity";
 import { PasswordResetCode } from "./password-reset-code.entity";
+import { UserTotp } from "./user-totp.entity";
 
 export const entities = [
   Tenant,
@@ -79,9 +83,13 @@ export const entities = [
   Sale,
   SaleLine,
   SalePayment,
+  TillSession,
+  TillWithdrawal,
+  ActivityLog,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,
+  UserTotp,
 ] as const;
 
 export {
@@ -123,7 +131,11 @@ export {
   Sale,
   SaleLine,
   SalePayment,
+  TillSession,
+  TillWithdrawal,
+  ActivityLog,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,
+  UserTotp,
 };

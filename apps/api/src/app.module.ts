@@ -14,6 +14,8 @@ import { RbacModule } from "./rbac/rbac.module";
 import { RolesModule } from "./roles/roles.module";
 import { SyncModule } from "./sync/sync.module";
 import { SalesModule } from "./sales/sales.module";
+import { TillsModule } from "./tills/tills.module";
+import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { TenantsModule } from "./tenants/tenants.module";
 import { UsersModule } from "./users/users.module";
 
@@ -34,6 +36,8 @@ import { UsersModule } from "./users/users.module";
     InventoryModule,
     SyncModule,
     SalesModule,
+    TillsModule,
+    ActivityLogModule,
   ],
   controllers: [AppController],
   providers: [

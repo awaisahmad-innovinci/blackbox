@@ -19,6 +19,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import { getRequestTenant } from "../common/request-tenant";
+import type { TenantContext } from "../common/tenant-context";
 import {
   InventoryMovement,
   InventoryOutItem,
@@ -36,6 +37,7 @@ import {
   getInventoryOutBalanceQty,
 } from "../inventory/inventory-out/inventory-out-balance";
 import { CreateSaleDto, ListSalesQueryDto } from "./dto/sale.dto";
+import { TillsService } from "../tills/tills.service";
 
 function toNum(value: string | null | undefined): number {
   if (value == null || value === "") return 0;
@@ -50,6 +52,7 @@ function round4(n: number): number {
 export class SalesService {
   constructor(
     private readonly fixedTenant: FixedTenantContext,
+    private readonly tills: TillsService,
     private readonly dataSource: DataSource,
     @InjectRepository(Sale) private readonly sales: Repository<Sale>,
     @InjectRepository(SaleLine) private readonly saleLines: Repository<SaleLine>,
@@ -146,7 +149,11 @@ export class SalesService {
     return this.toDetail(header);
   }
 
-  async create(dto: CreateSaleDto, saleId = randomUUID()): Promise<SaleDetail> {
+  async create(
+    dto: CreateSaleDto,
+    user: TenantContext,
+    saleId = randomUUID(),
+  ): Promise<SaleDetail> {
     const tenantId = this.fixedTenant.tenantId;
     if (!dto.items?.length) {
       throw new BadRequestException("At least one line item is required");
@@ -206,6 +213,22 @@ export class SalesService {
 
     const ctx = getRequestTenant();
     const postedAt = new Date();
+    const cashPaymentTotal = round4(
+      dto.payments
+        .filter((p) => p.method === "CASH")
+        .reduce((sum, p) => sum + Number(p.amount), 0),
+    );
+
+    if (ctx?.userId) {
+      await this.tills.assertCanPostSale(
+        this.dataSource.manager,
+        tenantId,
+        ctx.userId,
+        user.permissions,
+        cashPaymentTotal,
+      );
+    }
+
     const customerName =
       dto.customerName?.trim() || DEFAULT_SALE_CUSTOMER_NAME;
     const cashTendered =
@@ -365,6 +388,16 @@ export class SalesService {
           amount: round4(Number(payment.amount)),
           reference: payment.reference?.trim() ?? "",
         });
+      }
+
+      if (ctx?.userId) {
+        await this.tills.applyCashFromSale(
+          manager,
+          tenantId,
+          ctx.userId,
+          user.permissions,
+          cashPaymentTotal,
+        );
       }
 
       const detail: SaleDetail = {

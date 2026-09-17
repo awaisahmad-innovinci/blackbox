@@ -6,20 +6,24 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { loadSales } from "@renderer/lib/local-db/entity-source";
+import { defaultRouteForUser } from "@renderer/lib/sales-access";
+import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 
 export function HeldSalesPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { canWrite } = useSalesAccess();
+  const { user } = useSession();
+  const permissions = user?.permissions ?? [];
+  const { canWrite, canReadList, canReadTill } = useSalesAccess();
   const [items, setItems] = useState<SaleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [discardingId, setDiscardingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!canWrite) navigate("/sales/new", { replace: true });
-  }, [canWrite, navigate]);
+    if (!canWrite) navigate(defaultRouteForUser(permissions), { replace: true });
+  }, [canWrite, navigate, permissions]);
 
   async function refreshHeldBills() {
     setLoading(true);
@@ -76,9 +80,15 @@ export function HeldSalesPage() {
           <Button variant="outline" onClick={() => navigate("/sales/new")}>
             New sale
           </Button>
-          <Button variant="outline" onClick={() => navigate("/sales")}>
-            Past sales
-          </Button>
+          {canReadList ? (
+            <Button variant="outline" onClick={() => navigate("/sales")}>
+              Past sales
+            </Button>
+          ) : canReadTill ? (
+            <Button variant="outline" onClick={() => navigate("/sales/till")}>
+              My till
+            </Button>
+          ) : null}
         </div>
       </div>
 

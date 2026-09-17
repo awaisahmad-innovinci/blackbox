@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ConfirmProvider } from "./components/confirm-provider";
+import { SupervisorTotpProvider } from "./components/supervisor-totp-provider";
 import { AppShell } from "./app/AppShell";
 import { SignInPage } from "./features/auth/SignInPage";
 import { BarcodeScanProvider } from "./lib/barcode-scan";
@@ -41,12 +42,16 @@ import { HeldSalesPage } from "./features/sales/HeldSalesPage";
 import { SalePage } from "./features/sales/SalePage";
 import { SaleDetailPage } from "./features/sales/SaleDetailPage";
 import { SalesListPage } from "./features/sales/SalesListPage";
+import { TillPage } from "./features/sales/TillPage";
+import { ActivityLogPage } from "./features/activity/ActivityLogPage";
 
 export default function App() {
   return (
     <SessionProvider>
       <ConfirmProvider>
-        <AuthenticatedApp />
+        <SupervisorTotpProvider>
+          <AuthenticatedApp />
+        </SupervisorTotpProvider>
       </ConfirmProvider>
     </SessionProvider>
   );
@@ -156,6 +161,8 @@ function AuthenticatedApp() {
           <Route path="warehouses/:id/edit" element={<WarehouseFormPage />} />
           <Route path="sales" element={<SalesListPage />} />
           <Route path="sales/held" element={<HeldSalesPage />} />
+          <Route path="sales/till" element={<TillPage />} />
+          <Route path="activity" element={<ActivityLogPage />} />
           <Route path="sales/new/:draftId" element={<SalePage />} />
           <Route path="sales/new" element={<SalePage />} />
           <Route path="sales/:id" element={<SaleDetailPage />} />
