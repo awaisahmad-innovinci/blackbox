@@ -36,6 +36,8 @@ export default function SettingsPage() {
   const [requireTillOpenApproval, setRequireTillOpenApproval] = useState(true);
   const [requireTillWithdrawApproval, setRequireTillWithdrawApproval] =
     useState(true);
+  const [defaultGstRate, setDefaultGstRate] = useState("0");
+  const [defaultSalesTaxRate, setDefaultSalesTaxRate] = useState("0");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,6 +48,8 @@ export default function SettingsPage() {
       setRequireRemoveApproval(next.requireManagerApprovalRemoveSaleLine);
       setRequireTillOpenApproval(next.requireManagerApprovalTillOpen);
       setRequireTillWithdrawApproval(next.requireManagerApprovalTillWithdraw);
+      setDefaultGstRate(String(next.defaultGstRate ?? 0));
+      setDefaultSalesTaxRate(String(next.defaultSalesTaxRate ?? 0));
     } catch (err) {
       setError(err);
     } finally {
@@ -75,11 +79,15 @@ export default function SettingsPage() {
         requireManagerApprovalRemoveSaleLine: requireRemoveApproval,
         requireManagerApprovalTillOpen: requireTillOpenApproval,
         requireManagerApprovalTillWithdraw: requireTillWithdrawApproval,
+        defaultGstRate: Number(defaultGstRate) || 0,
+        defaultSalesTaxRate: Number(defaultSalesTaxRate) || 0,
       });
       setTenant(updated);
       setRequireRemoveApproval(updated.requireManagerApprovalRemoveSaleLine);
       setRequireTillOpenApproval(updated.requireManagerApprovalTillOpen);
       setRequireTillWithdrawApproval(updated.requireManagerApprovalTillWithdraw);
+      setDefaultGstRate(String(updated.defaultGstRate ?? 0));
+      setDefaultSalesTaxRate(String(updated.defaultSalesTaxRate ?? 0));
       setSuccess("Settings saved.");
     } catch (err) {
       setFormError(toUserFacingError(err));
@@ -149,6 +157,65 @@ export default function SettingsPage() {
                     {tenant.name}
                   </p>
                   <ActiveBadge active={tenant.isActive} />
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Tax rates"
+              description="Default percentages applied to every POS sale subtotal. Cashiers cannot change these on the sale screen."
+            >
+              {hasPermission("tenant.settings.write") ? (
+                <form className="space-y-4" onSubmit={(e) => void onSave(e)}>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="defaultGstRate">GST %</Label>
+                      <Input
+                        id="defaultGstRate"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="any"
+                        value={defaultGstRate}
+                        onChange={(event) =>
+                          setDefaultGstRate(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="defaultSalesTaxRate">Sales tax %</Label>
+                      <Input
+                        id="defaultSalesTaxRate"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="any"
+                        value={defaultSalesTaxRate}
+                        onChange={(event) =>
+                          setDefaultSalesTaxRate(event.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <Button type="submit" disabled={busy}>
+                    {busy ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save changes"
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  <p>
+                    GST: {tenant.defaultGstRate ?? 0}%
+                  </p>
+                  <p>
+                    Sales tax: {tenant.defaultSalesTaxRate ?? 0}%
+                  </p>
                 </div>
               )}
             </SectionCard>

@@ -9,9 +9,13 @@ import type {
   PaginatedInventoryOuts,
   PaginatedInventoryOutReturns,
   PaginatedSales,
+  PaginatedSaleReturns,
   PaginatedVendors,
+  ReturnableSaleLine,
   SaleDetail,
   SaleListQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
   ProductDetail,
   ProductSkuDetail,
   ProductSupplierRow,
@@ -45,6 +49,7 @@ import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
 import { salesApi } from "@renderer/lib/api/sales";
+import { saleReturnsApi } from "@renderer/lib/api/sale-returns";
 import { productsApi } from "@renderer/lib/api/products";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { brandsApi } from "@renderer/lib/api/brands";
@@ -232,6 +237,36 @@ export async function loadSale(id: string): Promise<SaleDetail> {
   const local = await window.blackbox?.localDb?.getSale?.(id);
   if (local) return local;
   return salesApi.get(id);
+}
+
+export async function loadSaleReturns(
+  query: SaleReturnListQuery = {},
+): Promise<PaginatedSaleReturns> {
+  try {
+    const local = await window.blackbox?.localDb?.listSaleReturns?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return saleReturnsApi.list(query);
+}
+
+export async function loadSaleReturn(id: string): Promise<SaleReturnDetail> {
+  const local = await window.blackbox?.localDb?.getSaleReturn?.(id);
+  if (local) return local;
+  return saleReturnsApi.get(id);
+}
+
+export async function loadReturnableSaleLines(
+  saleId: string,
+): Promise<ReturnableSaleLine[]> {
+  try {
+    const local = await window.blackbox?.localDb?.getReturnableSaleLines?.(saleId);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return saleReturnsApi.returnableLines(saleId);
 }
 
 export async function loadInventoryOutReturnableQuantity(

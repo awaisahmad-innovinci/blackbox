@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   SaleDetail,
@@ -11,22 +11,20 @@ import type {
 import {
   DEFAULT_SALE_CUSTOMER_NAME,
   isTillNearLimit,
+  lineTotalAfterDiscount,
   lineTotalForScan,
   maxCashTender,
   saleBillTotals,
   tillRemainingHeadroom,
 } from "@blackbox/shared";
-import { SaleThermalReceipt } from "./sale-thermal-receipt";
-import { FORM_GRID } from "@renderer/lib/form-layout";
+import { cn } from "@blackbox/ui/lib/utils";
 import {
   FormEnterNav,
 } from "@renderer/components/form-enter-nav";
+import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { PrintButton } from "@renderer/components/print-button";
-import { PrintDocument } from "@renderer/components/print-document";
-import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import {
   KEYBOARD_HINT_ENTER,
   KEYBOARD_HINT_SAVE,
@@ -36,12 +34,15 @@ import {
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
 import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
-import { focusLineQty } from "@renderer/lib/focus-line-qty";
+import {
+  barcodeScanInputProps,
+  useBarcodeScanTarget,
+} from "@renderer/lib/barcode-scan";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
-import { syncNow } from "@renderer/lib/sync/sync-status";
+import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { loadSkuByBarcode, loadSale, loadWarehouses, loadPosAvailableForSale, lookupSkuByBarcode } from "@renderer/lib/local-db/entity-source";
 import {
@@ -73,6 +74,8 @@ type DraftSaleLine = {
   unitsPerPurchaseUnit: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  discountPercent: number;
+  focQuantity: number;
   lastScanMultiplier?: number;
 };
 
@@ -105,20 +108,16 @@ function lineUnitPrice(line: DraftSaleLine): number {
   return pricing.unitPrice > 0 ? pricing.unitPrice : line.sellingPrice;
 }
 
+function lineInventoryQty(line: DraftSaleLine): number {
+  return round4(line.quantity + line.focQuantity);
+}
+
 function lineTotal(line: DraftSaleLine): number {
-  const pricing = lineTotalForScan({
-    quantityMultiplier:
-      line.lastScanMultiplier ??
-      (line.sellUnit === "box" ? line.unitsPerPurchaseUnit : 1),
-    unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
-    sellingPrice: line.sellingPrice,
-    sellingPricePerPurchaseUnit: line.sellingPricePerPurchaseUnit,
-    quantity: line.quantity,
-    sellUnit: line.sellUnit,
-  });
-  return pricing.lineTotal > 0
-    ? pricing.lineTotal
-    : round4(line.quantity * lineUnitPrice(line));
+  return lineTotalAfterDiscount(
+    line.quantity,
+    lineUnitPrice(line),
+    line.discountPercent,
+  );
 }
 
 function paymentMethodLabel(method: SalePaymentMethod): string {
@@ -131,8 +130,9 @@ export function SalePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { draftId: routeDraftId } = useParams();
-  const { user } = useSession();
-  const { canWrite, canReadList, canReadTill, canManageTill } = useSalesAccess();
+  const { user, offline } = useSession();
+  const sync = useSyncStatus();
+  const { canWrite, canReadTill, canManageTill } = useSalesAccess();
   const confirm = useConfirm();
   const { promptSupervisorTotp } = useSupervisorTotp();
   const requireTotp = user?.requireManagerApprovalRemoveSaleLine ?? true;
@@ -143,19 +143,16 @@ export function SalePage() {
   const [customerName, setCustomerName] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<DraftSaleLine[]>([]);
-  const [gstRate, setGstRate] = useState("0");
-  const [salesTaxRate, setSalesTaxRate] = useState("0");
   const [payments, setPayments] = useState<DraftPayment[]>([]);
-  const [scanOpen, setScanOpen] = useState(false);
-  const [removeScanOpen, setRemoveScanOpen] = useState(false);
+  const [scanDraft, setScanDraft] = useState("");
   const [itemOpen, setItemOpen] = useState(false);
+  const [removeScanOpen, setRemoveScanOpen] = useState(false);
+  const [showCustomerField, setShowCustomerField] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [holding, setHolding] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(Boolean(routeDraftId));
-  const [heldCount, setHeldCount] = useState(0);
-  const [success, setSuccess] = useState<SaleDetail | null>(null);
   const [tillSession, setTillSession] = useState<TillSessionDetail | null>(null);
   const [collectDialogOpen, setCollectDialogOpen] = useState(false);
   const editingDraftId = routeDraftId ?? null;
@@ -164,14 +161,20 @@ export function SalePage() {
   const scanQueueRef = useRef<string[]>([]);
   const scanProcessingRef = useRef(false);
   const paymentsTouchedRef = useRef(false);
-  const autoScanPendingRef = useRef(!routeDraftId);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const paymentAmountRef = useRef<HTMLInputElement>(null);
+
+  const focusScanInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      scanInputRef.current?.focus();
+      scanInputRef.current?.select();
+    });
+  }, []);
 
   function resetForNewSale() {
     setLines([]);
     setPayments([]);
     setCustomerName("");
-    setGstRate("0");
-    setSalesTaxRate("0");
     paymentsTouchedRef.current = false;
     holdNumberRef.current = null;
     setError(null);
@@ -189,7 +192,7 @@ export function SalePage() {
     void loadCurrentTill(user.id)
       .then(setTillSession)
       .catch(() => undefined);
-  }, [user?.id, canManageTill, success, location.pathname]);
+  }, [user?.id, canManageTill, location.pathname]);
 
   useEffect(() => {
     void loadWarehouses("active")
@@ -203,22 +206,9 @@ export function SalePage() {
   }, []);
 
   useEffect(() => {
-    autoScanPendingRef.current = !routeDraftId;
-  }, [routeDraftId]);
-
-  useEffect(() => {
-    if (!autoScanPendingRef.current) return;
-    if (loadingDraft || success || !warehouseId) return;
-    autoScanPendingRef.current = false;
-    setScanOpen(true);
-  }, [loadingDraft, success, warehouseId]);
-
-  useEffect(() => {
-    void window.blackbox?.localDb
-      ?.countDraftSales?.()
-      .then((count) => setHeldCount(count))
-      .catch(() => undefined);
-  }, [routeDraftId, success]);
+    if (loadingDraft || !warehouseId || itemOpen || removeScanOpen) return;
+    focusScanInput();
+  }, [loadingDraft, warehouseId, itemOpen, removeScanOpen, focusScanInput]);
 
   useEffect(() => {
     if (!routeDraftId) {
@@ -246,8 +236,6 @@ export function SalePage() {
             : detail.customerName,
         );
         setWarehouseId(detail.warehouseId);
-        setGstRate(String(detail.gstRate));
-        setSalesTaxRate(String(detail.salesTaxRate));
 
         const draftLines: DraftSaleLine[] = await Promise.all(
           detail.items.map(async (item) => {
@@ -273,6 +261,8 @@ export function SalePage() {
               unitsPerPurchaseUnit: 1,
               sellingPrice: item.unitPrice,
               sellingPricePerPurchaseUnit: null,
+              discountPercent: item.discountPercent ?? 0,
+              focQuantity: item.focQuantity ?? 0,
             };
           }),
         );
@@ -312,14 +302,13 @@ export function SalePage() {
     [lines],
   );
 
+  const tenantGstRate = user?.defaultGstRate ?? 0;
+  const tenantSalesTaxRate = user?.defaultSalesTaxRate ?? 0;
+
   const tax = useMemo(
     () =>
-      saleBillTotals(
-        subtotal,
-        Number(gstRate) || 0,
-        Number(salesTaxRate) || 0,
-      ),
-    [subtotal, gstRate, salesTaxRate],
+      saleBillTotals(subtotal, tenantGstRate, tenantSalesTaxRate),
+    [subtotal, tenantGstRate, tenantSalesTaxRate],
   );
 
   const billTotal = tax.total;
@@ -374,7 +363,9 @@ export function SalePage() {
     if (lines.length === 0 || !payment) return false;
     if (
       !lines.every(
-        (line) => line.quantity > 0 && line.quantity <= line.quantityAvailable,
+        (line) =>
+          line.quantity > 0 &&
+          lineInventoryQty(line) <= line.quantityAvailable,
       )
     ) {
       return false;
@@ -395,8 +386,8 @@ export function SalePage() {
   }): SaleDetail {
     const warehouseName =
       warehouses.find((warehouse) => warehouse.id === warehouseId)?.name ?? "";
-    const gst = Number(gstRate) || 0;
-    const salesTax = Number(salesTaxRate) || 0;
+    const gst = tenantGstRate;
+    const salesTax = tenantSalesTaxRate;
     const now = new Date().toISOString();
     const resolvedCustomerName =
       customerName.trim() || DEFAULT_SALE_CUSTOMER_NAME;
@@ -411,6 +402,8 @@ export function SalePage() {
         sku: line.sku,
         barcode: line.barcode,
         quantity: line.quantity,
+        discountPercent: line.discountPercent,
+        focQuantity: line.focQuantity,
         unitPrice,
         lineTotal: lineTotal(line),
         sellUnit: line.sellUnit,
@@ -485,11 +478,10 @@ export function SalePage() {
       const existing = prev.find((line) => line.productSkuId === row.id);
       if (existing) {
         const nextQty = round4(existing.quantity + multiplier);
-        if (nextQty > available) {
+        if (nextQty + existing.focQuantity > available) {
           scanError = `Cannot exceed POS balance (${available}) for ${row.sku}`;
           return prev;
         }
-        focusLineQty(row.id);
         return prev.map((line) =>
           line.productSkuId === row.id
             ? {
@@ -507,7 +499,6 @@ export function SalePage() {
         return prev;
       }
 
-      focusLineQty(row.id);
       return [
         ...prev,
         {
@@ -522,11 +513,16 @@ export function SalePage() {
           unitsPerPurchaseUnit,
           sellingPrice: row.sellingPrice ?? 0,
           sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit ?? null,
+          discountPercent: row.saleDiscountPercent ?? 0,
+          focQuantity: 0,
           lastScanMultiplier: multiplier,
         },
       ];
     });
 
+    if (!scanError) {
+      focusScanInput();
+    }
     return scanError;
   }
 
@@ -574,6 +570,8 @@ export function SalePage() {
     } finally {
       scanProcessingRef.current = false;
       setScanBusy(false);
+      setScanDraft("");
+      focusScanInput();
     }
   }
 
@@ -588,6 +586,61 @@ export function SalePage() {
 
     scanQueueRef.current.push(code);
     void processScanQueue();
+  }
+
+  useBarcodeScanTarget({
+    kind: "barcode",
+    layer: "main",
+    enabled:
+      !loadingDraft &&
+      !itemOpen &&
+      !removeScanOpen &&
+      Boolean(warehouseId),
+    inputRef: scanInputRef,
+    onScan: setScanDraft,
+    onComplete: (code) => {
+      setScanDraft("");
+      onBarcodeEnter(code);
+    },
+  });
+
+  function handleScanFieldEnter(): void {
+    const code = scanDraft.trim();
+    if (!code) return;
+    setScanDraft("");
+    onBarcodeEnter(code);
+  }
+
+  function updateLineFoc(line: DraftSaleLine, raw: string): void {
+    const focQuantity = Math.max(
+      0,
+      Math.floor(parseNumericInputChange(raw)),
+    );
+    const invQty = round4(line.quantity + focQuantity);
+    if (invQty > line.quantityAvailable) {
+      setError(
+        `Cannot exceed POS balance (${line.quantityAvailable}) for ${line.sku}`,
+      );
+      return;
+    }
+    setError(null);
+    setLines((prev) =>
+      prev.map((row) =>
+        row.productSkuId === line.productSkuId ? { ...row, focQuantity } : row,
+      ),
+    );
+  }
+
+  function selectPaymentMethod(method: SalePaymentMethod): void {
+    if (!payment) return;
+    paymentsTouchedRef.current = true;
+    setPayments([
+      {
+        ...payment,
+        method,
+        amount: method === "CASH" ? payment.amount : billTotal,
+      },
+    ]);
   }
 
   function findLineByBarcodeOnBill(code: string): DraftSaleLine | null {
@@ -605,6 +658,23 @@ export function SalePage() {
     const lookup = await lookupSkuByBarcode(code);
     if (!lookup) return null;
     return lines.find((line) => line.productSkuId === lookup.id) ?? null;
+  }
+
+  async function onRemoveBarcodeEnter(scannedCode: string) {
+    setError(null);
+    const code = scannedCode.trim();
+    if (!code) return;
+
+    const line = await resolveLineForRemoveScan(code);
+    if (!line) {
+      setError(NOT_ON_BILL_ERROR);
+      return;
+    }
+    const removed = await removeBillLine(line, { confirm: false });
+    if (removed) {
+      setRemoveScanOpen(false);
+      focusScanInput();
+    }
   }
 
   async function removeBillLine(
@@ -650,19 +720,6 @@ export function SalePage() {
     return true;
   }
 
-  async function onRemoveBarcodeEnter(scannedCode: string) {
-    setError(null);
-    const code = scannedCode.trim();
-    if (!code) return;
-
-    const line = await resolveLineForRemoveScan(code);
-    if (!line) {
-      setError(NOT_ON_BILL_ERROR);
-      return;
-    }
-    await removeBillLine(line, { confirm: false });
-  }
-
   async function onHoldBill() {
     if (!warehouseId || lines.length === 0) return;
     if (holdInFlightRef.current) return;
@@ -681,12 +738,6 @@ export function SalePage() {
       });
       await window.blackbox?.localDb?.upsertSaleDraft?.(detail);
       resetForNewSale();
-      try {
-        const count = await window.blackbox?.localDb?.countDraftSales?.();
-        if (count != null) setHeldCount(count);
-      } catch {
-        /* badge refresh is best-effort */
-      }
       navigate("/sales/new", { replace: true });
       setHolding(false);
       holdInFlightRef.current = false;
@@ -697,29 +748,8 @@ export function SalePage() {
     }
   }
 
-  async function onDiscardDraft() {
-    if (!editingDraftId) return;
-    const ok = await confirm({
-      title: "Discard held bill?",
-      description: `${holdNumberRef.current ?? "This bill"} will be removed. Reserved stock is released.`,
-      confirmLabel: "Discard",
-    });
-    if (!ok) return;
-
-    setError(null);
-    try {
-      await window.blackbox?.localDb?.deleteSaleDraft?.(editingDraftId);
-      navigate("/sales/new");
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, "Failed to discard held bill"));
-    }
-  }
-
   const tillBlocked =
-    !canManageTill &&
-    !loadingDraft &&
-    !success &&
-    tillSession?.status !== "OPEN";
+    !canManageTill && !loadingDraft && tillSession?.status !== "OPEN";
 
   const tillNearLimit =
     tillSession != null &&
@@ -769,10 +799,20 @@ export function SalePage() {
       }
     }
 
+    const focLines = lines.filter((line) => line.focQuantity > 0);
+    let focSupervisorUserId: string | null = null;
+    let focSupervisorDisplayName: string | null = null;
+    if (focLines.length > 0) {
+      const totp = await promptSupervisorTotp();
+      if (!totp.approved) return;
+      focSupervisorUserId = totp.supervisorUserId;
+      focSupervisorDisplayName = totp.supervisorDisplayName;
+    }
+
     setSaving(true);
     try {
-      const gst = Number(gstRate) || 0;
-      const salesTax = Number(salesTaxRate) || 0;
+      const gst = tenantGstRate;
+      const salesTax = tenantSalesTaxRate;
       const resolvedCustomerName =
         customerName.trim() || DEFAULT_SALE_CUSTOMER_NAME;
       const resolvedCashierName = user?.fullName?.trim() || "—";
@@ -791,6 +831,8 @@ export function SalePage() {
             sku: line.sku,
             barcode: line.barcode,
             quantity: line.quantity,
+            discountPercent: line.discountPercent,
+            focQuantity: line.focQuantity,
             unitPrice,
             lineTotal: lineTotal(line),
             sellUnit: line.sellUnit,
@@ -833,6 +875,7 @@ export function SalePage() {
         });
 
         for (const item of items) {
+          const invQty = round4(item.quantity + item.focQuantity);
           const movementId = crypto.randomUUID();
           await commitLocalChange({
             entityType: "inventory_movement",
@@ -846,8 +889,8 @@ export function SalePage() {
               warehouseId,
               warehouseName,
               movementType: "SALE",
-              quantity: item.quantity,
-              delta: -item.quantity,
+              quantity: invQty,
+              delta: -invQty,
               referenceType: "sale",
               referenceId: localId,
               reason: `Sale ${saleNumber}`,
@@ -858,6 +901,25 @@ export function SalePage() {
 
         void syncNow();
         if (user?.id) {
+          if (focLines.length > 0) {
+            await logActivityEvent(
+              {
+                eventType: "sale.foc_posted",
+                actorUserId: user.id,
+                supervisorUserId: focSupervisorUserId,
+                summary: `${focSupervisorDisplayName ?? "Manager"} approved FOC sale ${saleNumber}`,
+                metadata: {
+                  saleNumber,
+                  saleId: localId,
+                  focLineCount: focLines.length,
+                },
+              },
+              {
+                actorName: user.fullName?.trim() || user.username,
+                supervisorName: focSupervisorDisplayName,
+              },
+            );
+          }
           await applyTillCashFromSale({
             userId: user.id,
             skipForManager: canManageTill,
@@ -885,7 +947,19 @@ export function SalePage() {
             );
           }
         }
-        setSuccess(detail);
+        if (editingDraftId) {
+          try {
+            await window.blackbox?.localDb?.deleteSaleDraft?.(editingDraftId);
+          } catch {
+            /* draft cleanup is best-effort */
+          }
+        }
+        try {
+          await window.blackbox?.localDb?.upsertSale?.(detail);
+        } catch {
+          /* optional cache */
+        }
+        navigate(`/sales/${detail.id}`);
         return;
       }
 
@@ -895,9 +969,12 @@ export function SalePage() {
         salesTaxRate: salesTax,
         customerName: resolvedCustomerName,
         cashTendered: resolvedCashTendered() ?? undefined,
+        supervisorUserId: focSupervisorUserId ?? undefined,
         items: lines.map((line) => ({
           productSkuId: line.productSkuId,
           quantity: line.quantity,
+          discountPercent: line.discountPercent,
+          focQuantity: line.focQuantity,
           unitPrice: lineUnitPrice(line),
           lineTotal: lineTotal(line),
           sellUnit: line.sellUnit,
@@ -909,6 +986,26 @@ export function SalePage() {
           reference: row.reference || undefined,
         })),
       });
+
+      if (focLines.length > 0 && user?.id) {
+        await logActivityEvent(
+          {
+            eventType: "sale.foc_posted",
+            actorUserId: user.id,
+            supervisorUserId: focSupervisorUserId,
+            summary: `${focSupervisorDisplayName ?? "Manager"} approved FOC sale ${detail.saleNumber}`,
+            metadata: {
+              saleNumber: detail.saleNumber,
+              saleId: detail.id,
+              focLineCount: focLines.length,
+            },
+          },
+          {
+            actorName: user.fullName?.trim() || user.username,
+            supervisorName: focSupervisorDisplayName,
+          },
+        );
+      }
 
       if (editingDraftId) {
         try {
@@ -923,7 +1020,7 @@ export function SalePage() {
       } catch {
         /* optional cache */
       }
-      setSuccess(detail);
+      navigate(`/sales/${detail.id}`);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to post sale"));
     } finally {
@@ -932,120 +1029,138 @@ export function SalePage() {
   }
 
   usePageKeyboard({
-    enabled: !success && !loadingDraft,
+    enabled: !loadingDraft,
     onSave: () => {
       if (!saving && canPost) void onConfirm();
     },
-    onScan: () => {
-      if (
-        !warehouseId ||
-        scanBusy ||
-        itemOpen ||
-        removeScanOpen ||
-        success
-      ) {
-        return;
-      }
-      setScanOpen(true);
+    onScan: focusScanInput,
+    onAddItem: () => {
+      if (warehouseId && !itemOpen && !scanBusy) setItemOpen(true);
     },
   });
 
-  if (success) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {success.saleNumber}
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Sale posted
-            </p>
-          </div>
-          <div className="flex gap-2 print:hidden">
-            <PrintButton />
-            <Button onClick={() => navigate(`/sales/${success.id}`)}>View</Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                autoScanPendingRef.current = true;
-                setSuccess(null);
-                resetForNewSale();
-              }}
-            >
-              New sale
-            </Button>
-          </div>
-        </div>
+  useEffect(() => {
+    if (loadingDraft) return;
 
-        <PrintDocument showStoreHeader={false}>
-          <SaleThermalReceipt
-            detail={success}
-            businessName={user?.tenantName?.trim() ?? ""}
-            businessAddress={user?.businessAddress}
-            cashierName={
-              success.postedByName?.trim() || user?.fullName?.trim() || "—"
-            }
-          />
-        </PrintDocument>
-      </div>
-    );
-  }
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return;
+      }
+      if (event.key === "F1") {
+        event.preventDefault();
+        if (lines.length > 0) setRemoveScanOpen(true);
+        return;
+      }
+      if (event.key === "F6") {
+        event.preventDefault();
+        if (canHold && !holding) void onHoldBill();
+        return;
+      }
+      if (event.key === "F7") {
+        event.preventDefault();
+        navigate("/sales/held");
+        return;
+      }
+      if (event.key === "F4") {
+        event.preventDefault();
+        paymentAmountRef.current?.focus();
+        paymentAmountRef.current?.select();
+        return;
+      }
+      if (event.key === "F5") {
+        event.preventDefault();
+        if (payment) selectPaymentMethod("CASH");
+        return;
+      }
+      if (event.key === "F9") {
+        event.preventDefault();
+        if (payment) selectPaymentMethod("CARD");
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [loadingDraft, canHold, holding, navigate, payment, billTotal, lines.length]);
 
   if (loadingDraft) {
     return <p className="text-muted-foreground text-sm">Loading held bill…</p>;
   }
 
+  const tillStatusLabel =
+    canManageTill || !tillSession
+      ? null
+      : tillSession.status === "OPEN"
+        ? "Till open"
+        : tillSession.status === "PENDING_APPROVAL"
+          ? "Till pending"
+          : tillSession.status === "CLOSED_LIMIT"
+            ? "Till limit"
+            : "Till closed";
+
+  const syncLabel = sync.syncing
+    ? "Syncing…"
+    : sync.lastError
+      ? "Sync issue"
+      : offline
+        ? "Offline"
+        : "Online";
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {editingDraftId
-              ? holdNumberRef.current ?? "Held bill"
-              : "New sale"}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {editingDraftId
-              ? "Resume this held bill, post when ready, or discard to release stock"
-              : "Scan items from POS floor balance and collect payment"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canWrite ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/sales/held")}
-            >
-              Held bills
-              {heldCount > 0 ? ` (${heldCount})` : ""}
-            </Button>
+    <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
+      <div className="border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-semibold">
+            {user?.tenantName?.trim() || "Store"}
+          </span>
+          <span className="text-muted-foreground">·</span>
+          <span>{user?.fullName?.trim() || user?.username || "Cashier"}</span>
+          {tillStatusLabel ? (
+            <>
+              <span className="text-muted-foreground">·</span>
+              <span
+                className={cn(
+                  tillBlocked && "text-destructive font-medium",
+                  tillNearLimit && !tillBlocked && "text-amber-700 dark:text-amber-300",
+                )}
+              >
+                {tillStatusLabel}
+              </span>
+            </>
           ) : null}
-          {canReadList ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/sales")}
-            >
-              Past sales
-            </Button>
-          ) : canReadTill ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/sales/till")}
-            >
-              My till
-            </Button>
+          <span className="text-muted-foreground">·</span>
+          <span
+            className={cn(
+              sync.lastError && "text-destructive",
+              offline && !sync.lastError && "text-amber-700 dark:text-amber-300",
+            )}
+          >
+            {syncLabel}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {editingDraftId ? (
+            <span className="text-muted-foreground text-xs">
+              {holdNumberRef.current ?? "Held bill"}
+            </span>
           ) : null}
           {!canManageTill && tillSession?.status === "OPEN" ? (
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={() => setCollectDialogOpen(true)}
             >
               Withdraw cash
+            </Button>
+          ) : null}
+          {canReadTill && !canManageTill ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/sales/till")}
+            >
+              My till
             </Button>
           ) : null}
         </div>
@@ -1079,15 +1194,6 @@ export function SalePage() {
         >
           Till is near the cash limit — Rs{" "}
           {tillRemainingHeadroom(tillSession!).toLocaleString()} headroom left.
-          Tap Withdraw cash and ask a manager to authorize.{" "}
-          <Button
-            type="button"
-            variant="link"
-            className="text-amber-950 dark:text-amber-100 h-auto p-0"
-            onClick={() => navigate("/sales/till")}
-          >
-            View My till
-          </Button>
         </div>
       ) : null}
 
@@ -1097,350 +1203,366 @@ export function SalePage() {
         </p>
       ) : null}
 
-      <div className={FORM_GRID}>
-        <div className="space-y-2">
-          <Label htmlFor="customerName">Customer name</Label>
-          <Input
-            id="customerName"
-            placeholder="Customer name (optional)"
-            value={customerName}
-            onChange={(event) => setCustomerName(event.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={
-            !warehouseId || itemOpen || scanBusy || scanOpen || removeScanOpen
-          }
-          onClick={() => setItemOpen(true)}
-        >
-          Add item
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={
-            !warehouseId || scanBusy || itemOpen || scanOpen || removeScanOpen
-          }
-          onClick={() => setScanOpen(true)}
-        >
-          Scan barcode
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={
-            lines.length === 0 ||
-            scanBusy ||
-            itemOpen ||
-            scanOpen ||
-            removeScanOpen
-          }
-          onClick={() => setRemoveScanOpen(true)}
-        >
-          Remove item
-        </Button>
-      </div>
-
-      <FormEnterNav>
-        <div className="border-border overflow-x-auto rounded-lg border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted/40 text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Product</th>
-                <th className="px-4 py-3 font-medium">SKU</th>
-                <th className="px-4 py-3 font-medium">Qty</th>
-                <th className="px-4 py-3 font-medium">Unit price</th>
-                <th className="px-4 py-3 font-medium">Line total</th>
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.productSkuId} className="border-border border-t">
-                  <td className="px-4 py-3">
-                    {line.productName}
-                    {line.variantName ? ` · ${line.variantName}` : ""}
-                  </td>
-                  <td className="px-4 py-3">{line.sku}</td>
-                  <td className="px-4 py-3">
-                    <Input
-                      data-line-qty={line.productSkuId}
-                      type="number"
-                      min={0}
-                      step="any"
-                      className="w-28 tabular-nums"
-                      value={numericInputDisplayValue(line.quantity)}
-                      onFocus={selectZeroNumericOnFocus}
-                      onKeyDown={replaceLeadingZeroOnKeyDown}
-                      onChange={(event) => {
-                        const quantity = round4(
-                          parseNumericInputChange(event.target.value),
-                        );
-                        setLines((prev) =>
-                          prev.map((row) =>
-                            row.productSkuId === line.productSkuId
-                              ? { ...row, quantity, lastScanMultiplier: undefined }
-                              : row,
-                          ),
-                        );
-                      }}
-                    />
-                    {line.quantity > line.quantityAvailable ? (
-                      <p className="text-destructive mt-1 text-xs">
-                        Max POS balance {line.quantityAvailable}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">
-                    {lineUnitPrice(line).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">
-                    {lineTotal(line).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        void removeBillLine(line, { confirm: true });
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </FormEnterNav>
-
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-3">
-          <h2 className="text-lg font-medium">Tax</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="gstRate">GST %</Label>
-              <Input
-                id="gstRate"
-                type="number"
-                min={0}
-                step="any"
-                value={gstRate}
-                onFocus={selectZeroNumericOnFocus}
-                onChange={(event) => setGstRate(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="salesTaxRate">Sales tax %</Label>
-              <Input
-                id="salesTaxRate"
-                type="number"
-                min={0}
-                step="any"
-                value={salesTaxRate}
-                onFocus={selectZeroNumericOnFocus}
-                onChange={(event) => setSalesTaxRate(event.target.value)}
-              />
-            </div>
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr]">
+        <div className="flex min-h-0 flex-col gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="saleScanInput" className="sr-only">
+              Scan barcode
+            </Label>
+            <Input
+              ref={scanInputRef}
+              id="saleScanInput"
+              {...barcodeScanInputProps()}
+              autoComplete="off"
+              disabled={!warehouseId || scanBusy}
+              placeholder={
+                scanBusy
+                  ? "Looking up barcode…"
+                  : "Scan barcode or search product / SKU…"
+              }
+              value={scanDraft}
+              onChange={(event) => setScanDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                event.stopPropagation();
+                handleScanFieldEnter();
+              }}
+              className="h-11 text-base"
+            />
+            <p className="text-muted-foreground text-xs">
+              Rescanning the same SKU adds quantity. F2 focuses this field.
+            </p>
           </div>
-          <div className="space-y-2 text-sm">
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!warehouseId || itemOpen || scanBusy}
+              onClick={() => setItemOpen(true)}
+            >
+              Add item (F3)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={lines.length === 0}
+              onClick={() => setRemoveScanOpen(true)}
+            >
+              Remove item (F1)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!canHold || holding}
+              onClick={() => void onHoldBill()}
+            >
+              {holding ? "Holding…" : "Hold (F6)"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCustomerField((v) => !v)}
+            >
+              {showCustomerField ? "Hide customer" : "Customer"}
+            </Button>
+          </div>
+
+          {showCustomerField ? (
+            <div className="space-y-2">
+              <Label htmlFor="customerName">Customer name</Label>
+              <Input
+                id="customerName"
+                placeholder="Optional"
+                value={customerName}
+                onChange={(event) => setCustomerName(event.target.value)}
+              />
+            </div>
+          ) : null}
+
+          <div className="border-border min-h-0 flex-1 overflow-auto rounded-lg border">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Product</th>
+                  <th className="px-3 py-2 font-medium">Qty</th>
+                  <th className="px-3 py-2 font-medium">Disc %</th>
+                  <th className="px-3 py-2 font-medium">FOC</th>
+                  <th className="px-3 py-2 font-medium">Price</th>
+                  <th className="px-3 py-2 font-medium">Total</th>
+                  <th className="px-3 py-2 w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {lines.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="text-muted-foreground px-3 py-8 text-center"
+                    >
+                      Scan or add items to start a sale
+                    </td>
+                  </tr>
+                ) : (
+                  lines.map((line) => (
+                    <tr
+                      key={line.productSkuId}
+                      className="border-border border-t"
+                    >
+                      <td className="px-3 py-2">
+                        <p className="font-medium">
+                          {line.productName}
+                          {line.variantName ? ` · ${line.variantName}` : ""}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {line.sku}
+                          {line.barcode ? ` · ${line.barcode}` : ""}
+                        </p>
+                        {lineInventoryQty(line) > line.quantityAvailable ? (
+                          <p className="text-destructive text-xs">
+                            Max {line.quantityAvailable} (qty + FOC)
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.quantity.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {line.discountPercent.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={1}
+                          className="h-8 w-16 px-1 text-center tabular-nums"
+                          value={numericInputDisplayValue(line.focQuantity)}
+                          onFocus={selectZeroNumericOnFocus}
+                          onKeyDown={replaceLeadingZeroOnKeyDown}
+                          onChange={(event) =>
+                            updateLineFoc(line, event.target.value)
+                          }
+                        />
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {lineUnitPrice(line).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums font-medium">
+                        {lineTotal(line).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="Remove line"
+                          onClick={() => {
+                            void removeBillLine(line, { confirm: true });
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside className="border-border lg:sticky lg:top-20 lg:self-start space-y-4 rounded-lg border p-4">
+          <div>
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+              Invoice
+            </p>
+            <p className="text-lg font-semibold">
+              {editingDraftId
+                ? holdNumberRef.current ?? "Held bill"
+                : "New sale"}
+            </p>
+          </div>
+
+          <div className="space-y-1.5 text-sm">
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="tabular-nums">{subtotal.toLocaleString()}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">GST</span>
-              <span className="tabular-nums">{tax.gstAmount.toLocaleString()}</span>
+              <span className="text-muted-foreground">
+                GST ({tenantGstRate}%)
+              </span>
+              <span className="tabular-nums">
+                {tax.gstAmount.toLocaleString()}
+              </span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">Sales tax</span>
+              <span className="text-muted-foreground">
+                Sales tax ({tenantSalesTaxRate}%)
+              </span>
               <span className="tabular-nums">
                 {tax.salesTaxAmount.toLocaleString()}
               </span>
             </div>
-            <div className="flex justify-between gap-4 font-medium">
-              <span>Total</span>
-              <span className="tabular-nums">{tax.total.toLocaleString()}</span>
+            <div className="border-border flex justify-between gap-4 border-t pt-3">
+              <span className="text-base font-semibold">Total</span>
+              <span className="text-3xl font-bold tabular-nums tracking-tight">
+                {tax.total.toLocaleString()}
+              </span>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-3">
-          <h2 className="text-lg font-medium">Payment</h2>
-          {payment ? (
-            <div className="border-border grid gap-3 rounded-lg border p-3 sm:grid-cols-[8rem_1fr_1fr]">
-              <div className="space-y-1">
-                <Label htmlFor="paymentMethod">Method</Label>
-                <select
-                  id="paymentMethod"
-                  className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-                  value={payment.method}
-                  onChange={(event) => {
-                    const method = event.target.value as SalePaymentMethod;
-                    paymentsTouchedRef.current = true;
-                    setPayments([
-                      {
-                        ...payment,
-                        method,
-                        amount: method === "CASH" ? payment.amount : billTotal,
-                      },
-                    ]);
-                  }}
-                >
-                  {PAYMENT_METHODS.map((method) => (
-                    <option key={method} value={method}>
-                      {paymentMethodLabel(method)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="paymentAmount">
-                  {isCashPayment ? "Tendered" : "Amount"}
-                </Label>
-                <Input
-                  id="paymentAmount"
-                  type="number"
-                  min={0}
-                  max={isCashPayment ? cashMaxTender : billTotal}
-                  step="any"
-                  placeholder={isCashPayment ? "Cash received" : "Amount"}
-                  value={numericInputDisplayValue(payment.amount)}
-                  onFocus={selectZeroNumericOnFocus}
-                  onKeyDown={replaceLeadingZeroOnKeyDown}
-                  onChange={(event) => {
-                    const amount = round4(
-                      parseNumericInputChange(event.target.value),
-                    );
-                    paymentsTouchedRef.current = true;
-                    setPayments([{ ...payment, amount }]);
-                  }}
-                />
-                {isCashPayment ? (
-                  <p className="text-muted-foreground text-xs">
-                    Max tender: {cashMaxTender.toLocaleString()}
-                  </p>
-                ) : null}
-                {cashOverMax ? (
-                  <p className="text-destructive text-xs" role="alert">
-                    You can enter only {cashMaxTender.toLocaleString()} max.
-                  </p>
-                ) : null}
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="paymentReference">Reference</Label>
-                <Input
-                  id="paymentReference"
-                  placeholder="Optional"
-                  value={payment.reference}
-                  onChange={(event) => {
-                    paymentsTouchedRef.current = true;
-                    setPayments([{ ...payment, reference: event.target.value }]);
-                  }}
-                />
-              </div>
-            </div>
-          ) : null}
-          {payment && isCashPayment ? (
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Cash</span>
-                <span className="tabular-nums">{tendered.toLocaleString()}</span>
-              </div>
-              {tendered > billTotal ? (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Change</span>
-                  <span className="text-green-700 tabular-nums dark:text-green-400">
-                    {cashChange.toLocaleString()}
-                  </span>
-                </div>
-              ) : tendered < billTotal ? (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Short</span>
-                  <span className="text-amber-700 tabular-nums dark:text-amber-300">
-                    {cashShortfall.toLocaleString()}
-                  </span>
-                </div>
+          <FormEnterNav>
+            <div className="space-y-3">
+              <h2 className="text-sm font-medium">Payment</h2>
+              {payment ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Method</Label>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant={
+                          payment.method === "CASH" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => selectPaymentMethod("CASH")}
+                      >
+                        Cash (F5)
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={
+                          payment.method === "CARD" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => selectPaymentMethod("CARD")}
+                      >
+                        Card (F9)
+                      </Button>
+                    </div>
+                    {/* <select
+                      id="paymentMethod"
+                      className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                      value={payment.method}
+                      onChange={(event) => {
+                        selectPaymentMethod(
+                          event.target.value as SalePaymentMethod,
+                        );
+                      }}
+                    >
+                      {PAYMENT_METHODS.map((method) => (
+                        <option key={method} value={method}>
+                          {paymentMethodLabel(method)}
+                        </option>
+                      ))}
+                    </select> */}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentAmount">
+                      {isCashPayment ? "Cash received" : "Amount"}
+                    </Label>
+                    <Input
+                      ref={paymentAmountRef}
+                      id="paymentAmount"
+                      type="number"
+                      min={0}
+                      max={isCashPayment ? cashMaxTender : billTotal}
+                      step="any"
+                      placeholder={isCashPayment ? "Tendered" : "Amount"}
+                      className="h-12 text-lg tabular-nums"
+                      value={numericInputDisplayValue(payment.amount)}
+                      onFocus={selectZeroNumericOnFocus}
+                      onKeyDown={replaceLeadingZeroOnKeyDown}
+                      onChange={(event) => {
+                        const amount = round4(
+                          parseNumericInputChange(event.target.value),
+                        );
+                        paymentsTouchedRef.current = true;
+                        setPayments([{ ...payment, amount }]);
+                      }}
+                    />
+                    {cashOverMax ? (
+                      <p className="text-destructive text-xs" role="alert">
+                        Max tender {cashMaxTender.toLocaleString()}
+                      </p>
+                    ) : null}
+                  </div>
+                  {payment.method !== "CASH" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="paymentReference">Reference</Label>
+                      <Input
+                        id="paymentReference"
+                        placeholder="Optional"
+                        value={payment.reference}
+                        onChange={(event) => {
+                          paymentsTouchedRef.current = true;
+                          setPayments([
+                            { ...payment, reference: event.target.value },
+                          ]);
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  {isCashPayment ? (
+                    <div className="rounded-md bg-muted/50 px-3 py-3 text-lg">
+                      {tendered >= billTotal ? (
+                        <div className="flex justify-between gap-4 font-semibold">
+                          <span>Change</span>
+                          <span className="text-xl text-green-700 tabular-nums dark:text-green-400">
+                            {cashChange.toLocaleString()}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between gap-4 font-semibold">
+                          <span>Short</span>
+                          <span className="text-xl text-amber-700 tabular-nums dark:text-amber-300">
+                            {cashShortfall.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : cardRemaining !== 0 ? (
+                    <p className="text-amber-700 text-sm dark:text-amber-300">
+                      Remaining: {cardRemaining.toLocaleString()}
+                    </p>
+                  ) : null}
+                </>
               ) : (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Change</span>
-                  <span className="text-green-700 tabular-nums dark:text-green-400">
-                    0
-                  </span>
-                </div>
+                <p className="text-muted-foreground text-sm">
+                  Add items to enable payment
+                </p>
               )}
             </div>
-          ) : payment ? (
-            <p className="text-sm">
-              Remaining:{" "}
-              <span
-                className={
-                  cardRemaining === 0
-                    ? "text-green-700 dark:text-green-400"
-                    : "text-amber-700 dark:text-amber-300"
-                }
-              >
-                {cardRemaining.toLocaleString()}
-              </span>
-            </p>
-          ) : null}
-        </div>
-      </section>
+          </FormEnterNav>
 
-      <div className="flex flex-wrap justify-end gap-2">
-        {editingDraftId ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void onDiscardDraft()}
-          >
-            Discard
-          </Button>
-        ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!canHold || holding}
-          onClick={() => void onHoldBill()}
-        >
-          {holding ? "Holding…" : "Hold bill"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            navigate(editingDraftId ? "/sales/held" : canReadList ? "/sales" : "/")
-          }
-        >
-          Cancel
-        </Button>
-        <Button type="button" disabled={saving || !canPost} onClick={() => void onConfirm()}>
-          {saving ? "Posting…" : "Post sale"}
-        </Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              size="lg"
+              className="w-full"
+              disabled={saving || !canPost}
+              onClick={() => void onConfirm()}
+            >
+              {saving ? "Posting…" : "Post sale (F10)"}
+            </Button>
+          </div>
+        </aside>
       </div>
 
       <KeyboardHints
-        hints={[KEYBOARD_HINT_ENTER, KEYBOARD_HINT_SCAN, KEYBOARD_HINT_SAVE]}
-      />
-
-      <ScanBarcodePanel
-        open={scanOpen}
-        onOpenChange={setScanOpen}
-        busy={false}
-        clearAfterComplete
-        description={
-          scanBusy
-            ? "Looking up barcode…"
-            : "Scan or type a barcode — rescanning the same SKU adds quantity."
-        }
-        onComplete={(code) => onBarcodeEnter(code)}
+        hints={[
+          KEYBOARD_HINT_SCAN,
+          KEYBOARD_HINT_SAVE,
+          "F1 remove · F4 tender · F5 cash · F9 card · F6 hold · F7 held bills",
+          KEYBOARD_HINT_ENTER,
+        ]}
       />
 
       <ScanBarcodePanel
@@ -1448,7 +1570,8 @@ export function SalePage() {
         onOpenChange={setRemoveScanOpen}
         title="Remove item"
         description="Scan the barcode of an item on this bill to remove it."
-        clearAfterComplete
+        layer="dialog"
+        returnFocusTo="#saleScanInput"
         onComplete={(code) => void onRemoveBarcodeEnter(code)}
       />
 
@@ -1456,7 +1579,10 @@ export function SalePage() {
         open={itemOpen}
         warehouseId={warehouseId}
         excludeDraftSaleId={editingDraftId}
-        onClose={() => setItemOpen(false)}
+        onClose={() => {
+          setItemOpen(false);
+          focusScanInput();
+        }}
         onAddMany={onAddManyFromDialog}
       />
 

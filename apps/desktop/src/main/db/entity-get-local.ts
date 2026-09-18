@@ -27,7 +27,9 @@ import type {
   StockMovementRow,
   SaleDetail,
   SalePaymentMethod,
+  SaleReturnDetail,
   SaleStatus,
+  ReturnableSaleLine,
   VendorContact,
   VendorContactType,
   VendorDetail,
@@ -180,6 +182,7 @@ export function listProductSkusLocal(productId: string): ProductSkuDetail[] {
          s.cost_price as costPrice,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
+         coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
          s.reorder_level as reorderLevel,
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
@@ -220,6 +223,7 @@ function mapProductSkuRow(r: Record<string, unknown>): ProductSkuDetail {
     costPrice: num(r.costPrice),
     sellingPrice: num(r.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(r.sellingPricePerPurchaseUnit),
+    saleDiscountPercent: num(r.saleDiscountPercent),
     reorderLevel: num(r.reorderLevel),
     minimumStockLevel: num(r.minimumStockLevel),
     maximumStockLevel: numOrNull(r.maximumStockLevel),
@@ -630,6 +634,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
          s.cost_price as costPrice,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
+         coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
          s.reorder_level as reorderLevel,
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
@@ -663,6 +668,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
     costPrice: num(row.costPrice),
     sellingPrice: num(row.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
+    saleDiscountPercent: num(row.saleDiscountPercent),
     reorderLevel: num(row.reorderLevel),
     minimumStockLevel: num(row.minimumStockLevel),
     maximumStockLevel: numOrNull(row.maximumStockLevel),
@@ -760,6 +766,9 @@ function mapSkuSearchRow(
     variantName: String(r.variantName ?? ""),
     sku: String(r.sku),
     barcode: (r.barcode as string | null) ?? null,
+    ...(r.saleDiscountPercent != null
+      ? { saleDiscountPercent: num(r.saleDiscountPercent) }
+      : {}),
     ...(warehouseId
       ? {
           quantityAvailable: num(r.quantityAvailable),
@@ -847,6 +856,7 @@ export function getSkuByBarcodeLocal(
          s.cost_price as costPrice,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
+         coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
          coalesce(st.quantity_available, 0) as quantityAvailable
        from product_skus s
        inner join products p on p.id = s.product_id
@@ -887,6 +897,7 @@ export function getSkuByBarcodeLocal(
     purchaseUnitName: (row.purchaseUnitName as string | null) ?? null,
     sellingPrice: num(row.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
+    saleDiscountPercent: num(row.saleDiscountPercent),
   };
 }
 
@@ -917,6 +928,7 @@ function lookupProductSkuLocal(
          s.cost_price as costPrice,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
+         coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
          s.reorder_level as reorderLevel,
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
@@ -1641,6 +1653,8 @@ export function getSaleLocal(id: string): SaleDetail | null {
          l.quantity,
          l.unit_price as unitPrice,
          l.line_total as lineTotal,
+         coalesce(l.discount_percent, 0) as discountPercent,
+         coalesce(l.foc_quantity, 0) as focQuantity,
          l.sell_unit as sellUnit
        from sale_lines l
        left join product_skus sk on sk.id = l.product_sku_id
@@ -1696,12 +1710,180 @@ export function getSaleLocal(id: string): SaleDetail | null {
       unitPrice: num(r.unitPrice),
       lineTotal: num(r.lineTotal),
       sellUnit: (r.sellUnit as "pc" | "box") ?? "pc",
+      discountPercent: num(r.discountPercent),
+      focQuantity: num(r.focQuantity),
     })),
     payments: payments.map((r) => ({
       id: String(r.id),
       method: r.method as SalePaymentMethod,
       amount: num(r.amount),
       reference: String(r.reference ?? ""),
+    })),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  };
+}
+
+export function getReturnableSaleLinesLocal(
+  saleId: string,
+): ReturnableSaleLine[] {
+  const db = getLocalDb();
+  const sale = db
+    .prepare(
+      `select id from sales where id = ? and tenant_id = ? and status = 'POSTED'`,
+    )
+    .get(saleId, DEMO_STORE_TENANT_ID) as { id: string } | undefined;
+  if (!sale) return [];
+
+  const lines = db
+    .prepare(
+      `select
+         l.id as saleLineId,
+         l.product_sku_id as productSkuId,
+         coalesce(p.name, '') as productName,
+         coalesce(sk.variant_name, '') as variantName,
+         coalesce(sk.sku, '') as sku,
+         l.barcode,
+         l.quantity as soldQuantity,
+         l.unit_price as unitPrice,
+         coalesce(l.discount_percent, 0) as discountPercent,
+         l.sell_unit as sellUnit
+       from sale_lines l
+       left join product_skus sk on sk.id = l.product_sku_id
+       left join products p on p.id = sk.product_id
+       where l.sale_id = ? and l.tenant_id = ?
+       order by l.created_at, l.id`,
+    )
+    .all(saleId, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
+
+  return lines
+    .map((row) => {
+      const returned = db
+        .prepare(
+          `select coalesce(sum(quantity), 0) as qty
+           from sale_return_lines
+           where tenant_id = ? and sale_line_id = ?`,
+        )
+        .get(DEMO_STORE_TENANT_ID, String(row.saleLineId)) as {
+        qty: number;
+      };
+      const soldQuantity = num(row.soldQuantity);
+      const returnedQuantity = num(returned?.qty);
+      const returnableQuantity = Math.max(
+        0,
+        Math.round((soldQuantity - returnedQuantity) * 10000) / 10000,
+      );
+      return {
+        saleLineId: String(row.saleLineId),
+        productSkuId: String(row.productSkuId),
+        productName: String(row.productName ?? ""),
+        variantName: String(row.variantName ?? ""),
+        sku: String(row.sku ?? ""),
+        barcode: (row.barcode as string | null) ?? null,
+        soldQuantity,
+        returnedQuantity,
+        returnableQuantity,
+        unitPrice: num(row.unitPrice),
+        discountPercent: num(row.discountPercent),
+        sellUnit: (row.sellUnit as "pc" | "box") ?? "pc",
+      };
+    })
+    .filter((line) => line.returnableQuantity > 0);
+}
+
+export function getSaleReturnLocal(id: string): SaleReturnDetail | null {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select
+         r.id,
+         r.return_number as returnNumber,
+         r.sale_id as saleId,
+         s.sale_number as saleNumber,
+         r.warehouse_id as warehouseId,
+         coalesce(w.name, '') as warehouseName,
+         r.return_date as returnDate,
+         r.status,
+         r.subtotal,
+         r.gst_rate as gstRate,
+         r.gst_amount as gstAmount,
+         r.sales_tax_rate as salesTaxRate,
+         r.sales_tax_amount as salesTaxAmount,
+         r.refund_total as refundTotal,
+         r.refund_method as refundMethod,
+         r.notes,
+         r.processed_by as processedBy,
+         r.processed_by_name as processedByName,
+         r.created_at as createdAt,
+         r.updated_at as updatedAt
+       from sale_returns r
+       left join sales s on s.id = r.sale_id
+       left join warehouses w on w.id = r.warehouse_id
+       where r.id = ? and r.tenant_id = ?`,
+    )
+    .get(id, DEMO_STORE_TENANT_ID) as Record<string, unknown> | undefined;
+  if (!row) return null;
+
+  const items = db
+    .prepare(
+      `select
+         l.id,
+         l.sale_line_id as saleLineId,
+         l.product_sku_id as productSkuId,
+         coalesce(p.name, '') as productName,
+         coalesce(sk.variant_name, '') as variantName,
+         coalesce(sk.sku, '') as sku,
+         l.barcode,
+         l.quantity,
+         l.unit_price as unitPrice,
+         coalesce(l.discount_percent, 0) as discountPercent,
+         l.line_total as lineTotal,
+         l.sell_unit as sellUnit
+       from sale_return_lines l
+       left join product_skus sk on sk.id = l.product_sku_id
+       left join products p on p.id = sk.product_id
+       where l.sale_return_id = ? and l.tenant_id = ?
+       order by l.created_at, l.id`,
+    )
+    .all(id, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
+
+  const sale = getSaleLocal(String(row.saleId));
+  if (!sale) return null;
+
+  return {
+    id: String(row.id),
+    returnNumber: String(row.returnNumber),
+    saleId: String(row.saleId),
+    saleNumber: String(row.saleNumber ?? sale.saleNumber),
+    warehouseId: String(row.warehouseId),
+    warehouseName: String(row.warehouseName ?? ""),
+    returnDate: String(row.returnDate),
+    status: "POSTED",
+    subtotal: num(row.subtotal),
+    gstRate: num(row.gstRate),
+    gstAmount: num(row.gstAmount),
+    salesTaxRate: num(row.salesTaxRate),
+    salesTaxAmount: num(row.salesTaxAmount),
+    refundTotal: num(row.refundTotal),
+    refundMethod: row.refundMethod as SalePaymentMethod,
+    notes: String(row.notes ?? ""),
+    processedBy: (row.processedBy as string | null) ?? null,
+    processedByName:
+      String(row.processedByName ?? "").trim() || null,
+    sale,
+    items: items.map((r) => ({
+      id: String(r.id),
+      saleLineId: String(r.saleLineId),
+      productSkuId: String(r.productSkuId),
+      productName: String(r.productName ?? ""),
+      variantName: String(r.variantName ?? ""),
+      sku: String(r.sku ?? ""),
+      barcode: (r.barcode as string | null) ?? null,
+      quantity: num(r.quantity),
+      unitPrice: num(r.unitPrice),
+      discountPercent: num(r.discountPercent),
+      lineTotal: num(r.lineTotal),
+      sellUnit: (r.sellUnit as "pc" | "box") ?? "pc",
     })),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),

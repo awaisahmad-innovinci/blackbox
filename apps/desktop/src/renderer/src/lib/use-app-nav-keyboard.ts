@@ -15,11 +15,12 @@ import {
   matchGlobalTaxonomyShortcut,
   matchNavDropdownItem,
   visibleNavSections,
+  type AppNavSection,
   type NavDropdownId,
   type TaxonomyKind,
 } from "./app-nav-keyboard";
 
-type NavSection = ReturnType<typeof visibleNavSections>[number];
+type NavSection = AppNavSection;
 
 export function useAppNavKeyboard({
   sections = APP_NAV_SECTIONS as unknown as NavSection[],

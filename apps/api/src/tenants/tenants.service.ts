@@ -50,6 +50,12 @@ export class TenantsService {
       tenant.requireManagerApprovalTillWithdraw =
         dto.requireManagerApprovalTillWithdraw;
     }
+    if (dto.defaultGstRate !== undefined) {
+      tenant.defaultGstRate = dto.defaultGstRate;
+    }
+    if (dto.defaultSalesTaxRate !== undefined) {
+      tenant.defaultSalesTaxRate = dto.defaultSalesTaxRate;
+    }
     await this.tenants.save(tenant);
     return toTenantResponse(tenant);
   }

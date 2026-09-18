@@ -87,6 +87,15 @@ export class ProductSku {
   sellingPricePerPurchaseUnit!: string | null;
 
   @Column({
+    name: "sale_discount_percent",
+    type: "numeric",
+    precision: 8,
+    scale: 4,
+    default: 0,
+  })
+  saleDiscountPercent!: string;
+
+  @Column({
     name: "reorder_level",
     type: "numeric",
     precision: 14,

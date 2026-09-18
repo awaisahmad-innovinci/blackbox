@@ -10,6 +10,7 @@ export const INVENTORY_MOVEMENT_TYPES = [
   "OPENING_BALANCE",
   "PURCHASE_RECEIPT",
   "SALE",
+  "SALE_RETURN",
   "STOCK_ADJUSTMENT",
   "TRANSFER_IN",
   "TRANSFER_OUT",
@@ -312,6 +313,8 @@ export interface SkuSearchResult {
   purchaseUnitName?: string | null;
   sellingPrice?: number;
   sellingPricePerPurchaseUnit?: number | null;
+  /** Default POS line discount % for this SKU. */
+  saleDiscountPercent?: number;
 }
 
 /** Tenant-wide barcode lookup for duplicate detection (any SKU/product status). */
@@ -505,6 +508,7 @@ export interface SkuDetail {
   costPrice: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  saleDiscountPercent: number;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -640,6 +644,7 @@ export interface ProductSkuDetail {
   costPrice: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  saleDiscountPercent: number;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -659,6 +664,7 @@ export interface CreateProductSkuRequest {
   costPrice: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit?: number | null;
+  saleDiscountPercent?: number;
   reorderLevel?: number;
   minimumStockLevel?: number;
   maximumStockLevel?: number | null;

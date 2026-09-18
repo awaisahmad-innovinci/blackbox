@@ -14,6 +14,7 @@ export const salesApi = {
     if (query.status) params.set("status", query.status);
     if (query.dateFrom) params.set("dateFrom", query.dateFrom);
     if (query.dateTo) params.set("dateTo", query.dateTo);
+    if (query.hasFoc != null) params.set("hasFoc", String(query.hasFoc));
     if (query.page != null) params.set("page", String(query.page));
     if (query.pageSize != null) params.set("pageSize", String(query.pageSize));
     const q = params.toString() ? `?${params.toString()}` : "";

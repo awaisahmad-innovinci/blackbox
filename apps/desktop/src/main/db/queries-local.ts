@@ -31,7 +31,10 @@ import type {
   PaginatedInventoryOutReturns,
   InventoryOutReturnStatus,
   PaginatedSales,
+  PaginatedSaleReturns,
   SaleListQuery,
+  SaleReturnListItem,
+  SaleReturnListQuery,
   SaleStatus,
   WarehouseListItem,
 } from "@blackbox/shared";
@@ -1267,6 +1270,20 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
   const status = query.status ?? "";
   const dateFrom = query.dateFrom ?? "";
   const dateTo = query.dateTo ?? "";
+  const hasFocClause =
+    query.hasFoc === true
+      ? `and exists (
+           select 1 from sale_lines sl
+           where sl.sale_id = s.id and sl.tenant_id = s.tenant_id
+             and coalesce(sl.foc_quantity, 0) > 0
+         )`
+      : query.hasFoc === false
+        ? `and not exists (
+             select 1 from sale_lines sl
+             where sl.sale_id = s.id and sl.tenant_id = s.tenant_id
+               and coalesce(sl.foc_quantity, 0) > 0
+           )`
+        : "";
 
   const where = `
     s.tenant_id = @tenantId
@@ -1275,6 +1292,7 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
     and (@dateFrom = '' or s.posted_at >= @dateFrom)
     and (@dateTo = '' or s.posted_at <= @dateTo || 'T23:59:59.999Z')
     and (@search = '' or lower(s.sale_number) like '%' || @search || '%')
+    ${hasFocClause}
   `;
 
   const params = {
@@ -1341,5 +1359,134 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
     total,
     page,
     pageSize,
+  };
+}
+
+export function listSaleReturnsLocal(
+  query: SaleReturnListQuery = {},
+): PaginatedSaleReturns {
+  const db = getLocalDb();
+  const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
+  const search = query.search?.trim().toLowerCase() ?? "";
+  const warehouseId = query.warehouseId ?? "";
+  const saleId = query.saleId ?? "";
+  const dateFrom = query.dateFrom ?? "";
+  const dateTo = query.dateTo ?? "";
+  const hasFocClause =
+    query.hasFoc === true
+      ? `and exists (
+           select 1 from sale_lines sl
+           where sl.sale_id = r.sale_id and sl.tenant_id = r.tenant_id
+             and coalesce(sl.foc_quantity, 0) > 0
+         )`
+      : query.hasFoc === false
+        ? `and not exists (
+             select 1 from sale_lines sl
+             where sl.sale_id = r.sale_id and sl.tenant_id = r.tenant_id
+               and coalesce(sl.foc_quantity, 0) > 0
+           )`
+        : "";
+
+  const where = `
+    r.tenant_id = @tenantId
+    and (@warehouseId = '' or r.warehouse_id = @warehouseId)
+    and (@saleId = '' or r.sale_id = @saleId)
+    and (@dateFrom = '' or r.return_date >= @dateFrom)
+    and (@dateTo = '' or r.return_date <= @dateTo)
+    and (
+      @search = ''
+      or lower(r.return_number) like '%' || @search || '%'
+      or lower(coalesce(s.sale_number, '')) like '%' || @search || '%'
+    )
+    ${hasFocClause}
+  `;
+
+  const params = {
+    tenantId: DEMO_STORE_TENANT_ID,
+    warehouseId,
+    saleId,
+    dateFrom,
+    dateTo,
+    search,
+    limit: pageSize,
+    offset,
+  };
+
+  const total = (
+    db.prepare(`select count(*) as cnt from sale_returns r left join sales s on s.id = r.sale_id where ${where}`).get(params) as {
+      cnt: number;
+    }
+  ).cnt;
+
+  const sumRow = db
+    .prepare(
+      `select coalesce(sum(r.refund_total), 0) as refundTotalSum
+       from sale_returns r
+       left join sales s on s.id = r.sale_id
+       where ${where}`,
+    )
+    .get(params) as { refundTotalSum: number };
+
+  const rows = db
+    .prepare(
+      `select
+         r.id,
+         r.return_number as returnNumber,
+         r.sale_id as saleId,
+         coalesce(s.sale_number, '—') as saleNumber,
+         r.warehouse_id as warehouseId,
+         coalesce(w.name, '—') as warehouseName,
+         r.return_date as returnDate,
+         r.refund_total as refundTotal,
+         r.refund_method as refundMethod,
+         r.processed_by_name as processedByName,
+         r.created_at as createdAt,
+         (
+           select count(*) from sale_return_lines l
+           where l.sale_return_id = r.id and l.tenant_id = r.tenant_id
+         ) as lineCount
+       from sale_returns r
+       left join sales s on s.id = r.sale_id
+       left join warehouses w on w.id = r.warehouse_id
+       where ${where}
+       order by r.return_date desc, r.created_at desc
+       limit @limit offset @offset`,
+    )
+    .all(params) as Array<{
+    id: string;
+    returnNumber: string;
+    saleId: string;
+    saleNumber: string;
+    warehouseId: string;
+    warehouseName: string;
+    returnDate: string;
+    refundTotal: number;
+    refundMethod: string;
+    processedByName: string;
+    lineCount: number;
+    createdAt: string;
+  }>;
+
+  const items: SaleReturnListItem[] = rows.map((r) => ({
+    id: r.id,
+    returnNumber: r.returnNumber,
+    saleId: r.saleId,
+    saleNumber: r.saleNumber,
+    warehouseId: r.warehouseId,
+    warehouseName: r.warehouseName,
+    returnDate: r.returnDate,
+    refundTotal: Number(r.refundTotal),
+    refundMethod: r.refundMethod as SaleReturnListItem["refundMethod"],
+    lineCount: Number(r.lineCount),
+    processedByName: String(r.processedByName ?? "").trim() || null,
+    createdAt: r.createdAt,
+  }));
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    refundTotalSum: Number(sumRow.refundTotalSum),
   };
 }

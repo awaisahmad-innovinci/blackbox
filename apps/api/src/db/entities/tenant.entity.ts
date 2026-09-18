@@ -56,6 +56,14 @@ export class Tenant {
   })
   requireManagerApprovalTillWithdraw!: boolean;
 
+  /** Percentage applied to every sale subtotal (e.g. 17 = 17%). */
+  @Column({ name: "default_gst_rate", type: "real", default: 0 })
+  defaultGstRate!: number;
+
+  /** Percentage applied to every sale subtotal after GST. */
+  @Column({ name: "default_sales_tax_rate", type: "real", default: 0 })
+  defaultSalesTaxRate!: number;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

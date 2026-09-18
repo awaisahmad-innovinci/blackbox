@@ -21,6 +21,10 @@ export interface AuthUser {
   requireManagerApprovalTillOpen?: boolean;
   /** When true, POS requires manager Authy before collecting cash from a till. */
   requireManagerApprovalTillWithdraw?: boolean;
+  /** Tenant default GST percentage applied to every sale (e.g. 17 = 17%). */
+  defaultGstRate?: number;
+  /** Tenant default sales tax percentage applied to every sale. */
+  defaultSalesTaxRate?: number;
 }
 
 export interface AuthTokens {

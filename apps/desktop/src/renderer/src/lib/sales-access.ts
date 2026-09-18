@@ -40,6 +40,22 @@ export function canVoidSale(permissions: string[]): boolean {
   return permissions.includes("sales.void");
 }
 
+export function canAccessSaleReturn(permissions: string[]): boolean {
+  return permissions.includes("sales.return");
+}
+
+export function canAccessSalesModule(permissions: string[]): boolean {
+  return (
+    canAccessSale(permissions) ||
+    canAccessSalesList(permissions) ||
+    canAccessSaleReturn(permissions)
+  );
+}
+
+export function salesNavTarget(permissions: string[]): string {
+  return isCashierOnlyNav(permissions) ? "/sales/new" : "/sales";
+}
+
 export function defaultRouteForUser(permissions: string[]): string {
   if (isCashierOnlyNav(permissions)) return "/sales/new";
   return "/";
@@ -50,6 +66,9 @@ export function isRouteAllowed(pathname: string, permissions: string[]): boolean
     if (pathname === "/") return true;
     if (pathname === "/activity") return canAccessActivity(permissions);
     if (pathname === "/sales" || pathname.startsWith("/sales/")) {
+      if (pathname.startsWith("/sales/returns")) {
+        return canAccessSaleReturn(permissions);
+      }
       if (pathname === "/sales/new" || pathname.startsWith("/sales/new/")) {
         return canAccessSale(permissions);
       }

@@ -5,6 +5,7 @@ import {
   canAccessTill,
   canManageTill,
   canAccessActivity,
+  canAccessSaleReturn,
   canVoidSale,
   isCashierOnlyNav,
 } from "./sales-access";
@@ -20,6 +21,7 @@ export function useSalesAccess() {
     canManageTill: canManageTill(permissions),
     canReadActivity: canAccessActivity(permissions),
     canVoid: canVoidSale(permissions),
+    canReturn: canAccessSaleReturn(permissions),
     cashierOnly: isCashierOnlyNav(permissions),
   };
 }

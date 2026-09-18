@@ -19,6 +19,8 @@ import type {
   PurchaseOrderListQuery,
   SaleDetail,
   SaleListQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
   OpenTillRequest,
   ReopenTillRequest,
   TillListItem,
@@ -42,6 +44,10 @@ import {
   recordLocalDbInitError,
   reopenLocalDb,
 } from "./db";
+import {
+  listSaleReturnNumbersLocal,
+  upsertSaleReturnLocal,
+} from "./db/sale-returns-local";
 import {
   upsertGoodsReceiptLocal,
   upsertGoodsReceiptsLocal,
@@ -132,6 +138,8 @@ import {
   getInventoryOutLocal,
   getInventoryOutReturnLocal,
   getSaleLocal,
+  getReturnableSaleLinesLocal,
+  getSaleReturnLocal,
   getVendorReturnLocal,
   getProductLocal,
   getProductProfileLocal,
@@ -174,6 +182,7 @@ import {
   listInventoryOutsLocal,
   listInventoryOutReturnsLocal,
   listSalesLocal,
+  listSaleReturnsLocal,
   listVendorGroupsLocal,
   getVendorGroupLocal,
   listUnitsLocal,
@@ -823,6 +832,24 @@ function registerIpc(): void {
     getInventoryOutReturnLocal(id),
   );
   ipcMain.handle("localDb:getSale", (_event, id: string) => getSaleLocal(id));
+  ipcMain.handle(
+    "localDb:listSaleReturns",
+    (_event, query?: SaleReturnListQuery) => listSaleReturnsLocal(query),
+  );
+  ipcMain.handle("localDb:getSaleReturn", (_event, id: string) =>
+    getSaleReturnLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:getReturnableSaleLines",
+    (_event, saleId: string) => getReturnableSaleLinesLocal(saleId),
+  );
+  ipcMain.handle("localDb:upsertSaleReturn", (_event, detail: SaleReturnDetail) => {
+    upsertSaleReturnLocal(detail);
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:listSaleReturnNumbers", () =>
+    listSaleReturnNumbersLocal(),
+  );
   ipcMain.handle(
     "localDb:listVendorReturns",
     (_event, query?: VendorReturnListQuery) => listVendorReturnsLocal(query),

@@ -73,10 +73,10 @@ export function upsertSaleLocal(
     const insertLine = db.prepare(
       `insert into sale_lines (
         id, tenant_id, sale_id, product_sku_id, quantity, unit_price, line_total,
-        sell_unit, barcode, created_at, updated_at, sync_status, server_updated_at
+        discount_percent, foc_quantity, sell_unit, barcode, created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @saleId, @productSkuId, @quantity, @unitPrice, @lineTotal,
-        @sellUnit, @barcode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+        @discountPercent, @focQuantity, @sellUnit, @barcode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )`,
     );
 
@@ -89,6 +89,8 @@ export function upsertSaleLocal(
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.lineTotal,
+        discountPercent: item.discountPercent ?? 0,
+        focQuantity: item.focQuantity ?? 0,
         sellUnit: item.sellUnit,
         barcode: item.barcode,
         createdAt: detail.updatedAt,
@@ -164,7 +166,7 @@ export function getDraftSaleReservedQtyLocal(
   const db = getLocalDb();
   const row = db
     .prepare(
-      `select coalesce(sum(l.quantity), 0) as qty
+      `select coalesce(sum(l.quantity + coalesce(l.foc_quantity, 0)), 0) as qty
        from sale_lines l
        inner join sales s on s.id = l.sale_id and s.tenant_id = l.tenant_id
        where s.tenant_id = @tenantId

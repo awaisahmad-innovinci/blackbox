@@ -30,7 +30,7 @@ export function SalesListPage() {
   const navigate = useNavigate();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
-  const { canReadList, canWrite } = useSalesAccess();
+  const { canReadList, canWrite, canReturn } = useSalesAccess();
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -107,15 +107,29 @@ export function SalesListPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Sales</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Posted POS bills and receipts
+            {canWrite
+              ? "Posted POS bills and receipts"
+              : "Posted bills and customer returns"}
           </p>
         </div>
-        {canWrite ? (
+        {canWrite || canReturn ? (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/sales/held")}>
-              Held bills
-            </Button>
-            <Button onClick={() => navigate("/sales/new")}>New sale</Button>
+            {canReturn ? (
+              <Button
+                variant="outline"
+                onClick={() => navigate("/sales/returns")}
+              >
+                Customer returns
+              </Button>
+            ) : null}
+            {canWrite ? (
+              <>
+                <Button variant="outline" onClick={() => navigate("/sales/held")}>
+                  Held bills
+                </Button>
+                <Button onClick={() => navigate("/sales/new")}>New sale</Button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -20,6 +20,7 @@ import type {
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
   PaginatedSales,
+  PaginatedSaleReturns,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -29,6 +30,9 @@ import type {
   PurchaseOrderListQuery,
   SaleDetail,
   SaleListQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
+  ReturnableSaleLine,
   OpenTillRequest,
   ReopenTillRequest,
   TillListItem,
@@ -161,6 +165,7 @@ declare global {
         listOutNumbers: () => Promise<string[]>;
         listOutReturnNumbers: () => Promise<string[]>;
         listSaleNumbers: () => Promise<string[]>;
+        listSaleReturnNumbers: () => Promise<string[]>;
         listHoldNumbers: () => Promise<string[]>;
         listInventoryOuts: (
           query?: InventoryOutListQuery,
@@ -169,6 +174,12 @@ declare global {
           query?: InventoryOutReturnListQuery,
         ) => Promise<PaginatedInventoryOutReturns>;
         listSales: (query?: SaleListQuery) => Promise<PaginatedSales>;
+        listSaleReturns: (
+          query?: SaleReturnListQuery,
+        ) => Promise<PaginatedSaleReturns>;
+        getSaleReturn: (id: string) => Promise<SaleReturnDetail | null>;
+        getReturnableSaleLines: (saleId: string) => Promise<ReturnableSaleLine[]>;
+        upsertSaleReturn: (detail: SaleReturnDetail) => Promise<{ ok: true }>;
         getCurrentTill: (userId: string) => Promise<TillSessionDetail | null>;
         getLatestTillSession: (userId: string) => Promise<TillSessionDetail | null>;
         listTills: (query?: {

@@ -58,6 +58,7 @@ export class SalesService {
     @InjectRepository(SaleLine) private readonly saleLines: Repository<SaleLine>,
     @InjectRepository(SalePayment)
     private readonly salePayments: Repository<SalePayment>,
+    @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
   ) {}
 
   async list(query: ListSalesQueryDto): Promise<PaginatedSales> {
@@ -90,6 +91,24 @@ export class SalesService {
     if (query.search?.trim()) {
       const term = `%${query.search.trim().toLowerCase()}%`;
       qb.andWhere("LOWER(s.sale_number) LIKE :term", { term });
+    }
+
+    if (query.hasFoc === true) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM sale_lines sl
+          WHERE sl.sale_id = s.id AND sl.tenant_id = s.tenant_id
+            AND COALESCE(sl.foc_quantity, 0) > 0
+        )`,
+      );
+    } else if (query.hasFoc === false) {
+      qb.andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM sale_lines sl
+          WHERE sl.sale_id = s.id AND sl.tenant_id = s.tenant_id
+            AND COALESCE(sl.foc_quantity, 0) > 0
+        )`,
+      );
     }
 
     const total = await qb.getCount();
@@ -171,19 +190,31 @@ export class SalesService {
         lineTotal: number;
         sellUnit: "pc" | "box";
         barcode: string | null;
+        discountPercent: number;
+        focQuantity: number;
       }
     >();
     for (const item of dto.items) {
       const qty = round4(Number(item.quantity));
       const unitPrice = round4(Number(item.unitPrice));
       const lineTotal = round4(Number(item.lineTotal));
+      const focRaw = Number(item.focQuantity ?? 0);
+      const focQuantity = Math.max(0, Math.floor(focRaw));
+      const discountPercent = round4(Number(item.discountPercent ?? 0));
       if (!(qty > 0)) {
         throw new BadRequestException("Quantity must be greater than zero");
+      }
+      if (focRaw !== focQuantity) {
+        throw new BadRequestException("FOC quantity must be a whole number");
+      }
+      if (discountPercent < 0 || discountPercent > 100) {
+        throw new BadRequestException("Discount % must be between 0 and 100");
       }
       const existing = merged.get(item.productSkuId);
       if (existing) {
         existing.quantity = round4(existing.quantity + qty);
         existing.lineTotal = round4(existing.lineTotal + lineTotal);
+        existing.focQuantity = round4(existing.focQuantity + focQuantity);
       } else {
         merged.set(item.productSkuId, {
           productSkuId: item.productSkuId,
@@ -192,12 +223,29 @@ export class SalesService {
           lineTotal,
           sellUnit: item.sellUnit ?? "pc",
           barcode: item.barcode ?? null,
+          discountPercent,
+          focQuantity,
         });
       }
     }
 
-    const gstRate = round4(Number(dto.gstRate ?? 0));
-    const salesTaxRate = round4(Number(dto.salesTaxRate ?? 0));
+    const hasFoc = [...merged.values()].some((line) => line.focQuantity > 0);
+    if (hasFoc) {
+      if (!dto.supervisorUserId?.trim()) {
+        throw new BadRequestException(
+          "FOC sales require manager approval (supervisorUserId)",
+        );
+      }
+      await this.assertSupervisorUser(tenantId, dto.supervisorUserId.trim());
+    }
+
+    const tenant = await this.tenants.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException("Tenant not found");
+    }
+
+    const gstRate = round4(Number(tenant.defaultGstRate ?? 0));
+    const salesTaxRate = round4(Number(tenant.defaultSalesTaxRate ?? 0));
     const subtotal = round4(
       [...merged.values()].reduce((sum, line) => sum + line.lineTotal, 0),
     );
@@ -301,9 +349,9 @@ export class SalesService {
           warehouse.id,
           line.productSkuId,
         );
-        if (line.quantity > balanceQty) {
+        if (line.quantity + line.focQuantity > balanceQty) {
           throw new BadRequestException(
-            `Sale exceeds POS balance for ${productSku.sku}: requested ${line.quantity}, available ${balanceQty}`,
+            `Sale exceeds POS balance for ${productSku.sku}: requested ${line.quantity + line.focQuantity}, available ${balanceQty}`,
           );
         }
 
@@ -317,6 +365,7 @@ export class SalesService {
         const unitCost = balance ? toNum(balance.unitCost) : toNum(productSku.costPrice);
 
         const lineId = randomUUID();
+        const inventoryQty = round4(line.quantity + line.focQuantity);
         await manager.save(
           manager.create(SaleLine, {
             id: lineId,
@@ -326,6 +375,8 @@ export class SalesService {
             quantity: String(line.quantity),
             unitPrice: String(line.unitPrice),
             lineTotal: String(line.lineTotal),
+            discountPercent: String(line.discountPercent),
+            focQuantity: String(line.focQuantity),
             sellUnit: line.sellUnit,
             barcode: line.barcode,
           }),
@@ -336,7 +387,7 @@ export class SalesService {
           tenantId,
           warehouse.id,
           line.productSkuId,
-          -line.quantity,
+          -inventoryQty,
           unitCost,
         );
 
@@ -348,7 +399,7 @@ export class SalesService {
             productSkuId: line.productSkuId,
             warehouseId: warehouse.id,
             movementType: "SALE",
-            quantity: String(line.quantity),
+            quantity: String(inventoryQty),
             referenceType: "sale",
             referenceId: header.id,
             reason: `Sale ${saleNumber}`,
@@ -366,6 +417,8 @@ export class SalesService {
           unitPrice: line.unitPrice,
           lineTotal: line.lineTotal,
           sellUnit: line.sellUnit,
+          discountPercent: line.discountPercent,
+          focQuantity: line.focQuantity,
         });
       }
 
@@ -532,6 +585,8 @@ export class SalesService {
         unitPrice: toNum(l.unitPrice),
         lineTotal: toNum(l.lineTotal),
         sellUnit: (l.sellUnit as "pc" | "box") ?? "pc",
+        discountPercent: toNum(l.discountPercent),
+        focQuantity: toNum(l.focQuantity),
       })),
       payments: payments.map((p) => ({
         id: p.id,
@@ -559,5 +614,26 @@ export class SalesService {
       businessName,
       existing.map((r) => r.saleNumber),
     );
+  }
+
+  private async assertSupervisorUser(
+    tenantId: string,
+    supervisorUserId: string,
+  ): Promise<void> {
+    const count = await this.dataSource
+      .getRepository(User)
+      .createQueryBuilder("u")
+      .innerJoin("u.userRoles", "ur")
+      .innerJoin("ur.role", "r")
+      .where("u.id = :supervisorUserId", { supervisorUserId })
+      .andWhere("u.tenant_id = :tenantId", { tenantId })
+      .andWhere("u.is_active = true")
+      .andWhere("r.key IN (:...keys)", { keys: ["OWNER", "MANAGER"] })
+      .getCount();
+    if (count === 0) {
+      throw new BadRequestException(
+        "FOC sales require approval from a manager or owner",
+      );
+    }
   }
 }

@@ -3,10 +3,12 @@ import {
   ArrayMinSize,
   IsArray,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
   ValidateNested,
 } from "class-validator";
@@ -43,6 +45,19 @@ export class CreateSaleLineDto {
   @IsOptional()
   @IsString()
   barcode?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  discountPercent?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  focQuantity?: number;
 }
 
 export class CreateSalePaymentDto {
@@ -94,6 +109,10 @@ export class CreateSaleDto {
   @Min(0)
   cashTendered?: number;
 
+  @IsOptional()
+  @IsUUID()
+  supervisorUserId?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -127,6 +146,10 @@ export class ListSalesQueryDto {
   @IsOptional()
   @IsString()
   dateTo?: string;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  hasFoc?: boolean;
 
   @IsOptional()
   @Type(() => Number)

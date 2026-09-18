@@ -301,6 +301,8 @@ export class AuthService {
           tenant.requireManagerApprovalRemoveSaleLine,
           tenant.requireManagerApprovalTillOpen,
           tenant.requireManagerApprovalTillWithdraw,
+          tenant.defaultGstRate,
+          tenant.defaultSalesTaxRate,
         ),
         tokens: {
           accessToken,
@@ -345,6 +347,8 @@ export class AuthService {
       tenant.requireManagerApprovalRemoveSaleLine,
       tenant.requireManagerApprovalTillOpen,
       tenant.requireManagerApprovalTillWithdraw,
+      tenant.defaultGstRate,
+      tenant.defaultSalesTaxRate,
     );
   }
 
@@ -460,6 +464,8 @@ export class AuthService {
         tenant?.requireManagerApprovalRemoveSaleLine,
         tenant?.requireManagerApprovalTillOpen,
         tenant?.requireManagerApprovalTillWithdraw,
+        tenant?.defaultGstRate,
+        tenant?.defaultSalesTaxRate,
       ),
       tokens: {
         accessToken,
@@ -560,6 +566,8 @@ export class AuthService {
     requireManagerApprovalRemoveSaleLine?: boolean,
     requireManagerApprovalTillOpen?: boolean,
     requireManagerApprovalTillWithdraw?: boolean,
+    defaultGstRate?: number,
+    defaultSalesTaxRate?: number,
   ): AuthUser {
     return {
       id: user.id,
@@ -573,6 +581,8 @@ export class AuthService {
       requireManagerApprovalRemoveSaleLine,
       requireManagerApprovalTillOpen,
       requireManagerApprovalTillWithdraw,
+      defaultGstRate,
+      defaultSalesTaxRate,
     };
   }
 

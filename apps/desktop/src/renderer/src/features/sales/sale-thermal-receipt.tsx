@@ -24,6 +24,18 @@ function lineProductLabel(item: SaleDetail["items"][number]): string {
   return name;
 }
 
+function formatDiscountPercent(value: number): string {
+  if (value <= 0) return "0";
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatFocQuantity(value: number): string {
+  if (value <= 0) return "0";
+  return String(Math.floor(value));
+}
+
 export function SaleThermalReceipt({
   detail,
   businessName,
@@ -37,6 +49,15 @@ export function SaleThermalReceipt({
 }) {
   const totalItems = detail.items.length;
   const totalQty = detail.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalFoc = detail.items.reduce(
+    (sum, item) => sum + (item.focQuantity ?? 0),
+    0,
+  );
+  const totalQtyInclFoc = detail.items.reduce(
+    (sum, item) => sum + item.quantity + (item.focQuantity ?? 0),
+    0,
+  );
+  const hasFoc = totalFoc > 0;
   const postedLabel = detail.postedAt
     ? new Date(detail.postedAt).toLocaleString()
     : "—";
@@ -82,13 +103,15 @@ export function SaleThermalReceipt({
 
       <hr className="thermal-rule my-2 border-border border-dashed" />
 
-      <table className="w-full border-collapse text-[11px]">
+      <table className="w-full border-collapse text-[10px]">
         <thead>
           <tr className="border-border border-b border-dashed">
             <th className="py-1 text-left font-semibold">Item</th>
-            <th className="w-8 py-1 text-right font-semibold">Qty</th>
-            <th className="w-12 py-1 text-right font-semibold">Price</th>
-            <th className="w-12 py-1 text-right font-semibold">Total</th>
+            <th className="w-6 py-1 text-right font-semibold">Qty</th>
+            <th className="w-6 py-1 text-right font-semibold">Disc</th>
+            <th className="w-5 py-1 text-right font-semibold">FOC</th>
+            <th className="w-9 py-1 text-right font-semibold">Price</th>
+            <th className="w-9 py-1 text-right font-semibold">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -99,6 +122,12 @@ export function SaleThermalReceipt({
               </td>
               <td className="py-1 text-right tabular-nums align-top">
                 {item.quantity}
+              </td>
+              <td className="py-1 text-right tabular-nums align-top">
+                {formatDiscountPercent(item.discountPercent ?? 0)}%
+              </td>
+              <td className="py-1 text-right tabular-nums align-top">
+                {formatFocQuantity(item.focQuantity ? item.focQuantity : 0)}
               </td>
               <td className="py-1 text-right tabular-nums align-top">
                 {formatMoney(item.unitPrice)}
@@ -122,6 +151,18 @@ export function SaleThermalReceipt({
           <span>Total Qty</span>
           <span className="tabular-nums">{totalQty}</span>
         </div>
+        {hasFoc ? (
+          <>
+            <div className="flex justify-between gap-2">
+              <span>Total FOC</span>
+              <span className="tabular-nums">{totalFoc}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span>Qty incl. FOC</span>
+              <span className="tabular-nums">{totalQtyInclFoc}</span>
+            </div>
+          </>
+        ) : null}
         {detail.gstAmount > 0 ? (
           <div className="flex justify-between gap-2">
             <span>GST ({detail.gstRate}%)</span>
@@ -165,6 +206,28 @@ export function SaleThermalReceipt({
           </div>
         ))}
       </section>
+      {/* Return & Exchange Policy */}
+       <hr className="thermal-rule my-2 border-border border-dashed" />
+        <section className="pt-1 text-[9px] leading-tight"> 
+          <p className="mb-1 text-center font-semibold"> RETURN &amp; EXCHANGE POLICY </p> 
+          <ol className="list-decimal pl-4">
+             <li> Items/products can only be exchanged within 7 days of purchase. </li>
+             <li> Original receipt must be presented for exchange. </li>
+             <li> Product sold under offer/discount/promotion cannot be exchanged. </li>
+          </ol>
+       </section>
+       {/* Thank You / Return Notice */}
+        <section className="pt-2 text-center text-[10px] leading-tight"> 
+          <p className="font-semibold">Thanks for visiting us</p>
+           <p className="mt-1 font-bold">No Bill No Return</p>
+       </section>
+      {/* Software footer */}
+       <hr className="thermal-rule my-2 border-border border-dashed" />
+        <footer className="pt-1 pb-2 text-center text-[9px] leading-tight"> 
+          <p>This software design &amp; developed by</p>
+           <p>Innovinci Technologies</p>
+            <p>www.innovinci.com</p> 
+        </footer>
     </article>
   );
 }

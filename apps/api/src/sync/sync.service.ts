@@ -46,6 +46,8 @@ import {
   Sale,
   SaleLine,
   SalePayment,
+  SaleReturn,
+  SaleReturnLine,
   InventoryStock,
   Product,
   ProductSku,
@@ -676,6 +678,9 @@ export class SyncService {
             p.sellingPricePerPurchaseUnit == null
               ? row.sellingPricePerPurchaseUnit
               : String(p.sellingPricePerPurchaseUnit),
+          saleDiscountPercent: String(
+            p.saleDiscountPercent ?? row.saleDiscountPercent ?? 0,
+          ),
           reorderLevel: String(p.reorderLevel ?? row.reorderLevel ?? 0),
           minimumStockLevel: String(p.minimumStockLevel ?? row.minimumStockLevel ?? 0),
           maximumStockLevel:
@@ -827,6 +832,10 @@ export class SyncService {
         await this.upsertSale(manager, tenantId, change.entityId, p);
         break;
       }
+      case "sale_return": {
+        await this.upsertSaleReturn(manager, tenantId, change.entityId, p);
+        break;
+      }
       case "vendor_return": {
         await this.upsertVendorReturn(manager, tenantId, change.entityId, p);
         break;
@@ -879,6 +888,14 @@ export class SyncService {
         where: { id: entityId, tenantId },
       });
       if (row && (row.status === "POSTED" || row.status === "VOID")) {
+        return { status: row.status };
+      }
+    }
+    if (entityType === "sale_return") {
+      const row = await manager.findOne(SaleReturn, {
+        where: { id: entityId, tenantId },
+      });
+      if (row && row.status === "POSTED") {
         return { status: row.status };
       }
     }
@@ -1327,6 +1344,100 @@ export class SyncService {
     }
   }
 
+  private async upsertSaleReturn(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await manager.findOne(SaleReturn, {
+      where: { id: entityId, tenantId },
+    });
+    if (existing?.status === "POSTED") return;
+
+    const row =
+      existing ?? manager.create(SaleReturn, { id: entityId, tenantId });
+    Object.assign(row, {
+      returnNumber: String(
+        p.returnNumber ?? row.returnNumber ?? `SYNC-${entityId.slice(0, 8)}`,
+      ),
+      saleId: String(p.saleId ?? row.saleId ?? ""),
+      warehouseId: String(p.warehouseId ?? row.warehouseId ?? ""),
+      returnDate: String(
+        p.returnDate ?? row.returnDate ?? new Date().toISOString().slice(0, 10),
+      ),
+      status: String(p.status ?? row.status ?? "POSTED"),
+      subtotal: String(p.subtotal ?? row.subtotal ?? 0),
+      gstRate: String(p.gstRate ?? row.gstRate ?? 0),
+      gstAmount: String(p.gstAmount ?? row.gstAmount ?? 0),
+      salesTaxRate: String(p.salesTaxRate ?? row.salesTaxRate ?? 0),
+      salesTaxAmount: String(p.salesTaxAmount ?? row.salesTaxAmount ?? 0),
+      refundTotal: String(p.refundTotal ?? row.refundTotal ?? 0),
+      refundMethod: String(p.refundMethod ?? row.refundMethod ?? "CASH"),
+      notes: String(p.notes ?? row.notes ?? ""),
+      processedBy: (p.processedBy as string | null | undefined) ?? row.processedBy ?? null,
+    });
+    if (!row.saleId) throw new Error("sale not found");
+    if (!row.warehouseId) throw new Error("warehouse not found");
+    await manager.save(row);
+
+    if (Array.isArray(p.items)) {
+      await manager.delete(SaleReturnLine, {
+        saleReturnId: entityId,
+        tenantId,
+      });
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
+        const unitPrice = Number(item.unitPrice ?? 0);
+        await manager.save(
+          manager.create(SaleReturnLine, {
+            id: String(item.id ?? randomUUID()),
+            tenantId,
+            saleReturnId: entityId,
+            saleLineId: String(item.saleLineId ?? ""),
+            productSkuId,
+            quantity: String(qty),
+            unitPrice: String(unitPrice),
+            discountPercent: String(item.discountPercent ?? 0),
+            lineTotal: String(item.lineTotal ?? 0),
+            sellUnit: String(item.sellUnit ?? "pc"),
+            barcode: (item.barcode as string | null | undefined) ?? null,
+          }),
+        );
+        if (productSkuId && qty > 0 && !existing) {
+          const balance = await manager.findOne(InventoryOutItem, {
+            where: { tenantId, warehouseId: row.warehouseId, productSkuId },
+          });
+          const unitCost = balance
+            ? Number(balance.unitCost ?? 0)
+            : unitPrice;
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            qty,
+            unitCost,
+          );
+          await manager.save(
+            manager.create(InventoryMovement, {
+              id: randomUUID(),
+              tenantId,
+              productSkuId,
+              warehouseId: row.warehouseId,
+              movementType: "SALE_RETURN",
+              quantity: String(qty),
+              referenceType: "sale_return",
+              referenceId: entityId,
+              reason: `Return ${row.returnNumber} for sale`,
+            }),
+          );
+        }
+      }
+    }
+  }
+
   private async upsertSale(
     manager: EntityManager,
     tenantId: string,
@@ -1373,6 +1484,8 @@ export class SyncService {
 
       for (const item of p.items as Array<Record<string, unknown>>) {
         const qty = Number(item.quantity ?? 0);
+        const focQty = Math.max(0, Math.floor(Number(item.focQuantity ?? 0)));
+        const inventoryQty = qty + focQty;
         const productSkuId = String(item.productSkuId ?? "");
         const unitPrice = Number(item.unitPrice ?? 0);
         await manager.save(
@@ -1384,6 +1497,8 @@ export class SyncService {
             quantity: String(qty),
             unitPrice: String(unitPrice),
             lineTotal: String(item.lineTotal ?? qty * unitPrice),
+            discountPercent: String(item.discountPercent ?? 0),
+            focQuantity: String(focQty),
             sellUnit: String(item.sellUnit ?? "pc"),
             barcode: (item.barcode as string | null | undefined) ?? null,
           }),
@@ -1391,7 +1506,7 @@ export class SyncService {
 
         if (
           productSkuId &&
-          qty > 0 &&
+          inventoryQty > 0 &&
           row.status === "POSTED" &&
           prevStatus !== "POSTED"
         ) {
@@ -1406,7 +1521,7 @@ export class SyncService {
             tenantId,
             row.warehouseId,
             productSkuId,
-            -qty,
+            -inventoryQty,
             unitCost,
           );
         }

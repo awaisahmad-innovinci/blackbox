@@ -76,6 +76,10 @@ export function holdNumberPrefix(initials: string): string {
   return `${initials}-HOLD-`;
 }
 
+export function saleReturnNumberPrefix(initials: string): string {
+  return `${initials}-SR-`;
+}
+
 export function nextVendorCode(
   businessName: string,
   existingVendorCodes: string[],
@@ -143,6 +147,16 @@ export function nextHoldNumber(
   return nextSequentialCode(
     holdNumberPrefix(businessInitials(businessName)),
     existingHoldNumbers,
+  );
+}
+
+export function nextSaleReturnNumber(
+  businessName: string,
+  existingReturnNumbers: string[],
+): string {
+  return nextSequentialCode(
+    saleReturnNumberPrefix(businessInitials(businessName)),
+    existingReturnNumbers,
   );
 }
 

@@ -162,6 +162,7 @@ export class SkusService {
       purchaseUnitName: sku.purchaseUnit?.name ?? null,
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(sku.saleDiscountPercent),
     };
   }
 
@@ -244,6 +245,7 @@ export class SkusService {
       dto.sellingPricePerPurchaseUnit == null
         ? null
         : String(dto.sellingPricePerPurchaseUnit);
+    sku.saleDiscountPercent = String(dto.saleDiscountPercent ?? 0);
     sku.reorderLevel = String(dto.reorderLevel ?? 0);
     sku.minimumStockLevel = String(dto.minimumStockLevel ?? 0);
     sku.maximumStockLevel =
@@ -320,6 +322,7 @@ export class SkusService {
       costPrice: toNum(sku.costPrice),
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(sku.saleDiscountPercent),
       reorderLevel: toNum(sku.reorderLevel),
       minimumStockLevel: toNum(sku.minimumStockLevel),
       maximumStockLevel: toNumOrNull(sku.maximumStockLevel),

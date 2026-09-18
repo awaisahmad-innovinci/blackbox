@@ -19,6 +19,7 @@ import type {
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
   PaginatedSales,
+  PaginatedSaleReturns,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -28,6 +29,9 @@ import type {
   PurchaseOrderListQuery,
   SaleDetail,
   SaleListQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
+  ReturnableSaleLine,
   OpenTillRequest,
   ReopenTillRequest,
   TillListItem,
@@ -473,6 +477,30 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<InventoryOutReturnDetail | null>,
     getSale: (id: string) =>
       ipcRenderer.invoke("localDb:getSale", id) as Promise<SaleDetail | null>,
+    listSaleReturns: (query?: SaleReturnListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listSaleReturns",
+        query,
+      ) as Promise<PaginatedSaleReturns>,
+    getSaleReturn: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getSaleReturn",
+        id,
+      ) as Promise<SaleReturnDetail | null>,
+    getReturnableSaleLines: (saleId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getReturnableSaleLines",
+        saleId,
+      ) as Promise<ReturnableSaleLine[]>,
+    upsertSaleReturn: (detail: SaleReturnDetail) =>
+      ipcRenderer.invoke(
+        "localDb:upsertSaleReturn",
+        detail,
+      ) as Promise<{ ok: true }>,
+    listSaleReturnNumbers: () =>
+      ipcRenderer.invoke(
+        "localDb:listSaleReturnNumbers",
+      ) as Promise<string[]>,
     listVendorReturns: (query?: VendorReturnListQuery) =>
       ipcRenderer.invoke(
         "localDb:listVendorReturns",

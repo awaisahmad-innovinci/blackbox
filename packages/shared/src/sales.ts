@@ -26,6 +26,8 @@ export interface SaleLineRow {
   unitPrice: number;
   lineTotal: number;
   sellUnit: SellUnit;
+  discountPercent: number;
+  focQuantity: number;
 }
 
 export interface SaleDetail {
@@ -71,6 +73,8 @@ export interface SaleListQuery {
   status?: SaleStatus;
   dateFrom?: string;
   dateTo?: string;
+  /** When true, only sales with any line focQuantity > 0. When false, exclude those. */
+  hasFoc?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -89,6 +93,8 @@ export interface CreateSaleLineRequest {
   lineTotal: number;
   sellUnit?: SellUnit;
   barcode?: string | null;
+  discountPercent?: number;
+  focQuantity?: number;
 }
 
 export interface CreateSalePaymentRequest {
@@ -105,6 +111,8 @@ export interface CreateSaleRequest {
   customerName?: string;
   cashTendered?: number;
   notes?: string;
+  /** Required when any line has focQuantity > 0 (manager/owner who approved FOC). */
+  supervisorUserId?: string;
   items: CreateSaleLineRequest[];
   payments: CreateSalePaymentRequest[];
 }
@@ -136,4 +144,107 @@ export function saleLineTotal(quantity: number, unitPrice: number): number {
 export function maxCashTender(billTotal: number): number {
   if (billTotal <= 0) return 5000;
   return Math.ceil(billTotal / 5000) * 5000;
+}
+
+export interface ReturnableSaleLine {
+  saleLineId: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  soldQuantity: number;
+  returnedQuantity: number;
+  returnableQuantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  sellUnit: SellUnit;
+}
+
+export interface SaleReturnLineRow {
+  id: string;
+  saleLineId: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  lineTotal: number;
+  sellUnit: SellUnit;
+}
+
+export interface SaleReturnDetail {
+  id: string;
+  returnNumber: string;
+  saleId: string;
+  saleNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  status: "POSTED";
+  subtotal: number;
+  gstRate: number;
+  gstAmount: number;
+  salesTaxRate: number;
+  salesTaxAmount: number;
+  refundTotal: number;
+  refundMethod: SalePaymentMethod;
+  notes: string;
+  processedBy: string | null;
+  processedByName: string | null;
+  sale: SaleDetail;
+  items: SaleReturnLineRow[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleReturnListItem {
+  id: string;
+  returnNumber: string;
+  saleId: string;
+  saleNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  refundTotal: number;
+  refundMethod: SalePaymentMethod;
+  lineCount: number;
+  processedByName: string | null;
+  createdAt: string;
+}
+
+export interface SaleReturnListQuery {
+  search?: string;
+  warehouseId?: string;
+  saleId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  hasFoc?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedSaleReturns {
+  items: SaleReturnListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  refundTotalSum: number;
+}
+
+export interface CreateSaleReturnLineRequest {
+  saleLineId: string;
+  productSkuId: string;
+  quantity: number;
+}
+
+export interface CreateSaleReturnRequest {
+  saleId: string;
+  returnNumber?: string;
+  returnDate?: string;
+  notes?: string;
+  items: CreateSaleReturnLineRequest[];
 }

@@ -38,6 +38,24 @@ export class SaleLine {
   @Column({ name: "line_total", type: "numeric", precision: 14, scale: 4, default: 0 })
   lineTotal!: string;
 
+  @Column({
+    name: "discount_percent",
+    type: "numeric",
+    precision: 8,
+    scale: 4,
+    default: 0,
+  })
+  discountPercent!: string;
+
+  @Column({
+    name: "foc_quantity",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  focQuantity!: string;
+
   @Column({ name: "sell_unit", type: "text", default: "pc" })
   sellUnit!: string;
 

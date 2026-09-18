@@ -58,6 +58,7 @@ const emptyForm = {
   costPrice: "",
   marginPercent: "",
   sellingPrice: "",
+  saleDiscountPercent: "0",
   reorderLevel: "0",
   minimumStockLevel: "0",
   maximumStockLevel: "",
@@ -291,6 +292,10 @@ export function AddProductSkuDialog({
       unitsPerPurchaseUnit: nums.unitsPerPurchaseUnit,
       costPrice: nums.costPrice,
       sellingPrice: nums.sellingPrice,
+      saleDiscountPercent: Math.min(
+        100,
+        Math.max(0, Number(form.saleDiscountPercent) || 0),
+      ),
       reorderLevel: nums.reorderLevel,
       minimumStockLevel: nums.minimumStockLevel,
       maximumStockLevel: nums.maximumStockLevel,
@@ -353,6 +358,7 @@ export function AddProductSkuDialog({
           unitsPerPurchaseUnit: body.unitsPerPurchaseUnit,
           costPrice: body.costPrice,
           sellingPrice: body.sellingPrice,
+          saleDiscountPercent: body.saleDiscountPercent ?? 0,
           sellingPricePerPurchaseUnit: body.sellingPricePerPurchaseUnit ?? null,
           reorderLevel: body.reorderLevel ?? 0,
           minimumStockLevel: body.minimumStockLevel ?? 0,
@@ -640,6 +646,17 @@ export function AddProductSkuDialog({
                 {fieldErrors.sellingPrice}
               </p>
             ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Sale discount %</Label>
+            <Input
+              value={form.saleDiscountPercent}
+              placeholder="0"
+              onChange={(e) => setField("saleDiscountPercent", e.target.value)}
+            />
+            <p className="text-muted-foreground text-xs">
+              Default discount on POS sale lines for this SKU (0–100).
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Reorder level</Label>

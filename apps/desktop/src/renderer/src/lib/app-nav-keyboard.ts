@@ -1,4 +1,8 @@
-import { isCashierOnlyNav } from "./sales-access";
+import {
+  canAccessSalesList,
+  canAccessSaleReturn,
+  isCashierOnlyNav,
+} from "./sales-access";
 
 export type NavDropdownId = "inventory" | "purchasing" | "vendors";
 
@@ -37,6 +41,27 @@ export type AppNavSectionId =
   | "inventory"
   | "purchasing"
   | "vendors";
+
+type AppNavLinkSection = {
+  id: AppNavSectionId;
+  label: string;
+  shortcut: string;
+  kind: "link";
+  to: string;
+  requiresPermission?: string;
+  requireCtrl?: boolean;
+};
+
+type AppNavDropdownSection = {
+  id: AppNavSectionId;
+  label: string;
+  shortcut: string;
+  kind: "dropdown";
+  dropdownId: NavDropdownId;
+  requireCtrl?: boolean;
+};
+
+export type AppNavSection = AppNavLinkSection | AppNavDropdownSection;
 
 export const APP_NAV_SECTIONS = [
   {
@@ -207,20 +232,76 @@ export function matchNavDropdownItem(
   return item.to;
 }
 
-export function visibleNavSections(permissions: string[]) {
+function resolveSaleNavSection(permissions: string[]): AppNavLinkSection | null {
+  if (isCashierOnlyNav(permissions)) {
+    const sale = APP_NAV_SECTIONS.find((s) => s.id === "sale");
+    if (!sale || sale.kind !== "link") return null;
+    return {
+      id: "sale",
+      label: sale.label,
+      shortcut: sale.shortcut,
+      kind: "link",
+      to: sale.to,
+      requiresPermission: sale.requiresPermission,
+    };
+  }
+  if (
+    canAccessSalesList(permissions) ||
+    canAccessSaleReturn(permissions)
+  ) {
+    return {
+      id: "sale",
+      label: "Sales",
+      shortcut: "s",
+      kind: "link",
+      to: "/sales",
+    };
+  }
+  return null;
+}
+
+export function visibleNavSections(permissions: string[]): AppNavSection[] {
   if (isCashierOnlyNav(permissions)) {
     return APP_NAV_SECTIONS.filter(
       (s) => s.id === "dashboard" || s.id === "sale",
-    );
+    ).map((section) => normalizeNavSection(section));
   }
 
-  return APP_NAV_SECTIONS.filter((section) => {
+  return APP_NAV_SECTIONS.flatMap((section) => {
     if (section.id === "sale") {
-      return false;
+      const resolved = resolveSaleNavSection(permissions);
+      return resolved ? [resolved] : [];
     }
     if ("requiresPermission" in section) {
-      return permissions.includes(section.requiresPermission);
+      return permissions.includes(section.requiresPermission)
+        ? [normalizeNavSection(section)]
+        : [];
     }
-    return true;
+    return [normalizeNavSection(section)];
   });
+}
+
+function normalizeNavSection(
+  section: (typeof APP_NAV_SECTIONS)[number],
+): AppNavSection {
+  if (section.kind === "dropdown") {
+    return {
+      id: section.id,
+      label: section.label,
+      shortcut: section.shortcut,
+      kind: "dropdown",
+      dropdownId: section.dropdownId,
+      ...("requireCtrl" in section ? { requireCtrl: section.requireCtrl } : {}),
+    };
+  }
+  return {
+    id: section.id,
+    label: section.label,
+    shortcut: section.shortcut,
+    kind: "link",
+    to: section.to,
+    ...("requiresPermission" in section
+      ? { requiresPermission: section.requiresPermission }
+      : {}),
+  };
 }

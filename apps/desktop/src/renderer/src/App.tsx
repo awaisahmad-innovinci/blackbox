@@ -42,6 +42,10 @@ import { HeldSalesPage } from "./features/sales/HeldSalesPage";
 import { SalePage } from "./features/sales/SalePage";
 import { SaleDetailPage } from "./features/sales/SaleDetailPage";
 import { SalesListPage } from "./features/sales/SalesListPage";
+import { SaleReturnsListPage } from "./features/sales/SaleReturnsListPage";
+import { SaleReturnPickerPage } from "./features/sales/SaleReturnPickerPage";
+import { SaleReturnFormPage } from "./features/sales/SaleReturnFormPage";
+import { SaleReturnDetailPage } from "./features/sales/SaleReturnDetailPage";
 import { TillPage } from "./features/sales/TillPage";
 import { ActivityLogPage } from "./features/activity/ActivityLogPage";
 
@@ -160,6 +164,13 @@ function AuthenticatedApp() {
           <Route path="warehouses/new" element={<WarehouseFormPage />} />
           <Route path="warehouses/:id/edit" element={<WarehouseFormPage />} />
           <Route path="sales" element={<SalesListPage />} />
+          <Route path="sales/returns" element={<SaleReturnsListPage />} />
+          <Route path="sales/returns/new" element={<SaleReturnPickerPage />} />
+          <Route
+            path="sales/returns/new/:saleId"
+            element={<SaleReturnFormPage />}
+          />
+          <Route path="sales/returns/:id" element={<SaleReturnDetailPage />} />
           <Route path="sales/held" element={<HeldSalesPage />} />
           <Route path="sales/till" element={<TillPage />} />
           <Route path="activity" element={<ActivityLogPage />} />

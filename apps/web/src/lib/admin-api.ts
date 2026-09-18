@@ -12,6 +12,8 @@ export type TenantDto = {
   requireManagerApprovalRemoveSaleLine: boolean;
   requireManagerApprovalTillOpen: boolean;
   requireManagerApprovalTillWithdraw: boolean;
+  defaultGstRate: number;
+  defaultSalesTaxRate: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -67,6 +69,8 @@ export function updateCurrentTenant(body: {
   requireManagerApprovalRemoveSaleLine?: boolean;
   requireManagerApprovalTillOpen?: boolean;
   requireManagerApprovalTillWithdraw?: boolean;
+  defaultGstRate?: number;
+  defaultSalesTaxRate?: number;
 }) {
   return apiJson<TenantDto>("/tenants/current", "PATCH", body);
 }

@@ -33,6 +33,8 @@ import { InventoryOutItem } from "./inventory-out-item.entity";
 import { InventoryOutLine } from "./inventory-out-line.entity";
 import { InventoryOutReturn } from "./inventory-out-return.entity";
 import { InventoryOutReturnItem } from "./inventory-out-return-item.entity";
+import { SaleReturn } from "./sale-return.entity";
+import { SaleReturnLine } from "./sale-return-line.entity";
 import { Sale } from "./sale.entity";
 import { SaleLine } from "./sale-line.entity";
 import { SalePayment } from "./sale-payment.entity";
@@ -83,6 +85,8 @@ export const entities = [
   Sale,
   SaleLine,
   SalePayment,
+  SaleReturn,
+  SaleReturnLine,
   TillSession,
   TillWithdrawal,
   ActivityLog,
@@ -131,6 +135,8 @@ export {
   Sale,
   SaleLine,
   SalePayment,
+  SaleReturn,
+  SaleReturnLine,
   TillSession,
   TillWithdrawal,
   ActivityLog,

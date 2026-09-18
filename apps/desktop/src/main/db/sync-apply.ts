@@ -7,6 +7,7 @@ import type {
   ProductDetail,
   PurchaseOrderDetail,
   SaleDetail,
+  SaleReturnDetail,
   TillSessionDetail,
   SyncChangeDto,
   SyncEntityType,
@@ -47,9 +48,10 @@ import { upsertInventoryOutLocal } from "./inventory-out-local";
 import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
 import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
 import { upsertSaleLocal } from "./sales-local";
+import { upsertSaleReturnLocal } from "./sale-returns-local";
 import { upsertTillSessionLocal } from "./till-local";
 import { upsertVendorReturnLocal } from "./vendor-returns-local";
-import { getPurchaseOrderLocal } from "./entity-get-local";
+import { getPurchaseOrderLocal, getSaleLocal } from "./entity-get-local";
 import {
   getLocalEntityVersion,
   setLocalEntityVersion,
@@ -200,6 +202,7 @@ export function applyChange(change: SyncChangeDto): void {
         p.sellingPricePerPurchaseUnit == null
           ? null
           : Number(p.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: Number(p.saleDiscountPercent ?? 0),
       reorderLevel: Number(p.reorderLevel ?? 0),
       minimumStockLevel: Number(p.minimumStockLevel ?? 0),
       maximumStockLevel:
@@ -465,10 +468,11 @@ export function applyChange(change: SyncChangeDto): void {
             productSkuId: item.productSkuId,
           }) as { unitCost: number } | undefined;
         const unitCost = balanceRow ? Number(balanceRow.unitCost) : item.unitPrice;
+        const inventoryQty = item.quantity + (item.focQuantity ?? 0);
         applyInventoryOutBalanceDeltaLocal(
           warehouseId,
           item.productSkuId,
-          -item.quantity,
+          -inventoryQty,
           unitCost,
         );
       }
@@ -479,8 +483,74 @@ export function applyChange(change: SyncChangeDto): void {
         applyInventoryOutBalanceDeltaLocal(
           warehouseId,
           item.productSkuId,
-          item.quantity,
+          item.quantity + (item.focQuantity ?? 0),
           item.unitPrice,
+        );
+      }
+    }
+    return;
+  }
+  if (change.entityType === "sale_return") {
+    const db = getLocalDb();
+    const existed = db
+      .prepare(`select 1 from sale_returns where id = ? limit 1`)
+      .get(change.entityId);
+    const items = Array.isArray(p.items)
+      ? (p.items as SaleReturnDetail["items"])
+      : [];
+    const sale =
+      p.sale && typeof p.sale === "object"
+        ? (p.sale as SaleReturnDetail["sale"])
+        : getSaleLocal(String(p.saleId ?? ""));
+    if (!sale) return;
+
+    upsertSaleReturnLocal({
+      id: change.entityId,
+      returnNumber: str(p.returnNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
+      saleId: str(p.saleId, sale.id),
+      saleNumber: str(p.saleNumber, sale.saleNumber),
+      warehouseId: str(p.warehouseId, sale.warehouseId),
+      warehouseName: str(p.warehouseName, sale.warehouseName),
+      returnDate: str(p.returnDate, now.slice(0, 10)),
+      status: "POSTED",
+      subtotal: Number(p.subtotal ?? 0),
+      gstRate: Number(p.gstRate ?? sale.gstRate),
+      gstAmount: Number(p.gstAmount ?? 0),
+      salesTaxRate: Number(p.salesTaxRate ?? sale.salesTaxRate),
+      salesTaxAmount: Number(p.salesTaxAmount ?? 0),
+      refundTotal: Number(p.refundTotal ?? 0),
+      refundMethod: str(p.refundMethod, "CASH") as SaleReturnDetail["refundMethod"],
+      notes: str(p.notes),
+      processedBy: (p.processedBy as string | null) ?? null,
+      processedByName: (p.processedByName as string | null) ?? null,
+      sale,
+      items,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+
+    if (!existed) {
+      const warehouseId = str(p.warehouseId, sale.warehouseId);
+      for (const item of items) {
+        const balanceRow = db
+          .prepare(
+            `select unit_cost as unitCost from inventory_out_items
+             where tenant_id = @tenantId and warehouse_id = @warehouseId
+               and product_sku_id = @productSkuId`,
+          )
+          .get({
+            tenantId: DEMO_STORE_TENANT_ID,
+            warehouseId,
+            productSkuId: item.productSkuId,
+          }) as { unitCost: number } | undefined;
+        const unitCost = balanceRow
+          ? Number(balanceRow.unitCost)
+          : item.unitPrice;
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          item.quantity,
+          unitCost,
         );
       }
     }

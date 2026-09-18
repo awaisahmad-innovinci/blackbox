@@ -314,6 +314,7 @@ export {
   nextOutReturnNumber,
   nextHoldNumber,
   nextSaleNumber,
+  nextSaleReturnNumber,
   nextSkuCodeForProduct,
 } from "./document-numbers";
 export type {
@@ -328,6 +329,14 @@ export type {
   CreateSaleLineRequest,
   CreateSalePaymentRequest,
   CreateSaleRequest,
+  ReturnableSaleLine,
+  SaleReturnLineRow,
+  SaleReturnDetail,
+  SaleReturnListItem,
+  SaleReturnListQuery,
+  PaginatedSaleReturns,
+  CreateSaleReturnLineRequest,
+  CreateSaleReturnRequest,
 } from "./sales";
 export {
   SALE_STATUSES,

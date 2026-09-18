@@ -7,6 +7,7 @@ import {
   IsString,
   IsUUID,
   Min,
+  Max,
   MinLength,
   ValidateIf,
 } from "class-validator";
@@ -118,6 +119,13 @@ export class CreateProductSkuDto {
   @IsNumber()
   @Min(0)
   sellingPricePerPurchaseUnit?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  saleDiscountPercent?: number;
 
   @IsOptional()
   @Type(() => Number)

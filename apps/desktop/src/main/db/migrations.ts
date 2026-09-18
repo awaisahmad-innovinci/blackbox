@@ -1237,6 +1237,65 @@ where units_per_purchase_unit > 0;
       create index if not exists activity_logs_created_at_idx on activity_logs (created_at desc);
     `,
   },
+  {
+    id: "030_sale_discount_foc",
+    sql: `
+      alter table product_skus add column sale_discount_percent real not null default 0;
+      alter table sale_lines add column discount_percent real not null default 0;
+      alter table sale_lines add column foc_quantity real not null default 0;
+    `,
+  },
+  {
+    id: "031_sale_returns",
+    sql: `
+      create table if not exists sale_returns (
+        id text primary key,
+        tenant_id text not null,
+        return_number text not null,
+        sale_id text not null,
+        warehouse_id text not null,
+        return_date text not null,
+        status text not null default 'POSTED',
+        subtotal real not null default 0,
+        gst_rate real not null default 0,
+        gst_amount real not null default 0,
+        sales_tax_rate real not null default 0,
+        sales_tax_amount real not null default 0,
+        refund_total real not null default 0,
+        refund_method text not null default 'CASH',
+        notes text not null default '',
+        processed_by text,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text,
+        unique (tenant_id, return_number)
+      );
+      create index if not exists sale_returns_sale_id_idx on sale_returns (sale_id);
+      create index if not exists sale_returns_return_date_idx on sale_returns (return_date);
+      create table if not exists sale_return_lines (
+        id text primary key,
+        tenant_id text not null,
+        sale_return_id text not null,
+        sale_line_id text not null,
+        product_sku_id text not null,
+        quantity real not null,
+        unit_price real not null default 0,
+        discount_percent real not null default 0,
+        line_total real not null default 0,
+        sell_unit text not null default 'pc',
+        barcode text,
+        created_at text not null,
+        updated_at text not null
+      );
+      create index if not exists sale_return_lines_return_id_idx on sale_return_lines (sale_return_id);
+      create index if not exists sale_return_lines_sale_line_id_idx on sale_return_lines (sale_line_id);
+    `,
+  },
+  {
+    id: "032_sale_returns_processed_by_name",
+    sql: `alter table sale_returns add column processed_by_name text;`,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {
