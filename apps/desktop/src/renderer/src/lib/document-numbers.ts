@@ -36,7 +36,7 @@ async function existingVendorCodes(): Promise<string[]> {
 async function existingPoNumbers(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listPoNumbers?.();
-    if (local?.length) return local;
+    if (local != null) return local;
   } catch {
     /* fall through */
   }
@@ -57,7 +57,7 @@ async function existingPoNumbers(): Promise<string[]> {
 async function existingReceiptNumbers(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listReceiptNumbers?.();
-    if (local?.length) return local;
+    if (local != null) return local;
   } catch {
     /* fall through */
   }
@@ -68,7 +68,7 @@ async function existingReceiptNumbers(): Promise<string[]> {
 async function existingOutNumbers(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listOutNumbers?.();
-    if (local?.length) return local;
+    if (local != null) return local;
   } catch {
     /* fall through */
   }
@@ -89,7 +89,7 @@ async function existingOutNumbers(): Promise<string[]> {
 async function existingOutReturnNumbers(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listOutReturnNumbers?.();
-    if (local?.length) return local;
+    if (local != null) return local;
   } catch {
     /* fall through */
   }
@@ -149,7 +149,7 @@ export async function allocateOutReturnNumber(
 async function existingSaleNumbers(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listSaleNumbers?.();
-    if (local?.length) return local;
+    if (local != null) return local;
   } catch {
     /* fall through */
   }
@@ -174,7 +174,7 @@ export async function allocateSaleNumber(tenantName: string): Promise<string> {
 async function existingSaleReturnNumbers(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listSaleReturnNumbers?.();
-    if (local?.length) return local;
+    if (local != null) return local;
   } catch {
     /* fall through */
   }
@@ -201,7 +201,7 @@ export async function allocateSaleReturnNumber(
 async function existingHoldNumbers(): Promise<string[]> {
   try {
     const local = await window.blackbox?.localDb?.listHoldNumbers?.();
-    if (local?.length) return local;
+    if (local != null) return local;
   } catch {
     /* fall through */
   }
