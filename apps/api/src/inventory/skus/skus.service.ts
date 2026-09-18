@@ -17,6 +17,7 @@ import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { InventoryStock, ProductSku, Unit } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { getInventoryOutBalanceQty } from "../inventory-out/inventory-out-balance";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
 import { SkuBarcodesService } from "./sku-barcodes.service";
 
@@ -111,6 +112,7 @@ export class SkusService {
   async findByBarcode(
     barcode: string,
     warehouseId: string,
+    balanceSource: "stock" | "pos" = "stock",
   ): Promise<SkuSearchResult> {
     const tenantId = this.fixedTenant.tenantId;
     const code = barcode.trim();
@@ -130,9 +132,20 @@ export class SkusService {
     });
     if (!sku) throw new NotFoundException("SKU not found for barcode");
 
-    const stock = await this.stock.findOne({
-      where: { tenantId, productSkuId: sku.id, warehouseId },
-    });
+    let quantityAvailable = 0;
+    if (balanceSource === "pos") {
+      quantityAvailable = await getInventoryOutBalanceQty(
+        this.stock.manager,
+        tenantId,
+        warehouseId,
+        sku.id,
+      );
+    } else {
+      const stock = await this.stock.findOne({
+        where: { tenantId, productSkuId: sku.id, warehouseId },
+      });
+      quantityAvailable = stock ? toNum(stock.quantityAvailable) : 0;
+    }
 
     return {
       id: sku.id,
@@ -141,7 +154,7 @@ export class SkusService {
       variantName: sku.variantName,
       sku: sku.sku,
       barcode: sku.barcode,
-      quantityAvailable: stock ? toNum(stock.quantityAvailable) : 0,
+      quantityAvailable,
       costPrice: toNum(sku.costPrice),
       scannedQuantityMultiplier: match.quantityMultiplier,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit, 1),
@@ -149,6 +162,7 @@ export class SkusService {
       purchaseUnitName: sku.purchaseUnit?.name ?? null,
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(sku.saleDiscountPercent),
     };
   }
 
@@ -231,6 +245,7 @@ export class SkusService {
       dto.sellingPricePerPurchaseUnit == null
         ? null
         : String(dto.sellingPricePerPurchaseUnit);
+    sku.saleDiscountPercent = String(dto.saleDiscountPercent ?? 0);
     sku.reorderLevel = String(dto.reorderLevel ?? 0);
     sku.minimumStockLevel = String(dto.minimumStockLevel ?? 0);
     sku.maximumStockLevel =
@@ -307,6 +322,7 @@ export class SkusService {
       costPrice: toNum(sku.costPrice),
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(sku.saleDiscountPercent),
       reorderLevel: toNum(sku.reorderLevel),
       minimumStockLevel: toNum(sku.minimumStockLevel),
       maximumStockLevel: toNumOrNull(sku.maximumStockLevel),

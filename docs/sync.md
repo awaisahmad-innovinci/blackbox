@@ -23,7 +23,9 @@ Cloud (NestJS + Postgres) is the only hub. Devices never sync with each other.
 
 Push body: `{ stream, changes: [{ changeId, entityType, entityId, operation, baseEntityVersion, payload }] }` (max 100 items).
 
-Pull returns `{ changes, nextCursor, hasMore, serverSeq }`. The window is `seq > cursor` for that stream (origin rows included). The client skips apply when `originDeviceId` is itself, then advances `pull_cursor` to `nextCursor` in the same SQLite transaction as apply.
+Pull returns `{ changes, nextCursor, hasMore, serverSeq }`. The server returns only changes whose `origin_device_id` is **not** the requesting device (other POS devices and the per-tenant `cloud-hub` device for admin REST writes). When only this device's changes exist ahead of the cursor, the server skip-aheads `nextCursor` to the stream tail without transferring payloads. The client still defensively skips apply when `originDeviceId` is itself, then advances `pull_cursor` to `nextCursor` in the same SQLite transaction as apply.
+
+Incremental sync on desktop lists the outbox once, pushes pending rows grouped by stream, calls `GET /sync/status`, then pulls only streams where `lag > 0`.
 
 Cloud `sync_cursors` stores the **committed** cursor the device sent, not the delivered head.
 

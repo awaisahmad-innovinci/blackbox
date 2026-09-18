@@ -73,6 +73,10 @@ export class PurchaseOrderItemInputDto {
   unitCost!: number;
 
   @IsOptional()
+  @IsIn(["pc", "box"])
+  orderUnit?: "pc" | "box";
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)

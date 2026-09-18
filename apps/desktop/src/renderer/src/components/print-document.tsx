@@ -10,10 +10,17 @@ function PrintStoreHeader() {
   );
 }
 
-export function PrintDocument({ children }: { children: ReactNode }) {
+export function PrintDocument({
+  children,
+  showStoreHeader = true,
+}: {
+  children: ReactNode;
+  /** When false, skip the generic tenant header (e.g. thermal sales receipts). */
+  showStoreHeader?: boolean;
+}) {
   return (
     <article data-print-document className="space-y-8">
-      <PrintStoreHeader />
+      {showStoreHeader ? <PrintStoreHeader /> : null}
       {children}
     </article>
   );

@@ -68,12 +68,19 @@ function toProductSkuRow(
     costPrice: sku.costPrice,
     sellingPrice: sku.sellingPrice,
     sellingPricePerPurchaseUnit: sku.sellingPricePerPurchaseUnit,
+    saleDiscountPercent: sku.saleDiscountPercent,
     reorderLevel: sku.reorderLevel,
     minimumStockLevel: sku.minimumStockLevel,
     maximumStockLevel: sku.maximumStockLevel,
     trackInventory: sku.trackInventory,
     status,
   };
+}
+
+function clampSaleDiscountPercent(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, n));
 }
 
 export function SkuProfilePage() {
@@ -101,6 +108,7 @@ export function SkuProfilePage() {
   const [marginPercent, setMarginPercent] = useState("");
   const [sellingPrice, setSellingPrice] = useState("0");
   const [boxSellingPrice, setBoxSellingPrice] = useState("");
+  const [saleDiscountPercent, setSaleDiscountPercent] = useState("0");
   const [reorderLevel, setReorderLevel] = useState("0");
   const [minimumStockLevel, setMinimumStockLevel] = useState("0");
   const [maximumStockLevel, setMaximumStockLevel] = useState("");
@@ -152,6 +160,7 @@ export function SkuProfilePage() {
         ? ""
         : String(sku.sellingPricePerPurchaseUnit),
     );
+    setSaleDiscountPercent(String(sku.saleDiscountPercent ?? 0));
     setReorderLevel(String(sku.reorderLevel));
     setMinimumStockLevel(String(sku.minimumStockLevel));
     setMaximumStockLevel(
@@ -170,6 +179,7 @@ export function SkuProfilePage() {
   const sellingPriceN = Number(sellingPrice);
   const boxSellingPriceN =
     boxSellingPrice.trim() === "" ? null : Number(boxSellingPrice);
+  const saleDiscountPercentN = Number(saleDiscountPercent);
   const baseUnitError = baseUnitId ? null : "Base unit is required";
   const purchaseUnitError = purchaseUnitId ? null : "Purchase unit is required";
   const unitsPerError =
@@ -198,6 +208,13 @@ export function SkuProfilePage() {
     (Number.isNaN(boxSellingPriceN) || boxSellingPriceN < 0)
       ? "Box selling price must be zero or greater"
       : null;
+  const saleDiscountError =
+    saleDiscountPercent.trim() !== "" &&
+    (Number.isNaN(saleDiscountPercentN) ||
+      saleDiscountPercentN < 0 ||
+      saleDiscountPercentN > 100)
+      ? "Sale discount must be between 0 and 100"
+      : null;
   const canSaveEdit =
     Boolean(variantName.trim()) &&
     Boolean(skuCode.trim()) &&
@@ -207,7 +224,8 @@ export function SkuProfilePage() {
     !costError &&
     !marginError &&
     !sellingError &&
-    !boxSellingError;
+    !boxSellingError &&
+    !saleDiscountError;
 
   function onCostPriceChange(value: string) {
     setCostPrice(value);
@@ -225,6 +243,7 @@ export function SkuProfilePage() {
     if (!id || !sku || !canSaveEdit) return;
     setSaving(true);
     setFormError(null);
+    const saleDiscountPercentValue = clampSaleDiscountPercent(saleDiscountPercent);
     const next: SkuDetail = {
       ...sku,
       variantName: normalizeStoredText(variantName),
@@ -242,6 +261,7 @@ export function SkuProfilePage() {
       costPrice: costPriceN,
       sellingPrice: sellingPriceN,
       sellingPricePerPurchaseUnit: boxSellingPriceN,
+      saleDiscountPercent: saleDiscountPercentValue,
       reorderLevel: Number(reorderLevel),
       minimumStockLevel: Number(minimumStockLevel),
       maximumStockLevel:
@@ -276,6 +296,7 @@ export function SkuProfilePage() {
         costPrice: costPriceN,
         sellingPrice: sellingPriceN,
         sellingPricePerPurchaseUnit: boxSellingPriceN,
+        saleDiscountPercent: saleDiscountPercentValue,
         reorderLevel: next.reorderLevel,
         minimumStockLevel: next.minimumStockLevel,
         maximumStockLevel: next.maximumStockLevel,
@@ -427,6 +448,7 @@ export function SkuProfilePage() {
         unitsPerPurchaseUnit: active.unitsPerPurchaseUnit,
         costPrice: active.costPrice,
         sellingPrice: active.sellingPrice,
+        saleDiscountPercent: active.saleDiscountPercent,
         reorderLevel: active.reorderLevel,
         minimumStockLevel: active.minimumStockLevel,
         maximumStockLevel: active.maximumStockLevel,
@@ -529,6 +551,12 @@ export function SkuProfilePage() {
               {sku.sellingPricePerPurchaseUnit != null
                 ? ` (box ${sku.sellingPricePerPurchaseUnit})`
                 : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Sale discount %</dt>
+            <dd className="font-medium tabular-nums">
+              {sku.saleDiscountPercent ?? 0}
             </dd>
           </div>
           <div>
@@ -839,6 +867,21 @@ export function SkuProfilePage() {
               />
               {boxSellingError ? (
                 <p className="text-destructive text-xs">{boxSellingError}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sale discount %</Label>
+              <Input
+                value={saleDiscountPercent}
+                aria-invalid={Boolean(saleDiscountError)}
+                placeholder="0"
+                onChange={(e) => setSaleDiscountPercent(e.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Default discount on POS sale lines for this SKU (0–100).
+              </p>
+              {saleDiscountError ? (
+                <p className="text-destructive text-xs">{saleDiscountError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">

@@ -10,11 +10,13 @@ export const INVENTORY_MOVEMENT_TYPES = [
   "OPENING_BALANCE",
   "PURCHASE_RECEIPT",
   "SALE",
+  "SALE_RETURN",
   "STOCK_ADJUSTMENT",
   "TRANSFER_IN",
   "TRANSFER_OUT",
   "RETURN",
   "INVENTORY_OUT",
+  "INVENTORY_OUT_RETURN",
 ] as const;
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 
@@ -80,6 +82,7 @@ export const PAYMENT_TERMS = [
   "15_DAYS",
   "30_DAYS",
   "45_DAYS",
+  "BILL_TO_BILL",
   "CUSTOM",
 ] as const;
 export type PaymentTerms = (typeof PAYMENT_TERMS)[number];
@@ -90,6 +93,7 @@ export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
   "15_DAYS": "15 Days",
   "30_DAYS": "30 Days",
   "45_DAYS": "45 Days",
+  BILL_TO_BILL: "Bill to bill",
   CUSTOM: "Custom",
 };
 
@@ -116,6 +120,16 @@ export interface DashboardSummary {
   lowStockItems: number;
   pendingPurchaseOrders: number;
   recentReceipts: number;
+}
+
+/** POS cashier dashboard — today's sales metrics from local device data. */
+export interface CashierDashboardSummary {
+  /** Local calendar date (YYYY-MM-DD). */
+  date: string;
+  totalSalesAmount: number;
+  cashReceivedAmount: number;
+  cardPaymentsAmount: number;
+  heldBillsCount: number;
 }
 
 export interface VendorContactInput {
@@ -241,6 +255,8 @@ export interface VendorSku {
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
+  /** Base unit label from product SKU (for pc ordering). */
+  baseUnitName?: string | null;
   minimumOrderQuantity: number;
   leadTimeDays: number;
   isPreferred: boolean;
@@ -297,6 +313,8 @@ export interface SkuSearchResult {
   purchaseUnitName?: string | null;
   sellingPrice?: number;
   sellingPricePerPurchaseUnit?: number | null;
+  /** Default POS line discount % for this SKU. */
+  saleDiscountPercent?: number;
 }
 
 /** Tenant-wide barcode lookup for duplicate detection (any SKU/product status). */
@@ -314,6 +332,94 @@ export interface CreateSkuBarcodeRequest {
 }
 
 export type SellUnit = "pc" | "box";
+export type OrderUnit = SellUnit;
+
+export function toPurchaseQuantity(
+  displayQuantity: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  if (orderUnit === "box") return round4(displayQuantity);
+  return round4(displayQuantity / unitsPer);
+}
+
+export function toDisplayQuantity(
+  purchaseQuantity: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  if (orderUnit === "box") return round4(purchaseQuantity);
+  return round4(purchaseQuantity * unitsPer);
+}
+
+export function displayPurchaseUnitCost(
+  purchasePrice: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  if (orderUnit === "box") return round4(purchasePrice);
+  return pieceCostFromPurchase(purchasePrice, unitsPerPurchaseUnit);
+}
+
+export function defaultOrderUnitForScan(
+  scannedQuantityMultiplier: number,
+  unitsPerPurchaseUnit: number,
+): OrderUnit {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  return scannedQuantityMultiplier >= unitsPer && unitsPer > 1 ? "box" : "pc";
+}
+
+export function lineTotalForPurchase(input: {
+  displayQuantity: number;
+  purchasePrice: number;
+  unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
+}): {
+  purchaseQuantity: number;
+  displayQuantity: number;
+  displayUnitCost: number;
+  lineTotal: number;
+} {
+  const orderUnit = input.orderUnit ?? "box";
+  const purchaseQuantity = toPurchaseQuantity(
+    input.displayQuantity,
+    orderUnit,
+    input.unitsPerPurchaseUnit,
+  );
+  const displayUnitCost = displayPurchaseUnitCost(
+    input.purchasePrice,
+    orderUnit,
+    input.unitsPerPurchaseUnit,
+  );
+  return {
+    purchaseQuantity,
+    displayQuantity: round4(input.displayQuantity),
+    displayUnitCost,
+    lineTotal: round4(purchaseQuantity * input.purchasePrice),
+  };
+}
+
+export function formatPoOrderQuantity(item: {
+  quantity: number;
+  orderUnit?: OrderUnit;
+  unitsPerPurchaseUnit: number;
+  purchaseUnitName?: string | null;
+  baseUnitName?: string | null;
+}): string {
+  const orderUnit = item.orderUnit ?? "box";
+  const displayQty = toDisplayQuantity(
+    item.quantity,
+    orderUnit,
+    item.unitsPerPurchaseUnit,
+  );
+  const unitLabel =
+    orderUnit === "box"
+      ? (item.purchaseUnitName ?? "box")
+      : (item.baseUnitName ?? "pc");
+  return `${displayQty.toLocaleString()} ${unitLabel}`;
+}
 
 export function lineTotalForScan(input: {
   quantityMultiplier: number;
@@ -402,6 +508,7 @@ export interface SkuDetail {
   costPrice: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  saleDiscountPercent: number;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -537,6 +644,7 @@ export interface ProductSkuDetail {
   costPrice: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  saleDiscountPercent: number;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -556,6 +664,7 @@ export interface CreateProductSkuRequest {
   costPrice: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit?: number | null;
+  saleDiscountPercent?: number;
   reorderLevel?: number;
   minimumStockLevel?: number;
   maximumStockLevel?: number | null;
@@ -802,7 +911,9 @@ export interface PurchaseOrderItemRow {
   vendorSkuCode: string | null;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  baseUnitName?: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
   quantity: number;
   unitCost: number;
   discount: number;
@@ -851,6 +962,7 @@ export interface CreatePurchaseOrderItemRequest {
   vendorSkuId: string;
   quantity: number;
   unitCost: number;
+  orderUnit?: OrderUnit;
   discount?: number;
   tax?: number;
 }
@@ -903,7 +1015,9 @@ export interface ReceivingLineDraft {
   vendorSkuCode: string | null;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  baseUnitName?: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
   orderedQuantity: number;
   poUnitCost: number;
   currentVendorPurchasePrice: number | null;
@@ -1101,6 +1215,77 @@ export interface InventoryOutListQuery {
 
 export interface PaginatedInventoryOuts {
   items: InventoryOutListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const INVENTORY_OUT_RETURN_STATUSES = ["POSTED", "CANCELLED"] as const;
+export type InventoryOutReturnStatus =
+  (typeof INVENTORY_OUT_RETURN_STATUSES)[number];
+
+export interface CreateInventoryOutReturnItemRequest {
+  productSkuId: string;
+  quantity: number;
+}
+
+export interface CreateInventoryOutReturnRequest {
+  warehouseId: string;
+  returnDate?: string;
+  notes?: string;
+  items: CreateInventoryOutReturnItemRequest[];
+}
+
+export interface InventoryOutReturnItemRow {
+  id: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+  inventoryOutItemId: string | null;
+}
+
+export interface InventoryOutReturnDetail {
+  id: string;
+  returnNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  notes: string;
+  status: InventoryOutReturnStatus;
+  subtotal: number;
+  total: number;
+  items: InventoryOutReturnItemRow[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryOutReturnListItem {
+  id: string;
+  returnNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  status: InventoryOutReturnStatus;
+  total: number;
+  itemCount: number;
+}
+
+export interface InventoryOutReturnListQuery {
+  search?: string;
+  warehouseId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedInventoryOutReturns {
+  items: InventoryOutReturnListItem[];
   total: number;
   page: number;
   pageSize: number;

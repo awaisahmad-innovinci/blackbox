@@ -8,11 +8,23 @@ export interface AuthUser {
   tenantId: string;
   /** Store / business display name (tenant.name). */
   tenantName?: string;
+  /** Formatted business address from onboarding location (receipt header). */
+  businessAddress?: string;
   email: string;
   username: string;
   fullName: string;
   /** Effective permission keys resolved from User → Role → Permission. */
   permissions: Permission[];
+  /** When true, POS requires manager Authy before removing a sale line. */
+  requireManagerApprovalRemoveSaleLine?: boolean;
+  /** When true, POS requires manager Authy before opening a cashier till. */
+  requireManagerApprovalTillOpen?: boolean;
+  /** When true, POS requires manager Authy before collecting cash from a till. */
+  requireManagerApprovalTillWithdraw?: boolean;
+  /** Tenant default GST percentage applied to every sale (e.g. 17 = 17%). */
+  defaultGstRate?: number;
+  /** Tenant default sales tax percentage applied to every sale. */
+  defaultSalesTaxRate?: number;
 }
 
 export interface AuthTokens {
@@ -44,6 +56,8 @@ export interface LoginRequest {
   client: AuthClient;
   /** Desktop machine fingerprint; bound to JWT deviceId when provided. */
   fingerprint?: string;
+  /** When migrating from a legacy random fingerprint, the stable OS machine id hash. */
+  stableFingerprint?: string;
   deviceName?: string;
 }
 

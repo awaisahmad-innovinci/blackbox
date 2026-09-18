@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
+import {
+  displayPurchaseUnitCost,
+  formatPoOrderQuantity,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
@@ -14,6 +18,7 @@ import {
   isDeviceBound,
 } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
+import { PendingVendorReturnsSection } from "./PendingVendorReturnsSection";
 
 export function PurchaseOrderProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -270,11 +275,19 @@ export function PurchaseOrderProfilePage() {
                       </ListTableLink>
                     </td>
                     <td className="px-4 py-3">
-                      {item.purchaseUnitName || "—"}
+                      {(item.orderUnit ?? "box") === "box"
+                        ? (item.purchaseUnitName ?? "box")
+                        : (item.baseUnitName ?? "pc")}
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{item.quantity}</td>
                     <td className="px-4 py-3 tabular-nums">
-                      {item.unitCost.toLocaleString()}
+                      {formatPoOrderQuantity(item)}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {displayPurchaseUnitCost(
+                        item.unitCost,
+                        item.orderUnit ?? "box",
+                        item.unitsPerPurchaseUnit,
+                      ).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
                       {item.lineTotal.toLocaleString()}
@@ -286,6 +299,11 @@ export function PurchaseOrderProfilePage() {
           </table>
         </div>
       </section>
+
+      <PendingVendorReturnsSection
+        vendorId={po.vendorId}
+        vendorName={po.vendorName}
+      />
 
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">

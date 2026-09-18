@@ -12,6 +12,7 @@ import type {
 } from "@blackbox/shared";
 import {
   buildReceivedAtIso,
+  formatPoOrderQuantity,
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   goodsReceiptGrandTotal,
@@ -956,7 +957,13 @@ export function ReceivePurchaseOrderPage() {
                       </td>
                       <td className="px-3 py-2">{line.sku}</td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.orderedQuantity} {line.purchaseUnitName || ""}
+                        {formatPoOrderQuantity({
+                          quantity: line.orderedQuantity,
+                          orderUnit: line.orderUnit,
+                          unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+                          purchaseUnitName: line.purchaseUnitName,
+                          baseUnitName: line.baseUnitName,
+                        })}
                       </td>
                       <td className="px-3 py-2">
                         <Input

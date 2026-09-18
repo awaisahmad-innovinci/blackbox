@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ConfirmProvider } from "./components/confirm-provider";
+import { SupervisorTotpProvider } from "./components/supervisor-totp-provider";
 import { AppShell } from "./app/AppShell";
 import { SignInPage } from "./features/auth/SignInPage";
 import { BarcodeScanProvider } from "./lib/barcode-scan";
@@ -14,6 +15,9 @@ import { InventoryInOutReportPage } from "./features/inventory/InventoryInOutRep
 import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
 import { InventoryOutListPage } from "./features/inventory/InventoryOutListPage";
 import { InventoryOutPage } from "./features/inventory/InventoryOutPage";
+import { InventoryOutReturnDetailPage } from "./features/inventory/InventoryOutReturnDetailPage";
+import { InventoryOutReturnFormPage } from "./features/inventory/InventoryOutReturnFormPage";
+import { InventoryOutReturnListPage } from "./features/inventory/InventoryOutReturnListPage";
 import { VendorReturnDetailPage } from "./features/inventory/VendorReturnDetailPage";
 import { VendorReturnFormPage } from "./features/inventory/VendorReturnFormPage";
 import { VendorReturnsListPage } from "./features/inventory/VendorReturnsListPage";
@@ -34,12 +38,24 @@ import { VendorProfilePage } from "./features/vendors/VendorProfilePage";
 import { VendorsListPage } from "./features/vendors/VendorsListPage";
 import { WarehouseFormPage } from "./features/warehouses/WarehouseFormPage";
 import { WarehousesListPage } from "./features/warehouses/WarehousesListPage";
+import { HeldSalesPage } from "./features/sales/HeldSalesPage";
+import { SalePage } from "./features/sales/SalePage";
+import { SaleDetailPage } from "./features/sales/SaleDetailPage";
+import { SalesListPage } from "./features/sales/SalesListPage";
+import { SaleReturnsListPage } from "./features/sales/SaleReturnsListPage";
+import { SaleReturnPickerPage } from "./features/sales/SaleReturnPickerPage";
+import { SaleReturnFormPage } from "./features/sales/SaleReturnFormPage";
+import { SaleReturnDetailPage } from "./features/sales/SaleReturnDetailPage";
+import { TillPage } from "./features/sales/TillPage";
+import { ActivityLogPage } from "./features/activity/ActivityLogPage";
 
 export default function App() {
   return (
     <SessionProvider>
       <ConfirmProvider>
-        <AuthenticatedApp />
+        <SupervisorTotpProvider>
+          <AuthenticatedApp />
+        </SupervisorTotpProvider>
       </ConfirmProvider>
     </SessionProvider>
   );
@@ -97,6 +113,18 @@ function AuthenticatedApp() {
             path="inventory/out/:id"
             element={<InventoryOutDetailPage />}
           />
+          <Route
+            path="inventory/out-returns"
+            element={<InventoryOutReturnListPage />}
+          />
+          <Route
+            path="inventory/out-returns/new"
+            element={<InventoryOutReturnFormPage />}
+          />
+          <Route
+            path="inventory/out-returns/:id"
+            element={<InventoryOutReturnDetailPage />}
+          />
           <Route path="inventory/returns" element={<VendorReturnsListPage />} />
           <Route
             path="inventory/returns/new"
@@ -135,6 +163,20 @@ function AuthenticatedApp() {
           <Route path="warehouses" element={<WarehousesListPage />} />
           <Route path="warehouses/new" element={<WarehouseFormPage />} />
           <Route path="warehouses/:id/edit" element={<WarehouseFormPage />} />
+          <Route path="sales" element={<SalesListPage />} />
+          <Route path="sales/returns" element={<SaleReturnsListPage />} />
+          <Route path="sales/returns/new" element={<SaleReturnPickerPage />} />
+          <Route
+            path="sales/returns/new/:saleId"
+            element={<SaleReturnFormPage />}
+          />
+          <Route path="sales/returns/:id" element={<SaleReturnDetailPage />} />
+          <Route path="sales/held" element={<HeldSalesPage />} />
+          <Route path="sales/till" element={<TillPage />} />
+          <Route path="activity" element={<ActivityLogPage />} />
+          <Route path="sales/new/:draftId" element={<SalePage />} />
+          <Route path="sales/new" element={<SalePage />} />
+          <Route path="sales/:id" element={<SaleDetailPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

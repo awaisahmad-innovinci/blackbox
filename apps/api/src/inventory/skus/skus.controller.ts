@@ -18,7 +18,7 @@ import type {
   SkuSupplier,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { IsOptional, IsString, IsUUID, Min, IsNumber } from "class-validator";
+import { IsIn, IsOptional, IsString, IsUUID, Min, IsNumber } from "class-validator";
 import { Type } from "class-transformer";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
 import { VendorSkusService } from "../vendors/vendor-skus.service";
@@ -41,6 +41,10 @@ class ByBarcodeQueryDto {
 
   @IsUUID()
   warehouseId!: string;
+
+  @IsOptional()
+  @IsIn(["stock", "pos"])
+  balance?: "stock" | "pos";
 }
 
 class ExistsByBarcodeQueryDto {
@@ -83,7 +87,11 @@ export class SkusController {
   findByBarcode(
     @Query() query: ByBarcodeQueryDto,
   ): Promise<SkuSearchResult> {
-    return this.skus.findByBarcode(query.barcode, query.warehouseId);
+    return this.skus.findByBarcode(
+      query.barcode,
+      query.warehouseId,
+      query.balance ?? "stock",
+    );
   }
 
   @Get(":id")

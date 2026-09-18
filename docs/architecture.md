@@ -141,6 +141,7 @@ apps/desktop/
 - Smoke surface: `GET /rbac/check` requires `permissions.read` → 200 / 403 / 401; returns `{ ok: true }` only.
 - Tenant admin APIs: see [admin-api.md](./admin-api.md) (users, roles, permissions catalog, devices read/revoke, tenant settings)
 - Web admin UI: see [web-admin.md](./web-admin.md) (session + permission-aware `/app`)
+- POS sales (desktop): `sales.read`, `sales.write`, `sales.void` — see [sales-api.md](./sales-api.md). Cashiers (`sales.write` only) get Dashboard + Sale nav on desktop.
 
 ### Data access (locked)
 

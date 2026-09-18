@@ -14,15 +14,21 @@ import {
   matchGlobalNavShortcut,
   matchGlobalTaxonomyShortcut,
   matchNavDropdownItem,
+  visibleNavSections,
+  type AppNavSection,
   type NavDropdownId,
   type TaxonomyKind,
 } from "./app-nav-keyboard";
 
+type NavSection = AppNavSection;
+
 export function useAppNavKeyboard({
+  sections = APP_NAV_SECTIONS as unknown as NavSection[],
   openNavDropdown,
   setOpenNavDropdown,
   onGlobalTaxonomyShortcut,
 }: {
+  sections?: NavSection[];
   openNavDropdown: NavDropdownId | null;
   setOpenNavDropdown: Dispatch<SetStateAction<NavDropdownId | null>>;
   onGlobalTaxonomyShortcut?: (kind: TaxonomyKind) => void;
@@ -40,11 +46,11 @@ export function useAppNavKeyboard({
   );
 
   const focusNavIndex = useCallback((index: number) => {
-    const count = APP_NAV_SECTIONS.length;
+    const count = sections.length;
     const next = ((index % count) + count) % count;
     setActiveIndex(next);
     navRefs.current[next]?.focus();
-  }, []);
+  }, [sections.length]);
 
   useEffect(() => {
     if (initialFocusDone.current) return;
@@ -65,8 +71,8 @@ export function useAppNavKeyboard({
     function onKeyDown(event: KeyboardEvent) {
       const sectionId = matchAppNavShortcut(event);
       if (sectionId) {
-        const index = APP_NAV_SECTIONS.findIndex((s) => s.id === sectionId);
-        const section = APP_NAV_SECTIONS[index];
+        const index = sections.findIndex((section) => section.id === sectionId);
+        const section = sections[index];
         if (!section) return;
 
         if (section.kind === "link") {
@@ -102,7 +108,7 @@ export function useAppNavKeyboard({
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [navigate, focusNavIndex, setOpenNavDropdown, openNavDropdown, onGlobalTaxonomyShortcut]);
+  }, [navigate, focusNavIndex, setOpenNavDropdown, openNavDropdown, onGlobalTaxonomyShortcut, sections]);
 
   const handleMenubarKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {

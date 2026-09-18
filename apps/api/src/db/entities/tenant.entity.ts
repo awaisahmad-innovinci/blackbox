@@ -35,6 +35,35 @@ export class Tenant {
   @Column({ name: "onboarding_completed_at", type: "timestamptz", nullable: true })
   onboardingCompletedAt!: Date | null;
 
+  @Column({
+    name: "require_manager_approval_remove_sale_line",
+    type: "boolean",
+    default: true,
+  })
+  requireManagerApprovalRemoveSaleLine!: boolean;
+
+  @Column({
+    name: "require_manager_approval_till_open",
+    type: "boolean",
+    default: true,
+  })
+  requireManagerApprovalTillOpen!: boolean;
+
+  @Column({
+    name: "require_manager_approval_till_withdraw",
+    type: "boolean",
+    default: true,
+  })
+  requireManagerApprovalTillWithdraw!: boolean;
+
+  /** Percentage applied to every sale subtotal (e.g. 17 = 17%). */
+  @Column({ name: "default_gst_rate", type: "real", default: 0 })
+  defaultGstRate!: number;
+
+  /** Percentage applied to every sale subtotal after GST. */
+  @Column({ name: "default_sales_tax_rate", type: "real", default: 0 })
+  defaultSalesTaxRate!: number;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

@@ -11,6 +11,93 @@ type Migration = {
   after?: (db: Database.Database) => void;
 };
 
+function ensureInventoryOutReturnTotalsColumns(db: Database.Database): void {
+  const returnCols = (
+    db.prepare("pragma table_info(inventory_out_returns)").all() as {
+      name: string;
+    }[]
+  ).map((c) => c.name);
+  if (returnCols.length > 0) {
+    if (!returnCols.includes("subtotal")) {
+      db.exec(
+        `alter table inventory_out_returns add column subtotal real not null default 0`,
+      );
+    }
+    if (!returnCols.includes("total")) {
+      db.exec(
+        `alter table inventory_out_returns add column total real not null default 0`,
+      );
+    }
+  }
+
+  const itemCols = (
+    db.prepare("pragma table_info(inventory_out_return_items)").all() as {
+      name: string;
+    }[]
+  ).map((c) => c.name);
+  if (itemCols.length > 0 && !itemCols.includes("inventory_out_item_id")) {
+    db.exec(
+      `alter table inventory_out_return_items add column inventory_out_item_id text`,
+    );
+  }
+}
+
+function ensureInventoryOutReturnItemsNullableBalanceLink(
+  db: Database.Database,
+): void {
+  const tableExists = db
+    .prepare(
+      `select 1 from sqlite_master where type = 'table' and name = 'inventory_out_return_items' limit 1`,
+    )
+    .get();
+  if (!tableExists) return;
+
+  const itemColInfo = db
+    .prepare("pragma table_info(inventory_out_return_items)")
+    .all() as { name: string; notnull: number }[];
+  const balanceLinkCol = itemColInfo.find(
+    (c) => c.name === "inventory_out_item_id",
+  );
+  if (!balanceLinkCol || balanceLinkCol.notnull !== 1) return;
+
+  db.exec(`
+    create table inventory_out_return_items_new (
+      id text primary key,
+      tenant_id text not null,
+      inventory_out_return_id text not null,
+      product_sku_id text not null,
+      inventory_out_item_id text,
+      quantity real not null,
+      unit_cost real not null default 0,
+      created_at text not null,
+      updated_at text not null,
+      sync_status text not null default 'synced',
+      server_updated_at text
+    );
+
+    insert into inventory_out_return_items_new (
+      id, tenant_id, inventory_out_return_id, product_sku_id,
+      inventory_out_item_id, quantity, unit_cost,
+      created_at, updated_at, sync_status, server_updated_at
+    )
+    select
+      id, tenant_id, inventory_out_return_id, product_sku_id,
+      inventory_out_item_id, quantity, unit_cost,
+      created_at, updated_at, sync_status, server_updated_at
+    from inventory_out_return_items;
+
+    drop table inventory_out_return_items;
+    alter table inventory_out_return_items_new rename to inventory_out_return_items;
+
+    create index if not exists inventory_out_return_items_tenant_id_idx
+      on inventory_out_return_items (tenant_id);
+    create index if not exists inventory_out_return_items_return_id_idx
+      on inventory_out_return_items (inventory_out_return_id);
+    create index if not exists inventory_out_return_items_product_sku_id_idx
+      on inventory_out_return_items (product_sku_id);
+  `);
+}
+
 const MIGRATIONS: Migration[] = [
   {
     id: "001_local_inventory",
@@ -788,6 +875,426 @@ update vendor_return_items
 set quantity = quantity * units_per_purchase_unit
 where units_per_purchase_unit > 0;
 `,
+  },
+  {
+    id: "017_po_item_order_unit",
+    sql: `-- column add applied in after()`,
+    after: (db) => {
+      const itemCols = (
+        db.prepare("pragma table_info(purchase_order_items)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!itemCols.includes("order_unit")) {
+        db.exec(
+          `alter table purchase_order_items add column order_unit text not null default 'box'`,
+        );
+      }
+    },
+  },
+  {
+    id: "018_inventory_out_balance_and_returns",
+    sql: `-- applied in after()`,
+    after: (db) => {
+      db.exec(`
+        create table if not exists inventory_out_lines (
+          id text primary key,
+          tenant_id text not null,
+          inventory_out_id text not null,
+          product_sku_id text not null,
+          quantity real not null,
+          unit_cost real not null default 0,
+          created_at text not null,
+          updated_at text not null,
+          sync_status text not null default 'synced',
+          server_updated_at text
+        );
+        create index if not exists inventory_out_lines_tenant_id_idx
+          on inventory_out_lines (tenant_id);
+        create index if not exists inventory_out_lines_out_id_idx
+          on inventory_out_lines (inventory_out_id);
+        create index if not exists inventory_out_lines_product_sku_id_idx
+          on inventory_out_lines (product_sku_id);
+      `);
+
+      const itemCols = (
+        db.prepare("pragma table_info(inventory_out_items)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+
+      if (itemCols.includes("inventory_out_id")) {
+        db.exec(`
+          insert or ignore into inventory_out_lines (
+            id, tenant_id, inventory_out_id, product_sku_id, quantity, unit_cost,
+            created_at, updated_at, sync_status, server_updated_at
+          )
+          select
+            id, tenant_id, inventory_out_id, product_sku_id, quantity, unit_cost,
+            created_at, updated_at, sync_status, server_updated_at
+          from inventory_out_items;
+        `);
+
+        db.exec(`
+          create table inventory_out_items_new (
+            id text primary key,
+            tenant_id text not null,
+            warehouse_id text not null,
+            product_sku_id text not null,
+            quantity real not null,
+            unit_cost real not null default 0,
+            created_at text not null,
+            updated_at text not null,
+            sync_status text not null default 'synced',
+            server_updated_at text,
+            unique (tenant_id, warehouse_id, product_sku_id)
+          );
+        `);
+
+        db.exec(`
+          insert into inventory_out_items_new (
+            id, tenant_id, warehouse_id, product_sku_id, quantity, unit_cost,
+            created_at, updated_at, sync_status, server_updated_at
+          )
+          select
+            min(i.id),
+            i.tenant_id,
+            o.warehouse_id,
+            i.product_sku_id,
+            sum(i.quantity),
+            max(i.unit_cost),
+            min(i.created_at),
+            max(i.updated_at),
+            'synced',
+            max(i.server_updated_at)
+          from inventory_out_items i
+          inner join inventory_outs o on o.id = i.inventory_out_id
+          group by i.tenant_id, o.warehouse_id, i.product_sku_id
+          having sum(i.quantity) > 0;
+        `);
+
+        db.exec(`drop table inventory_out_items`);
+        db.exec(
+          `alter table inventory_out_items_new rename to inventory_out_items`,
+        );
+        db.exec(`
+          create index if not exists inventory_out_items_tenant_id_idx
+            on inventory_out_items (tenant_id);
+          create index if not exists inventory_out_items_warehouse_id_idx
+            on inventory_out_items (warehouse_id);
+          create index if not exists inventory_out_items_product_sku_id_idx
+            on inventory_out_items (product_sku_id);
+        `);
+      } else if (!itemCols.includes("warehouse_id")) {
+        db.exec(
+          `alter table inventory_out_items add column warehouse_id text not null default ''`,
+        );
+      }
+
+      db.exec(`
+        create table if not exists inventory_out_returns (
+          id text primary key,
+          tenant_id text not null,
+          return_number text not null,
+          warehouse_id text not null,
+          return_date text not null,
+          notes text not null default '',
+          status text not null default 'POSTED',
+          subtotal real not null default 0,
+          total real not null default 0,
+          created_at text not null,
+          updated_at text not null,
+          sync_status text not null default 'synced',
+          server_updated_at text,
+          unique (tenant_id, return_number)
+        );
+        create index if not exists inventory_out_returns_tenant_id_idx
+          on inventory_out_returns (tenant_id);
+        create index if not exists inventory_out_returns_warehouse_id_idx
+          on inventory_out_returns (warehouse_id);
+
+        create table if not exists inventory_out_return_items (
+          id text primary key,
+          tenant_id text not null,
+          inventory_out_return_id text not null,
+          product_sku_id text not null,
+          inventory_out_item_id text,
+          quantity real not null,
+          unit_cost real not null default 0,
+          created_at text not null,
+          updated_at text not null,
+          sync_status text not null default 'synced',
+          server_updated_at text
+        );
+        create index if not exists inventory_out_return_items_tenant_id_idx
+          on inventory_out_return_items (tenant_id);
+        create index if not exists inventory_out_return_items_return_id_idx
+          on inventory_out_return_items (inventory_out_return_id);
+        create index if not exists inventory_out_return_items_product_sku_id_idx
+          on inventory_out_return_items (product_sku_id);
+      `);
+
+      ensureInventoryOutReturnTotalsColumns(db);
+      ensureInventoryOutReturnItemsNullableBalanceLink(db);
+    },
+  },
+  {
+    id: "019_inventory_out_return_totals",
+    sql: `-- column adds applied in after()`,
+    after: (db) => {
+      ensureInventoryOutReturnTotalsColumns(db);
+    },
+  },
+  {
+    id: "020_inventory_out_return_items_nullable_balance_link",
+    sql: `-- table rebuild applied in after()`,
+    after: (db) => {
+      ensureInventoryOutReturnItemsNullableBalanceLink(db);
+    },
+  },
+  {
+    id: "021_sales",
+    sql: `
+      create table if not exists sales (
+        id text primary key,
+        tenant_id text not null,
+        sale_number text not null,
+        warehouse_id text not null,
+        status text not null default 'POSTED',
+        subtotal real not null default 0,
+        gst_rate real not null default 0,
+        gst_amount real not null default 0,
+        sales_tax_rate real not null default 0,
+        sales_tax_amount real not null default 0,
+        total real not null default 0,
+        device_id text,
+        posted_by text,
+        posted_at text,
+        notes text not null default '',
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text,
+        unique (tenant_id, sale_number)
+      );
+      create index if not exists sales_tenant_id_idx on sales (tenant_id);
+      create index if not exists sales_warehouse_id_idx on sales (warehouse_id);
+      create index if not exists sales_posted_at_idx on sales (posted_at);
+
+      create table if not exists sale_lines (
+        id text primary key,
+        tenant_id text not null,
+        sale_id text not null,
+        product_sku_id text not null,
+        quantity real not null,
+        unit_price real not null default 0,
+        line_total real not null default 0,
+        sell_unit text not null default 'pc',
+        barcode text,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists sale_lines_tenant_id_idx on sale_lines (tenant_id);
+      create index if not exists sale_lines_sale_id_idx on sale_lines (sale_id);
+      create index if not exists sale_lines_product_sku_id_idx on sale_lines (product_sku_id);
+
+      create table if not exists sale_payments (
+        id text primary key,
+        tenant_id text not null,
+        sale_id text not null,
+        method text not null,
+        amount real not null,
+        reference text not null default '',
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists sale_payments_tenant_id_idx on sale_payments (tenant_id);
+      create index if not exists sale_payments_sale_id_idx on sale_payments (sale_id);
+    `,
+  },
+  {
+    id: "022_sales_receipt_fields",
+    sql: `
+      alter table sales add column customer_name text not null default 'CASH SALES CUSTOMER';
+      alter table sales add column posted_by_name text;
+    `,
+  },
+  {
+    id: "023_sales_cash_tendered",
+    sql: `alter table sales add column cash_tendered real;`,
+  },
+  {
+    id: "024_supervisor_totp",
+    sql: `
+      create table if not exists supervisor_totp (
+        user_id text primary key,
+        tenant_id text not null,
+        secret_base32 text not null,
+        updated_at text not null default (datetime('now'))
+      );
+      create index if not exists supervisor_totp_tenant_id_idx
+        on supervisor_totp (tenant_id);
+    `,
+  },
+  {
+    id: "025_till_sessions",
+    sql: `
+      create table if not exists till_sessions (
+        id text primary key,
+        tenant_id text not null,
+        user_id text not null,
+        user_name text not null default '',
+        status text not null,
+        note_10 integer not null default 0,
+        note_20 integer not null default 0,
+        note_50 integer not null default 0,
+        note_100 integer not null default 0,
+        note_500 integer not null default 0,
+        note_1000 integer not null default 0,
+        note_5000 integer not null default 0,
+        opening_total real not null default 0,
+        opening_balance real not null default 0,
+        current_cash_balance real not null default 0,
+        max_cash_limit real not null default 0,
+        opened_at text,
+        closed_at text,
+        approved_by_user_id text,
+        approved_by_name text,
+        approved_at text,
+        reopened_by_user_id text,
+        reopened_by_name text,
+        close_reason text,
+        created_at text not null,
+        updated_at text not null
+      );
+      create index if not exists till_sessions_tenant_id_idx on till_sessions (tenant_id);
+      create index if not exists till_sessions_user_id_idx on till_sessions (user_id);
+      create index if not exists till_sessions_status_idx on till_sessions (status);
+
+      create table if not exists till_withdrawals (
+        id text primary key,
+        tenant_id text not null,
+        till_session_id text not null,
+        withdrawn_by_user_id text not null,
+        withdrawn_by_name text not null default '',
+        note_10 integer not null default 0,
+        note_20 integer not null default 0,
+        note_50 integer not null default 0,
+        note_100 integer not null default 0,
+        note_500 integer not null default 0,
+        note_1000 integer not null default 0,
+        note_5000 integer not null default 0,
+        withdrawal_total real not null default 0,
+        created_at text not null
+      );
+      create index if not exists till_withdrawals_tenant_id_idx on till_withdrawals (tenant_id);
+      create index if not exists till_withdrawals_till_session_id_idx on till_withdrawals (till_session_id);
+    `,
+  },
+  {
+    id: "026_till_withdrawal_kind",
+    sql: `
+      alter table till_withdrawals add column kind text not null default 'full';
+    `,
+  },
+  {
+    id: "027_activity_log_pending",
+    sql: `
+      create table if not exists activity_log_pending (
+        id text primary key,
+        payload text not null,
+        created_at text not null
+      );
+    `,
+  },
+  {
+    id: "028_supervisor_totp_display_name",
+    sql: `
+      alter table supervisor_totp add column display_name text not null default '';
+    `,
+  },
+  {
+    id: "029_activity_logs_local",
+    sql: `
+      create table if not exists activity_logs (
+        id text primary key,
+        event_type text not null,
+        actor_user_id text not null,
+        actor_name text not null,
+        supervisor_user_id text,
+        supervisor_name text,
+        subject_user_id text,
+        subject_name text,
+        summary text not null,
+        metadata text not null default '{}',
+        created_at text not null,
+        synced_at text
+      );
+      create index if not exists activity_logs_created_at_idx on activity_logs (created_at desc);
+    `,
+  },
+  {
+    id: "030_sale_discount_foc",
+    sql: `
+      alter table product_skus add column sale_discount_percent real not null default 0;
+      alter table sale_lines add column discount_percent real not null default 0;
+      alter table sale_lines add column foc_quantity real not null default 0;
+    `,
+  },
+  {
+    id: "031_sale_returns",
+    sql: `
+      create table if not exists sale_returns (
+        id text primary key,
+        tenant_id text not null,
+        return_number text not null,
+        sale_id text not null,
+        warehouse_id text not null,
+        return_date text not null,
+        status text not null default 'POSTED',
+        subtotal real not null default 0,
+        gst_rate real not null default 0,
+        gst_amount real not null default 0,
+        sales_tax_rate real not null default 0,
+        sales_tax_amount real not null default 0,
+        refund_total real not null default 0,
+        refund_method text not null default 'CASH',
+        notes text not null default '',
+        processed_by text,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text,
+        unique (tenant_id, return_number)
+      );
+      create index if not exists sale_returns_sale_id_idx on sale_returns (sale_id);
+      create index if not exists sale_returns_return_date_idx on sale_returns (return_date);
+      create table if not exists sale_return_lines (
+        id text primary key,
+        tenant_id text not null,
+        sale_return_id text not null,
+        sale_line_id text not null,
+        product_sku_id text not null,
+        quantity real not null,
+        unit_price real not null default 0,
+        discount_percent real not null default 0,
+        line_total real not null default 0,
+        sell_unit text not null default 'pc',
+        barcode text,
+        created_at text not null,
+        updated_at text not null
+      );
+      create index if not exists sale_return_lines_return_id_idx on sale_return_lines (sale_return_id);
+      create index if not exists sale_return_lines_sale_line_id_idx on sale_return_lines (sale_line_id);
+    `,
+  },
+  {
+    id: "032_sale_returns_processed_by_name",
+    sql: `alter table sale_returns add column processed_by_name text;`,
   },
 ];
 

@@ -17,6 +17,13 @@ export const PERMISSIONS = [
   "devices.manage",
   "sync.use",
   "warehouses.write",
+  "sales.read",
+  "sales.write",
+  "sales.void",
+  "sales.return",
+  "till.read",
+  "till.manage",
+  "activity.read",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -36,6 +43,13 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   "devices.manage": "Register, trust, revoke, and manage device associations",
   "sync.use": "Push and pull incremental desktop sync",
   "warehouses.write": "Create, update, and deactivate warehouses",
+  "sales.read": "View sales bills and receipts",
+  "sales.write": "Create and post sales bills",
+  "sales.void": "Void posted sales bills",
+  "sales.return": "Process customer sale returns",
+  "till.read": "View own cash till session",
+  "till.manage": "Approve, withdraw, and reopen cashier tills",
+  "activity.read": "View POS activity and approval log",
 };
 
 export function isPermission(value: string): value is Permission {

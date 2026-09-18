@@ -15,13 +15,14 @@ import { InjectRepository } from "@nestjs/typeorm";
 import {
   InventoryMovement,
   InventoryOut,
-  InventoryOutItem,
+  InventoryOutLine,
   InventoryStock,
   ProductSku,
   Warehouse,
 } from "../../db/entities";
 import { allocateOutNumber } from "../common/allocate-document-number";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { applyInventoryOutBalanceDelta } from "./inventory-out-balance";
 import { CreateInventoryOutDto } from "./dto/inventory-out.dto";
 import { ListInventoryOutQueryDto } from "./dto/list-inventory-out-query.dto";
 
@@ -41,8 +42,8 @@ export class InventoryOutService {
     private readonly dataSource: DataSource,
     @InjectRepository(InventoryOut)
     private readonly outs: Repository<InventoryOut>,
-    @InjectRepository(InventoryOutItem)
-    private readonly outItems: Repository<InventoryOutItem>,
+    @InjectRepository(InventoryOutLine)
+    private readonly outLines: Repository<InventoryOutLine>,
     @InjectRepository(Warehouse)
     private readonly warehouses: Repository<Warehouse>,
   ) {}
@@ -87,7 +88,7 @@ export class InventoryOutService {
     const ids = rows.map((r) => r.id);
     const itemCounts = new Map<string, number>();
     if (ids.length > 0) {
-      const counts = await this.outItems
+      const counts = await this.outLines
         .createQueryBuilder("i")
         .select("i.inventory_out_id", "outId")
         .addSelect("COUNT(*)", "cnt")
@@ -243,14 +244,23 @@ export class InventoryOutService {
 
       const stockRepo = manager.getRepository(InventoryStock);
       for (const line of builtLines) {
-        await manager.getRepository(InventoryOutItem).save(
-          manager.getRepository(InventoryOutItem).create({
+        await manager.getRepository(InventoryOutLine).save(
+          manager.getRepository(InventoryOutLine).create({
             tenantId,
             inventoryOutId: header.id,
             productSkuId: line.productSkuId,
             quantity: String(line.quantity),
             unitCost: String(line.unitCost),
           }),
+        );
+
+        await applyInventoryOutBalanceDelta(
+          manager,
+          tenantId,
+          warehouse.id,
+          line.productSkuId,
+          line.quantity,
+          line.unitCost,
         );
 
         await manager.getRepository(InventoryMovement).save(
@@ -299,7 +309,7 @@ export class InventoryOutService {
     });
     if (!header) throw new NotFoundException("Inventory out not found");
 
-    const lines = await manager.getRepository(InventoryOutItem).find({
+    const lines = await manager.getRepository(InventoryOutLine).find({
       where: { inventoryOutId: id, tenantId },
       relations: { productSku: { product: true } },
       order: { createdAt: "ASC" },
@@ -340,5 +350,4 @@ export class InventoryOutService {
       updatedAt: header.updatedAt.toISOString(),
     };
   }
-
 }

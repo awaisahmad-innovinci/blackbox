@@ -58,11 +58,11 @@ export function upsertPurchaseOrderLocal(detail: PurchaseOrderDetail): void {
     const insertItem = db.prepare(
       `insert into purchase_order_items (
         id, tenant_id, purchase_order_id, product_sku_id, vendor_sku_id,
-        purchase_unit_id, units_per_purchase_unit, quantity, unit_cost, tax,
-        discount, line_total, created_at, updated_at, sync_status, server_updated_at
+        purchase_unit_id, units_per_purchase_unit, order_unit, quantity, unit_cost,
+        tax, discount, line_total, created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @purchaseOrderId, @productSkuId, @vendorSkuId,
-        @purchaseUnitId, @unitsPerPurchaseUnit, @quantity, @unitCost, @tax,
+        @purchaseUnitId, @unitsPerPurchaseUnit, @orderUnit, @quantity, @unitCost, @tax,
         @discount, @lineTotal, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )`,
     );
@@ -76,6 +76,7 @@ export function upsertPurchaseOrderLocal(detail: PurchaseOrderDetail): void {
         vendorSkuId: item.vendorSkuId || null,
         purchaseUnitId: item.purchaseUnitId,
         unitsPerPurchaseUnit: item.unitsPerPurchaseUnit,
+        orderUnit: item.orderUnit === "pc" ? "pc" : "box",
         quantity: item.quantity,
         unitCost: item.unitCost,
         tax: item.tax,

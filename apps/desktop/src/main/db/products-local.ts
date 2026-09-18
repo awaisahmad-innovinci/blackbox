@@ -52,12 +52,12 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
     `insert into product_skus (
       id, tenant_id, product_id, sku, barcode, variant_name, size_value, size_unit,
       base_unit_id, purchase_unit_id, units_per_purchase_unit, cost_price, selling_price,
-      selling_price_per_purchase_unit, reorder_level, minimum_stock_level, maximum_stock_level, track_inventory, status,
+      selling_price_per_purchase_unit, sale_discount_percent, reorder_level, minimum_stock_level, maximum_stock_level, track_inventory, status,
       created_at, updated_at, sync_status, server_updated_at
     ) values (
       @id, @tenantId, @productId, @sku, @barcode, @variantName, @sizeValue, @sizeUnit,
       @baseUnitId, @purchaseUnitId, @unitsPerPurchaseUnit, @costPrice, @sellingPrice,
-      @sellingPricePerPurchaseUnit, @reorderLevel, @minimumStockLevel, @maximumStockLevel, @trackInventory, @status,
+      @sellingPricePerPurchaseUnit, @saleDiscountPercent, @reorderLevel, @minimumStockLevel, @maximumStockLevel, @trackInventory, @status,
       @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
     on conflict(id) do update set
@@ -72,6 +72,7 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
       cost_price = excluded.cost_price,
       selling_price = excluded.selling_price,
       selling_price_per_purchase_unit = excluded.selling_price_per_purchase_unit,
+      sale_discount_percent = excluded.sale_discount_percent,
       reorder_level = excluded.reorder_level,
       minimum_stock_level = excluded.minimum_stock_level,
       maximum_stock_level = excluded.maximum_stock_level,
@@ -95,6 +96,7 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
     costPrice: row.costPrice,
     sellingPrice: row.sellingPrice,
     sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit,
+    saleDiscountPercent: row.saleDiscountPercent ?? 0,
     reorderLevel: row.reorderLevel,
     minimumStockLevel: row.minimumStockLevel,
     maximumStockLevel: row.maximumStockLevel,

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   Brand,
+  CashierDashboardSummary,
   Category,
   DashboardSummary,
   EntityStatus,
@@ -10,10 +11,15 @@ import type {
   InventoryMovementListItem,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
+  PaginatedInventoryOutReturns,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
+  PaginatedSales,
+  PaginatedSaleReturns,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -21,6 +27,17 @@ import type {
   ProductSupplierRow,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  SaleDetail,
+  SaleListQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
+  ReturnableSaleLine,
+  OpenTillRequest,
+  ReopenTillRequest,
+  TillListItem,
+  TillSessionDetail,
+  TillStatus,
+  WithdrawTillRequest,
   ReceivingDraft,
   SkuBarcodeLookupResult,
   SkuDetail,
@@ -106,6 +123,48 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:upsertInventoryOut", detail) as Promise<Ok>,
     upsertInventoryOuts: (rows: InventoryOutDetail[]) =>
       ipcRenderer.invoke("localDb:upsertInventoryOuts", rows) as Promise<Ok>,
+    upsertInventoryOutReturn: (detail: InventoryOutReturnDetail) =>
+      ipcRenderer.invoke(
+        "localDb:upsertInventoryOutReturn",
+        detail,
+      ) as Promise<Ok>,
+    upsertInventoryOutReturns: (rows: InventoryOutReturnDetail[]) =>
+      ipcRenderer.invoke(
+        "localDb:upsertInventoryOutReturns",
+        rows,
+      ) as Promise<Ok>,
+    upsertSale: (detail: SaleDetail) =>
+      ipcRenderer.invoke("localDb:upsertSale", detail) as Promise<Ok>,
+    upsertSaleDraft: (detail: SaleDetail) =>
+      ipcRenderer.invoke("localDb:upsertSaleDraft", detail) as Promise<Ok>,
+    deleteSaleDraft: (id: string) =>
+      ipcRenderer.invoke("localDb:deleteSaleDraft", id) as Promise<{ ok: boolean }>,
+    countDraftSales: () =>
+      ipcRenderer.invoke("localDb:countDraftSales") as Promise<number>,
+    getDraftSaleReservedQty: (
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:getDraftSaleReservedQty",
+        warehouseId,
+        productSkuId,
+        excludeSaleId,
+      ) as Promise<number>,
+    getPosAvailableForSale: (
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:getPosAvailableForSale",
+        warehouseId,
+        productSkuId,
+        excludeSaleId,
+      ) as Promise<number>,
+    upsertSales: (rows: SaleDetail[]) =>
+      ipcRenderer.invoke("localDb:upsertSales", rows) as Promise<Ok>,
     upsertVendorReturn: (detail: VendorReturnDetail) =>
       ipcRenderer.invoke("localDb:upsertVendorReturn", detail) as Promise<Ok>,
     upsertVendorReturns: (rows: VendorReturnDetail[]) =>
@@ -137,15 +196,147 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:listReceiptNumbers") as Promise<string[]>,
     listOutNumbers: () =>
       ipcRenderer.invoke("localDb:listOutNumbers") as Promise<string[]>,
+    listOutReturnNumbers: () =>
+      ipcRenderer.invoke("localDb:listOutReturnNumbers") as Promise<string[]>,
+    listSaleNumbers: () =>
+      ipcRenderer.invoke("localDb:listSaleNumbers") as Promise<string[]>,
+    listHoldNumbers: () =>
+      ipcRenderer.invoke("localDb:listHoldNumbers") as Promise<string[]>,
     listInventoryOuts: (query?: InventoryOutListQuery) =>
       ipcRenderer.invoke(
         "localDb:listInventoryOuts",
         query,
       ) as Promise<PaginatedInventoryOuts>,
+    listInventoryOutReturns: (query?: InventoryOutReturnListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listInventoryOutReturns",
+        query,
+      ) as Promise<PaginatedInventoryOutReturns>,
+    listSales: (query?: SaleListQuery) =>
+      ipcRenderer.invoke("localDb:listSales", query) as Promise<PaginatedSales>,
+    getCurrentTill: (userId: string) =>
+      ipcRenderer.invoke("localDb:getCurrentTill", userId) as Promise<TillSessionDetail | null>,
+    getLatestTillSession: (userId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getLatestTillSession",
+        userId,
+      ) as Promise<TillSessionDetail | null>,
+    listTills: (query?: { status?: TillStatus; userId?: string }) =>
+      ipcRenderer.invoke("localDb:listTills", query) as Promise<TillListItem[]>,
+    openTill: (input: {
+      userId: string;
+      userName: string;
+      body: OpenTillRequest;
+      requireApproval: boolean;
+    }) => ipcRenderer.invoke("localDb:openTill", input) as Promise<TillSessionDetail>,
+    approveTill: (input: {
+      id: string;
+      managerId: string;
+      managerName: string;
+    }) => ipcRenderer.invoke("localDb:approveTill", input) as Promise<TillSessionDetail>,
+    withdrawTill: (input: {
+      id: string;
+      managerId: string;
+      managerName: string;
+      body: WithdrawTillRequest;
+    }) => ipcRenderer.invoke("localDb:withdrawTill", input) as Promise<TillSessionDetail>,
+    collectCashTill: (input: {
+      id: string;
+      managerId: string;
+      managerName: string;
+      body: WithdrawTillRequest;
+    }) => ipcRenderer.invoke("localDb:collectCashTill", input) as Promise<TillSessionDetail>,
+    collectCashByAmount: (input: {
+      userId: string;
+      userName: string;
+      amount: number;
+      supervisorUserId?: string;
+      collectedByName?: string;
+    }) =>
+      ipcRenderer.invoke("localDb:collectCashByAmount", input) as Promise<TillSessionDetail>,
+    closeTill: (input: { userId: string; userName: string }) =>
+      ipcRenderer.invoke("localDb:closeTill", input) as Promise<TillSessionDetail>,
+    reopenTill: (input: {
+      id: string;
+      managerId: string;
+      managerName: string;
+      body: ReopenTillRequest;
+    }) => ipcRenderer.invoke("localDb:reopenTill", input) as Promise<TillSessionDetail>,
+    upsertTillSession: (detail: TillSessionDetail) =>
+      ipcRenderer.invoke("localDb:upsertTillSession", detail) as Promise<{ ok: true }>,
+    assertTillCanPostSale: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      cashPaymentTotal: number;
+    }) =>
+      ipcRenderer.invoke("localDb:assertTillCanPostSale", input) as Promise<{ ok: true }>,
+    applyTillCashFromSale: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      cashPaymentTotal: number;
+    }) =>
+      ipcRenderer.invoke("localDb:applyTillCashFromSale", input) as Promise<{ ok: true }>,
+    appendPendingActivityLog: (input: {
+      id: string;
+      payload: import("@blackbox/shared").CreateActivityLogRequest;
+    }) =>
+      ipcRenderer.invoke("localDb:appendPendingActivityLog", input) as Promise<{
+        ok: true;
+      }>,
+    appendLocalActivityLog: (item: import("@blackbox/shared").ActivityLogItem) =>
+      ipcRenderer.invoke("localDb:appendLocalActivityLog", item) as Promise<{
+        ok: true;
+      }>,
+    listLocalActivityLogs: (
+      query?: import("@blackbox/shared").ActivityLogListQuery,
+    ) =>
+      ipcRenderer.invoke("localDb:listLocalActivityLogs", query ?? {}) as Promise<
+        import("@blackbox/shared").PaginatedActivityLogs
+      >,
+    markActivityLogSynced: (id: string) =>
+      ipcRenderer.invoke("localDb:markActivityLogSynced", id) as Promise<{
+        ok: true;
+      }>,
+    listPendingActivityLogs: () =>
+      ipcRenderer.invoke("localDb:listPendingActivityLogs") as Promise<
+        Array<{
+          id: string;
+          payload: import("@blackbox/shared").CreateActivityLogRequest;
+          createdAt: string;
+        }>
+      >,
+    deletePendingActivityLog: (id: string) =>
+      ipcRenderer.invoke("localDb:deletePendingActivityLog", id) as Promise<{
+        ok: true;
+      }>,
+    inventoryOutReturnableQuantity: (warehouseId: string, productSkuId: string) =>
+      ipcRenderer.invoke(
+        "localDb:inventoryOutReturnableQuantity",
+        warehouseId,
+        productSkuId,
+      ) as Promise<{ quantityAvailable: number }>,
+    applyInventoryOutBalanceDelta: (
+      warehouseId: string,
+      productSkuId: string,
+      deltaQty: number,
+      unitCost: number,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:applyInventoryOutBalanceDelta",
+        warehouseId,
+        productSkuId,
+        deltaQty,
+        unitCost,
+      ) as Promise<Ok>,
     getDashboardSummary: () =>
       ipcRenderer.invoke(
         "localDb:getDashboardSummary",
       ) as Promise<DashboardSummary>,
+    getCashierDashboardSummary: (userId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getCashierDashboardSummary",
+        userId,
+      ) as Promise<CashierDashboardSummary>,
     listBrands: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke("localDb:listBrands", status) as Promise<Brand[]>,
     getBrand: (id: string) =>
@@ -227,11 +418,18 @@ contextBridge.exposeInMainWorld("blackbox", {
         q,
         warehouseId,
       ) as Promise<SkuSearchResult[]>,
-    getSkuByBarcode: (barcode: string, warehouseId: string) =>
+    getSkuByBarcode: (
+      barcode: string,
+      warehouseId: string,
+      balanceSource?: "stock" | "pos",
+      excludeDraftSaleId?: string | null,
+    ) =>
       ipcRenderer.invoke(
         "localDb:getSkuByBarcode",
         barcode,
         warehouseId,
+        balanceSource,
+        excludeDraftSaleId,
       ) as Promise<SkuSearchResult | null>,
     lookupSkuByBarcode: (barcode: string) =>
       ipcRenderer.invoke(
@@ -272,6 +470,37 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getInventoryOut",
         id,
       ) as Promise<InventoryOutDetail | null>,
+    getInventoryOutReturn: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getInventoryOutReturn",
+        id,
+      ) as Promise<InventoryOutReturnDetail | null>,
+    getSale: (id: string) =>
+      ipcRenderer.invoke("localDb:getSale", id) as Promise<SaleDetail | null>,
+    listSaleReturns: (query?: SaleReturnListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listSaleReturns",
+        query,
+      ) as Promise<PaginatedSaleReturns>,
+    getSaleReturn: (id: string) =>
+      ipcRenderer.invoke(
+        "localDb:getSaleReturn",
+        id,
+      ) as Promise<SaleReturnDetail | null>,
+    getReturnableSaleLines: (saleId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getReturnableSaleLines",
+        saleId,
+      ) as Promise<ReturnableSaleLine[]>,
+    upsertSaleReturn: (detail: SaleReturnDetail) =>
+      ipcRenderer.invoke(
+        "localDb:upsertSaleReturn",
+        detail,
+      ) as Promise<{ ok: true }>,
+    listSaleReturnNumbers: () =>
+      ipcRenderer.invoke(
+        "localDb:listSaleReturnNumbers",
+      ) as Promise<string[]>,
     listVendorReturns: (query?: VendorReturnListQuery) =>
       ipcRenderer.invoke(
         "localDb:listVendorReturns",
@@ -314,6 +543,14 @@ contextBridge.exposeInMainWorld("blackbox", {
   identity: {
     getFingerprint: () =>
       ipcRenderer.invoke("identity:getFingerprint") as Promise<string>,
+    getStableFingerprint: () =>
+      ipcRenderer.invoke("identity:getStableFingerprint") as Promise<
+        string | null
+      >,
+    persistFingerprint: (fingerprint: string) =>
+      ipcRenderer.invoke("identity:persistFingerprint", fingerprint) as Promise<{
+        ok: true;
+      }>,
     get: () =>
       ipcRenderer.invoke("identity:get") as Promise<{
         tenantId: string;
@@ -355,5 +592,27 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("sync:enqueue", input) as Promise<{ changeId: string }>,
     commit: (input: unknown) =>
       ipcRenderer.invoke("sync:commit", input) as Promise<{ changeId: string }>,
+  },
+  totp: {
+    verifySupervisorCode: (code: string) =>
+      ipcRenderer.invoke("totp:verifySupervisorCode", code) as Promise<
+        import("@blackbox/shared").TotpVerifySupervisorCodeResult
+      >,
+    replaceSupervisorCache: (
+      entries: Array<{
+        userId: string;
+        secretBase32: string;
+        displayName: string;
+      }>,
+    ) =>
+      ipcRenderer.invoke("localDb:replaceSupervisorTotp", entries) as Promise<{
+        ok: true;
+      }>,
+    listSupervisorUsers: () =>
+      ipcRenderer.invoke("localDb:listSupervisorTotpUsers") as Promise<
+        string[]
+      >,
+    hasSupervisorCache: () =>
+      ipcRenderer.invoke("localDb:hasSupervisorTotp") as Promise<boolean>,
   },
 });

@@ -9,6 +9,11 @@ export type TenantDto = {
   currency: string | null;
   onboardingCompleted: boolean;
   onboardingCompletedAt: string | null;
+  requireManagerApprovalRemoveSaleLine: boolean;
+  requireManagerApprovalTillOpen: boolean;
+  requireManagerApprovalTillWithdraw: boolean;
+  defaultGstRate: number;
+  defaultSalesTaxRate: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -59,8 +64,15 @@ export function getCurrentTenant() {
   return apiFetch<TenantDto>("/tenants/current");
 }
 
-export function updateCurrentTenant(name: string) {
-  return apiJson<TenantDto>("/tenants/current", "PATCH", { name });
+export function updateCurrentTenant(body: {
+  name: string;
+  requireManagerApprovalRemoveSaleLine?: boolean;
+  requireManagerApprovalTillOpen?: boolean;
+  requireManagerApprovalTillWithdraw?: boolean;
+  defaultGstRate?: number;
+  defaultSalesTaxRate?: number;
+}) {
+  return apiJson<TenantDto>("/tenants/current", "PATCH", body);
 }
 
 export function saveOnboardingBusiness(body: {

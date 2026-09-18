@@ -17,6 +17,7 @@ import { setOnSessionCleared } from "@renderer/lib/api/session";
 import { setDeviceRevoked } from "@renderer/lib/local-db/local-write";
 import { startAutoSync, stopAutoSync } from "@renderer/lib/sync/auto-sync";
 import { refreshPendingCount } from "@renderer/lib/sync/sync-status";
+import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
 import {
   SessionContext,
   type DeviceState,
@@ -105,6 +106,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setUser(result.user);
         setOffline(false);
         setStatus("signed-in");
+        void refreshSupervisorTotpCache();
       } else if (result.status === "offline") {
         setUser(readCachedUser());
         setOffline(true);
@@ -146,6 +148,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setOffline(false);
       setStatus("signed-in");
       await refreshDeviceState();
+      void refreshSupervisorTotpCache();
     },
     [refreshDeviceState],
   );

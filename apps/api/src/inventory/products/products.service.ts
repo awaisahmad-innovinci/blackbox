@@ -361,6 +361,7 @@ export class ProductsService {
             dto.sellingPricePerPurchaseUnit == null
               ? null
               : String(dto.sellingPricePerPurchaseUnit),
+          saleDiscountPercent: String(dto.saleDiscountPercent ?? 0),
           reorderLevel: String(dto.reorderLevel ?? 0),
           minimumStockLevel: String(dto.minimumStockLevel ?? 0),
           maximumStockLevel:
@@ -496,6 +497,7 @@ export class ProductsService {
       costPrice: toNum(s.costPrice),
       sellingPrice: toNum(s.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(s.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(s.saleDiscountPercent),
       reorderLevel: toNum(s.reorderLevel),
       minimumStockLevel: toNum(s.minimumStockLevel),
       maximumStockLevel: toNumOrNull(s.maximumStockLevel),

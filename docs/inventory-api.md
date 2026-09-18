@@ -126,6 +126,8 @@ Statuses: `DRAFT` \| `SUBMITTED` \| `PARTIALLY_RECEIVED` \| `RECEIVED` \| `CANCE
 
 Backend recalculates line and header totals. Creating/submitting/cancelling does **not** change inventory. Lines require `vendorSkuId` + `productSkuId`; purchase unit is snapshotted from `vendor_skus`.
 
+Each line accepts optional `orderUnit`: `"box"` (default) or `"pc"`. **Stored values stay in purchase units:** `quantity` is always purchase-unit count (e.g. `0.5` boxes for 5 pcs when `unitsPerPurchaseUnit` is 10), `unitCost` is always per purchase unit (box price). `orderUnit` records how the user entered the line for display/edit. Desktop converts display qty/cost before POST; receiving and stock math use stored purchase-unit `quantity` × `units_per_purchase_unit` unchanged.
+
 ## Goods receipts / receiving (Phase 1)
 
 | Method | Path | Notes |
@@ -148,6 +150,19 @@ Rules: one POSTED receipt per PO; `0 ≤ receivedQty ≤ orderedQty`; inventory 
 | `GET` | `/inventory-out/:id` | Read-only bill detail (lines + subtotal + total) |
 
 Rules: `0 < qty ≤ quantity_available` in the selected warehouse; movements store **positive** qty with type `INVENTORY_OUT`; do **not** change `product_skus.cost_price` on outbound. Out numbers: `IO-YYYY-######`. Snapshot `unit_cost` from avg cost at post. Line total = qty × avg cost; **no discount/tax** so `subtotal === total`. Desktop bill has a trailing barcode scan row (Enter adds/increments qty by 1).
+
+**POS balance:** `inventory_out_items` holds one row per `(warehouse, product_sku)` — net quantity currently out at POS. Document lines live in `inventory_out_lines`. Re-outting the same SKU adds to the same balance row.
+
+## Inventory out returns
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/inventory-out-returns` | Atomic: return header + history lines + decrease POS balance + `INVENTORY_OUT_RETURN` movements + stock increase |
+| `GET` | `/inventory-out-returns` | Paginated list (`search`, `warehouseId`, `dateFrom`, `dateTo`, `page`, `pageSize`) |
+| `GET` | `/inventory-out-returns/returnable-quantity?warehouseId=&productSkuId=` | Max returnable qty (= current POS out balance) |
+| `GET` | `/inventory-out-returns/:id` | Read-only return detail |
+
+Rules: `0 < return qty ≤` current POS out balance for that warehouse + SKU. Return numbers: `IOR-YYYY-######`. History rows in `inventory_out_return_items`.
 
 ## Inventory movements
 
@@ -196,7 +211,7 @@ Allowed values:
 - `status`: `active`, `inactive`
 - unit `type`: `count`, `weight`, `volume`, `length`, `other`
 - `product_type`: `STOCK_ITEM`, `CONSUMABLE`, `RESALABLE`
-- `payment_terms`: `CASH`, `7_DAYS`, `15_DAYS`, `30_DAYS`, `45_DAYS`, `CUSTOM`
+- `payment_terms`: `CASH`, `7_DAYS`, `15_DAYS`, `30_DAYS`, `45_DAYS`, `BILL_TO_BILL`, `CUSTOM`
 - booleans: `true`, `false`
 
 Rows are upserted by stable keys, so repeating an upload updates units, named

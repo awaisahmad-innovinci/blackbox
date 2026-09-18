@@ -8,6 +8,7 @@ import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./jwt.strategy";
 import { PasswordResetService } from "./password-reset.service";
+import { TotpModule } from "./totp/totp.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PasswordResetService } from "./password-reset.service";
       }),
     }),
     RbacModule,
+    TotpModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, PasswordResetService, JwtStrategy],

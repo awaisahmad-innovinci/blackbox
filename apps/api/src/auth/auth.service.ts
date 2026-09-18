@@ -29,6 +29,7 @@ import { Permission as PermissionEntity } from "../db/entities/permission.entity
 import { RefreshToken } from "../db/entities/refresh-token.entity";
 import { RolePermission } from "../db/entities/role-permission.entity";
 import { Role } from "../db/entities/role.entity";
+import { Location } from "../db/entities/location.entity";
 import { Tenant } from "../db/entities/tenant.entity";
 import { UserRole } from "../db/entities/user-role.entity";
 import { User } from "../db/entities/user.entity";
@@ -55,6 +56,7 @@ export class AuthService {
     private readonly permissionsService: PermissionsService,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
+    @InjectRepository(Location) private readonly locations: Repository<Location>,
     @InjectRepository(PermissionEntity)
     private readonly permissions: Repository<PermissionEntity>,
     @InjectRepository(RefreshToken)
@@ -79,6 +81,16 @@ export class AuthService {
   async signupTenant(dto: SignupTenantDto): Promise<AuthResponse> {
     const email = dto.email.trim().toLowerCase();
     const username = dto.username.trim();
+
+    const activeEmailCount = await this.users.count({
+      where: { email, isActive: true },
+    });
+    if (activeEmailCount > 0) {
+      throw new ConflictException(
+        "This email is already registered with an active account.",
+      );
+    }
+
     const passwordHash = await argon2.hash(dto.password);
 
     // Resolve catalog rows by stable permission key — never hard-coded UUIDs.
@@ -211,6 +223,7 @@ export class AuthService {
         user.tenantId,
         dto.fingerprint.trim(),
         dto.deviceName?.trim() || "Desktop",
+        dto.stableFingerprint?.trim(),
       );
       await this.assertSingleDesktopSessionAllowed(
         user.id,
@@ -280,7 +293,17 @@ export class AuthService {
       await manager.save(stored);
 
       return {
-        user: this.toAuthUser(user, userPermissions, tenant.name),
+        user: this.toAuthUser(
+          user,
+          userPermissions,
+          tenant.name,
+          await this.getBusinessAddress(user.tenantId),
+          tenant.requireManagerApprovalRemoveSaleLine,
+          tenant.requireManagerApprovalTillOpen,
+          tenant.requireManagerApprovalTillWithdraw,
+          tenant.defaultGstRate,
+          tenant.defaultSalesTaxRate,
+        ),
         tokens: {
           accessToken,
           refreshToken: newRefreshToken,
@@ -316,13 +339,24 @@ export class AuthService {
         user.id,
         user.tenantId,
       );
-    return this.toAuthUser(user, userPermissions, tenant.name);
+    return this.toAuthUser(
+      user,
+      userPermissions,
+      tenant.name,
+      await this.getBusinessAddress(user.tenantId),
+      tenant.requireManagerApprovalRemoveSaleLine,
+      tenant.requireManagerApprovalTillOpen,
+      tenant.requireManagerApprovalTillWithdraw,
+      tenant.defaultGstRate,
+      tenant.defaultSalesTaxRate,
+    );
   }
 
   /**
    * Resolve login identifier without tenant_id.
    * Email/username are tenant-scoped, so multiple matches across tenants are
-   * possible — treat 0 or >1 rows as "not found" (generic 401 at call site).
+   * possible — treat 0 or >1 active rows as "not found" (generic 401 at call site).
+   * Inactive rows are ignored so a deactivated duplicate does not block sign-in.
    */
   private async findUserByIdentifier(identifier: string): Promise<User | null> {
     const trimmed = identifier.trim();
@@ -333,10 +367,11 @@ export class AuthService {
       where: isEmail ? { email: value } : { username: value },
     });
 
-    if (rows.length !== 1) {
+    const active = rows.filter((user) => user.isActive);
+    if (active.length !== 1) {
       return null;
     }
-    return rows[0] ?? null;
+    return active[0] ?? null;
   }
 
   private async issueAuthResponse(
@@ -419,8 +454,19 @@ export class AuthService {
       }
     });
 
+    const businessAddress = await this.getBusinessAddress(user.tenantId);
     return {
-      user: this.toAuthUser(user, userPermissions, tenant?.name),
+      user: this.toAuthUser(
+        user,
+        userPermissions,
+        tenant?.name,
+        businessAddress,
+        tenant?.requireManagerApprovalRemoveSaleLine,
+        tenant?.requireManagerApprovalTillOpen,
+        tenant?.requireManagerApprovalTillWithdraw,
+        tenant?.defaultGstRate,
+        tenant?.defaultSalesTaxRate,
+      ),
       tokens: {
         accessToken,
         refreshToken,
@@ -429,27 +475,60 @@ export class AuthService {
     };
   }
 
+  private async getBusinessAddress(
+    tenantId: string,
+  ): Promise<string | undefined> {
+    const location = await this.locations.findOne({
+      where: { tenantId },
+      order: { createdAt: "ASC" },
+    });
+    if (!location) return undefined;
+    const line = [location.address?.trim(), location.city?.trim()]
+      .filter(Boolean)
+      .join(", ");
+    return line || undefined;
+  }
+
   private async bindDesktopDevice(
     userId: string,
     tenantId: string,
     fingerprint: string,
     name: string,
+    stableFingerprint?: string,
   ): Promise<string> {
+    const stable = stableFingerprint?.trim() || null;
+
     let device = await this.devices.findOne({
       where: { tenantId, fingerprint },
     });
+
+    if (!device && stable && stable !== fingerprint) {
+      device = await this.devices.findOne({
+        where: { tenantId, fingerprint: stable },
+      });
+    }
+
     if (device?.status === "revoked") {
       throw new UnauthorizedException("Device revoked");
     }
+
     if (!device) {
       device = await this.devices.save(
         this.devices.create({
           tenantId,
-          fingerprint,
+          fingerprint: stable ?? fingerprint,
           name,
           status: "pending",
         }),
       );
+    } else if (stable && stable !== device.fingerprint) {
+      const conflict = await this.devices.findOne({
+        where: { tenantId, fingerprint: stable },
+      });
+      if (!conflict || conflict.id === device.id) {
+        device.fingerprint = stable;
+        await this.devices.save(device);
+      }
     }
 
     const expires = new Date();
@@ -483,15 +562,27 @@ export class AuthService {
     user: User,
     perms: Permission[],
     tenantName?: string,
+    businessAddress?: string,
+    requireManagerApprovalRemoveSaleLine?: boolean,
+    requireManagerApprovalTillOpen?: boolean,
+    requireManagerApprovalTillWithdraw?: boolean,
+    defaultGstRate?: number,
+    defaultSalesTaxRate?: number,
   ): AuthUser {
     return {
       id: user.id,
       tenantId: user.tenantId,
       tenantName: tenantName?.trim() || undefined,
+      businessAddress: businessAddress?.trim() || undefined,
       email: user.email,
       username: user.username,
       fullName: user.fullName,
       permissions: perms,
+      requireManagerApprovalRemoveSaleLine,
+      requireManagerApprovalTillOpen,
+      requireManagerApprovalTillWithdraw,
+      defaultGstRate,
+      defaultSalesTaxRate,
     };
   }
 

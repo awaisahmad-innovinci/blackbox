@@ -2,6 +2,7 @@
 
 import type {
   Brand,
+  CashierDashboardSummary,
   Category,
   DashboardSummary,
   EntityStatus,
@@ -11,10 +12,15 @@ import type {
   InventoryMovementListItem,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
+  PaginatedInventoryOutReturns,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
+  PaginatedSales,
+  PaginatedSaleReturns,
   PaginatedVendors,
   ProductDetail,
   ProductListQuery,
@@ -22,6 +28,17 @@ import type {
   ProductSupplierRow,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  SaleDetail,
+  SaleListQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
+  ReturnableSaleLine,
+  OpenTillRequest,
+  ReopenTillRequest,
+  TillListItem,
+  TillSessionDetail,
+  TillStatus,
+  WithdrawTillRequest,
   ReceivingDraft,
   SkuBarcode,
   SkuBarcodeLookupResult,
@@ -102,6 +119,27 @@ declare global {
         upsertInventoryOuts: (
           rows: InventoryOutDetail[],
         ) => Promise<{ ok: true }>;
+        upsertInventoryOutReturn: (
+          detail: InventoryOutReturnDetail,
+        ) => Promise<{ ok: true }>;
+        upsertInventoryOutReturns: (
+          rows: InventoryOutReturnDetail[],
+        ) => Promise<{ ok: true }>;
+        upsertSale: (detail: SaleDetail) => Promise<{ ok: true }>;
+        upsertSaleDraft: (detail: SaleDetail) => Promise<{ ok: true }>;
+        deleteSaleDraft: (id: string) => Promise<{ ok: boolean }>;
+        countDraftSales: () => Promise<number>;
+        getDraftSaleReservedQty: (
+          warehouseId: string,
+          productSkuId: string,
+          excludeSaleId?: string | null,
+        ) => Promise<number>;
+        getPosAvailableForSale: (
+          warehouseId: string,
+          productSkuId: string,
+          excludeSaleId?: string | null,
+        ) => Promise<number>;
+        upsertSales: (rows: SaleDetail[]) => Promise<{ ok: true }>;
         upsertVendorReturn: (
           detail: VendorReturnDetail,
         ) => Promise<{ ok: true }>;
@@ -125,10 +163,113 @@ declare global {
         listSkuCodes: () => Promise<string[]>;
         listReceiptNumbers: () => Promise<string[]>;
         listOutNumbers: () => Promise<string[]>;
+        listOutReturnNumbers: () => Promise<string[]>;
+        listSaleNumbers: () => Promise<string[]>;
+        listSaleReturnNumbers: () => Promise<string[]>;
+        listHoldNumbers: () => Promise<string[]>;
         listInventoryOuts: (
           query?: InventoryOutListQuery,
         ) => Promise<PaginatedInventoryOuts>;
+        listInventoryOutReturns: (
+          query?: InventoryOutReturnListQuery,
+        ) => Promise<PaginatedInventoryOutReturns>;
+        listSales: (query?: SaleListQuery) => Promise<PaginatedSales>;
+        listSaleReturns: (
+          query?: SaleReturnListQuery,
+        ) => Promise<PaginatedSaleReturns>;
+        getSaleReturn: (id: string) => Promise<SaleReturnDetail | null>;
+        getReturnableSaleLines: (saleId: string) => Promise<ReturnableSaleLine[]>;
+        upsertSaleReturn: (detail: SaleReturnDetail) => Promise<{ ok: true }>;
+        getCurrentTill: (userId: string) => Promise<TillSessionDetail | null>;
+        getLatestTillSession: (userId: string) => Promise<TillSessionDetail | null>;
+        listTills: (query?: {
+          status?: TillStatus;
+          userId?: string;
+        }) => Promise<TillListItem[]>;
+        openTill: (input: {
+          userId: string;
+          userName: string;
+          body: OpenTillRequest;
+          requireApproval: boolean;
+        }) => Promise<TillSessionDetail>;
+        approveTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+        }) => Promise<TillSessionDetail>;
+        withdrawTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+          body: WithdrawTillRequest;
+        }) => Promise<TillSessionDetail>;
+        collectCashTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+          body: WithdrawTillRequest;
+        }) => Promise<TillSessionDetail>;
+        collectCashByAmount: (input: {
+          userId: string;
+          userName: string;
+          amount: number;
+          supervisorUserId?: string;
+          collectedByName?: string;
+        }) => Promise<TillSessionDetail>;
+        closeTill: (input: {
+          userId: string;
+          userName: string;
+        }) => Promise<TillSessionDetail>;
+        reopenTill: (input: {
+          id: string;
+          managerId: string;
+          managerName: string;
+          body: ReopenTillRequest;
+        }) => Promise<TillSessionDetail>;
+        upsertTillSession: (detail: TillSessionDetail) => Promise<{ ok: true }>;
+        assertTillCanPostSale: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          cashPaymentTotal: number;
+        }) => Promise<{ ok: true }>;
+        applyTillCashFromSale: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          cashPaymentTotal: number;
+        }) => Promise<{ ok: true }>;
+        appendPendingActivityLog: (input: {
+          id: string;
+          payload: import("@blackbox/shared").CreateActivityLogRequest;
+        }) => Promise<{ ok: true }>;
+        appendLocalActivityLog: (
+          item: import("@blackbox/shared").ActivityLogItem,
+        ) => Promise<{ ok: true }>;
+        listLocalActivityLogs: (
+          query?: import("@blackbox/shared").ActivityLogListQuery,
+        ) => Promise<import("@blackbox/shared").PaginatedActivityLogs>;
+        markActivityLogSynced: (id: string) => Promise<{ ok: true }>;
+        listPendingActivityLogs: () => Promise<
+          Array<{
+            id: string;
+            payload: import("@blackbox/shared").CreateActivityLogRequest;
+            createdAt: string;
+          }>
+        >;
+        deletePendingActivityLog: (id: string) => Promise<{ ok: true }>;
+        inventoryOutReturnableQuantity: (
+          warehouseId: string,
+          productSkuId: string,
+        ) => Promise<{ quantityAvailable: number }>;
+        applyInventoryOutBalanceDelta: (
+          warehouseId: string,
+          productSkuId: string,
+          deltaQty: number,
+          unitCost: number,
+        ) => Promise<{ ok: true }>;
         getDashboardSummary: () => Promise<DashboardSummary>;
+        getCashierDashboardSummary: (
+          userId: string,
+        ) => Promise<CashierDashboardSummary>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
         listCategories: (status?: EntityStatus | "all") => Promise<Category[]>;
@@ -180,6 +321,8 @@ declare global {
         getSkuByBarcode: (
           barcode: string,
           warehouseId: string,
+          balanceSource?: "stock" | "pos",
+          excludeDraftSaleId?: string | null,
         ) => Promise<SkuSearchResult | null>;
         lookupSkuByBarcode: (
           barcode: string,
@@ -194,6 +337,10 @@ declare global {
         getReceivingDraft: (poId: string) => Promise<ReceivingDraft | null>;
         getGoodsReceipt: (id: string) => Promise<GoodsReceiptDetail | null>;
         getInventoryOut: (id: string) => Promise<InventoryOutDetail | null>;
+        getInventoryOutReturn: (
+          id: string,
+        ) => Promise<InventoryOutReturnDetail | null>;
+        getSale: (id: string) => Promise<SaleDetail | null>;
         listVendorReturns: (
           query?: VendorReturnListQuery,
         ) => Promise<PaginatedVendorReturns>;
@@ -217,6 +364,8 @@ declare global {
       };
       identity?: {
         getFingerprint: () => Promise<string>;
+        getStableFingerprint: () => Promise<string | null>;
+        persistFingerprint: (fingerprint: string) => Promise<{ ok: true }>;
         get: () => Promise<{
           tenantId: string;
           deviceId: string;
@@ -252,6 +401,20 @@ declare global {
         pendingCount: () => Promise<number>;
         enqueue: (input: unknown) => Promise<{ changeId: string }>;
         commit: (input: unknown) => Promise<{ changeId: string }>;
+      };
+      totp?: {
+        verifySupervisorCode: (
+          code: string,
+        ) => Promise<import("@blackbox/shared").TotpVerifySupervisorCodeResult>;
+        replaceSupervisorCache: (
+          entries: Array<{
+            userId: string;
+            secretBase32: string;
+            displayName: string;
+          }>,
+        ) => Promise<{ ok: true }>;
+        listSupervisorUsers: () => Promise<string[]>;
+        hasSupervisorCache: () => Promise<boolean>;
       };
     };
   }

@@ -4,8 +4,18 @@ import type {
   InventoryInOutReport,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
+  PaginatedInventoryOutReturns,
+  PaginatedSales,
+  PaginatedSaleReturns,
   PaginatedVendors,
+  ReturnableSaleLine,
+  SaleDetail,
+  SaleListQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
   ProductDetail,
   ProductSkuDetail,
   ProductSupplierRow,
@@ -37,6 +47,9 @@ import { ApiError } from "@renderer/lib/api/client";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
+import { salesApi } from "@renderer/lib/api/sales";
+import { saleReturnsApi } from "@renderer/lib/api/sale-returns";
 import { productsApi } from "@renderer/lib/api/products";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { brandsApi } from "@renderer/lib/api/brands";
@@ -186,6 +199,90 @@ export async function loadInventoryOuts(
     return window.blackbox.localDb.listInventoryOuts(query);
   }
   return inventoryOutApi.list(query);
+}
+
+export async function loadInventoryOutReturns(
+  query: InventoryOutReturnListQuery = {},
+): Promise<PaginatedInventoryOutReturns> {
+  try {
+    const local = await window.blackbox?.localDb?.listInventoryOutReturns?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return inventoryOutReturnsApi.list(query);
+}
+
+export async function loadInventoryOutReturn(
+  id: string,
+): Promise<InventoryOutReturnDetail> {
+  const local = await window.blackbox?.localDb?.getInventoryOutReturn?.(id);
+  if (local) return local;
+  return inventoryOutReturnsApi.get(id);
+}
+
+export async function loadSales(
+  query: SaleListQuery = {},
+): Promise<PaginatedSales> {
+  try {
+    const local = await window.blackbox?.localDb?.listSales?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return salesApi.list(query);
+}
+
+export async function loadSale(id: string): Promise<SaleDetail> {
+  const local = await window.blackbox?.localDb?.getSale?.(id);
+  if (local) return local;
+  return salesApi.get(id);
+}
+
+export async function loadSaleReturns(
+  query: SaleReturnListQuery = {},
+): Promise<PaginatedSaleReturns> {
+  try {
+    const local = await window.blackbox?.localDb?.listSaleReturns?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return saleReturnsApi.list(query);
+}
+
+export async function loadSaleReturn(id: string): Promise<SaleReturnDetail> {
+  const local = await window.blackbox?.localDb?.getSaleReturn?.(id);
+  if (local) return local;
+  return saleReturnsApi.get(id);
+}
+
+export async function loadReturnableSaleLines(
+  saleId: string,
+): Promise<ReturnableSaleLine[]> {
+  try {
+    const local = await window.blackbox?.localDb?.getReturnableSaleLines?.(saleId);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return saleReturnsApi.returnableLines(saleId);
+}
+
+export async function loadInventoryOutReturnableQuantity(
+  warehouseId: string,
+  productSkuId: string,
+): Promise<{ quantityAvailable: number }> {
+  try {
+    const local = await window.blackbox?.localDb?.inventoryOutReturnableQuantity?.(
+      warehouseId,
+      productSkuId,
+    );
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return inventoryOutReturnsApi.returnableQuantity(warehouseId, productSkuId);
 }
 
 export async function loadVendorReturns(
@@ -501,17 +598,78 @@ export async function resolveVendorReturnScan(
 export async function loadSkuByBarcode(
   barcode: string,
   warehouseId: string,
+  options?: { balance?: "stock" | "pos"; excludeDraftSaleId?: string | null },
 ): Promise<SkuSearchResult> {
+  const balance = options?.balance ?? "stock";
+  const excludeDraftSaleId = options?.excludeDraftSaleId ?? null;
   try {
     const local = await window.blackbox?.localDb?.getSkuByBarcode?.(
       barcode,
       warehouseId,
+      balance,
+      excludeDraftSaleId,
     );
     if (local) return local;
   } catch {
     /* fall through to API */
   }
-  return skusApi.byBarcode(barcode, warehouseId);
+  const remote = await skusApi.byBarcode(barcode, warehouseId, options);
+  if (balance === "pos") {
+    try {
+      const reserved = await window.blackbox?.localDb?.getDraftSaleReservedQty?.(
+        warehouseId,
+        remote.id,
+        excludeDraftSaleId,
+      );
+      if (reserved && reserved > 0) {
+        return {
+          ...remote,
+          quantityAvailable: Math.max(
+            0,
+            (remote.quantityAvailable ?? 0) - reserved,
+          ),
+        };
+      }
+    } catch {
+      /* ignore reservation adjustment */
+    }
+  }
+  return remote;
+}
+
+export async function loadPosAvailableForSale(
+  warehouseId: string,
+  productSkuId: string,
+  excludeDraftSaleId?: string | null,
+): Promise<number> {
+  try {
+    const local = await window.blackbox?.localDb?.getPosAvailableForSale?.(
+      warehouseId,
+      productSkuId,
+      excludeDraftSaleId ?? null,
+    );
+    if (local != null) return local;
+  } catch {
+    /* fall through */
+  }
+
+  const { quantityAvailable } = await loadInventoryOutReturnableQuantity(
+    warehouseId,
+    productSkuId,
+  );
+  try {
+    const reserved = await window.blackbox?.localDb?.getDraftSaleReservedQty?.(
+      warehouseId,
+      productSkuId,
+      excludeDraftSaleId ?? null,
+    );
+    if (reserved && reserved > 0) {
+      return Math.max(0, quantityAvailable - reserved);
+    }
+  } catch {
+    /* ignore reservation adjustment */
+  }
+  return quantityAvailable;
 }
 
 export async function lookupSkuByCode(

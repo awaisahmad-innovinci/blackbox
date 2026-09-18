@@ -164,7 +164,7 @@ export class PurchaseOrdersService {
     const lines = await this.items.find({
       where: { purchaseOrderId: id, tenantId },
       relations: {
-        productSku: { product: true },
+        productSku: { product: true, baseUnit: true },
         vendorSku: true,
         purchaseUnit: true,
       },
@@ -512,7 +512,7 @@ export class PurchaseOrdersService {
     const lines = await manager.getRepository(PurchaseOrderItem).find({
       where: { purchaseOrderId: id, tenantId },
       relations: {
-        productSku: { product: true },
+        productSku: { product: true, baseUnit: true },
         vendorSku: true,
         purchaseUnit: true,
       },
@@ -535,7 +535,9 @@ export class PurchaseOrdersService {
       vendorSkuCode: l.vendorSku?.vendorSkuCode ?? null,
       purchaseUnitId: l.purchaseUnitId,
       purchaseUnitName: l.purchaseUnit?.name ?? null,
+      baseUnitName: l.productSku?.baseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(l.unitsPerPurchaseUnit),
+      orderUnit: (l.orderUnit === "pc" ? "pc" : "box") as "pc" | "box",
       quantity: toNum(l.quantity),
       unitCost: toNum(l.unitCost),
       discount: toNum(l.discount),
@@ -602,6 +604,7 @@ export class PurchaseOrdersService {
       vendorSkuId: string;
       purchaseUnitId: string | null;
       unitsPerPurchaseUnit: string;
+      orderUnit: string;
       quantity: string;
       unitCost: string;
       tax: string;
@@ -616,6 +619,7 @@ export class PurchaseOrdersService {
       vendorSkuId: string;
       purchaseUnitId: string | null;
       unitsPerPurchaseUnit: string;
+      orderUnit: string;
       quantity: string;
       unitCost: string;
       tax: string;
@@ -683,6 +687,7 @@ export class PurchaseOrdersService {
         vendorSkuId: item.vendorSkuId,
         purchaseUnitId: vs.purchaseUnitId,
         unitsPerPurchaseUnit: String(unitsPerPurchaseUnit),
+        orderUnit: item.orderUnit === "pc" ? "pc" : "box",
         quantity: String(item.quantity),
         unitCost: String(item.unitCost),
         tax: String(tax),

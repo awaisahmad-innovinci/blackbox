@@ -4,7 +4,8 @@
 
 @media print {
   @page {
-    margin: 12mm;
+    margin: 3mm;
+    size: 80mm auto;
   }
 
   body {
@@ -38,5 +39,23 @@
   thead {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  [data-print-document] {
+    margin: 0 auto !important;
+    max-width: 72mm !important;
+    width: 72mm !important;
+  }
+
+  [data-thermal-receipt] {
+    color: black !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    width: 72mm !important;
+  }
+
+  [data-thermal-receipt] .thermal-rule {
+    border-color: black !important;
   }
 }

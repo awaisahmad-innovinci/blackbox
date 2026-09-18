@@ -3,8 +3,12 @@ import type {
   Category,
   GoodsReceiptDetail,
   InventoryOutDetail,
+  InventoryOutReturnDetail,
   ProductDetail,
   PurchaseOrderDetail,
+  SaleDetail,
+  SaleReturnDetail,
+  TillSessionDetail,
   SyncChangeDto,
   SyncEntityType,
   SyncOperation,
@@ -16,6 +20,7 @@ import type {
 } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
+import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import {
   enqueueOutbox,
   recordApplied,
@@ -40,8 +45,13 @@ import {
 import { upsertPurchaseOrderLocal } from "./purchase-orders-local";
 import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
+import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
+import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
+import { upsertSaleLocal } from "./sales-local";
+import { upsertSaleReturnLocal } from "./sale-returns-local";
+import { upsertTillSessionLocal } from "./till-local";
 import { upsertVendorReturnLocal } from "./vendor-returns-local";
-import { getPurchaseOrderLocal } from "./entity-get-local";
+import { getPurchaseOrderLocal, getSaleLocal } from "./entity-get-local";
 import {
   getLocalEntityVersion,
   setLocalEntityVersion,
@@ -192,6 +202,7 @@ export function applyChange(change: SyncChangeDto): void {
         p.sellingPricePerPurchaseUnit == null
           ? null
           : Number(p.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: Number(p.saleDiscountPercent ?? 0),
       reorderLevel: Number(p.reorderLevel ?? 0),
       minimumStockLevel: Number(p.minimumStockLevel ?? 0),
       maximumStockLevel:
@@ -332,6 +343,13 @@ export function applyChange(change: SyncChangeDto): void {
     return;
   }
   if (change.entityType === "inventory_out") {
+    const db = getLocalDb();
+    const existed = db
+      .prepare(`select 1 from inventory_outs where id = ? limit 1`)
+      .get(change.entityId);
+    const items = Array.isArray(p.items)
+      ? (p.items as InventoryOutDetail["items"])
+      : [];
     upsertInventoryOutLocal({
       id: change.entityId,
       outNumber: str(p.outNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
@@ -343,9 +361,226 @@ export function applyChange(change: SyncChangeDto): void {
       status: str(p.status, "POSTED") as InventoryOutDetail["status"],
       subtotal: Number(p.subtotal ?? 0),
       total: Number(p.total ?? 0),
-      items: Array.isArray(p.items)
-        ? (p.items as InventoryOutDetail["items"])
-        : [],
+      items,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+    if (!existed) {
+      const warehouseId = str(p.warehouseId);
+      for (const item of items) {
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          item.quantity,
+          item.unitCost,
+        );
+      }
+    }
+    return;
+  }
+  if (change.entityType === "inventory_out_return") {
+    const db = getLocalDb();
+    const existed = db
+      .prepare(`select 1 from inventory_out_returns where id = ? limit 1`)
+      .get(change.entityId);
+    const items = Array.isArray(p.items)
+      ? (p.items as InventoryOutReturnDetail["items"])
+      : [];
+    upsertInventoryOutReturnLocal({
+      id: change.entityId,
+      returnNumber: str(p.returnNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
+      warehouseId: str(p.warehouseId),
+      warehouseName: str(p.warehouseName),
+      returnDate: str(p.returnDate, now.slice(0, 10)),
+      notes: str(p.notes),
+      status: str(p.status, "POSTED") as InventoryOutReturnDetail["status"],
+      subtotal: Number(p.subtotal ?? 0),
+      total: Number(p.total ?? 0),
+      items,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+    if (!existed) {
+      const warehouseId = str(p.warehouseId);
+      for (const item of items) {
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          -item.quantity,
+          item.unitCost,
+        );
+      }
+    }
+    return;
+  }
+  if (change.entityType === "sale") {
+    const db = getLocalDb();
+    const existing = db
+      .prepare(`select status from sales where id = ? limit 1`)
+      .get(change.entityId) as { status: string } | undefined;
+    const prevStatus = existing?.status;
+    const items = Array.isArray(p.items) ? (p.items as SaleDetail["items"]) : [];
+    const payments = Array.isArray(p.payments)
+      ? (p.payments as SaleDetail["payments"])
+      : [];
+    const status = str(p.status, "POSTED") as SaleDetail["status"];
+    const warehouseId = str(p.warehouseId);
+
+    upsertSaleLocal({
+      id: change.entityId,
+      saleNumber: str(p.saleNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
+      warehouseId,
+      warehouseName: str(p.warehouseName),
+      status,
+      subtotal: Number(p.subtotal ?? 0),
+      gstRate: Number(p.gstRate ?? 0),
+      gstAmount: Number(p.gstAmount ?? 0),
+      salesTaxRate: Number(p.salesTaxRate ?? 0),
+      salesTaxAmount: Number(p.salesTaxAmount ?? 0),
+      total: Number(p.total ?? 0),
+      notes: str(p.notes),
+      customerName: str(p.customerName, "CASH SALES CUSTOMER"),
+      cashTendered:
+        p.cashTendered != null && p.cashTendered !== ""
+          ? Number(p.cashTendered)
+          : null,
+      deviceId: (p.deviceId as string | null) ?? null,
+      postedBy: (p.postedBy as string | null) ?? null,
+      postedByName: (p.postedByName as string | null) ?? null,
+      postedAt: (p.postedAt as string | null) ?? null,
+      items,
+      payments,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+
+    if (status === "POSTED" && prevStatus !== "POSTED") {
+      for (const item of items) {
+        const balanceRow = db
+          .prepare(
+            `select unit_cost as unitCost from inventory_out_items
+             where tenant_id = @tenantId and warehouse_id = @warehouseId
+               and product_sku_id = @productSkuId`,
+          )
+          .get({
+            tenantId: DEMO_STORE_TENANT_ID,
+            warehouseId,
+            productSkuId: item.productSkuId,
+          }) as { unitCost: number } | undefined;
+        const unitCost = balanceRow ? Number(balanceRow.unitCost) : item.unitPrice;
+        const inventoryQty = item.quantity + (item.focQuantity ?? 0);
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          -inventoryQty,
+          unitCost,
+        );
+      }
+    }
+
+    if (status === "VOID" && prevStatus === "POSTED") {
+      for (const item of items) {
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          item.quantity + (item.focQuantity ?? 0),
+          item.unitPrice,
+        );
+      }
+    }
+    return;
+  }
+  if (change.entityType === "sale_return") {
+    const db = getLocalDb();
+    const existed = db
+      .prepare(`select 1 from sale_returns where id = ? limit 1`)
+      .get(change.entityId);
+    const items = Array.isArray(p.items)
+      ? (p.items as SaleReturnDetail["items"])
+      : [];
+    const sale =
+      p.sale && typeof p.sale === "object"
+        ? (p.sale as SaleReturnDetail["sale"])
+        : getSaleLocal(String(p.saleId ?? ""));
+    if (!sale) return;
+
+    upsertSaleReturnLocal({
+      id: change.entityId,
+      returnNumber: str(p.returnNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
+      saleId: str(p.saleId, sale.id),
+      saleNumber: str(p.saleNumber, sale.saleNumber),
+      warehouseId: str(p.warehouseId, sale.warehouseId),
+      warehouseName: str(p.warehouseName, sale.warehouseName),
+      returnDate: str(p.returnDate, now.slice(0, 10)),
+      status: "POSTED",
+      subtotal: Number(p.subtotal ?? 0),
+      gstRate: Number(p.gstRate ?? sale.gstRate),
+      gstAmount: Number(p.gstAmount ?? 0),
+      salesTaxRate: Number(p.salesTaxRate ?? sale.salesTaxRate),
+      salesTaxAmount: Number(p.salesTaxAmount ?? 0),
+      refundTotal: Number(p.refundTotal ?? 0),
+      refundMethod: str(p.refundMethod, "CASH") as SaleReturnDetail["refundMethod"],
+      notes: str(p.notes),
+      processedBy: (p.processedBy as string | null) ?? null,
+      processedByName: (p.processedByName as string | null) ?? null,
+      sale,
+      items,
+      createdAt: str(p.createdAt, now),
+      updatedAt: str(p.updatedAt, now),
+    });
+
+    if (!existed) {
+      const warehouseId = str(p.warehouseId, sale.warehouseId);
+      for (const item of items) {
+        const balanceRow = db
+          .prepare(
+            `select unit_cost as unitCost from inventory_out_items
+             where tenant_id = @tenantId and warehouse_id = @warehouseId
+               and product_sku_id = @productSkuId`,
+          )
+          .get({
+            tenantId: DEMO_STORE_TENANT_ID,
+            warehouseId,
+            productSkuId: item.productSkuId,
+          }) as { unitCost: number } | undefined;
+        const unitCost = balanceRow
+          ? Number(balanceRow.unitCost)
+          : item.unitPrice;
+        applyInventoryOutBalanceDeltaLocal(
+          warehouseId,
+          item.productSkuId,
+          item.quantity,
+          unitCost,
+        );
+      }
+    }
+    return;
+  }
+  if (change.entityType === "till_session") {
+    upsertTillSessionLocal({
+      id: change.entityId,
+      userId: str(p.userId),
+      userName: str(p.userName),
+      status: str(p.status, "OPEN") as TillSessionDetail["status"],
+      note10: Number(p.note10 ?? 0),
+      note20: Number(p.note20 ?? 0),
+      note50: Number(p.note50 ?? 0),
+      note100: Number(p.note100 ?? 0),
+      note500: Number(p.note500 ?? 0),
+      note1000: Number(p.note1000 ?? 0),
+      note5000: Number(p.note5000 ?? 0),
+      openingTotal: Number(p.openingTotal ?? 0),
+      openingBalance: Number(p.openingBalance ?? 0),
+      currentCashBalance: Number(p.currentCashBalance ?? 0),
+      maxCashLimit: Number(p.maxCashLimit ?? 0),
+      openedAt: (p.openedAt as string | null | undefined) ?? null,
+      closedAt: (p.closedAt as string | null | undefined) ?? null,
+      approvedByUserId: (p.approvedByUserId as string | null | undefined) ?? null,
+      approvedByName: (p.approvedByName as string | null | undefined) ?? null,
+      approvedAt: (p.approvedAt as string | null | undefined) ?? null,
+      reopenedByUserId: (p.reopenedByUserId as string | null | undefined) ?? null,
+      reopenedByName: (p.reopenedByName as string | null | undefined) ?? null,
+      closeReason: (p.closeReason as string | null | undefined) ?? null,
       createdAt: str(p.createdAt, now),
       updatedAt: str(p.updatedAt, now),
     });

@@ -41,12 +41,12 @@ export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
       serverUpdatedAt: detail.updatedAt,
     });
 
-    db.prepare("delete from inventory_out_items where inventory_out_id = ?").run(
+    db.prepare("delete from inventory_out_lines where inventory_out_id = ?").run(
       detail.id,
     );
 
-    const insertItem = db.prepare(
-      `insert into inventory_out_items (
+    const insertLine = db.prepare(
+      `insert into inventory_out_lines (
         id, tenant_id, inventory_out_id, product_sku_id, quantity, unit_cost,
         created_at, updated_at, sync_status, server_updated_at
       ) values (
@@ -56,7 +56,7 @@ export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
     );
 
     for (const item of detail.items) {
-      insertItem.run({
+      insertLine.run({
         id: item.id,
         tenantId: DEMO_STORE_TENANT_ID,
         inventoryOutId: detail.id,

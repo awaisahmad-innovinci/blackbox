@@ -64,6 +64,22 @@ export function outNumberPrefix(initials: string): string {
   return `${initials}-IO-`;
 }
 
+export function outReturnNumberPrefix(initials: string): string {
+  return `${initials}-IR-`;
+}
+
+export function saleNumberPrefix(initials: string): string {
+  return `${initials}-SB-`;
+}
+
+export function holdNumberPrefix(initials: string): string {
+  return `${initials}-HOLD-`;
+}
+
+export function saleReturnNumberPrefix(initials: string): string {
+  return `${initials}-SR-`;
+}
+
 export function nextVendorCode(
   businessName: string,
   existingVendorCodes: string[],
@@ -101,6 +117,46 @@ export function nextOutNumber(
   return nextSequentialCode(
     outNumberPrefix(businessInitials(businessName)),
     existingOutNumbers,
+  );
+}
+
+export function nextOutReturnNumber(
+  businessName: string,
+  existingReturnNumbers: string[],
+): string {
+  return nextSequentialCode(
+    outReturnNumberPrefix(businessInitials(businessName)),
+    existingReturnNumbers,
+  );
+}
+
+export function nextSaleNumber(
+  businessName: string,
+  existingSaleNumbers: string[],
+): string {
+  return nextSequentialCode(
+    saleNumberPrefix(businessInitials(businessName)),
+    existingSaleNumbers,
+  );
+}
+
+export function nextHoldNumber(
+  businessName: string,
+  existingHoldNumbers: string[],
+): string {
+  return nextSequentialCode(
+    holdNumberPrefix(businessInitials(businessName)),
+    existingHoldNumbers,
+  );
+}
+
+export function nextSaleReturnNumber(
+  businessName: string,
+  existingReturnNumbers: string[],
+): string {
+  return nextSequentialCode(
+    saleReturnNumberPrefix(businessInitials(businessName)),
+    existingReturnNumbers,
   );
 }
 

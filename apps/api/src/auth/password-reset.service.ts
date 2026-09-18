@@ -18,6 +18,13 @@ import type { ResetPasswordDto } from "./dto/reset-password.dto";
 const GENERIC_FORGOT_MESSAGE =
   "If an account exists for this email, we sent a verification code.";
 
+type OwnerLookupSkipReason =
+  | "no_user"
+  | "ambiguous_email"
+  | "user_inactive"
+  | "tenant_inactive"
+  | "not_owner";
+
 @Injectable()
 export class PasswordResetService {
   private readonly logger = new Logger(PasswordResetService.name);
@@ -45,7 +52,11 @@ export class PasswordResetService {
           createdAt: MoreThan(oneHourAgo),
         },
       });
-      if (recentCount < 3) {
+      if (recentCount >= 3) {
+        this.logger.debug(
+          `Password reset rate limit reached for ${email} (${recentCount} in last hour)`,
+        );
+      } else {
         try {
           await this.issueResetCode(user);
         } catch (err: unknown) {
@@ -127,21 +138,64 @@ export class PasswordResetService {
   }
 
   private async findOwnerByEmail(email: string): Promise<User | null> {
-    const rows = await this.users
-      .createQueryBuilder("u")
-      .innerJoin("u.userRoles", "ur")
-      .innerJoin("ur.role", "r")
-      .innerJoin("u.tenant", "t")
-      .where("LOWER(u.email) = :email", { email })
-      .andWhere("u.is_active = true")
-      .andWhere("t.is_active = true")
-      .andWhere("r.key = :ownerKey", { ownerKey: "OWNER" })
-      .getMany();
+    const rows = await this.users.find({
+      where: { email },
+      relations: { tenant: true, userRoles: { role: true } },
+    });
 
-    if (rows.length !== 1) {
-      return null;
+    const eligible = rows.filter((user) => this.isEligibleOwner(user));
+
+    if (eligible.length === 1) {
+      return eligible[0]!;
     }
-    return rows[0] ?? null;
+
+    this.logOwnerLookupSkipped(
+      email,
+      eligible.length > 1 ? eligible.length : rows.length,
+      eligible.length > 1
+        ? "ambiguous_email"
+        : this.deriveOwnerSkipReason(rows),
+    );
+    return null;
+  }
+
+  private isEligibleOwner(user: User): boolean {
+    return (
+      user.isActive &&
+      user.tenant?.isActive === true &&
+      user.userRoles.some((ur) => ur.role.key === "OWNER")
+    );
+  }
+
+  private deriveOwnerSkipReason(rows: User[]): OwnerLookupSkipReason {
+    if (rows.length === 0) {
+      return "no_user";
+    }
+    if (rows.every((user) => !user.isActive)) {
+      return "user_inactive";
+    }
+    const active = rows.filter((user) => user.isActive);
+    if (active.every((user) => !user.tenant?.isActive)) {
+      return "tenant_inactive";
+    }
+    if (
+      active.every(
+        (user) => !user.userRoles.some((ur) => ur.role.key === "OWNER"),
+      )
+    ) {
+      return "not_owner";
+    }
+    return "ambiguous_email";
+  }
+
+  private logOwnerLookupSkipped(
+    email: string,
+    candidateCount: number,
+    reason: OwnerLookupSkipReason,
+  ): void {
+    this.logger.debug(
+      `Owner lookup skipped for ${email}: ${reason} (candidates=${candidateCount})`,
+    );
   }
 
   private hashCode(code: string): string {

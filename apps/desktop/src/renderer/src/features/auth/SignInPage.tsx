@@ -1,10 +1,14 @@
 import { useState, type FormEvent } from "react";
+import { SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
 import { useSession } from "@renderer/lib/session/context";
+
+const REINSTALL_HINT =
+  " If you reinstalled the app, ask your admin to revoke the old device in web admin → Devices, then try again.";
 
 export function SignInPage() {
   const { signIn } = useSession();
@@ -21,7 +25,15 @@ export function SignInPage() {
     try {
       await signIn(identifier.trim(), password);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, "Sign in failed"));
+      let message = getApiErrorMessage(err, "Sign in failed");
+      if (
+        err instanceof ApiError &&
+        err.status === 409 &&
+        err.message === SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE
+      ) {
+        message += REINSTALL_HINT;
+      }
+      setError(message);
     } finally {
       setBusy(false);
     }
