@@ -112,30 +112,18 @@ export class DashboardService {
     const returnCount = await this.saleReturns
       .createQueryBuilder("r")
       .where("r.tenant_id = :tenantId", { tenantId })
-      .andWhere("r.status = :status", { status: "POSTED" })
+      .andWhere("r.status IN (:...statuses)", {
+        statuses: ["PENDING", "COMPLETED"],
+      })
       .andWhere("r.return_date = :today", { today })
       .getCount();
 
-    const refundRow = await this.saleReturns
-      .createQueryBuilder("r")
-      .select("COALESCE(SUM(r.refund_total), 0)", "amount")
-      .where("r.tenant_id = :tenantId", { tenantId })
-      .andWhere("r.status = :status", { status: "POSTED" })
-      .andWhere("r.return_date = :today", { today })
-      .andWhere("r.processed_by = :userId", { userId })
-      .getRawOne<{ amount: string }>();
-
     const tillCashCollectedAmount = roundMoney(toNum(tillRow?.amount));
-    const refundTotalAmount = roundMoney(toNum(refundRow?.amount));
 
     return {
       date: today,
       tillCashCollectedAmount,
       customerReturnCount: returnCount,
-      refundTotalAmount,
-      netAfterRefundsAmount: roundMoney(
-        tillCashCollectedAmount - refundTotalAmount,
-      ),
     };
   }
 

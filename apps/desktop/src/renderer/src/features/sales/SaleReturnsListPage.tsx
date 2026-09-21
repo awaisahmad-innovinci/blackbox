@@ -15,7 +15,7 @@ import {
   filterSelectProps,
   ListFilterNav,
 } from "@renderer/components/list-filter-nav";
-import { loadSaleReturns, loadWarehouses } from "@renderer/lib/local-db/entity-source";
+import { loadSaleReturns, loadWarehouses, resolveSaleReturnByNumber } from "@renderer/lib/local-db/entity-source";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -55,6 +55,16 @@ export function SaleReturnsListPage() {
     enabled: true,
     inputRef: searchRef,
     onScan: setSearch,
+    onComplete: (code) => {
+      void (async () => {
+        const match = await resolveSaleReturnByNumber(code);
+        if (match) {
+          navigate(`/sales/returns/${match.id}`);
+          return;
+        }
+        setError(`Return not found: ${code.trim()}`);
+      })();
+    },
   });
 
   useEffect(() => {
@@ -237,7 +247,7 @@ export function SaleReturnsListPage() {
                     {item.refundTotal.toFixed(2)}
                   </td>
                   <td className="px-4 py-2">
-                    {item.processedByName ?? "—"}
+                    {item.issuedByName ?? "—"}
                   </td>
                 </ListTableRow>
               ))}

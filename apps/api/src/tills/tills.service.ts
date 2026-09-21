@@ -627,6 +627,49 @@ export class TillsService {
     }
   }
 
+  async assertCanPayCashRefund(
+    manager: EntityManager,
+    tenantId: string,
+    userId: string,
+    permissions: string[],
+    refundAmount: number,
+  ): Promise<void> {
+    if (permissions.includes("till.manage") || refundAmount <= 0) return;
+
+    const row = await manager.getRepository(TillSession).findOne({
+      where: { tenantId, userId, status: "OPEN" },
+    });
+    if (!row) {
+      throw new ForbiddenException("Open your till before paying refunds");
+    }
+
+    const balance = round4(toNum(row.currentCashBalance));
+    if (refundAmount > balance) {
+      throw new BadRequestException(
+        "Till does not have enough cash for this refund",
+      );
+    }
+  }
+
+  async applyCashRefund(
+    manager: EntityManager,
+    tenantId: string,
+    userId: string,
+    permissions: string[],
+    refundAmount: number,
+  ): Promise<void> {
+    if (permissions.includes("till.manage") || refundAmount <= 0) return;
+
+    const row = await manager.getRepository(TillSession).findOne({
+      where: { tenantId, userId, status: "OPEN" },
+    });
+    if (!row) return;
+
+    const nextBalance = round4(toNum(row.currentCashBalance) - refundAmount);
+    row.currentCashBalance = String(Math.max(nextBalance, 0));
+    await manager.save(row);
+  }
+
   private async applyPartialCashCollection(input: {
     tenantId: string;
     row: TillSession;

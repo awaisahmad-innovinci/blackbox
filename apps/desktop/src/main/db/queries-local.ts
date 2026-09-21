@@ -642,12 +642,27 @@ export function getCashierDashboardSummaryLocal(
     )
     .get({ tenantId, userId }) as { cnt: number };
 
+  const refundRow = db
+    .prepare(
+      `select coalesce(sum(refund_total), 0) as amount
+       from sale_returns
+       where tenant_id = @tenantId
+         and status = 'COMPLETED'
+         and refunded_by = @userId
+         and date(refunded_at) = date('now', 'localtime')`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
   return {
     date: todayRow.d,
     totalSalesAmount: roundMoney(Number(totalSalesRow.amount)),
     cashReceivedAmount: roundMoney(Number(cashRow.amount)),
     cardPaymentsAmount: roundMoney(Number(cardRow.amount)),
     heldBillsCount: Number(heldRow.cnt),
+    refundTotalAmount: roundMoney(Number(refundRow.amount)),
+    cashInHandAmount: roundMoney(
+      Number(cashRow.amount) - Number(refundRow.amount),
+    ),
   };
 }
 
@@ -676,33 +691,17 @@ export function getManagerDashboardSummaryLocal(
       `select count(*) as cnt
        from sale_returns
        where tenant_id = @tenantId
-         and status = 'POSTED'
+         and status in ('PENDING', 'COMPLETED')
          and return_date = @today`,
     )
     .get({ tenantId, today }) as { cnt: number };
 
-  const refundRow = db
-    .prepare(
-      `select coalesce(sum(refund_total), 0) as amount
-       from sale_returns
-       where tenant_id = @tenantId
-         and status = 'POSTED'
-         and return_date = @today
-         and processed_by = @userId`,
-    )
-    .get({ tenantId, today, userId }) as { amount: number };
-
   const tillCashCollectedAmount = roundMoney(Number(tillRow.amount));
-  const refundTotalAmount = roundMoney(Number(refundRow.amount));
 
   return {
     date: today,
     tillCashCollectedAmount,
     customerReturnCount: Number(returnCountRow.cnt),
-    refundTotalAmount,
-    netAfterRefundsAmount: roundMoney(
-      tillCashCollectedAmount - refundTotalAmount,
-    ),
   };
 }
 
@@ -1614,9 +1613,11 @@ export function listSaleReturnsLocal(
          r.warehouse_id as warehouseId,
          coalesce(w.name, '—') as warehouseName,
          r.return_date as returnDate,
+         r.status,
          r.refund_total as refundTotal,
          r.refund_method as refundMethod,
-         r.processed_by_name as processedByName,
+         coalesce(r.issued_by_name, r.processed_by_name, '') as issuedByName,
+         r.refunded_by_name as refundedByName,
          r.created_at as createdAt,
          (
            select count(*) from sale_return_lines l
@@ -1637,9 +1638,11 @@ export function listSaleReturnsLocal(
     warehouseId: string;
     warehouseName: string;
     returnDate: string;
+    status: string;
     refundTotal: number;
     refundMethod: string;
-    processedByName: string;
+    issuedByName: string;
+    refundedByName: string | null;
     lineCount: number;
     createdAt: string;
   }>;
@@ -1652,10 +1655,12 @@ export function listSaleReturnsLocal(
     warehouseId: r.warehouseId,
     warehouseName: r.warehouseName,
     returnDate: r.returnDate,
+    status: r.status as SaleReturnListItem["status"],
     refundTotal: Number(r.refundTotal),
     refundMethod: r.refundMethod as SaleReturnListItem["refundMethod"],
     lineCount: Number(r.lineCount),
-    processedByName: String(r.processedByName ?? "").trim() || null,
+    issuedByName: String(r.issuedByName ?? "").trim() || null,
+    refundedByName: String(r.refundedByName ?? "").trim() || null,
     createdAt: r.createdAt,
   }));
 

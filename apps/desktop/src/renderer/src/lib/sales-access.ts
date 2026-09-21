@@ -80,11 +80,16 @@ export function canAccessSaleReturn(permissions: string[]): boolean {
   return permissions.includes("sales.return");
 }
 
+export function canAccessSaleRefund(permissions: string[]): boolean {
+  return permissions.includes("sales.refund");
+}
+
 export function canAccessSalesModule(permissions: string[]): boolean {
   return (
     canAccessSale(permissions) ||
     canAccessSalesList(permissions) ||
-    canAccessSaleReturn(permissions)
+    canAccessSaleReturn(permissions) ||
+    canAccessSaleRefund(permissions)
   );
 }
 
@@ -118,6 +123,9 @@ function isSalesPathAllowed(pathname: string, permissions: string[]): boolean {
   }
   if (pathname.startsWith("/sales/returns")) {
     return canAccessSaleReturn(permissions);
+  }
+  if (pathname === "/sales/refund-return") {
+    return canAccessSaleRefund(permissions);
   }
   if (pathname === "/sales/new" || pathname.startsWith("/sales/new/")) {
     return canAccessSale(permissions);

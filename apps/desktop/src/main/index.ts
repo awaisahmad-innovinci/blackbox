@@ -46,7 +46,12 @@ import {
   reopenLocalDb,
 } from "./db";
 import {
+  completeSaleReturnStandaloneLocal,
+  completeSaleReturnWithSaleLocal,
   listSaleReturnNumbersLocal,
+  getSaleReturnCreditForSaleLocal,
+  lookupSaleReturnLocal,
+  resolveSaleReturnByNumberLocal,
   upsertSaleReturnLocal,
 } from "./db/sale-returns-local";
 import {
@@ -81,6 +86,9 @@ import {
 } from "./db/activity-log-local";
 import {
   applyTillCashFromSaleLocal,
+  applyTillCashRefundLocal,
+  applyTillReturnCreditOnSaleLocal,
+  assertTillCanPayRefundLocal,
   approveTillLocal,
   assertTillCanPostSaleLocal,
   collectCashByAmountLocal,
@@ -141,6 +149,7 @@ import {
   getSaleLocal,
   getReturnableSaleLinesLocal,
   getSaleReturnLocal,
+  resolveSaleByNumberLocal,
   getVendorReturnLocal,
   getProductLocal,
   getProductProfileLocal,
@@ -678,6 +687,49 @@ function registerIpc(): void {
     },
   );
   ipcMain.handle(
+    "localDb:applyTillCashRefund",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        refundAmount: number;
+      },
+    ) => {
+      applyTillCashRefundLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:applyTillReturnCreditOnSale",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        cashPaymentTotal: number;
+        cashBackFromCredit: number;
+      },
+    ) => {
+      applyTillReturnCreditOnSaleLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:assertTillCanPayRefund",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        refundAmount: number;
+      },
+    ) => {
+      assertTillCanPayRefundLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
     "localDb:inventoryOutReturnableQuantity",
     (_event, warehouseId: string, productSkuId: string) =>
       inventoryOutReturnableQuantityLocal(warehouseId, productSkuId),
@@ -851,6 +903,10 @@ function registerIpc(): void {
   );
   ipcMain.handle("localDb:getSale", (_event, id: string) => getSaleLocal(id));
   ipcMain.handle(
+    "localDb:resolveSaleByNumber",
+    (_event, saleNumber: string) => resolveSaleByNumberLocal(saleNumber),
+  );
+  ipcMain.handle(
     "localDb:listSaleReturns",
     (_event, query?: SaleReturnListQuery) => listSaleReturnsLocal(query),
   );
@@ -865,6 +921,38 @@ function registerIpc(): void {
     upsertSaleReturnLocal(detail);
     return { ok: true as const };
   });
+  ipcMain.handle(
+    "localDb:lookupSaleReturn",
+    (_event, returnNumber: string) => lookupSaleReturnLocal(returnNumber),
+  );
+  ipcMain.handle(
+    "localDb:resolveSaleReturnByNumber",
+    (_event, returnNumber: string) =>
+      resolveSaleReturnByNumberLocal(returnNumber),
+  );
+  ipcMain.handle(
+    "localDb:getSaleReturnCreditForSale",
+    (_event, saleId: string) => getSaleReturnCreditForSaleLocal(saleId),
+  );
+  ipcMain.handle(
+    "localDb:completeSaleReturnStandalone",
+    (
+      _event,
+      input: { returnId: string; userId: string; userName: string },
+    ) => completeSaleReturnStandaloneLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:completeSaleReturnWithSale",
+    (
+      _event,
+      input: {
+        returnId: string;
+        saleId: string;
+        userId: string;
+        userName: string;
+      },
+    ) => completeSaleReturnWithSaleLocal(input),
+  );
   ipcMain.handle("localDb:listSaleReturnNumbers", () =>
     listSaleReturnNumbersLocal(),
   );

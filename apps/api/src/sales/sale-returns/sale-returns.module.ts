@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   Sale,
@@ -8,8 +8,10 @@ import {
   Tenant,
   User,
 } from "../../db/entities";
+import { ActivityLogModule } from "../../activity-log/activity-log.module";
 import { InventoryCommonModule } from "../../inventory/common/inventory-common.module";
 import { RbacModule } from "../../rbac/rbac.module";
+import { TillsModule } from "../../tills/tills.module";
 import { SalesModule } from "../sales.module";
 import { SaleReturnsController } from "./sale-returns.controller";
 import { SaleReturnsService } from "./sale-returns.service";
@@ -18,7 +20,9 @@ import { SaleReturnsService } from "./sale-returns.service";
   imports: [
     InventoryCommonModule,
     RbacModule,
-    SalesModule,
+    ActivityLogModule,
+    TillsModule,
+    forwardRef(() => SalesModule),
     TypeOrmModule.forFeature([
       SaleReturn,
       SaleReturnLine,

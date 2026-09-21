@@ -74,4 +74,16 @@
     margin-top: 4px !important;
     margin-bottom: 4px !important;
   }
+
+  [data-thermal-receipt] .thermal-receipt-barcode {
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-barcode svg {
+    color: black !important;
+    fill: black !important;
+    stroke: black !important;
+  }
 }

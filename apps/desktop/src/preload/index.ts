@@ -282,6 +282,28 @@ contextBridge.exposeInMainWorld("blackbox", {
       cashPaymentTotal: number;
     }) =>
       ipcRenderer.invoke("localDb:applyTillCashFromSale", input) as Promise<{ ok: true }>,
+    applyTillCashRefund: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      refundAmount: number;
+    }) =>
+      ipcRenderer.invoke("localDb:applyTillCashRefund", input) as Promise<{ ok: true }>,
+    applyTillReturnCreditOnSale: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      cashPaymentTotal: number;
+      cashBackFromCredit: number;
+    }) =>
+      ipcRenderer.invoke(
+        "localDb:applyTillReturnCreditOnSale",
+        input,
+      ) as Promise<{ ok: true }>,
+    assertTillCanPayRefund: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      refundAmount: number;
+    }) =>
+      ipcRenderer.invoke("localDb:assertTillCanPayRefund", input) as Promise<{ ok: true }>,
     appendPendingActivityLog: (input: {
       id: string;
       payload: import("@blackbox/shared").CreateActivityLogRequest;
@@ -513,6 +535,45 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:upsertSaleReturn",
         detail,
       ) as Promise<{ ok: true }>,
+    lookupSaleReturn: (returnNumber: string) =>
+      ipcRenderer.invoke(
+        "localDb:lookupSaleReturn",
+        returnNumber,
+      ) as Promise<import("@blackbox/shared").SaleReturnLookupSummary>,
+    resolveSaleByNumber: (saleNumber: string) =>
+      ipcRenderer.invoke(
+        "localDb:resolveSaleByNumber",
+        saleNumber,
+      ) as Promise<{ id: string; saleNumber: string } | null>,
+    resolveSaleReturnByNumber: (returnNumber: string) =>
+      ipcRenderer.invoke(
+        "localDb:resolveSaleReturnByNumber",
+        returnNumber,
+      ) as Promise<{ id: string; returnNumber: string } | null>,
+    getSaleReturnCreditForSale: (saleId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getSaleReturnCreditForSale",
+        saleId,
+      ) as Promise<{ returnNumber: string; amount: number } | null>,
+    completeSaleReturnStandalone: (input: {
+      returnId: string;
+      userId: string;
+      userName: string;
+    }) =>
+      ipcRenderer.invoke(
+        "localDb:completeSaleReturnStandalone",
+        input,
+      ) as Promise<SaleReturnDetail>,
+    completeSaleReturnWithSale: (input: {
+      returnId: string;
+      saleId: string;
+      userId: string;
+      userName: string;
+    }) =>
+      ipcRenderer.invoke(
+        "localDb:completeSaleReturnWithSale",
+        input,
+      ) as Promise<SaleReturnDetail>,
     listSaleReturnNumbers: () =>
       ipcRenderer.invoke(
         "localDb:listSaleReturnNumbers",

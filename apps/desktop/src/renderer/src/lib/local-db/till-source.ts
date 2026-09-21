@@ -349,3 +349,34 @@ export async function applyTillCashFromSale(input: {
     await window.blackbox.localDb.applyTillCashFromSale(input);
   }
 }
+
+export async function applyTillCashRefund(input: {
+  userId: string;
+  skipForManager?: boolean;
+  refundAmount: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.applyTillCashRefund) {
+    await window.blackbox.localDb.applyTillCashRefund(input);
+  }
+}
+
+export async function applyTillReturnCreditOnSale(input: {
+  userId: string;
+  skipForManager?: boolean;
+  cashPaymentTotal: number;
+  cashBackFromCredit: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.applyTillReturnCreditOnSale) {
+    await window.blackbox.localDb.applyTillReturnCreditOnSale(input);
+  }
+}
+
+export async function assertTillCanPayRefund(input: {
+  userId: string;
+  skipForManager?: boolean;
+  refundAmount: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.assertTillCanPayRefund) {
+    await window.blackbox.localDb.assertTillCanPayRefund(input);
+  }
+}

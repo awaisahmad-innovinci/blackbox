@@ -115,6 +115,8 @@ export interface CreateSaleRequest {
   notes?: string;
   /** Required when any line has focQuantity > 0 (manager/owner who approved FOC). */
   supervisorUserId?: string;
+  /** Pending return voucher to apply as credit when posting this sale. */
+  pendingReturnId?: string;
   items: CreateSaleLineRequest[];
   payments: CreateSalePaymentRequest[];
 }
@@ -178,6 +180,10 @@ export interface SaleReturnLineRow {
   sellUnit: SellUnit;
 }
 
+export type SaleReturnStatus = "PENDING" | "COMPLETED";
+
+export type SaleReturnCompletionMode = "SALE_OFFSET" | "STANDALONE_CASH";
+
 export interface SaleReturnDetail {
   id: string;
   returnNumber: string;
@@ -186,7 +192,7 @@ export interface SaleReturnDetail {
   warehouseId: string;
   warehouseName: string;
   returnDate: string;
-  status: "POSTED";
+  status: SaleReturnStatus;
   subtotal: number;
   gstRate: number;
   gstAmount: number;
@@ -195,8 +201,17 @@ export interface SaleReturnDetail {
   refundTotal: number;
   refundMethod: SalePaymentMethod;
   notes: string;
+  /** @deprecated Use issuedBy — kept for sync compatibility */
   processedBy: string | null;
+  /** @deprecated Use issuedByName */
   processedByName: string | null;
+  issuedBy: string | null;
+  issuedByName: string | null;
+  refundedBy: string | null;
+  refundedByName: string | null;
+  refundedAt: string | null;
+  appliedToSaleId: string | null;
+  completionMode: SaleReturnCompletionMode | null;
   sale: SaleDetail;
   items: SaleReturnLineRow[];
   createdAt: string;
@@ -211,10 +226,12 @@ export interface SaleReturnListItem {
   warehouseId: string;
   warehouseName: string;
   returnDate: string;
+  status: SaleReturnStatus;
   refundTotal: number;
   refundMethod: SalePaymentMethod;
   lineCount: number;
-  processedByName: string | null;
+  issuedByName: string | null;
+  refundedByName: string | null;
   createdAt: string;
 }
 
@@ -251,12 +268,25 @@ export interface CreateSaleReturnRequest {
   items: CreateSaleReturnLineRequest[];
 }
 
-/** Manager dashboard — today's till collections and refunds for the logged-in supervisor. */
+/** Cashier lookup — scan or enter return number at till. */
+export interface SaleReturnLookupSummary {
+  id: string;
+  returnNumber: string;
+  status: SaleReturnStatus;
+  refundTotal: number;
+  refundMethod: SalePaymentMethod;
+  saleId: string;
+  saleNumber: string;
+  issuedByName: string | null;
+  refundedByName: string | null;
+  refundedAt: string | null;
+  lineCount: number;
+}
+
+/** Manager dashboard — today's till collections (no refund cash metrics). */
 export interface ManagerDashboardSummary {
   /** Local calendar date (YYYY-MM-DD). */
   date: string;
   tillCashCollectedAmount: number;
   customerReturnCount: number;
-  refundTotalAmount: number;
-  netAfterRefundsAmount: number;
 }

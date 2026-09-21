@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   SaleDetail,
   SalePaymentMethod,
+  SaleReturnLookupSummary,
   SellUnit,
   SkuSearchResult,
   TillSessionDetail,
@@ -44,9 +45,11 @@ import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { loadSkuByBarcode, loadSale, loadWarehouses, loadPosAvailableForSale, lookupSkuByBarcode } from "@renderer/lib/local-db/entity-source";
+import { loadSkuByBarcode, loadSale, loadWarehouses, loadPosAvailableForSale, lookupSkuByBarcode, lookupSaleReturn } from "@renderer/lib/local-db/entity-source";
 import {
   applyTillCashFromSale,
+  applyTillReturnCreditOnSale,
+  assertTillCanPayRefund,
   assertTillCanPostSale,
   loadCurrentTill,
 } from "@renderer/lib/local-db/till-source";
@@ -161,6 +164,10 @@ export function SalePage() {
   const [loadingDraft, setLoadingDraft] = useState(Boolean(routeDraftId));
   const [tillSession, setTillSession] = useState<TillSessionDetail | null>(null);
   const [collectDialogOpen, setCollectDialogOpen] = useState(false);
+  const [appliedReturn, setAppliedReturn] =
+    useState<SaleReturnLookupSummary | null>(null);
+  const [returnEntry, setReturnEntry] = useState("");
+  const [returnLookupBusy, setReturnLookupBusy] = useState(false);
   const editingDraftId = routeDraftId ?? null;
   const holdNumberRef = useRef<string | null>(null);
   const holdInFlightRef = useRef(false);
@@ -319,20 +326,23 @@ export function SalePage() {
   );
 
   const billTotal = tax.total;
+  const returnCredit = appliedReturn?.refundTotal ?? 0;
+  const amountDue = round4(Math.max(0, billTotal - returnCredit));
+  const cashBackFromCredit = round4(Math.max(0, returnCredit - billTotal));
   const payment = payments[0] ?? null;
   const tendered = payment ? round4(payment.amount) : 0;
   const isCashPayment = payment?.method === "CASH";
-  const cashMaxTender = maxCashTender(billTotal);
+  const cashMaxTender = maxCashTender(amountDue > 0 ? amountDue : billTotal);
   const cashChange = isCashPayment
-    ? round4(Math.max(0, tendered - billTotal))
+    ? round4(Math.max(0, tendered - amountDue))
     : 0;
   const cashShortfall = isCashPayment
-    ? round4(Math.max(0, billTotal - tendered))
+    ? round4(Math.max(0, amountDue - tendered))
     : 0;
   const cardRemaining = !isCashPayment
-    ? round4(billTotal - tendered)
+    ? round4(amountDue - tendered)
     : 0;
-  const cashOverMax = isCashPayment && tendered > cashMaxTender;
+  const cashOverMax = isCashPayment && amountDue > 0 && tendered > cashMaxTender;
 
   function resolvedCashTendered(): number | null {
     if (!payment || payment.method !== "CASH") return null;
@@ -345,7 +355,13 @@ export function SalePage() {
       paymentsTouchedRef.current = false;
       return;
     }
-    if (paymentsTouchedRef.current || !(billTotal > 0)) return;
+    if (paymentsTouchedRef.current) return;
+    if (!(amountDue > 0)) {
+      if (amountDue === 0 && appliedReturn) {
+        setPayments([]);
+      }
+      return;
+    }
 
     setPayments((prev) => {
       if (prev.length !== 1) {
@@ -354,20 +370,20 @@ export function SalePage() {
           {
             id: existing?.id ?? crypto.randomUUID(),
             method: "CASH",
-            amount: billTotal,
+            amount: amountDue,
             reference: "",
           },
         ];
       }
       if (prev[0]!.method === "CASH" && !prev[0]!.reference.trim()) {
-        return [{ ...prev[0]!, amount: billTotal }];
+        return [{ ...prev[0]!, amount: amountDue }];
       }
       return prev;
     });
-  }, [lines.length, billTotal]);
+  }, [lines.length, amountDue, appliedReturn]);
 
   const canPost = useMemo(() => {
-    if (lines.length === 0 || !payment) return false;
+    if (lines.length === 0) return false;
     if (
       !lines.every(
         (line) =>
@@ -377,11 +393,15 @@ export function SalePage() {
     ) {
       return false;
     }
-    if (payment.method === "CASH") {
-      return tendered >= billTotal && tendered <= cashMaxTender;
+    if (amountDue === 0) {
+      return appliedReturn != null;
     }
-    return tendered === billTotal;
-  }, [lines, payment, tendered, billTotal, cashMaxTender]);
+    if (!payment) return false;
+    if (payment.method === "CASH") {
+      return tendered >= amountDue && tendered <= cashMaxTender;
+    }
+    return tendered === amountDue;
+  }, [lines, payment, tendered, amountDue, cashMaxTender, appliedReturn]);
 
   const canHold = lines.length > 0 && !loadingDraft;
 
@@ -456,9 +476,9 @@ export function SalePage() {
   }
 
   function postedPaymentRows() {
-    if (!payment) return [];
+    if (!payment || amountDue <= 0) return [];
     const postedAmount =
-      payment.method === "CASH" ? billTotal : round4(payment.amount);
+      payment.method === "CASH" ? amountDue : round4(payment.amount);
     return [
       {
         id: payment.id,
@@ -467,6 +487,24 @@ export function SalePage() {
         reference: payment.reference.trim(),
       },
     ];
+  }
+
+  async function lookupReturnVoucher(code: string) {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setReturnLookupBusy(true);
+    setError(null);
+    try {
+      const summary = await lookupSaleReturn(trimmed);
+      setAppliedReturn(summary);
+      setReturnEntry("");
+      paymentsTouchedRef.current = false;
+    } catch (err: unknown) {
+      setAppliedReturn(null);
+      setError(getApiErrorMessage(err, "Return voucher not found"));
+    } finally {
+      setReturnLookupBusy(false);
+    }
   }
 
   function upsertScannedLine(row: SkuSearchResult): string | null {
@@ -648,7 +686,7 @@ export function SalePage() {
       {
         ...payment,
         method,
-        amount: method === "CASH" ? payment.amount : billTotal,
+        amount: method === "CASH" ? payment.amount : amountDue,
       },
     ]);
   }
@@ -867,9 +905,11 @@ export function SalePage() {
     }
     if (!canPost) {
       setError(
-        payment?.method === "CASH"
-          ? "Enter cash tender at least equal to the bill total (within max limit)"
-          : "Payment amount must match the bill total",
+        amountDue === 0 && appliedReturn
+          ? "Return credit covers the bill — confirm to pay cash back from till"
+          : payment?.method === "CASH"
+            ? "Enter cash tender at least equal to the amount due (within max limit)"
+            : "Payment amount must match the amount due",
       );
       return;
     }
@@ -895,6 +935,13 @@ export function SalePage() {
           skipForManager: canManageTill,
           cashPaymentTotal,
         });
+        if (cashBackFromCredit > 0) {
+          await assertTillCanPayRefund({
+            userId: user.id,
+            skipForManager: canManageTill,
+            refundAmount: cashBackFromCredit,
+          });
+        }
       } catch (err: unknown) {
         setError(getApiErrorMessage(err, "Till is not ready for this sale"));
         return;
@@ -1022,11 +1069,49 @@ export function SalePage() {
               },
             );
           }
-          await applyTillCashFromSale({
-            userId: user.id,
-            skipForManager: canManageTill,
-            cashPaymentTotal,
-          });
+          if (appliedReturn) {
+            await applyTillReturnCreditOnSale({
+              userId: user.id,
+              skipForManager: canManageTill,
+              cashPaymentTotal,
+              cashBackFromCredit,
+            });
+            const completedReturn =
+              await window.blackbox!.localDb!.completeSaleReturnWithSale!({
+                returnId: appliedReturn.id,
+                saleId: localId,
+                userId: user.id,
+                userName: resolvedCashierName,
+              });
+            await commitLocalChange({
+              entityType: "sale_return",
+              entityId: completedReturn.id,
+              operation: "UPSERT",
+              payload: completedReturn as unknown as Record<string, unknown>,
+            });
+            await logActivityEvent(
+              {
+                eventType: "sale.return_refunded",
+                actorUserId: user.id,
+                summary: `${resolvedCashierName} refunded return ${completedReturn.returnNumber} — Rs ${completedReturn.refundTotal.toLocaleString()} cash`,
+                metadata: {
+                  returnNumber: completedReturn.returnNumber,
+                  returnId: completedReturn.id,
+                  refundTotal: completedReturn.refundTotal,
+                  issuedByName: appliedReturn.issuedByName,
+                  appliedToSaleId: localId,
+                  completionMode: "SALE_OFFSET",
+                },
+              },
+              { actorName: resolvedCashierName },
+            );
+          } else {
+            await applyTillCashFromSale({
+              userId: user.id,
+              skipForManager: canManageTill,
+              cashPaymentTotal,
+            });
+          }
           const refreshed = await loadCurrentTill(user.id);
           setTillSession(refreshed);
           if (refreshed?.status === "CLOSED_LIMIT") {
@@ -1072,6 +1157,7 @@ export function SalePage() {
         customerName: resolvedCustomerName,
         cashTendered: resolvedCashTendered() ?? undefined,
         supervisorUserId: focSupervisorUserId ?? undefined,
+        pendingReturnId: appliedReturn?.id,
         items: lines.map((line) => ({
           productSkuId: line.productSkuId,
           quantity: line.quantity,
@@ -1550,6 +1636,71 @@ export function SalePage() {
                 {tax.total.toLocaleString()}
               </span>
             </div>
+            {appliedReturn ? (
+              <>
+                <div className="flex justify-between gap-4 text-sm">
+                  <span className="text-muted-foreground">
+                    Return credit ({appliedReturn.returnNumber})
+                  </span>
+                  <span className="font-medium tabular-nums text-green-700 dark:text-green-400">
+                    −{returnCredit.toLocaleString()}
+                  </span>
+                </div>
+                {cashBackFromCredit > 0 ? (
+                  <div className="flex justify-between gap-4 text-sm">
+                    <span className="text-muted-foreground">Cash back</span>
+                    <span className="font-medium tabular-nums">
+                      {cashBackFromCredit.toLocaleString()}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="border-border flex justify-between gap-4 border-t pt-3">
+                  <span className="text-base font-semibold">Amount due</span>
+                  <span className="text-2xl font-bold tabular-nums tracking-tight">
+                    {amountDue.toLocaleString()}
+                  </span>
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="returnVoucherEntry">Return voucher (optional)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="returnVoucherEntry"
+                placeholder="Scan or enter return #"
+                value={returnEntry}
+                disabled={returnLookupBusy}
+                onChange={(event) => setReturnEntry(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void lookupReturnVoucher(returnEntry);
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={returnLookupBusy || !returnEntry.trim()}
+                onClick={() => void lookupReturnVoucher(returnEntry)}
+              >
+                Apply
+              </Button>
+              {appliedReturn ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setAppliedReturn(null);
+                    paymentsTouchedRef.current = false;
+                  }}
+                >
+                  Clear
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           <FormEnterNav>
@@ -1607,7 +1758,7 @@ export function SalePage() {
                       id="paymentAmount"
                       type="number"
                       min={0}
-                      max={isCashPayment ? cashMaxTender : billTotal}
+                      max={isCashPayment ? cashMaxTender : amountDue}
                       step="any"
                       placeholder={isCashPayment ? "Tendered" : "Amount"}
                       className="h-12 text-lg tabular-nums"
@@ -1646,7 +1797,14 @@ export function SalePage() {
                   ) : null}
                   {isCashPayment ? (
                     <div className="rounded-md bg-muted/50 px-3 py-3 text-lg">
-                      {tendered >= billTotal ? (
+                      {amountDue === 0 && appliedReturn ? (
+                        <div className="flex justify-between gap-4 font-semibold">
+                          <span>Cash back from credit</span>
+                          <span className="text-xl tabular-nums">
+                            {cashBackFromCredit.toLocaleString()}
+                          </span>
+                        </div>
+                      ) : tendered >= amountDue ? (
                         <div className="flex justify-between gap-4 font-semibold">
                           <span>Change</span>
                           <span className="text-xl text-green-700 tabular-nums dark:text-green-400">

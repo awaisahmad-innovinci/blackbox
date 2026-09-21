@@ -260,6 +260,82 @@ export async function loadSaleReturn(id: string): Promise<SaleReturnDetail> {
   return saleReturnsApi.get(id);
 }
 
+export async function lookupSaleReturn(
+  returnNumber: string,
+): Promise<import("@blackbox/shared").SaleReturnLookupSummary> {
+  try {
+    const local = await window.blackbox?.localDb?.lookupSaleReturn?.(returnNumber);
+    if (local) return local;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (
+      message.startsWith("Already processed by") ||
+      message === "Return voucher not found"
+    ) {
+      throw err;
+    }
+    /* fall through for online lookup */
+  }
+  return saleReturnsApi.lookup(returnNumber);
+}
+
+export type ResolvedSaleRef = { id: string; saleNumber: string };
+export type ResolvedSaleReturnRef = { id: string; returnNumber: string };
+
+export async function resolveSaleByNumber(
+  saleNumber: string,
+): Promise<ResolvedSaleRef | null> {
+  const trimmed = saleNumber.trim();
+  if (!trimmed) return null;
+
+  try {
+    const local = await window.blackbox?.localDb?.resolveSaleByNumber?.(trimmed);
+    if (local !== undefined) return local;
+  } catch {
+    /* fall through */
+  }
+
+  const remote = await salesApi.list({ search: trimmed, pageSize: 5 });
+  const match = remote.items.find(
+    (item) => item.saleNumber.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return match ? { id: match.id, saleNumber: match.saleNumber } : null;
+}
+
+export async function resolveSaleReturnByNumber(
+  returnNumber: string,
+): Promise<ResolvedSaleReturnRef | null> {
+  const trimmed = returnNumber.trim();
+  if (!trimmed) return null;
+
+  try {
+    const local =
+      await window.blackbox?.localDb?.resolveSaleReturnByNumber?.(trimmed);
+    if (local !== undefined) return local;
+  } catch {
+    /* fall through */
+  }
+
+  const remote = await saleReturnsApi.list({ search: trimmed, pageSize: 5 });
+  const match = remote.items.find(
+    (item) => item.returnNumber.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return match ? { id: match.id, returnNumber: match.returnNumber } : null;
+}
+
+export async function loadSaleReturnCreditForSale(
+  saleId: string,
+): Promise<{ returnNumber: string; amount: number } | null> {
+  try {
+    const local =
+      await window.blackbox?.localDb?.getSaleReturnCreditForSale?.(saleId);
+    if (local) return local;
+  } catch {
+    /* optional */
+  }
+  return null;
+}
+
 export async function loadReturnableSaleLines(
   saleId: string,
 ): Promise<ReturnableSaleLine[]> {

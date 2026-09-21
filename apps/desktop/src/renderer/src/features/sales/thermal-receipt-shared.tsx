@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import JsBarcode from "jsbarcode";
+import { useEffect, useRef, type ReactNode } from "react";
 
 export function formatMoney(value: number): string {
   return value.toLocaleString(undefined, {
@@ -86,6 +87,39 @@ export function ThermalMetaRow({
     <div className="flex justify-between gap-2 text-left text-[11px]">
       <span className="font-semibold">{label}</span>
       <span className="text-right tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+export function ThermalReceiptBarcode({ value }: { value: string }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const trimmed = value.trim();
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !trimmed || trimmed === "DRAFT") return;
+
+    svg.innerHTML = "";
+    try {
+      JsBarcode(svg, trimmed, {
+        format: "CODE128",
+        width: 1.5,
+        height: 40,
+        displayValue: true,
+        fontSize: 10,
+        margin: 0,
+        textMargin: 2,
+      });
+    } catch {
+      /* invalid barcode value */
+    }
+  }, [trimmed]);
+
+  if (!trimmed || trimmed === "DRAFT") return null;
+
+  return (
+    <div className="thermal-receipt-barcode mx-auto w-full max-w-[60mm] break-inside-avoid py-1">
+      <svg ref={svgRef} className="mx-auto block h-auto w-full" />
     </div>
   );
 }

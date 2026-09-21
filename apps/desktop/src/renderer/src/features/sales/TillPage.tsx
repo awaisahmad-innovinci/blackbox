@@ -56,7 +56,7 @@ export function TillPage() {
   const navigate = useNavigate();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
-  const { canReadTill, canManageTill, canWrite } = useSalesAccess();
+  const { canReadTill, canManageTill, canWrite, canRefund } = useSalesAccess();
   const { promptSupervisorTotp } = useSupervisorTotp();
   const requireTillApproval = user?.requireManagerApprovalTillOpen ?? true;
   const requireTillWithdrawApproval =
@@ -130,6 +130,21 @@ export function TillPage() {
 
   useEffect(() => {
     void refresh();
+  }, [user?.id, canManageTill]);
+
+  useEffect(() => {
+    function onFocus() {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    }
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [user?.id, canManageTill]);
 
   async function onOpenTillDirect(): Promise<void> {
@@ -321,6 +336,11 @@ export function TillPage() {
                 Printer settings
               </Button>
             </>
+          ) : null}
+          {canRefund ? (
+            <Button variant="outline" onClick={() => navigate("/sales/refund-return")}>
+              Refund return
+            </Button>
           ) : null}
           <Button variant="outline" onClick={() => navigate("/sales/new")}>
             Back to sale

@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
@@ -38,6 +40,8 @@ import {
 } from "../inventory/inventory-out/inventory-out-balance";
 import { CreateSaleDto, ListSalesQueryDto } from "./dto/sale.dto";
 import { TillsService } from "../tills/tills.service";
+import { SaleReturnsService } from "./sale-returns/sale-returns.service";
+import { SaleReturn } from "../db/entities";
 
 function toNum(value: string | null | undefined): number {
   if (value == null || value === "") return 0;
@@ -53,6 +57,8 @@ export class SalesService {
   constructor(
     private readonly fixedTenant: FixedTenantContext,
     private readonly tills: TillsService,
+    @Inject(forwardRef(() => SaleReturnsService))
+    private readonly saleReturns: SaleReturnsService,
     private readonly dataSource: DataSource,
     @InjectRepository(Sale) private readonly sales: Repository<Sale>,
     @InjectRepository(SaleLine) private readonly saleLines: Repository<SaleLine>,
@@ -177,9 +183,6 @@ export class SalesService {
     if (!dto.items?.length) {
       throw new BadRequestException("At least one line item is required");
     }
-    if (!dto.payments?.length) {
-      throw new BadRequestException("At least one payment is required");
-    }
 
     const merged = new Map<
       string,
@@ -250,19 +253,45 @@ export class SalesService {
       [...merged.values()].reduce((sum, line) => sum + line.lineTotal, 0),
     );
     const tax = saleBillTotals(subtotal, gstRate, salesTaxRate);
+
+    let pendingReturn: SaleReturn | null = null;
+    let billDue = tax.total;
+    let cashBackFromCredit = 0;
+    if (dto.pendingReturnId) {
+      pendingReturn = await this.dataSource.manager.findOne(SaleReturn, {
+        where: {
+          id: dto.pendingReturnId,
+          tenantId,
+          status: "PENDING",
+        },
+      });
+      if (!pendingReturn) {
+        throw new BadRequestException("Pending return voucher not found");
+      }
+      const credit = round4(toNum(pendingReturn.refundTotal));
+      billDue = round4(Math.max(0, tax.total - credit));
+      cashBackFromCredit = round4(Math.max(0, credit - tax.total));
+    }
+
     const paymentTotal = round4(
-      dto.payments.reduce((sum, p) => sum + Number(p.amount), 0),
+      (dto.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0),
     );
-    if (round4(paymentTotal) !== tax.total) {
+    if (round4(paymentTotal) !== billDue) {
       throw new BadRequestException(
-        `Payment total (${paymentTotal}) must equal bill total (${tax.total})`,
+        `Payment total (${paymentTotal}) must equal amount due (${billDue})`,
       );
+    }
+    if (billDue === 0 && cashBackFromCredit === 0 && !dto.pendingReturnId) {
+      throw new BadRequestException("At least one payment is required");
+    }
+    if (billDue > 0 && (!dto.payments?.length)) {
+      throw new BadRequestException("At least one payment is required");
     }
 
     const ctx = getRequestTenant();
     const postedAt = new Date();
     const cashPaymentTotal = round4(
-      dto.payments
+      (dto.payments ?? [])
         .filter((p) => p.method === "CASH")
         .reduce((sum, p) => sum + Number(p.amount), 0),
     );
@@ -275,6 +304,15 @@ export class SalesService {
         user.permissions,
         cashPaymentTotal,
       );
+      if (cashBackFromCredit > 0) {
+        await this.tills.assertCanPayCashRefund(
+          this.dataSource.manager,
+          tenantId,
+          ctx.userId,
+          user.permissions,
+          cashBackFromCredit,
+        );
+      }
     }
 
     const customerName =
@@ -423,7 +461,7 @@ export class SalesService {
       }
 
       const detailPayments: SaleDetail["payments"] = [];
-      for (const payment of dto.payments) {
+      for (const payment of dto.payments ?? []) {
         const paymentId = randomUUID();
         await manager.save(
           manager.create(SalePayment, {
@@ -450,6 +488,24 @@ export class SalesService {
           ctx.userId,
           user.permissions,
           cashPaymentTotal,
+        );
+        if (cashBackFromCredit > 0) {
+          await this.tills.applyCashRefund(
+            manager,
+            tenantId,
+            ctx.userId,
+            user.permissions,
+            cashBackFromCredit,
+          );
+        }
+      }
+
+      if (pendingReturn && ctx?.userId) {
+        await this.saleReturns.completeWithSale(
+          manager,
+          pendingReturn.id,
+          header.id,
+          user,
         );
       }
 

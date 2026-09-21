@@ -57,21 +57,9 @@ const MANAGER_CARDS: {
   },
   {
     key: "customerReturnCount",
-    label: "Customer returns (today)",
-    hint: "Posted returns for the store today",
+    label: "Returns issued (today)",
+    hint: "Pending and completed return vouchers today",
     format: "count",
-  },
-  {
-    key: "refundTotalAmount",
-    label: "Refunds issued (today)",
-    hint: "Refund amount you processed today",
-    format: "money",
-  },
-  {
-    key: "netAfterRefundsAmount",
-    label: "Net after refunds",
-    hint: "Till cash collected minus refunds you issued",
-    format: "money",
   },
 ];
 
@@ -125,6 +113,18 @@ const CASHIER_CARDS: {
     label: "Held bills",
     hint: "Your held bills on this device",
     format: "count",
+  },
+  {
+    key: "refundTotalAmount",
+    label: "Refunds paid (today)",
+    hint: "Cash refunds you completed today",
+    format: "money",
+  },
+  {
+    key: "cashInHandAmount",
+    label: "Cash in hand (today)",
+    hint: "Cash received minus refunds paid today",
+    format: "money",
   },
 ];
 
@@ -187,6 +187,8 @@ export function DashboardPage() {
             cashReceivedAmount: 0,
             cardPaymentsAmount: 0,
             heldBillsCount: 0,
+            refundTotalAmount: 0,
+            cashInHandAmount: 0,
           });
         }
         setSummary(null);
@@ -210,8 +212,6 @@ export function DashboardPage() {
                 date: new Date().toISOString().slice(0, 10),
                 tillCashCollectedAmount: 0,
                 customerReturnCount: 0,
-                refundTotalAmount: 0,
-                netAfterRefundsAmount: 0,
               });
             }
           }

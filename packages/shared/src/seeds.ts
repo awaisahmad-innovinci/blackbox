@@ -37,5 +37,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "purchasing.access",
     "vendors.access",
   ],
-  CASHIER: ["desktop.access", "sync.use", "sales.write", "till.read"],
+  CASHIER: [
+    "desktop.access",
+    "sync.use",
+    "sales.write",
+    "sales.refund",
+    "till.read",
+  ],
 };

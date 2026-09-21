@@ -7,12 +7,12 @@ import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { salesApi } from "@renderer/lib/api/sales";
-import { loadSale } from "@renderer/lib/local-db/entity-source";
+import { loadSale, loadSaleReturnCreditForSale } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
-import { SaleThermalReceipt } from "./sale-thermal-receipt";
+import { SaleThermalReceipt, type SaleReturnCreditReceipt } from "./sale-thermal-receipt";
 import { useSession } from "@renderer/lib/session/context";
 
 export function SaleDetailPage() {
@@ -23,6 +23,8 @@ export function SaleDetailPage() {
   const permissions = user?.permissions ?? [];
   const { canReadList, canVoid, canWrite } = useSalesAccess();
   const [detail, setDetail] = useState<SaleDetail | null>(null);
+  const [returnCredit, setReturnCredit] =
+    useState<SaleReturnCreditReceipt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
@@ -38,10 +40,19 @@ export function SaleDetailPage() {
     if (!id) return;
     let cancelled = false;
     setLoading(true);
-    void loadSale(id)
-      .then((row) => {
+    void Promise.all([loadSale(id), loadSaleReturnCreditForSale(id)])
+      .then(([row, credit]) => {
         if (!cancelled) {
           setDetail(row);
+          if (credit && row.status === "POSTED") {
+            setReturnCredit({
+              returnNumber: credit.returnNumber,
+              amount: credit.amount,
+              cashBack: Math.max(0, credit.amount - row.total),
+            });
+          } else {
+            setReturnCredit(null);
+          }
           setError(null);
         }
       })
@@ -205,6 +216,7 @@ export function SaleDetailPage() {
             cashierName={
               detail.postedByName?.trim() || user?.fullName?.trim() || "—"
             }
+            returnCredit={returnCredit ?? undefined}
           />
         </PrintDocument>
       ) : null}

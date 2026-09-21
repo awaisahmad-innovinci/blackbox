@@ -130,6 +130,8 @@ export interface CashierDashboardSummary {
   cashReceivedAmount: number;
   cardPaymentsAmount: number;
   heldBillsCount: number;
+  refundTotalAmount: number;
+  cashInHandAmount: number;
 }
 
 /** Manager reports — floor (POS out) vs warehouse stock per SKU. */

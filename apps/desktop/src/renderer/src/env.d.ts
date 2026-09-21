@@ -185,6 +185,29 @@ declare global {
         getSaleReturn: (id: string) => Promise<SaleReturnDetail | null>;
         getReturnableSaleLines: (saleId: string) => Promise<ReturnableSaleLine[]>;
         upsertSaleReturn: (detail: SaleReturnDetail) => Promise<{ ok: true }>;
+        lookupSaleReturn: (
+          returnNumber: string,
+        ) => Promise<import("@blackbox/shared").SaleReturnLookupSummary>;
+        resolveSaleByNumber: (
+          saleNumber: string,
+        ) => Promise<{ id: string; saleNumber: string } | null>;
+        resolveSaleReturnByNumber: (
+          returnNumber: string,
+        ) => Promise<{ id: string; returnNumber: string } | null>;
+        getSaleReturnCreditForSale: (
+          saleId: string,
+        ) => Promise<{ returnNumber: string; amount: number } | null>;
+        completeSaleReturnStandalone: (input: {
+          returnId: string;
+          userId: string;
+          userName: string;
+        }) => Promise<SaleReturnDetail>;
+        completeSaleReturnWithSale: (input: {
+          returnId: string;
+          saleId: string;
+          userId: string;
+          userName: string;
+        }) => Promise<SaleReturnDetail>;
         getCurrentTill: (userId: string) => Promise<TillSessionDetail | null>;
         getLatestTillSession: (userId: string) => Promise<TillSessionDetail | null>;
         listTills: (query?: {
@@ -242,6 +265,22 @@ declare global {
           userId: string;
           skipForManager?: boolean;
           cashPaymentTotal: number;
+        }) => Promise<{ ok: true }>;
+        applyTillCashRefund: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          refundAmount: number;
+        }) => Promise<{ ok: true }>;
+        applyTillReturnCreditOnSale: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          cashPaymentTotal: number;
+          cashBackFromCredit: number;
+        }) => Promise<{ ok: true }>;
+        assertTillCanPayRefund: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          refundAmount: number;
         }) => Promise<{ ok: true }>;
         appendPendingActivityLog: (input: {
           id: string;

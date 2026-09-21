@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -9,9 +10,12 @@ import type {
   ReturnableSaleLine,
   SaleDetail,
   SalePaymentMethod,
+  SaleReturnCompletionMode,
   SaleReturnDetail,
   SaleReturnLineRow,
   SaleReturnListItem,
+  SaleReturnLookupSummary,
+  SaleReturnStatus,
 } from "@blackbox/shared";
 import {
   lineTotalAfterDiscount,
@@ -36,6 +40,8 @@ import {
 } from "../../db/entities";
 import { FixedTenantContext } from "../../inventory/common/fixed-tenant.context";
 import { applyInventoryOutBalanceDelta } from "../../inventory/inventory-out/inventory-out-balance";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
+import { TillsService } from "../../tills/tills.service";
 import { SalesService } from "../sales.service";
 import {
   CreateSaleReturnDto,
@@ -57,6 +63,8 @@ export class SaleReturnsService {
     private readonly fixedTenant: FixedTenantContext,
     private readonly dataSource: DataSource,
     private readonly salesService: SalesService,
+    private readonly tills: TillsService,
+    private readonly activityLog: ActivityLogService,
     @InjectRepository(SaleReturn)
     private readonly saleReturns: Repository<SaleReturn>,
     @InjectRepository(SaleReturnLine)
@@ -117,7 +125,9 @@ export class SaleReturnsService {
       .createQueryBuilder("r")
       .leftJoinAndSelect("r.sale", "sale")
       .leftJoinAndSelect("r.warehouse", "warehouse")
+      .leftJoinAndSelect("r.issuedByUser", "issuer")
       .leftJoinAndSelect("r.processedByUser", "processor")
+      .leftJoinAndSelect("r.refundedByUser", "refunder")
       .where("r.tenant_id = :tenantId", { tenantId });
 
     if (query.warehouseId) {
@@ -195,10 +205,15 @@ export class SaleReturnsService {
       warehouseId: row.warehouseId,
       warehouseName: row.warehouse?.name ?? "—",
       returnDate: row.returnDate,
+      status: row.status as SaleReturnStatus,
       refundTotal: toNum(row.refundTotal),
       refundMethod: row.refundMethod as SalePaymentMethod,
       lineCount: lineCounts.get(row.id) ?? 0,
-      processedByName: row.processedByUser?.fullName?.trim() ?? null,
+      issuedByName:
+        row.issuedByUser?.fullName?.trim() ||
+        row.processedByUser?.fullName?.trim() ||
+        null,
+      refundedByName: row.refundedByUser?.fullName?.trim() ?? null,
       createdAt: row.createdAt.toISOString(),
     }));
 
@@ -212,7 +227,9 @@ export class SaleReturnsService {
       relations: {
         sale: { warehouse: true },
         warehouse: true,
+        issuedByUser: true,
         processedByUser: true,
+        refundedByUser: true,
       },
     });
     if (!header) throw new NotFoundException("Sale return not found");
@@ -336,10 +353,10 @@ export class SaleReturnsService {
 
       const tax = saleBillTotals(subtotal, gstRate, salesTaxRate);
       const headerId = randomUUID();
-      const processor = await manager.getRepository(User).findOne({
+      const issuer = await manager.getRepository(User).findOne({
         where: { id: user.userId, tenantId },
       });
-      const processorName = processor?.fullName?.trim() || null;
+      const issuerName = issuer?.fullName?.trim() || null;
 
       await manager.save(
         manager.create(SaleReturn, {
@@ -349,7 +366,7 @@ export class SaleReturnsService {
           saleId: sale.id,
           warehouseId: sale.warehouseId,
           returnDate,
-          status: "POSTED",
+          status: "PENDING",
           subtotal: String(subtotal),
           gstRate: String(gstRate),
           gstAmount: String(tax.gstAmount),
@@ -359,6 +376,8 @@ export class SaleReturnsService {
           refundMethod,
           notes: dto.notes?.trim() ?? "",
           processedBy: user.userId,
+          issuedBy: user.userId,
+          issuedByName: issuerName,
         }),
       );
 
@@ -444,11 +463,226 @@ export class SaleReturnsService {
 
       const saleDetail = await this.salesService.getById(sale.id);
       const detail = await this.toDetail(saved);
-      detail.processedByName = processorName;
+      detail.issuedByName = issuerName;
+      detail.processedByName = issuerName;
       detail.sale = saleDetail;
       detail.items = detailLines;
+
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "sale.return_issued",
+        actorUserId: user.userId,
+        summary: `${issuerName ?? "Manager"} issued return ${returnNumber} — refund Rs ${tax.total.toLocaleString()}`,
+        metadata: {
+          returnNumber,
+          returnId: headerId,
+          saleNumber: sale.saleNumber,
+          saleId: sale.id,
+          refundTotal: tax.total,
+          issuedByName: issuerName,
+          lineCount: detailLines.length,
+        },
+      });
+
       return detail;
     });
+  }
+
+  async lookup(returnNumber: string): Promise<SaleReturnLookupSummary> {
+    const tenantId = this.fixedTenant.tenantId;
+    const trimmed = returnNumber.trim();
+    if (!trimmed) throw new BadRequestException("Return number is required");
+
+    const header = await this.saleReturns.findOne({
+      where: { tenantId, returnNumber: trimmed },
+      relations: { sale: true, issuedByUser: true, refundedByUser: true },
+    });
+    if (!header) throw new NotFoundException("Return voucher not found");
+
+    if (header.status === "COMPLETED") {
+      const cashierName =
+        header.refundedByName?.trim() ||
+        header.refundedByUser?.fullName?.trim() ||
+        "cashier";
+      throw new ConflictException(
+        `Already processed by ${cashierName}`,
+      );
+    }
+
+    const lineCount = await this.saleReturnLines.count({
+      where: { saleReturnId: header.id, tenantId },
+    });
+
+    return {
+      id: header.id,
+      returnNumber: header.returnNumber,
+      status: header.status as SaleReturnStatus,
+      refundTotal: toNum(header.refundTotal),
+      refundMethod: header.refundMethod as SalePaymentMethod,
+      saleId: header.saleId,
+      saleNumber: header.sale?.saleNumber ?? "—",
+      issuedByName:
+        header.issuedByName?.trim() ||
+        header.issuedByUser?.fullName?.trim() ||
+        null,
+      refundedByName: null,
+      refundedAt: null,
+      lineCount,
+    };
+  }
+
+  async completeStandalone(
+    id: string,
+    user: TenantContext,
+  ): Promise<SaleReturnDetail> {
+    const tenantId = this.fixedTenant.tenantId;
+    return this.dataSource.transaction(async (manager) => {
+      const header = await manager.getRepository(SaleReturn).findOne({
+        where: { id, tenantId },
+        relations: {
+          sale: { warehouse: true },
+          warehouse: true,
+          issuedByUser: true,
+        },
+      });
+      if (!header) throw new NotFoundException("Sale return not found");
+
+      if (header.status === "COMPLETED") {
+        const cashierName =
+          header.refundedByName?.trim() ||
+          header.refundedByUser?.fullName?.trim() ||
+          "cashier";
+        throw new ConflictException(
+          `Already processed by ${cashierName}`,
+        );
+      }
+      if (header.status !== "PENDING") {
+        throw new BadRequestException("Return is not pending refund");
+      }
+
+      const refundTotal = toNum(header.refundTotal);
+      await this.tills.assertCanPayCashRefund(
+        manager,
+        tenantId,
+        user.userId,
+        user.permissions,
+        refundTotal,
+      );
+
+      const cashier = await manager.getRepository(User).findOne({
+        where: { id: user.userId, tenantId },
+      });
+      const cashierName = cashier?.fullName?.trim() || null;
+      const now = new Date();
+
+      header.status = "COMPLETED";
+      header.refundedBy = user.userId;
+      header.refundedByName = cashierName;
+      header.refundedAt = now;
+      header.completionMode = "STANDALONE_CASH";
+      await manager.save(header);
+
+      await this.tills.applyCashRefund(
+        manager,
+        tenantId,
+        user.userId,
+        user.permissions,
+        refundTotal,
+      );
+
+      const issuerName =
+        header.issuedByName?.trim() ||
+        header.issuedByUser?.fullName?.trim() ||
+        null;
+
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "sale.return_refunded",
+        actorUserId: user.userId,
+        summary: `${cashierName ?? "Cashier"} refunded return ${header.returnNumber} — Rs ${refundTotal.toLocaleString()} cash`,
+        metadata: {
+          returnNumber: header.returnNumber,
+          returnId: header.id,
+          refundTotal,
+          issuedByName: issuerName,
+          completionMode: "STANDALONE_CASH" satisfies SaleReturnCompletionMode,
+        },
+      });
+
+      return this.toDetail(header);
+    });
+  }
+
+  async completeWithSale(
+    manager: EntityManager,
+    returnId: string,
+    saleId: string,
+    user: TenantContext,
+  ): Promise<void> {
+    const tenantId = this.fixedTenant.tenantId;
+    const header = await manager.getRepository(SaleReturn).findOne({
+      where: { id: returnId, tenantId },
+      relations: { issuedByUser: true },
+    });
+    if (!header) throw new NotFoundException("Sale return not found");
+
+    if (header.status === "COMPLETED") {
+      const cashierName =
+        header.refundedByName?.trim() ||
+        header.refundedByUser?.fullName?.trim() ||
+        "cashier";
+      throw new ConflictException(
+        `Already processed by ${cashierName}`,
+      );
+    }
+    if (header.status !== "PENDING") {
+      throw new BadRequestException("Return is not pending refund");
+    }
+
+    const cashier = await manager.getRepository(User).findOne({
+      where: { id: user.userId, tenantId },
+    });
+    const cashierName = cashier?.fullName?.trim() || null;
+    const now = new Date();
+
+    header.status = "COMPLETED";
+    header.refundedBy = user.userId;
+    header.refundedByName = cashierName;
+    header.refundedAt = now;
+    header.appliedToSaleId = saleId;
+    header.completionMode = "SALE_OFFSET";
+    await manager.save(header);
+
+    const issuerName =
+      header.issuedByName?.trim() ||
+      header.issuedByUser?.fullName?.trim() ||
+      null;
+
+    await this.activityLog.logFromContext({
+      tenantId,
+      eventType: "sale.return_refunded",
+      actorUserId: user.userId,
+      summary: `${cashierName ?? "Cashier"} refunded return ${header.returnNumber} — Rs ${toNum(header.refundTotal).toLocaleString()} cash`,
+      metadata: {
+        returnNumber: header.returnNumber,
+        returnId: header.id,
+        refundTotal: toNum(header.refundTotal),
+        issuedByName: issuerName,
+        appliedToSaleId: saleId,
+        completionMode: "SALE_OFFSET" satisfies SaleReturnCompletionMode,
+      },
+    });
+  }
+
+  async completeWithSaleEndpoint(
+    id: string,
+    saleId: string,
+    user: TenantContext,
+  ): Promise<SaleReturnDetail> {
+    await this.dataSource.transaction(async (manager) => {
+      await this.completeWithSale(manager, id, saleId, user);
+    });
+    return this.getById(id);
   }
 
   private primaryRefundMethod(
@@ -506,7 +740,7 @@ export class SaleReturnsService {
       warehouseId: header.warehouseId,
       warehouseName: header.warehouse?.name ?? saleDetail.warehouseName,
       returnDate: header.returnDate,
-      status: "POSTED",
+      status: header.status as SaleReturnStatus,
       subtotal: toNum(header.subtotal),
       gstRate: toNum(header.gstRate),
       gstAmount: toNum(header.gstAmount),
@@ -515,8 +749,25 @@ export class SaleReturnsService {
       refundTotal: toNum(header.refundTotal),
       refundMethod: header.refundMethod as SalePaymentMethod,
       notes: header.notes,
-      processedBy: header.processedBy,
-      processedByName: header.processedByUser?.fullName?.trim() ?? null,
+      processedBy: header.processedBy ?? header.issuedBy,
+      processedByName:
+        header.issuedByName?.trim() ||
+        header.issuedByUser?.fullName?.trim() ||
+        header.processedByUser?.fullName?.trim() ||
+        null,
+      issuedBy: header.issuedBy ?? header.processedBy,
+      issuedByName:
+        header.issuedByName?.trim() ||
+        header.issuedByUser?.fullName?.trim() ||
+        header.processedByUser?.fullName?.trim() ||
+        null,
+      refundedBy: header.refundedBy,
+      refundedByName: header.refundedByName?.trim() ||
+        header.refundedByUser?.fullName?.trim() ||
+        null,
+      refundedAt: header.refundedAt?.toISOString() ?? null,
+      appliedToSaleId: header.appliedToSaleId,
+      completionMode: (header.completionMode as SaleReturnCompletionMode | null) ?? null,
       sale: saleDetail,
       items: lines.map((l) => ({
         id: l.id,

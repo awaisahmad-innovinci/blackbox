@@ -801,3 +801,100 @@ export function assertTillCanPostSaleLocal(input: {
     );
   }
 }
+
+export function applyTillCashRefundLocal(input: {
+  userId: string;
+  refundAmount: number;
+  skipForManager?: boolean;
+}): void {
+  if (input.skipForManager || input.refundAmount <= 0) return;
+
+  const row = findActiveSession(input.userId);
+  if (!row || row.status !== "OPEN") {
+    throw new Error("Open your till before paying refunds");
+  }
+
+  if (input.refundAmount > row.current_cash_balance) {
+    throw new Error("Till does not have enough cash for this refund");
+  }
+
+  const db = getLocalDb();
+  const nextBalance =
+    Math.round((row.current_cash_balance - input.refundAmount) * 10000) /
+    10000;
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+    update till_sessions
+    set current_cash_balance = @nextBalance, updated_at = @now
+    where id = @id
+  `,
+  ).run({ id: row.id, nextBalance, now });
+}
+
+export function applyTillReturnCreditOnSaleLocal(input: {
+  userId: string;
+  cashPaymentTotal: number;
+  cashBackFromCredit: number;
+  skipForManager?: boolean;
+}): void {
+  if (input.skipForManager) return;
+
+  const row = findActiveSession(input.userId);
+  if (!row || row.status !== "OPEN") {
+    throw new Error("Open your till before posting sales");
+  }
+
+  const netChange =
+    Math.round((input.cashPaymentTotal - input.cashBackFromCredit) * 10000) /
+    10000;
+
+  if (input.cashBackFromCredit > row.current_cash_balance) {
+    throw new Error("Till does not have enough cash for return credit payout");
+  }
+
+  const nextBalance =
+    Math.round((row.current_cash_balance + netChange) * 10000) / 10000;
+  const db = getLocalDb();
+  const now = new Date().toISOString();
+
+  if (nextBalance >= row.max_cash_limit) {
+    db.prepare(
+      `
+      update till_sessions
+      set current_cash_balance = @nextBalance,
+          status = 'CLOSED_LIMIT',
+          closed_at = @now,
+          close_reason = 'LIMIT_REACHED',
+          updated_at = @now
+      where id = @id
+    `,
+    ).run({ id: row.id, nextBalance, now });
+    return;
+  }
+
+  db.prepare(
+    `
+    update till_sessions
+    set current_cash_balance = @nextBalance, updated_at = @now
+    where id = @id
+  `,
+  ).run({ id: row.id, nextBalance, now });
+}
+
+export function assertTillCanPayRefundLocal(input: {
+  userId: string;
+  refundAmount: number;
+  skipForManager?: boolean;
+}): void {
+  if (input.skipForManager || input.refundAmount <= 0) return;
+
+  const row = findActiveSession(input.userId);
+  if (!row || row.status !== "OPEN") {
+    throw new Error("Open your till before paying refunds");
+  }
+  if (input.refundAmount > row.current_cash_balance) {
+    throw new Error("Till does not have enough cash for this refund");
+  }
+}

@@ -66,6 +66,7 @@ export function SaleReturnDetailPage() {
   }
 
   const managerName =
+    detail.issuedByName?.trim() ||
     detail.processedByName?.trim() ||
     user?.fullName?.trim() ||
     user?.username ||
@@ -97,15 +98,25 @@ export function SaleReturnDetailPage() {
             <dd>{detail.returnDate}</dd>
           </div>
           <div>
+            <dt className="text-muted-foreground">Status</dt>
+            <dd>{detail.status === "PENDING" ? "Pending refund" : "Completed"}</dd>
+          </div>
+          <div>
             <dt className="text-muted-foreground">Refund</dt>
             <dd className="font-semibold tabular-nums">
               {detail.refundTotal.toFixed(2)} ({detail.refundMethod})
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Processed by</dt>
+            <dt className="text-muted-foreground">Issued by</dt>
             <dd>{managerName}</dd>
           </div>
+          {detail.refundedByName ? (
+            <div>
+              <dt className="text-muted-foreground">Refunded by</dt>
+              <dd>{detail.refundedByName}</dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-muted-foreground">Original sale</dt>
             <dd>

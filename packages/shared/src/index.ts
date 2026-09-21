@@ -340,6 +340,9 @@ export type {
   PaginatedSaleReturns,
   CreateSaleReturnLineRequest,
   CreateSaleReturnRequest,
+  SaleReturnStatus,
+  SaleReturnCompletionMode,
+  SaleReturnLookupSummary,
   ManagerDashboardSummary,
 } from "./sales";
 export {

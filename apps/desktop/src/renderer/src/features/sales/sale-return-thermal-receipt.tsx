@@ -2,6 +2,7 @@ import type { SalePaymentMethod, SaleReturnDetail } from "@blackbox/shared";
 import {
   THERMAL_RECEIPT_CLASS,
   ThermalMetaRow,
+  ThermalReceiptBarcode,
   ThermalReceiptHeader,
   ThermalRule,
   ThermalTotalsRow,
@@ -32,6 +33,7 @@ export function SaleReturnThermalReceipt({
   const sale = detail.sale;
   const returnDate = formatReceiptDateTime(`${detail.returnDate}T12:00:00`);
   const salePosted = formatReceiptDateTime(sale.postedAt);
+  const isPending = detail.status === "PENDING";
 
   return (
     <article data-thermal-receipt className={THERMAL_RECEIPT_CLASS}>
@@ -45,9 +47,16 @@ export function SaleReturnThermalReceipt({
       <section className="space-y-0.5 text-left">
         <p className="text-center text-sm font-bold">CUSTOMER RETURN</p>
         {detail.returnNumber === "DRAFT" ? (
-          <p className="text-center text-[11px] font-bold">*** DRAFT — NOT POSTED ***</p>
+          <p className="text-center text-[11px] font-bold">*** DRAFT — NOT ISSUED ***</p>
+        ) : isPending ? (
+          <p className="text-center text-[11px] font-bold">
+            PENDING — present to cashier for refund
+          </p>
         ) : null}
         <ThermalMetaRow label="Return #" value={detail.returnNumber} />
+        {detail.returnNumber !== "DRAFT" ? (
+          <ThermalReceiptBarcode value={detail.returnNumber} />
+        ) : null}
         <ThermalMetaRow label="Date" value={returnDate.date} />
         <ThermalMetaRow label="Manager" value={managerName} />
       </section>
@@ -154,7 +163,7 @@ export function SaleReturnThermalReceipt({
           />
         ) : null}
         <ThermalTotalsRow
-          label="Refund"
+          label="Refund total"
           value={formatMoney(detail.refundTotal)}
           bold
         />
@@ -163,7 +172,9 @@ export function SaleReturnThermalReceipt({
           value={paymentMethodLabel(detail.refundMethod)}
         />
         <p className="pt-0.5 text-center text-[10px]">
-          Refund recorded — not deducted from till
+          {isPending
+            ? "Cashier will refund at till — present this voucher"
+            : "Refund completed"}
         </p>
       </section>
     </article>

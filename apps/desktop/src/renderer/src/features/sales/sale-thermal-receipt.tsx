@@ -2,6 +2,7 @@ import type { SaleDetail, SalePaymentMethod } from "@blackbox/shared";
 import {
   THERMAL_RECEIPT_CLASS,
   ThermalMetaRow,
+  ThermalReceiptBarcode,
   ThermalReceiptHeader,
   ThermalRule,
   ThermalTotalsRow,
@@ -22,16 +23,24 @@ function round4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
+export type SaleReturnCreditReceipt = {
+  returnNumber: string;
+  amount: number;
+  cashBack?: number;
+};
+
 export function SaleThermalReceipt({
   detail,
   businessName,
   businessAddress,
   cashierName,
+  returnCredit,
 }: {
   detail: SaleDetail;
   businessName: string;
   businessAddress?: string;
   cashierName: string;
+  returnCredit?: SaleReturnCreditReceipt;
 }) {
   const totalItems = detail.items.length;
   const totalQty = detail.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -45,10 +54,15 @@ export function SaleThermalReceipt({
   );
   const hasFoc = totalFoc > 0;
   const { date, time } = formatReceiptDateTime(detail.postedAt);
+  const creditAmount = returnCredit?.amount ?? 0;
+  const netAmount = round4(Math.max(0, detail.total - creditAmount));
+  const cashBackFromCredit =
+    returnCredit?.cashBack ?? round4(Math.max(0, creditAmount - detail.total));
+  const amountDue = netAmount;
   const hasCashOverpay =
-    detail.cashTendered != null && detail.cashTendered > detail.total;
+    detail.cashTendered != null && detail.cashTendered > amountDue;
   const cashChange = hasCashOverpay
-    ? round4(detail.cashTendered! - detail.total)
+    ? round4(detail.cashTendered! - amountDue)
     : 0;
   const nonCashPayments = detail.payments.filter(
     (payment) => payment.method !== "CASH",
@@ -73,6 +87,8 @@ export function SaleThermalReceipt({
           <p className="pt-0.5 text-center text-sm font-bold">*** VOID ***</p>
         ) : null}
       </section>
+
+      <ThermalReceiptBarcode value={detail.saleNumber} />
 
       <ThermalRule />
 
@@ -124,6 +140,10 @@ export function SaleThermalReceipt({
             <ThermalTotalsRow label="Qty incl. FOC" value={totalQtyInclFoc} />
           </>
         ) : null}
+        <ThermalTotalsRow
+          label="Subtotal"
+          value={formatMoney(detail.subtotal)}
+        />
         {detail.gstAmount > 0 ? (
           <ThermalTotalsRow
             label={`GST (${detail.gstRate}%)`}
@@ -136,18 +156,34 @@ export function SaleThermalReceipt({
             value={formatMoney(detail.salesTaxAmount)}
           />
         ) : null}
+        <ThermalTotalsRow
+          label="Bill total"
+          value={formatMoney(detail.total)}
+        />
+        {returnCredit ? (
+          <ThermalTotalsRow
+            label={`Return credit (${returnCredit.returnNumber})`}
+            value={`−${formatMoney(returnCredit.amount)}`}
+          />
+        ) : null}
+        {returnCredit && cashBackFromCredit > 0 ? (
+          <ThermalTotalsRow
+            label="Cash back"
+            value={formatMoney(cashBackFromCredit)}
+          />
+        ) : null}
         {hasCashOverpay ? (
           <>
             <ThermalTotalsRow
               label="Paid"
               value={formatMoney(detail.cashTendered!)}
             />
-            <ThermalTotalsRow label="Cash Back" value={formatMoney(cashChange)} />
+            <ThermalTotalsRow label="Change" value={formatMoney(cashChange)} />
           </>
         ) : null}
         <ThermalTotalsRow
           label="Net Amount"
-          value={formatMoney(detail.total)}
+          value={formatMoney(netAmount)}
           bold
         />
         {nonCashPayments.map((payment) => (

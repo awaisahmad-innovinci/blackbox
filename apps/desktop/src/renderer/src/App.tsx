@@ -47,6 +47,7 @@ import { SaleReturnsListPage } from "./features/sales/SaleReturnsListPage";
 import { SaleReturnPickerPage } from "./features/sales/SaleReturnPickerPage";
 import { SaleReturnFormPage } from "./features/sales/SaleReturnFormPage";
 import { SaleReturnDetailPage } from "./features/sales/SaleReturnDetailPage";
+import { SaleReturnRefundPage } from "./features/sales/SaleReturnRefundPage";
 import { TillPage } from "./features/sales/TillPage";
 import { ActivityLogPage } from "./features/activity/ActivityLogPage";
 
@@ -174,6 +175,7 @@ function AuthenticatedApp() {
           />
           <Route path="sales/returns/:id" element={<SaleReturnDetailPage />} />
           <Route path="sales/held" element={<HeldSalesPage />} />
+          <Route path="sales/refund-return" element={<SaleReturnRefundPage />} />
           <Route path="sales/till" element={<TillPage />} />
           <Route path="activity" element={<ActivityLogPage />} />
           <Route path="sales/new/:draftId" element={<SalePage />} />
