@@ -6,6 +6,9 @@ import type {
   Category,
   DashboardSummary,
   EntityStatus,
+  ManagerDashboardSummary,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   GoodsReceiptDetail,
   GoodsReceiptListQuery,
   InventoryInOutReport,
@@ -54,6 +57,8 @@ import type {
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PendingVendorReturnLine,
+  PosPrinterInfo,
+  PosPrinterSettings,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -271,6 +276,12 @@ declare global {
         getCashierDashboardSummary: (
           userId: string,
         ) => Promise<CashierDashboardSummary>;
+        getManagerDashboardSummary: (
+          userId: string,
+        ) => Promise<ManagerDashboardSummary>;
+        listManagerStockOverview: (
+          query?: ManagerStockOverviewQuery,
+        ) => Promise<PaginatedManagerStockOverview>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
         listCategories: (status?: EntityStatus | "all") => Promise<Category[]>;
@@ -377,6 +388,15 @@ declare global {
           deviceId: string;
           instanceId: string;
         }) => Promise<{ ok: true }>;
+      };
+      pos?: {
+        getPrinterSettings: () => Promise<PosPrinterSettings>;
+        savePrinterSettings: (
+          settings: PosPrinterSettings,
+        ) => Promise<{ ok: true }>;
+        listPrinters: () => Promise<PosPrinterInfo[]>;
+        openCashDrawer: () => Promise<{ ok: true }>;
+        testDrawer: () => Promise<{ ok: true }>;
       };
       sync?: {
         listOutbox: (limit?: number) => Promise<unknown>;

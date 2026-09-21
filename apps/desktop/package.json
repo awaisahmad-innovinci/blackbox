@@ -19,6 +19,7 @@
   "dependencies": {
     "@blackbox/shared": "workspace:*",
     "@blackbox/ui": "workspace:*",
+    "@grandchef/node-printer": "^0.8.0",
     "better-sqlite3": "^13.0.3",
     "otpauth": "^9.5.2",
     "react": "^19.1.0",

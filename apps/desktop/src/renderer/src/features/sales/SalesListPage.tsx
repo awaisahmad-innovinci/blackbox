@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { SaleListItem, WarehouseListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
@@ -131,6 +131,10 @@ export function SalesListPage() {
               </>
             ) : null}
           </div>
+        ) : canReadList ? (
+          <Button variant="outline" asChild>
+            <Link to="/sales/stock-overview">Floor &amp; warehouse stock</Link>
+          </Button>
         ) : null}
       </div>
 

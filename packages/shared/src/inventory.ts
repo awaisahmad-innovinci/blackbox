@@ -132,6 +132,37 @@ export interface CashierDashboardSummary {
   heldBillsCount: number;
 }
 
+/** Manager reports — floor (POS out) vs warehouse stock per SKU. */
+export interface ManagerStockOverviewRow {
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  floorQuantity: number;
+  warehouseQuantity: number;
+  totalQuantity: number;
+  reorderLevel: number;
+}
+
+export interface ManagerStockOverviewQuery {
+  warehouseId?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedManagerStockOverview {
+  items: ManagerStockOverviewRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  floorTotal: number;
+  warehouseTotal: number;
+}
+
 export interface VendorContactInput {
   name?: string | null;
   phone?: string | null;

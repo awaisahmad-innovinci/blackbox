@@ -150,7 +150,7 @@ export function SaleDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {!isDraft ? <PrintButton /> : null}
+            {!isDraft ? <PrintButton openDrawerOnPrint /> : null}
             {isDraft && canWrite ? (
               <>
                 <Button onClick={() => navigate(`/sales/new/${detail.id}`)}>

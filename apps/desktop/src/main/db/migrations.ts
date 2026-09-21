@@ -1305,6 +1305,12 @@ where units_per_purchase_unit > 0;
       where till_name = '' and trim(user_name) != '';
     `,
   },
+  {
+    id: "034_sale_line_quantity_corrected",
+    sql: `
+      alter table sale_lines add column quantity_corrected integer not null default 0;
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

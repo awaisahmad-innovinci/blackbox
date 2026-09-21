@@ -1655,6 +1655,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
          l.line_total as lineTotal,
          coalesce(l.discount_percent, 0) as discountPercent,
          coalesce(l.foc_quantity, 0) as focQuantity,
+         coalesce(l.quantity_corrected, 0) as quantityCorrected,
          l.sell_unit as sellUnit
        from sale_lines l
        left join product_skus sk on sk.id = l.product_sku_id
@@ -1712,6 +1713,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
       sellUnit: (r.sellUnit as "pc" | "box") ?? "pc",
       discountPercent: num(r.discountPercent),
       focQuantity: num(r.focQuantity),
+      quantityCorrected: Number(r.quantityCorrected) === 1,
     })),
     payments: payments.map((r) => ({
       id: String(r.id),

@@ -23,6 +23,7 @@ import { Label } from "@blackbox/ui/label";
 import { SearchableMultiSelect } from "@blackbox/ui/searchable-multi-select";
 import { PageHeader } from "@/components/page-header";
 import { LoadingState, PageError } from "@/components/page-state";
+import { RequirePermission } from "@/components/require-permission";
 import {
   listVendors,
   listWarehouses,
@@ -157,7 +158,8 @@ export default function InventoryReportsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <RequirePermission permissions={["inventory.access"]}>
+      <div className="space-y-8">
       <PageHeader
         title="Inventory in / out"
         description="Purchase receipts and inventory out for a date, month, or year range."
@@ -383,6 +385,7 @@ export default function InventoryReportsPage() {
         </>
       )}
     </div>
+    </RequirePermission>
   );
 }
 

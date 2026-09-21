@@ -5,6 +5,9 @@ import type {
   Category,
   DashboardSummary,
   EntityStatus,
+  ManagerDashboardSummary,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   GoodsReceiptDetail,
   GoodsReceiptListQuery,
   InventoryInOutReport,
@@ -52,6 +55,8 @@ import type {
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PendingVendorReturnLine,
+  PosPrinterInfo,
+  PosPrinterSettings,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -338,6 +343,16 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getCashierDashboardSummary",
         userId,
       ) as Promise<CashierDashboardSummary>,
+    getManagerDashboardSummary: (userId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getManagerDashboardSummary",
+        userId,
+      ) as Promise<ManagerDashboardSummary>,
+    listManagerStockOverview: (query?: ManagerStockOverviewQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listManagerStockOverview",
+        query ?? {},
+      ) as Promise<PaginatedManagerStockOverview>,
     listBrands: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke("localDb:listBrands", status) as Promise<Brand[]>,
     getBrand: (id: string) =>
@@ -563,6 +578,20 @@ contextBridge.exposeInMainWorld("blackbox", {
       deviceId: string;
       instanceId: string;
     }) => ipcRenderer.invoke("identity:bind", identity) as Promise<{ ok: true }>,
+  },
+  pos: {
+    getPrinterSettings: () =>
+      ipcRenderer.invoke("pos:getPrinterSettings") as Promise<PosPrinterSettings>,
+    savePrinterSettings: (settings: PosPrinterSettings) =>
+      ipcRenderer.invoke("pos:savePrinterSettings", settings) as Promise<{
+        ok: true;
+      }>,
+    listPrinters: () =>
+      ipcRenderer.invoke("pos:listPrinters") as Promise<PosPrinterInfo[]>,
+    openCashDrawer: () =>
+      ipcRenderer.invoke("pos:openCashDrawer") as Promise<{ ok: true }>,
+    testDrawer: () =>
+      ipcRenderer.invoke("pos:testDrawer") as Promise<{ ok: true }>,
   },
   sync: {
     listOutbox: (limit?: number) => ipcRenderer.invoke("sync:listOutbox", limit),

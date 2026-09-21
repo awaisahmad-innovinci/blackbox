@@ -51,6 +51,7 @@ import {
   loadCurrentTill,
 } from "@renderer/lib/local-db/till-source";
 import { AddSaleItemDialog } from "./AddSaleItemDialog";
+import { AdjustSaleQtyDialog } from "./AdjustSaleQtyDialog";
 import { CollectCashDialog } from "./CollectCashDialog";
 import { allocateHoldNumber, allocateSaleNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
@@ -76,6 +77,7 @@ type DraftSaleLine = {
   sellingPricePerPurchaseUnit: number | null;
   discountPercent: number;
   focQuantity: number;
+  quantityCorrected?: boolean;
   lastScanMultiplier?: number;
 };
 
@@ -147,6 +149,10 @@ export function SalePage() {
   const [scanDraft, setScanDraft] = useState("");
   const [itemOpen, setItemOpen] = useState(false);
   const [removeScanOpen, setRemoveScanOpen] = useState(false);
+  const [adjustScanOpen, setAdjustScanOpen] = useState(false);
+  const [adjustQtyOpen, setAdjustQtyOpen] = useState(false);
+  const [adjustQtyLine, setAdjustQtyLine] = useState<DraftSaleLine | null>(null);
+  const [adjustingQty, setAdjustingQty] = useState(false);
   const [showCustomerField, setShowCustomerField] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,9 +212,9 @@ export function SalePage() {
   }, []);
 
   useEffect(() => {
-    if (loadingDraft || !warehouseId || itemOpen || removeScanOpen) return;
+    if (loadingDraft || !warehouseId || itemOpen || removeScanOpen || adjustScanOpen || adjustQtyOpen) return;
     focusScanInput();
-  }, [loadingDraft, warehouseId, itemOpen, removeScanOpen, focusScanInput]);
+  }, [loadingDraft, warehouseId, itemOpen, removeScanOpen, adjustScanOpen, adjustQtyOpen, focusScanInput]);
 
   useEffect(() => {
     if (!routeDraftId) {
@@ -263,6 +269,7 @@ export function SalePage() {
               sellingPricePerPurchaseUnit: null,
               discountPercent: item.discountPercent ?? 0,
               focQuantity: item.focQuantity ?? 0,
+              quantityCorrected: item.quantityCorrected ?? false,
             };
           }),
         );
@@ -407,6 +414,7 @@ export function SalePage() {
         unitPrice,
         lineTotal: lineTotal(line),
         sellUnit: line.sellUnit,
+        ...(line.quantityCorrected ? { quantityCorrected: true } : {}),
       };
     });
     const paymentRows = payment
@@ -595,6 +603,8 @@ export function SalePage() {
       !loadingDraft &&
       !itemOpen &&
       !removeScanOpen &&
+      !adjustScanOpen &&
+      !adjustQtyOpen &&
       Boolean(warehouseId),
     inputRef: scanInputRef,
     onScan: setScanDraft,
@@ -716,6 +726,98 @@ export function SalePage() {
         },
       );
     }
+    setError(null);
+    return true;
+  }
+
+  function openAdjustQtyDialog(line: DraftSaleLine): void {
+    if (line.quantityCorrected) {
+      setError("Quantity already corrected for this item");
+      return;
+    }
+    setAdjustQtyLine(line);
+    setAdjustQtyOpen(true);
+    setError(null);
+  }
+
+  async function onAdjustBarcodeEnter(scannedCode: string) {
+    setError(null);
+    const code = scannedCode.trim();
+    if (!code) return;
+
+    const line = await resolveLineForRemoveScan(code);
+    if (!line) {
+      setError(NOT_ON_BILL_ERROR);
+      return;
+    }
+    setAdjustScanOpen(false);
+    openAdjustQtyDialog(line);
+  }
+
+  async function adjustBillLineQuantity(
+    line: DraftSaleLine,
+    newQuantity: number,
+  ): Promise<boolean> {
+    if (line.quantityCorrected) {
+      setError("Quantity already corrected for this item");
+      return false;
+    }
+    if (newQuantity >= line.quantity || newQuantity <= 0) {
+      setError("New quantity must be less than current and greater than zero");
+      return false;
+    }
+    if (round4(newQuantity + line.focQuantity) > line.quantityAvailable) {
+      setError(
+        `Cannot exceed POS balance (${line.quantityAvailable}) for ${line.sku}`,
+      );
+      return false;
+    }
+
+    let supervisorUserId: string | null = null;
+    let supervisorDisplayName: string | null = null;
+    if (requireTotp) {
+      const totp = await promptSupervisorTotp();
+      if (!totp.approved) return false;
+      supervisorUserId = totp.supervisorUserId;
+      supervisorDisplayName = totp.supervisorDisplayName;
+    }
+
+    const oldQuantity = line.quantity;
+    setLines((prev) =>
+      prev.map((row) =>
+        row.productSkuId === line.productSkuId
+          ? {
+              ...row,
+              quantity: round4(newQuantity),
+              quantityCorrected: true,
+            }
+          : row,
+      ),
+    );
+
+    if (user?.id) {
+      const actorName = user.fullName?.trim() || user.username;
+      await logActivityEvent(
+        {
+          eventType: "sale.line_qty_adjusted",
+          actorUserId: user.id,
+          supervisorUserId,
+          summary: `Adjusted ${line.sku} qty ${oldQuantity} → ${newQuantity}`,
+          metadata: {
+            sku: line.sku,
+            productName: line.productName,
+            variantName: line.variantName,
+            oldQuantity,
+            newQuantity,
+          },
+        },
+        {
+          actorName,
+          supervisorName: supervisorDisplayName,
+        },
+      );
+    }
+
     setError(null);
     return true;
   }
@@ -1051,6 +1153,11 @@ export function SalePage() {
         if (lines.length > 0) setRemoveScanOpen(true);
         return;
       }
+      if (event.key === "F8") {
+        event.preventDefault();
+        if (lines.length > 0) setAdjustScanOpen(true);
+        return;
+      }
       if (event.key === "F6") {
         event.preventDefault();
         if (canHold && !holding) void onHoldBill();
@@ -1258,6 +1365,15 @@ export function SalePage() {
               type="button"
               variant="outline"
               size="sm"
+              disabled={lines.length === 0}
+              onClick={() => setAdjustScanOpen(true)}
+            >
+              Adjust qty (F8)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               disabled={!canHold || holding}
               onClick={() => void onHoldBill()}
             >
@@ -1328,9 +1444,27 @@ export function SalePage() {
                             Max {line.quantityAvailable} (qty + FOC)
                           </p>
                         ) : null}
+                        {line.quantityCorrected ? (
+                          <p className="text-muted-foreground text-xs">
+                            Qty corrected
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.quantity.toLocaleString()}
+                        <div className="flex items-center gap-2">
+                          <span>{line.quantity.toLocaleString()}</span>
+                          {!line.quantityCorrected ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground h-7 px-2 text-xs"
+                              onClick={() => openAdjustQtyDialog(line)}
+                            >
+                              Adjust
+                            </Button>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-3 py-2 tabular-nums">
                         {line.discountPercent.toLocaleString()}
@@ -1560,7 +1694,7 @@ export function SalePage() {
         hints={[
           KEYBOARD_HINT_SCAN,
           KEYBOARD_HINT_SAVE,
-          "F1 remove · F4 tender · F5 cash · F9 card · F6 hold · F7 held bills",
+          "F1 remove · F8 adjust qty · F4 tender · F5 cash · F9 card · F6 hold · F7 held bills",
           KEYBOARD_HINT_ENTER,
         ]}
       />
@@ -1573,6 +1707,43 @@ export function SalePage() {
         layer="dialog"
         returnFocusTo="#saleScanInput"
         onComplete={(code) => void onRemoveBarcodeEnter(code)}
+      />
+
+      <ScanBarcodePanel
+        open={adjustScanOpen}
+        onOpenChange={setAdjustScanOpen}
+        title="Adjust quantity"
+        description="Scan the barcode of an item on this bill to correct its quantity."
+        layer="dialog"
+        returnFocusTo="#saleScanInput"
+        onComplete={(code) => void onAdjustBarcodeEnter(code)}
+      />
+
+      <AdjustSaleQtyDialog
+        open={adjustQtyOpen}
+        line={adjustQtyLine}
+        busy={adjustingQty}
+        onOpenChange={(open) => {
+          setAdjustQtyOpen(open);
+          if (!open) {
+            setAdjustQtyLine(null);
+            focusScanInput();
+          }
+        }}
+        onApply={async (newQuantity) => {
+          if (!adjustQtyLine) return;
+          setAdjustingQty(true);
+          try {
+            const ok = await adjustBillLineQuantity(adjustQtyLine, newQuantity);
+            if (ok) {
+              setAdjustQtyOpen(false);
+              setAdjustQtyLine(null);
+              focusScanInput();
+            }
+          } finally {
+            setAdjustingQty(false);
+          }
+        }}
       />
 
       <AddSaleItemDialog

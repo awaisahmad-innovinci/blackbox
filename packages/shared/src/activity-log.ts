@@ -1,5 +1,6 @@
 export const ACTIVITY_LOG_EVENT_TYPES = [
   "sale.line_removed",
+  "sale.line_qty_adjusted",
   "sale.foc_posted",
   "sale.return_posted",
   "till.opened",
@@ -53,6 +54,7 @@ export type CreateActivityLogRequest = {
 
 export const ACTIVITY_LOG_EVENT_LABELS: Record<ActivityLogEventType, string> = {
   "sale.line_removed": "Sale line removed",
+  "sale.line_qty_adjusted": "Sale line quantity adjusted",
   "sale.foc_posted": "FOC sale posted",
   "sale.return_posted": "Customer sale return",
   "till.opened": "Till opened",

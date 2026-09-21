@@ -84,7 +84,7 @@ export function SaleReturnDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <PrintButton />
+            <PrintButton openDrawerOnPrint />
             <Button variant="outline" onClick={() => navigate("/sales/returns")}>
               Back to list
             </Button>

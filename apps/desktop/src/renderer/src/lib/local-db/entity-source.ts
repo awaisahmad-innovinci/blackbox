@@ -37,6 +37,8 @@ import type {
   PaginatedVendorReturns,
   PaginatedGoodsReceipts,
   PaginatedProducts,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   PendingVendorReturnLine,
   ProductListQuery,
   VendorSku,
@@ -44,6 +46,7 @@ import type {
   WarehouseStockRow,
 } from "@blackbox/shared";
 import { ApiError } from "@renderer/lib/api/client";
+import { dashboardApi } from "@renderer/lib/api/dashboard";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
@@ -394,6 +397,18 @@ export async function loadWarehouses(
     /* fall through to API */
   }
   return warehousesApi.list({ status });
+}
+
+export async function loadManagerStockOverview(
+  query: ManagerStockOverviewQuery = {},
+): Promise<PaginatedManagerStockOverview> {
+  try {
+    const local = await window.blackbox?.localDb?.listManagerStockOverview?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through to API */
+  }
+  return dashboardApi.listManagerStockOverview(query);
 }
 
 export async function loadWarehouse(id: string): Promise<WarehouseListItem> {

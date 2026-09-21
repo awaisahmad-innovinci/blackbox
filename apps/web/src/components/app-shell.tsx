@@ -62,7 +62,7 @@ const NAV: {
   {
     href: "/app/inventory/reports",
     label: "Inventory report",
-    permission: null,
+    permission: "inventory.access",
     icon: BarChart3,
   },
   {

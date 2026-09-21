@@ -5,7 +5,8 @@ import type { DefaultRole } from "./roles";
 /**
  * Phase 1 default role → permission seeds.
  * OWNER is the tenant administrator (all Phase 1 permissions except POS sales.write).
- * MANAGER does not receive web.access, roles.write, devices.manage, or sales.write.
+ * MANAGER: desktop sales supervision only — no web.access or inventory modules.
+ * WAREHOUSE_MANAGER: desktop inventory modules only — no sales or web.access.
  */
 /** Owner gets all Phase 1 permissions except POS sale creation (cashier-only). */
 const OWNER_PERMISSIONS: Permission[] = PERMISSIONS.filter(
@@ -19,12 +20,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
   OWNER: OWNER_PERMISSIONS,
   MANAGER: [
     "desktop.access",
-    "users.read",
-    "users.write",
-    "roles.read",
-    "permissions.read",
-    "devices.read",
-    "tenant.settings.read",
     "sync.use",
     "sales.read",
     "sales.void",
@@ -32,8 +27,15 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "till.read",
     "till.manage",
     "activity.read",
-    "warehouses.write",
   ],
-  WAREHOUSE_MANAGER: ["desktop.access", "sync.use"],
+  WAREHOUSE_MANAGER: [
+    "desktop.access",
+    "sync.use",
+    "warehouses.read",
+    "warehouses.write",
+    "inventory.access",
+    "purchasing.access",
+    "vendors.access",
+  ],
   CASHIER: ["desktop.access", "sync.use", "sales.write", "till.read"],
 };

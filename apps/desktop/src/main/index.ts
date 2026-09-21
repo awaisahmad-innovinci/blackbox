@@ -12,6 +12,7 @@ import type {
   InventoryOutListQuery,
   InventoryOutReturnDetail,
   InventoryOutReturnListQuery,
+  ManagerStockOverviewQuery,
   ProductDetail,
   ProductListQuery,
   ProductSkuDetail,
@@ -166,6 +167,8 @@ import {
 import {
   getCashierDashboardSummaryLocal,
   getDashboardSummaryLocal,
+  getManagerDashboardSummaryLocal,
+  listManagerStockOverviewLocal,
   listBrandsLocal,
   getBrandLocal,
   listCategoriesLocal,
@@ -215,6 +218,9 @@ import {
   resetStalePushing,
 } from "./db/outbox-local";
 import { applyPullBatch, commitLocalMutation } from "./db/sync-apply";
+import { registerPosHandlers } from "./pos/register-pos-handlers";
+
+let appMainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
   const preloadPath = join(__dirname, "../preload/index.js");
@@ -253,6 +259,8 @@ function createWindow(): void {
   } else {
     void mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
+
+  appMainWindow = mainWindow;
 }
 
 function registerIpc(): void {
@@ -700,6 +708,15 @@ function registerIpc(): void {
     (_event, userId: string) => getCashierDashboardSummaryLocal(userId),
   );
   ipcMain.handle(
+    "localDb:getManagerDashboardSummary",
+    (_event, userId: string) => getManagerDashboardSummaryLocal(userId),
+  );
+  ipcMain.handle(
+    "localDb:listManagerStockOverview",
+    (_event, query: ManagerStockOverviewQuery) =>
+      listManagerStockOverviewLocal(query),
+  );
+  ipcMain.handle(
     "localDb:listBrands",
     (_event, status?: EntityStatus | "all") => listBrandsLocal(status),
   );
@@ -982,6 +999,8 @@ function registerIpc(): void {
     listSupervisorTotpUsersLocal(),
   );
   ipcMain.handle("localDb:hasSupervisorTotp", () => hasSupervisorTotpLocal());
+
+  registerPosHandlers(ipcMain, () => appMainWindow);
 }
 
 app.disableHardwareAcceleration();

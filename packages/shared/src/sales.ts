@@ -28,6 +28,8 @@ export interface SaleLineRow {
   sellUnit: SellUnit;
   discountPercent: number;
   focQuantity: number;
+  /** Draft bill only: one manager-approved qty correction already used on this line. */
+  quantityCorrected?: boolean;
 }
 
 export interface SaleDetail {
@@ -247,4 +249,14 @@ export interface CreateSaleReturnRequest {
   returnDate?: string;
   notes?: string;
   items: CreateSaleReturnLineRequest[];
+}
+
+/** Manager dashboard — today's till collections and refunds for the logged-in supervisor. */
+export interface ManagerDashboardSummary {
+  /** Local calendar date (YYYY-MM-DD). */
+  date: string;
+  tillCashCollectedAmount: number;
+  customerReturnCount: number;
+  refundTotalAmount: number;
+  netAfterRefundsAmount: number;
 }

@@ -147,6 +147,9 @@ export type {
   GoodsReceiptStatus,
   DashboardSummary,
   CashierDashboardSummary,
+  ManagerStockOverviewRow,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   VendorContactType,
   PaymentTerms,
   VendorContactInput,
@@ -337,6 +340,7 @@ export type {
   PaginatedSaleReturns,
   CreateSaleReturnLineRequest,
   CreateSaleReturnRequest,
+  ManagerDashboardSummary,
 } from "./sales";
 export {
   SALE_STATUSES,
@@ -465,3 +469,8 @@ export const normalizeStoredText = normalizeStoredTextFn;
 export const normalizeOptionalStoredText = normalizeOptionalStoredTextFn;
 
 export { buildReceivedAtIso, formatStoredDateTime } from "./datetime";
+
+export type { PosPrinterSettings, PosPrinterInfo } from "./pos-hardware";
+export {
+  DEFAULT_POS_PRINTER_SETTINGS,
+} from "./pos-hardware";

@@ -77,6 +77,7 @@ export function AppShell() {
   const { activeIndex, setNavRef, handleMenubarKeyDown, onNavFocus } =
     useAppNavKeyboard({
       sections,
+      permissions,
       openNavDropdown,
       setOpenNavDropdown,
       onGlobalTaxonomyShortcut: setGlobalTaxonomyKind,

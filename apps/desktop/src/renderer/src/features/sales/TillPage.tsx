@@ -28,6 +28,7 @@ import {
 import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
 import { CollectCashDialog } from "@renderer/features/sales/CollectCashDialog";
 import { OpenTillDialog } from "@renderer/features/sales/OpenTillDialog";
+import { PosPrinterSettingsDialog } from "@renderer/features/sales/PosPrinterSettingsDialog";
 import { ReopenTillDialog } from "@renderer/features/sales/ReopenTillDialog";
 import {
   approveTill,
@@ -55,7 +56,7 @@ export function TillPage() {
   const navigate = useNavigate();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
-  const { canReadTill, canManageTill } = useSalesAccess();
+  const { canReadTill, canManageTill, canWrite } = useSalesAccess();
   const { promptSupervisorTotp } = useSupervisorTotp();
   const requireTillApproval = user?.requireManagerApprovalTillOpen ?? true;
   const requireTillWithdrawApproval =
@@ -78,6 +79,8 @@ export function TillPage() {
   >(null);
   const [managerForm, setManagerForm] = useState(createEmptyTillFormState());
   const [collectDialogOpen, setCollectDialogOpen] = useState(false);
+  const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
+  const [openingDrawer, setOpeningDrawer] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [openDialogOpen, setOpenDialogOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
@@ -278,6 +281,20 @@ export function TillPage() {
     ? validateTillCanCloseBalance(session.currentCashBalance)
     : null;
 
+  async function onOpenDrawer(): Promise<void> {
+    setOpeningDrawer(true);
+    setError(null);
+    try {
+      await window.blackbox?.pos?.openCashDrawer?.();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to open cash drawer"));
+    } finally {
+      setOpeningDrawer(false);
+    }
+  }
+
+  const showDrawerControls = canManageTill || canWrite;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -287,9 +304,28 @@ export function TillPage() {
             Cash drawer session and balance
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate("/sales/new")}>
-          Back to sale
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {showDrawerControls ? (
+            <>
+              <Button
+                variant="outline"
+                disabled={openingDrawer}
+                onClick={() => void onOpenDrawer()}
+              >
+                {openingDrawer ? "Opening…" : "Open drawer"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setPrinterSettingsOpen(true)}
+              >
+                Printer settings
+              </Button>
+            </>
+          ) : null}
+          <Button variant="outline" onClick={() => navigate("/sales/new")}>
+            Back to sale
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -660,6 +696,11 @@ export function TillPage() {
           onSuccess={(updated) => setSession(updated)}
         />
       ) : null}
+
+      <PosPrinterSettingsDialog
+        open={printerSettingsOpen}
+        onOpenChange={setPrinterSettingsOpen}
+      />
     </div>
   );
 }

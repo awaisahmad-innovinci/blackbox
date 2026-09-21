@@ -614,7 +614,7 @@ export function SaleReturnFormPage() {
         <Button onClick={() => setScanOpen(true)} disabled={scanBusy || saving}>
           Scan barcode
         </Button>
-        {draftReturnDetail ? <PrintButton /> : null}
+        {draftReturnDetail ? <PrintButton openDrawerOnPrint /> : null}
         <Button
           onClick={() => void onConfirm()}
           disabled={saving || activeLines.length === 0}
