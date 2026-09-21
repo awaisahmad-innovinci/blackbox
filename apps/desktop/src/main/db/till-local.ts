@@ -10,8 +10,10 @@ import type {
 import {
   computeTillDenominationTotal,
   emptyTillNotes,
+  formatTillName,
   TILL_CLOSE_REASON_CASHIER_CLOSED,
   tillMaxLimit,
+  validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -30,6 +32,7 @@ type TillRow = {
   tenant_id: string;
   user_id: string;
   user_name: string;
+  till_name: string;
   status: TillStatus;
   note_10: number;
   note_20: number;
@@ -66,12 +69,19 @@ function notesFromRow(row: TillRow): TillNoteCounts {
   };
 }
 
+function tillNameFromRow(row: TillRow): string {
+  if (row.till_name?.trim()) return row.till_name.trim();
+  const name = row.user_name?.trim();
+  return name ? `${name} till` : "till";
+}
+
 function rowToDetail(row: TillRow): TillSessionDetail {
   return {
     ...notesFromRow(row),
     id: row.id,
     userId: row.user_id,
     userName: row.user_name,
+    tillName: tillNameFromRow(row),
     status: row.status,
     openingTotal: row.opening_total,
     openingBalance: row.opening_balance,
@@ -95,6 +105,7 @@ function rowToListItem(row: TillRow): TillListItem {
     id: row.id,
     userId: row.user_id,
     userName: row.user_name,
+    tillName: tillNameFromRow(row),
     status: row.status,
     openingBalance: row.opening_balance,
     currentCashBalance: row.current_cash_balance,
@@ -182,6 +193,7 @@ export function listTillsLocal(query: {
 export function openTillLocal(input: {
   userId: string;
   userName: string;
+  tillUsername: string;
   body: OpenTillRequest;
   requireApproval: boolean;
 }): TillSessionDetail {
@@ -225,6 +237,7 @@ export function openTillLocal(input: {
     tenant_id: DEMO_STORE_TENANT_ID,
     user_id: input.userId,
     user_name: input.userName,
+    till_name: formatTillName(input.tillUsername),
     status,
     note_10: zeroNotes.note10,
     note_20: zeroNotes.note20,
@@ -252,13 +265,13 @@ export function openTillLocal(input: {
   db.prepare(
     `
     insert into till_sessions (
-      id, tenant_id, user_id, user_name, status,
+      id, tenant_id, user_id, user_name, till_name, status,
       note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
       opening_total, opening_balance, current_cash_balance, max_cash_limit,
       opened_at, closed_at, approved_by_user_id, approved_by_name, approved_at,
       reopened_by_user_id, reopened_by_name, close_reason, created_at, updated_at
     ) values (
-      @id, @tenant_id, @user_id, @user_name, @status,
+      @id, @tenant_id, @user_id, @user_name, @till_name, @status,
       @note_10, @note_20, @note_50, @note_100, @note_500, @note_1000, @note_5000,
       @opening_total, @opening_balance, @current_cash_balance, @max_cash_limit,
       @opened_at, @closed_at, @approved_by_user_id, @approved_by_name, @approved_at,
@@ -537,6 +550,9 @@ export function closeTillLocal(input: {
     throw new Error("Till must be open to close");
   }
 
+  const closeBalanceError = validateTillCanCloseBalance(row.current_cash_balance);
+  if (closeBalanceError) throw new Error(closeBalanceError);
+
   const db = getLocalDb();
   const now = new Date().toISOString();
   db.prepare(
@@ -595,6 +611,7 @@ export function reopenTillLocal(input: {
     tenant_id: DEMO_STORE_TENANT_ID,
     user_id: previous.user_id,
     user_name: previous.user_name,
+    till_name: previous.till_name || tillNameFromRow(previous),
     status: "OPEN",
     note_10: zeroNotes?.note10 ?? input.body.note10,
     note_20: zeroNotes?.note20 ?? input.body.note20,
@@ -622,13 +639,13 @@ export function reopenTillLocal(input: {
   db.prepare(
     `
     insert into till_sessions (
-      id, tenant_id, user_id, user_name, status,
+      id, tenant_id, user_id, user_name, till_name, status,
       note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
       opening_total, opening_balance, current_cash_balance, max_cash_limit,
       opened_at, closed_at, approved_by_user_id, approved_by_name, approved_at,
       reopened_by_user_id, reopened_by_name, close_reason, created_at, updated_at
     ) values (
-      @id, @tenant_id, @user_id, @user_name, @status,
+      @id, @tenant_id, @user_id, @user_name, @till_name, @status,
       @note_10, @note_20, @note_50, @note_100, @note_500, @note_1000, @note_5000,
       @opening_total, @opening_balance, @current_cash_balance, @max_cash_limit,
       @opened_at, @closed_at, @approved_by_user_id, @approved_by_name, @approved_at,
@@ -646,13 +663,13 @@ export function upsertTillSessionLocal(detail: TillSessionDetail): void {
   db.prepare(
     `
     insert into till_sessions (
-      id, tenant_id, user_id, user_name, status,
+      id, tenant_id, user_id, user_name, till_name, status,
       note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
       opening_total, opening_balance, current_cash_balance, max_cash_limit,
       opened_at, closed_at, approved_by_user_id, approved_by_name, approved_at,
       reopened_by_user_id, reopened_by_name, close_reason, created_at, updated_at
     ) values (
-      @id, @tenant_id, @user_id, @user_name, @status,
+      @id, @tenant_id, @user_id, @user_name, @till_name, @status,
       @note_10, @note_20, @note_50, @note_100, @note_500, @note_1000, @note_5000,
       @opening_total, @opening_balance, @current_cash_balance, @max_cash_limit,
       @opened_at, @closed_at, @approved_by_user_id, @approved_by_name, @approved_at,
@@ -660,6 +677,7 @@ export function upsertTillSessionLocal(detail: TillSessionDetail): void {
     )
     on conflict(id) do update set
       user_name = excluded.user_name,
+      till_name = excluded.till_name,
       status = excluded.status,
       note_10 = excluded.note_10,
       note_20 = excluded.note_20,
@@ -687,6 +705,7 @@ export function upsertTillSessionLocal(detail: TillSessionDetail): void {
     tenant_id: DEMO_STORE_TENANT_ID,
     user_id: detail.userId,
     user_name: detail.userName,
+    till_name: detail.tillName,
     status: detail.status,
     note_10: detail.note10,
     note_20: detail.note20,

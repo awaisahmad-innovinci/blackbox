@@ -7,9 +7,20 @@ import type {
   TillStatus,
   WithdrawTillRequest,
 } from "@blackbox/shared";
-import { computeTillDenominationTotal } from "@blackbox/shared";
+import { computeTillDenominationTotal, tillLogoutBlockMessage, tillSessionBlocksLogout } from "@blackbox/shared";
 import { tillsApi } from "@renderer/lib/api/tills";
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
+
+export async function getTillLogoutBlockMessage(input: {
+  userId: string;
+  permissions: string[];
+}): Promise<string | null> {
+  if (!input.permissions.includes("till.read")) return null;
+  if (input.permissions.includes("till.manage")) return null;
+  const session = await loadCurrentTill(input.userId);
+  if (!session || !tillSessionBlocksLogout(session)) return null;
+  return tillLogoutBlockMessage(session);
+}
 
 export async function loadCurrentTill(
   userId: string,
@@ -51,6 +62,7 @@ export async function loadTills(query: {
 export async function openTill(input: {
   userId: string;
   userName: string;
+  tillUsername: string;
   body: OpenTillRequest;
   requireApproval: boolean;
   supervisorDisplayName?: string;

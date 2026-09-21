@@ -1296,6 +1296,15 @@ where units_per_purchase_unit > 0;
     id: "032_sale_returns_processed_by_name",
     sql: `alter table sale_returns add column processed_by_name text;`,
   },
+  {
+    id: "033_till_sessions_till_name",
+    sql: `
+      alter table till_sessions add column till_name text not null default '';
+      update till_sessions
+      set till_name = trim(user_name) || ' till'
+      where till_name = '' and trim(user_name) != '';
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

@@ -363,6 +363,8 @@ export {
   TILL_WARNING_EXTRA_CASH,
   TILL_STATUSES,
   TILL_CLOSE_REASON_CASHIER_CLOSED,
+  TILL_MAX_CASH_BALANCE_TO_CLOSE,
+  TILL_ACTIVE_SESSION_STATUSES,
   computeTillDenominationTotal,
   tillMaxLimit,
   tillWarningThreshold,
@@ -371,6 +373,10 @@ export {
   emptyTillNotes,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
+  formatTillName,
+  validateTillCanCloseBalance,
+  tillSessionBlocksLogout,
+  tillLogoutBlockMessage,
 } from "./till";
 export type {
   ActivityLogEventType,
@@ -404,6 +410,7 @@ export {
   defaultOrderUnitForScan,
   lineTotalForPurchase,
   formatPoOrderQuantity,
+  poOrderUnitLabel,
 } from "./inventory";
 export {
   DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS,

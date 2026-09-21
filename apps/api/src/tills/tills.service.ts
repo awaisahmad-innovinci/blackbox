@@ -15,8 +15,10 @@ import type {
 } from "@blackbox/shared";
 import {
   computeTillDenominationTotal,
+  formatTillName,
   TILL_CLOSE_REASON_CASHIER_CLOSED,
   tillMaxLimit,
+  validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -136,6 +138,14 @@ export class TillsService {
       throw new NotFoundException("Tenant not found");
     }
 
+    const cashierUser = await this.users.findOne({
+      where: { id: ctx.userId, tenantId: ctx.tenantId },
+    });
+    if (!cashierUser) {
+      throw new NotFoundException("User not found");
+    }
+    const tillName = formatTillName(cashierUser.username);
+
     const openingBalance = round4(dto.openingBalance);
     const openingTotal = openingBalance;
     const maxLimit = round4(tillMaxLimit(openingBalance));
@@ -149,6 +159,7 @@ export class TillsService {
         id: randomUUID(),
         tenantId: ctx.tenantId,
         userId: ctx.userId,
+        tillName,
         status: "PENDING_APPROVAL",
         ...notesFromDto(dto),
         openingTotal: String(openingTotal),
@@ -165,6 +176,7 @@ export class TillsService {
       id: randomUUID(),
       tenantId: ctx.tenantId,
       userId: ctx.userId,
+      tillName,
       status: "OPEN",
       ...notesFromDto(dto),
       openingTotal: String(openingTotal),
@@ -360,6 +372,10 @@ export class TillsService {
 
     const now = new Date();
     const currentBalance = round4(toNum(row.currentCashBalance));
+    const closeBalanceError = validateTillCanCloseBalance(currentBalance);
+    if (closeBalanceError) {
+      throw new BadRequestException(closeBalanceError);
+    }
     row.status = "CLOSED";
     row.closedAt = now;
     row.closeReason = TILL_CLOSE_REASON_CASHIER_CLOSED;
@@ -489,6 +505,9 @@ export class TillsService {
       id: randomUUID(),
       tenantId: ctx.tenantId,
       userId: previous.userId,
+      tillName:
+        previous.tillName?.trim() ||
+        formatTillName(previous.user?.username ?? ""),
       status: "OPEN",
       ...(amountOnly
         ? {
@@ -702,6 +721,9 @@ export class TillsService {
       id: row.id,
       userId: row.userId,
       userName: row.user?.fullName?.trim() || "—",
+      tillName:
+        row.tillName?.trim() ||
+        formatTillName(row.user?.username ?? ""),
       status: row.status as TillSessionDetail["status"],
       openingTotal: toNum(row.openingTotal),
       openingBalance: toNum(row.openingBalance),
@@ -725,6 +747,9 @@ export class TillsService {
       id: row.id,
       userId: row.userId,
       userName: row.user?.fullName?.trim() || "—",
+      tillName:
+        row.tillName?.trim() ||
+        formatTillName(row.user?.username ?? ""),
       status: row.status as TillListItem["status"],
       openingBalance: toNum(row.openingBalance),
       currentCashBalance: toNum(row.currentCashBalance),

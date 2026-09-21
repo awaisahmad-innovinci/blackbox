@@ -139,61 +139,64 @@ export function SaleDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {detail.saleNumber}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {detail.warehouseName} · {isDraft ? "Held" : detail.status}
-          </p>
-        </div>
-        <div className="flex gap-2 print:hidden">
-          {!isDraft ? <PrintButton /> : null}
-          {isDraft && canWrite ? (
-            <>
-              <Button onClick={() => navigate(`/sales/new/${detail.id}`)}>
-                Resume
-              </Button>
+      <div className="print:hidden space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {detail.saleNumber}
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {detail.warehouseName} · {isDraft ? "Held" : detail.status}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {!isDraft ? <PrintButton /> : null}
+            {isDraft && canWrite ? (
+              <>
+                <Button onClick={() => navigate(`/sales/new/${detail.id}`)}>
+                  Resume
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={discarding}
+                  onClick={() => void onDiscardDraft()}
+                >
+                  {discarding ? "Discarding…" : "Discard"}
+                </Button>
+              </>
+            ) : null}
+            {canVoid && detail.status === "POSTED" ? (
               <Button
                 variant="destructive"
-                disabled={discarding}
-                onClick={() => void onDiscardDraft()}
+                disabled={voiding}
+                onClick={() => void onVoid()}
               >
-                {discarding ? "Discarding…" : "Discard"}
+                {voiding ? "Voiding…" : "Void sale"}
               </Button>
-            </>
-          ) : null}
-          {canVoid && detail.status === "POSTED" ? (
+            ) : null}
             <Button
-              variant="destructive"
-              disabled={voiding}
-              onClick={() => void onVoid()}
+              variant="outline"
+              onClick={() => navigate(isDraft ? "/sales/held" : "/sales")}
             >
-              {voiding ? "Voiding…" : "Void sale"}
+              Back to list
             </Button>
-          ) : null}
-          <Button
-            variant="outline"
-            onClick={() => navigate(isDraft ? "/sales/held" : "/sales")}
-          >
-            Back to list
-          </Button>
+          </div>
         </div>
+
+        {error ? (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        {isDraft ? (
+          <p className="text-muted-foreground text-sm">
+            This bill is held on this device only. Stock is reserved until you post
+            or discard it.
+          </p>
+        ) : null}
       </div>
-
-      {error ? (
-        <p className="text-destructive text-sm" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      {isDraft ? (
-        <p className="text-muted-foreground text-sm">
-          This bill is held on this device only. Stock is reserved until you post
-          or discard it.
-        </p>
-      ) : (
+      {!isDraft ? (
         <PrintDocument showStoreHeader={false}>
           <SaleThermalReceipt
             detail={detail}
@@ -204,7 +207,7 @@ export function SaleDetailPage() {
             }
           />
         </PrintDocument>
-      )}
+      ) : null}
     </div>
   );
 }

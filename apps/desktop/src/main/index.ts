@@ -523,6 +523,7 @@ function registerIpc(): void {
       input: {
         userId: string;
         userName: string;
+        tillUsername: string;
         body: OpenTillRequest;
         requireApproval: boolean;
       },

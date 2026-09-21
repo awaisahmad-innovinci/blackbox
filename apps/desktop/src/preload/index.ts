@@ -226,6 +226,7 @@ contextBridge.exposeInMainWorld("blackbox", {
     openTill: (input: {
       userId: string;
       userName: string;
+      tillUsername: string;
       body: OpenTillRequest;
       requireApproval: boolean;
     }) => ipcRenderer.invoke("localDb:openTill", input) as Promise<TillSessionDetail>,

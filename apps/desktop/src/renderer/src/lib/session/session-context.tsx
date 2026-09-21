@@ -13,6 +13,7 @@ import {
   fetchCurrentDevice,
   restoreDesktopSession,
 } from "@renderer/lib/api/auth";
+import { getTillLogoutBlockMessage } from "@renderer/lib/local-db/till-source";
 import { setOnSessionCleared } from "@renderer/lib/api/session";
 import { setDeviceRevoked } from "@renderer/lib/local-db/local-write";
 import { startAutoSync, stopAutoSync } from "@renderer/lib/sync/auto-sync";
@@ -154,13 +155,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    if (user) {
+      const block = await getTillLogoutBlockMessage({
+        userId: user.id,
+        permissions: user.permissions ?? [],
+      });
+      if (block) throw new Error(block);
+    }
     await desktopLogout();
     writeCachedUser(null);
     setUser(null);
     setOffline(false);
     setDeviceState("unknown");
     setStatus("signed-out");
-  }, []);
+  }, [user]);
 
   const value = useMemo<SessionValue>(
     () => ({

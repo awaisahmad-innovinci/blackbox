@@ -561,6 +561,7 @@ export function applyChange(change: SyncChangeDto): void {
       id: change.entityId,
       userId: str(p.userId),
       userName: str(p.userName),
+      tillName: str(p.tillName) || `${str(p.userName).trim()} till`.replace(/^ till$/, "till"),
       status: str(p.status, "OPEN") as TillSessionDetail["status"],
       note10: Number(p.note10 ?? 0),
       note20: Number(p.note20 ?? 0),

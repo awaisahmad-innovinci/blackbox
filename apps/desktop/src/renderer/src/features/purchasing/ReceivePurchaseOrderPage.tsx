@@ -18,7 +18,9 @@ import {
   goodsReceiptGrandTotal,
   landedUnitByQuantity,
   lineTotalAfterDiscount,
+  poOrderUnitLabel,
   roundMoney4,
+  toPurchaseQuantity,
   VENDOR_RETURN_REASON_LABELS,
 } from "@blackbox/shared";
 import { FORM_GRID } from "@renderer/lib/form-layout";
@@ -67,6 +69,14 @@ function saleChanged(line: DraftLine): boolean {
 
 function pricesChanged(line: DraftLine): boolean {
   return costChanged(line) || saleChanged(line);
+}
+
+function receivePurchaseQty(line: DraftLine): number {
+  return toPurchaseQuantity(
+    line.receiveQuantity,
+    line.orderUnit ?? "box",
+    line.unitsPerPurchaseUnit,
+  );
 }
 
 async function buildReceivedPurchaseOrderPayload(
@@ -385,7 +395,7 @@ export function ReceivePurchaseOrderPage() {
           (sum, l) =>
             sum +
             lineTotalAfterDiscount(
-              l.receiveQuantity,
+              receivePurchaseQty(l),
               l.receivingUnitCost,
               l.discountPercent,
             ),
@@ -398,6 +408,25 @@ export function ReceivePurchaseOrderPage() {
     () => lines.reduce((sum, line) => sum + line.receiveQuantity, 0),
     [lines],
   );
+  const totalReceivePurchaseQty = useMemo(
+    () =>
+      lines.reduce(
+        (sum, line) =>
+          sum + (receivePurchaseQty(line) > 0 ? receivePurchaseQty(line) : 0),
+        0,
+      ),
+    [lines],
+  );
+  const receiveQtyColumnLabel = useMemo(() => {
+    if (lines.length === 0) return "Receive qty";
+    const first = lines[0]!;
+    const firstUnit = first.orderUnit ?? "box";
+    const sameUnit = lines.every(
+      (line) => (line.orderUnit ?? "box") === firstUnit,
+    );
+    if (!sameUnit) return "Receive qty";
+    return `Receive qty (${poOrderUnitLabel(firstUnit, first.purchaseUnitName, first.baseUnitName)})`;
+  }, [lines]);
   const discountPct = Number(discount) || 0;
   const discountAmount =
     Math.round(((subtotal * discountPct) / 100) * 10000) / 10000;
@@ -479,9 +508,17 @@ export function ReceivePurchaseOrderPage() {
         setError("Received quantity must be >= 0");
         return false;
       }
-      if (line.receiveQuantity > line.orderedQuantity) {
+      if (receivePurchaseQty(line) > line.orderedQuantity) {
         setError(
-          "Received quantity cannot be greater than ordered quantity.",
+          `Received quantity cannot be greater than ordered quantity (${formatPoOrderQuantity(
+            {
+              quantity: line.orderedQuantity,
+              orderUnit: line.orderUnit,
+              unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+              purchaseUnitName: line.purchaseUnitName,
+              baseUnitName: line.baseUnitName,
+            },
+          )}).`,
         );
         return false;
       }
@@ -556,13 +593,13 @@ export function ReceivePurchaseOrderPage() {
             purchaseUnitName: l.purchaseUnitName,
             unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
             orderedQuantity: l.orderedQuantity,
-            receivedQuantity: l.receiveQuantity,
+            receivedQuantity: receivePurchaseQty(l),
             bonusQuantity: l.bonusQuantity,
             poUnitCost: l.poUnitCost,
             receivingUnitCost: l.receivingUnitCost,
             discountPercent: l.discountPercent,
             lineTotal: lineTotalAfterDiscount(
-              l.receiveQuantity,
+              receivePurchaseQty(l),
               l.receivingUnitCost,
               l.discountPercent,
             ),
@@ -590,22 +627,19 @@ export function ReceivePurchaseOrderPage() {
           operation: "UPSERT",
           payload: poPayload,
         });
-        const totalReceivedQty = lines.reduce(
-          (sum, l) => sum + (l.receiveQuantity > 0 ? l.receiveQuantity : 0),
-          0,
-        );
+        const totalReceivedQty = totalReceivePurchaseQty;
         const skuIdsWithProductUpsert = new Set<string>();
         for (const line of lines) {
           const unitsPer =
             line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
-          const billedDelta = line.receiveQuantity * unitsPer;
-          const stockDelta =
-            line.receiveQuantity * unitsPer + line.bonusQuantity;
+          const purchaseQty = receivePurchaseQty(line);
+          const billedDelta = purchaseQty * unitsPer;
+          const stockDelta = purchaseQty * unitsPer + line.bonusQuantity;
           if (!(stockDelta > 0)) continue;
           const movementId = crypto.randomUUID();
           if (billedDelta > 0) {
             const netUnit = landedUnitByQuantity(
-              line.receiveQuantity,
+              purchaseQty,
               line.receivingUnitCost,
               line.discountPercent,
               totalReceivedQty,
@@ -691,7 +725,7 @@ export function ReceivePurchaseOrderPage() {
           returnAdjustments.length > 0 ? returnAdjustments : undefined,
         items: lines.map((l) => ({
           purchaseOrderItemId: l.purchaseOrderItemId,
-          receivedQuantity: l.receiveQuantity,
+          receivedQuantity: receivePurchaseQty(l),
           bonusQuantity: l.bonusQuantity,
           receivingUnitCost: l.receivingUnitCost,
           discountPercent: l.discountPercent,
@@ -937,7 +971,7 @@ export function ReceivePurchaseOrderPage() {
                   <th className="px-3 py-2 font-medium">Product</th>
                   <th className="px-3 py-2 font-medium">SKU</th>
                   <th className="px-3 py-2 font-medium">Ordered</th>
-                  <th className="px-3 py-2 font-medium">Receive qty</th>
+                  <th className="px-3 py-2 font-medium">{receiveQtyColumnLabel}</th>
                   <th className="px-3 py-2 font-medium">FOC (pcs)</th>
                   <th className="px-3 py-2 font-medium">PO price</th>
                   <th className="px-3 py-2 font-medium">Sale price</th>
@@ -1019,7 +1053,7 @@ export function ReceivePurchaseOrderPage() {
                       </td>
                       <td className="px-3 py-2 tabular-nums">
                         {lineTotalAfterDiscount(
-                          line.receiveQuantity,
+                          receivePurchaseQty(line),
                           line.receivingUnitCost,
                           line.discountPercent,
                         ).toLocaleString()}

@@ -19,7 +19,7 @@ export function PrintDocument({
   showStoreHeader?: boolean;
 }) {
   return (
-    <article data-print-document className="space-y-8">
+    <article data-print-document className="space-y-8 print:space-y-0">
       {showStoreHeader ? <PrintStoreHeader /> : null}
       {children}
     </article>

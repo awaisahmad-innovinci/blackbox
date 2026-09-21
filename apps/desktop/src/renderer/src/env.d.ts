@@ -189,6 +189,7 @@ declare global {
         openTill: (input: {
           userId: string;
           userName: string;
+          tillUsername: string;
           body: OpenTillRequest;
           requireApproval: boolean;
         }) => Promise<TillSessionDetail>;

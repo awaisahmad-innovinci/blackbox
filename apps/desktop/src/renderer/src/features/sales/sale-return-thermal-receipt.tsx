@@ -1,35 +1,21 @@
 import type { SalePaymentMethod, SaleReturnDetail } from "@blackbox/shared";
+import {
+  THERMAL_RECEIPT_CLASS,
+  ThermalMetaRow,
+  ThermalReceiptHeader,
+  ThermalRule,
+  ThermalTotalsRow,
+  formatDiscountPercent,
+  formatFocQuantity,
+  formatMoney,
+  formatReceiptDateTime,
+  lineProductLabel,
+} from "./thermal-receipt-shared";
 
 function paymentMethodLabel(method: SalePaymentMethod): string {
   if (method === "CASH") return "Cash";
   if (method === "CARD") return "Card";
   return "Credit";
-}
-
-function formatMoney(value: number): string {
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
-
-function lineProductLabel(name: string, variant: string): string {
-  const productName = name.trim();
-  const variantName = variant.trim();
-  if (variantName) return `${productName} · ${variantName}`;
-  return productName;
-}
-
-function formatDiscountPercent(value: number): string {
-  if (value <= 0) return "0";
-  return value.toLocaleString(undefined, {
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatFocQuantity(value: number): string {
-  if (value <= 0) return "0";
-  return String(Math.floor(value));
 }
 
 export function SaleReturnThermalReceipt({
@@ -44,85 +30,67 @@ export function SaleReturnThermalReceipt({
   managerName: string;
 }) {
   const sale = detail.sale;
-  const returnLabel = new Date(detail.returnDate).toLocaleDateString();
-  const salePostedLabel = sale.postedAt
-    ? new Date(sale.postedAt).toLocaleString()
-    : "—";
+  const returnDate = formatReceiptDateTime(`${detail.returnDate}T12:00:00`);
+  const salePosted = formatReceiptDateTime(sale.postedAt);
 
   return (
-    <article
-      data-thermal-receipt
-      className="thermal-receipt mx-auto w-full max-w-[72mm] font-mono text-xs leading-snug"
-    >
-      <header className="space-y-1 text-center">
-        {businessName ? (
-          <p className="text-sm font-semibold">{businessName}</p>
-        ) : null}
-        {businessAddress ? (
-          <p className="text-[11px] whitespace-pre-wrap">{businessAddress}</p>
-        ) : null}
-      </header>
+    <article data-thermal-receipt className={THERMAL_RECEIPT_CLASS}>
+      <ThermalReceiptHeader
+        businessName={businessName}
+        businessAddress={businessAddress}
+      />
 
-      <hr className="thermal-rule my-2 border-border border-dashed" />
+      <ThermalRule />
 
-      <section className="space-y-1">
-        <p className="text-center font-semibold">CUSTOMER RETURN</p>
+      <section className="space-y-0.5 text-left">
+        <p className="text-center text-sm font-bold">CUSTOMER RETURN</p>
         {detail.returnNumber === "DRAFT" ? (
-          <p className="text-center text-[11px] font-semibold">*** DRAFT — NOT POSTED ***</p>
+          <p className="text-center text-[11px] font-bold">*** DRAFT — NOT POSTED ***</p>
         ) : null}
-        <div className="flex justify-between gap-2">
-          <span>
-            <span className="font-semibold">Return #:</span> {detail.returnNumber}
-          </span>
-        </div>
-        <p className="text-[11px]">{returnLabel}</p>
-        <div className="flex justify-between gap-2">
-          <span>Manager</span>
-          <span>{managerName}</span>
-        </div>
+        <ThermalMetaRow label="Return #" value={detail.returnNumber} />
+        <ThermalMetaRow label="Date" value={returnDate.date} />
+        <ThermalMetaRow label="Manager" value={managerName} />
       </section>
 
-      <hr className="thermal-rule my-2 border-border border-dashed" />
+      <ThermalRule />
 
-      <section className="space-y-1">
-        <p className="font-semibold">Original invoice</p>
-        <div className="flex justify-between gap-2">
-          <span>Invoice</span>
-          <span>{sale.saleNumber}</span>
-        </div>
-        <p className="text-[11px]">{salePostedLabel}</p>
+      <section className="space-y-0.5 text-left">
+        <p className="text-center text-[11px] font-bold">Original invoice</p>
+        <ThermalMetaRow label="Bill #" value={sale.saleNumber} />
+        <ThermalMetaRow label="Date" value={salePosted.date} />
+        <ThermalMetaRow label="At" value={salePosted.time} />
       </section>
 
-      <table className="mt-2 w-full border-collapse text-[10px]">
+      <table className="mt-1 w-full border-collapse text-left text-[11px]">
         <thead>
-          <tr className="border-border border-b border-dashed">
-            <th className="py-1 text-left font-semibold">Item</th>
-            <th className="w-6 py-1 text-right font-semibold">Qty</th>
-            <th className="w-6 py-1 text-right font-semibold">Disc</th>
-            <th className="w-5 py-1 text-right font-semibold">FOC</th>
-            <th className="w-9 py-1 text-right font-semibold">Price</th>
-            <th className="w-9 py-1 text-right font-semibold">Total</th>
+          <tr className="border-b border-solid border-black">
+            <th className="py-0.5 pr-1 text-left font-bold">Item</th>
+            <th className="w-6 py-0.5 text-right font-bold">Qty</th>
+            <th className="w-6 py-0.5 text-right font-bold">Disc</th>
+            <th className="w-5 py-0.5 text-right font-bold">FOC</th>
+            <th className="w-9 py-0.5 text-right font-bold">Price</th>
+            <th className="w-9 py-0.5 text-right font-bold">Total</th>
           </tr>
         </thead>
         <tbody>
           {sale.items.map((item) => (
-            <tr key={item.id} className="border-border border-b border-dashed">
-              <td className="py-1 pr-1 align-top break-words">
+            <tr key={item.id}>
+              <td className="py-0.5 pr-1 align-top break-words font-bold">
                 {lineProductLabel(item.productName, item.variantName)}
               </td>
-              <td className="py-1 text-right tabular-nums align-top">
+              <td className="py-0.5 text-right tabular-nums align-top font-normal">
                 {item.quantity}
               </td>
-              <td className="py-1 text-right tabular-nums align-top">
+              <td className="py-0.5 text-right tabular-nums align-top font-normal">
                 {formatDiscountPercent(item.discountPercent ?? 0)}%
               </td>
-              <td className="py-1 text-right tabular-nums align-top">
+              <td className="py-0.5 text-right tabular-nums align-top font-normal">
                 {formatFocQuantity(item.focQuantity ?? 0)}
               </td>
-              <td className="py-1 text-right tabular-nums align-top">
+              <td className="py-0.5 text-right tabular-nums align-top font-normal">
                 {formatMoney(item.unitPrice)}
               </td>
-              <td className="py-1 text-right tabular-nums align-top">
+              <td className="py-0.5 text-right tabular-nums align-top font-normal">
                 {formatMoney(item.lineTotal)}
               </td>
             </tr>
@@ -130,33 +98,34 @@ export function SaleReturnThermalReceipt({
         </tbody>
       </table>
 
-      <div className="mt-1 flex justify-between gap-2 text-[11px] font-semibold">
-        <span>Original gross</span>
-        <span className="tabular-nums">{formatMoney(sale.total)}</span>
-      </div>
+      <ThermalTotalsRow
+        label="Original gross"
+        value={formatMoney(sale.total)}
+        bold
+      />
 
-      <hr className="thermal-rule my-2 border-border border-dashed" />
+      <ThermalRule />
 
-      <section className="space-y-1">
-        <p className="font-semibold">Return</p>
-        <table className="w-full border-collapse text-[10px]">
+      <section className="space-y-0.5 text-left">
+        <p className="text-center text-[11px] font-bold">Return</p>
+        <table className="w-full border-collapse text-[11px]">
           <thead>
-            <tr className="border-border border-b border-dashed">
-              <th className="py-1 text-left font-semibold">Item</th>
-              <th className="w-8 py-1 text-right font-semibold">Qty</th>
-              <th className="w-10 py-1 text-right font-semibold">Total</th>
+            <tr className="border-b border-solid border-black">
+              <th className="py-0.5 pr-1 text-left font-bold">Item</th>
+              <th className="w-8 py-0.5 text-right font-bold">Qty</th>
+              <th className="w-10 py-0.5 text-right font-bold">Total</th>
             </tr>
           </thead>
           <tbody>
             {detail.items.map((item) => (
-              <tr key={item.id} className="border-border border-b border-dashed">
-                <td className="py-1 pr-1 align-top break-words">
+              <tr key={item.id}>
+                <td className="py-0.5 pr-1 align-top break-words font-bold">
                   {lineProductLabel(item.productName, item.variantName)}
                 </td>
-                <td className="py-1 text-right tabular-nums align-top">
+                <td className="py-0.5 text-right tabular-nums align-top font-normal">
                   {item.quantity}
                 </td>
-                <td className="py-1 text-right tabular-nums align-top">
+                <td className="py-0.5 text-right tabular-nums align-top font-normal">
                   {formatMoney(item.lineTotal)}
                 </td>
               </tr>
@@ -165,36 +134,35 @@ export function SaleReturnThermalReceipt({
         </table>
       </section>
 
-      <hr className="thermal-rule my-2 border-border border-dashed" />
+      <ThermalRule />
 
-      <section className="space-y-1 text-[11px]">
-        <div className="flex justify-between gap-2">
-          <span>Refund subtotal</span>
-          <span className="tabular-nums">{formatMoney(detail.subtotal)}</span>
-        </div>
+      <section className="space-y-0.5">
+        <ThermalTotalsRow
+          label="Refund subtotal"
+          value={formatMoney(detail.subtotal)}
+        />
         {detail.gstAmount > 0 ? (
-          <div className="flex justify-between gap-2">
-            <span>GST ({detail.gstRate}%)</span>
-            <span className="tabular-nums">{formatMoney(detail.gstAmount)}</span>
-          </div>
+          <ThermalTotalsRow
+            label={`GST (${detail.gstRate}%)`}
+            value={formatMoney(detail.gstAmount)}
+          />
         ) : null}
         {detail.salesTaxAmount > 0 ? (
-          <div className="flex justify-between gap-2">
-            <span>Sales tax ({detail.salesTaxRate}%)</span>
-            <span className="tabular-nums">
-              {formatMoney(detail.salesTaxAmount)}
-            </span>
-          </div>
+          <ThermalTotalsRow
+            label={`Sales tax (${detail.salesTaxRate}%)`}
+            value={formatMoney(detail.salesTaxAmount)}
+          />
         ) : null}
-        <div className="flex justify-between gap-2 text-sm font-semibold">
-          <span>Refund</span>
-          <span className="tabular-nums">{formatMoney(detail.refundTotal)}</span>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span>Method</span>
-          <span>{paymentMethodLabel(detail.refundMethod)}</span>
-        </div>
-        <p className="pt-1 text-center text-[10px]">
+        <ThermalTotalsRow
+          label="Refund"
+          value={formatMoney(detail.refundTotal)}
+          bold
+        />
+        <ThermalTotalsRow
+          label="Method"
+          value={paymentMethodLabel(detail.refundMethod)}
+        />
+        <p className="pt-0.5 text-center text-[10px]">
           Refund recorded — not deducted from till
         </p>
       </section>

@@ -35,6 +35,7 @@ import {
   totpApi,
 } from "@renderer/lib/api/totp";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
+import { useTillGuardedLogout } from "@renderer/lib/use-till-guarded-logout";
 
 const DEVICE_LABEL: Record<string, string> = {
   unknown: "Device status unknown",
@@ -56,15 +57,14 @@ function navItemClass(active: boolean): string {
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, offline, deviceState, signOut } = useSession();
+  const { user, offline, deviceState } = useSession();
   const sync = useSyncStatus();
+  const { requestLogout, logoutDialogs } = useTillGuardedLogout();
   const permissions = user?.permissions ?? [];
   const sections = useMemo(
     () => visibleNavSections(permissions),
     [permissions],
   );
-  const [logoutOpen, setLogoutOpen] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   const [openNavDropdown, setOpenNavDropdown] = useState<NavDropdownId | null>(
     null,
   );
@@ -289,7 +289,7 @@ export function AppShell() {
                 <DropdownMenuItem onSelect={() => void syncNow()}>
                   Sync now
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setLogoutOpen(true)}>
+                <DropdownMenuItem onSelect={() => void requestLogout()}>
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -323,24 +323,7 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      <ConfirmDialog
-        open={logoutOpen}
-        onOpenChange={setLogoutOpen}
-        title="Are you sure you want to logout?"
-        description="Are you sure you want to logout?"
-        confirmLabel="Yes"
-        cancelLabel="Cancel"
-        loading={loggingOut}
-        onConfirm={async () => {
-          setLoggingOut(true);
-          try {
-            await signOut();
-          } finally {
-            setLoggingOut(false);
-            setLogoutOpen(false);
-          }
-        }}
-      />
+      {logoutDialogs}
 
       {globalTaxonomyKind ? (
         <AddTaxonomyDialog

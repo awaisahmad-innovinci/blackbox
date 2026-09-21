@@ -421,6 +421,17 @@ export function formatPoOrderQuantity(item: {
   return `${displayQty.toLocaleString()} ${unitLabel}`;
 }
 
+export function poOrderUnitLabel(
+  orderUnit?: OrderUnit,
+  purchaseUnitName?: string | null,
+  baseUnitName?: string | null,
+): string {
+  const unit = orderUnit ?? "box";
+  return unit === "box"
+    ? (purchaseUnitName ?? "box")
+    : (baseUnitName ?? "pc");
+}
+
 export function lineTotalForScan(input: {
   quantityMultiplier: number;
   unitsPerPurchaseUnit: number;
