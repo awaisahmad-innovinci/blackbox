@@ -4,7 +4,7 @@
 
 @media print {
   @page {
-    margin: 3mm;
+    margin: 1mm 2mm;
     size: 80mm auto;
   }
 
@@ -13,6 +13,24 @@
     color: black !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print-document],
+  [data-print-document] * {
+    visibility: visible;
+  }
+
+  [data-print-document] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   header,
@@ -41,21 +59,31 @@
     print-color-adjust: exact;
   }
 
-  [data-print-document] {
-    margin: 0 auto !important;
-    max-width: 72mm !important;
-    width: 72mm !important;
-  }
-
   [data-thermal-receipt] {
     color: black !important;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-    font-size: 11px !important;
-    line-height: 1.35 !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
     width: 72mm !important;
+    margin: 0 auto !important;
   }
 
   [data-thermal-receipt] .thermal-rule {
-    border-color: black !important;
+    border: none !important;
+    border-top: 1px solid black !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-barcode {
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-barcode svg {
+    color: black !important;
+    fill: black !important;
+    stroke: black !important;
   }
 }

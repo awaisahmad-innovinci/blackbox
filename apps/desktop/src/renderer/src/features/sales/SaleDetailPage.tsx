@@ -7,12 +7,12 @@ import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { salesApi } from "@renderer/lib/api/sales";
-import { loadSale } from "@renderer/lib/local-db/entity-source";
+import { loadSale, loadSaleReturnCreditForSale } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
-import { SaleThermalReceipt } from "./sale-thermal-receipt";
+import { SaleThermalReceipt, type SaleReturnCreditReceipt } from "./sale-thermal-receipt";
 import { useSession } from "@renderer/lib/session/context";
 
 export function SaleDetailPage() {
@@ -23,6 +23,8 @@ export function SaleDetailPage() {
   const permissions = user?.permissions ?? [];
   const { canReadList, canVoid, canWrite } = useSalesAccess();
   const [detail, setDetail] = useState<SaleDetail | null>(null);
+  const [returnCredit, setReturnCredit] =
+    useState<SaleReturnCreditReceipt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
@@ -38,10 +40,19 @@ export function SaleDetailPage() {
     if (!id) return;
     let cancelled = false;
     setLoading(true);
-    void loadSale(id)
-      .then((row) => {
+    void Promise.all([loadSale(id), loadSaleReturnCreditForSale(id)])
+      .then(([row, credit]) => {
         if (!cancelled) {
           setDetail(row);
+          if (credit && row.status === "POSTED") {
+            setReturnCredit({
+              returnNumber: credit.returnNumber,
+              amount: credit.amount,
+              cashBack: Math.max(0, credit.amount - row.total),
+            });
+          } else {
+            setReturnCredit(null);
+          }
           setError(null);
         }
       })
@@ -139,61 +150,64 @@ export function SaleDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {detail.saleNumber}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {detail.warehouseName} · {isDraft ? "Held" : detail.status}
-          </p>
-        </div>
-        <div className="flex gap-2 print:hidden">
-          {!isDraft ? <PrintButton /> : null}
-          {isDraft && canWrite ? (
-            <>
-              <Button onClick={() => navigate(`/sales/new/${detail.id}`)}>
-                Resume
-              </Button>
+      <div className="print:hidden space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {detail.saleNumber}
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {detail.warehouseName} · {isDraft ? "Held" : detail.status}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {!isDraft ? <PrintButton openDrawerOnPrint /> : null}
+            {isDraft && canWrite ? (
+              <>
+                <Button onClick={() => navigate(`/sales/new/${detail.id}`)}>
+                  Resume
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={discarding}
+                  onClick={() => void onDiscardDraft()}
+                >
+                  {discarding ? "Discarding…" : "Discard"}
+                </Button>
+              </>
+            ) : null}
+            {canVoid && detail.status === "POSTED" ? (
               <Button
                 variant="destructive"
-                disabled={discarding}
-                onClick={() => void onDiscardDraft()}
+                disabled={voiding}
+                onClick={() => void onVoid()}
               >
-                {discarding ? "Discarding…" : "Discard"}
+                {voiding ? "Voiding…" : "Void sale"}
               </Button>
-            </>
-          ) : null}
-          {canVoid && detail.status === "POSTED" ? (
+            ) : null}
             <Button
-              variant="destructive"
-              disabled={voiding}
-              onClick={() => void onVoid()}
+              variant="outline"
+              onClick={() => navigate(isDraft ? "/sales/held" : "/sales")}
             >
-              {voiding ? "Voiding…" : "Void sale"}
+              Back to list
             </Button>
-          ) : null}
-          <Button
-            variant="outline"
-            onClick={() => navigate(isDraft ? "/sales/held" : "/sales")}
-          >
-            Back to list
-          </Button>
+          </div>
         </div>
+
+        {error ? (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        {isDraft ? (
+          <p className="text-muted-foreground text-sm">
+            This bill is held on this device only. Stock is reserved until you post
+            or discard it.
+          </p>
+        ) : null}
       </div>
-
-      {error ? (
-        <p className="text-destructive text-sm" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      {isDraft ? (
-        <p className="text-muted-foreground text-sm">
-          This bill is held on this device only. Stock is reserved until you post
-          or discard it.
-        </p>
-      ) : (
+      {!isDraft ? (
         <PrintDocument showStoreHeader={false}>
           <SaleThermalReceipt
             detail={detail}
@@ -202,9 +216,10 @@ export function SaleDetailPage() {
             cashierName={
               detail.postedByName?.trim() || user?.fullName?.trim() || "—"
             }
+            returnCredit={returnCredit ?? undefined}
           />
         </PrintDocument>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -113,17 +113,20 @@ export class CreateSaleDto {
   @IsUUID()
   supervisorUserId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  pendingReturnId?: string;
+
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateSaleLineDto)
   items!: CreateSaleLineDto[];
 
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateSalePaymentDto)
-  payments!: CreateSalePaymentDto[];
+  payments?: CreateSalePaymentDto[];
 }
 
 export class ListSalesQueryDto {

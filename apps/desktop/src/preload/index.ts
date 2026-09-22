@@ -5,6 +5,9 @@ import type {
   Category,
   DashboardSummary,
   EntityStatus,
+  ManagerDashboardSummary,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   GoodsReceiptDetail,
   GoodsReceiptListQuery,
   InventoryInOutReport,
@@ -52,6 +55,8 @@ import type {
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PendingVendorReturnLine,
+  PosPrinterInfo,
+  PosPrinterSettings,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -226,6 +231,7 @@ contextBridge.exposeInMainWorld("blackbox", {
     openTill: (input: {
       userId: string;
       userName: string;
+      tillUsername: string;
       body: OpenTillRequest;
       requireApproval: boolean;
     }) => ipcRenderer.invoke("localDb:openTill", input) as Promise<TillSessionDetail>,
@@ -276,6 +282,28 @@ contextBridge.exposeInMainWorld("blackbox", {
       cashPaymentTotal: number;
     }) =>
       ipcRenderer.invoke("localDb:applyTillCashFromSale", input) as Promise<{ ok: true }>,
+    applyTillCashRefund: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      refundAmount: number;
+    }) =>
+      ipcRenderer.invoke("localDb:applyTillCashRefund", input) as Promise<{ ok: true }>,
+    applyTillReturnCreditOnSale: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      cashPaymentTotal: number;
+      cashBackFromCredit: number;
+    }) =>
+      ipcRenderer.invoke(
+        "localDb:applyTillReturnCreditOnSale",
+        input,
+      ) as Promise<{ ok: true }>,
+    assertTillCanPayRefund: (input: {
+      userId: string;
+      skipForManager?: boolean;
+      refundAmount: number;
+    }) =>
+      ipcRenderer.invoke("localDb:assertTillCanPayRefund", input) as Promise<{ ok: true }>,
     appendPendingActivityLog: (input: {
       id: string;
       payload: import("@blackbox/shared").CreateActivityLogRequest;
@@ -337,6 +365,16 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getCashierDashboardSummary",
         userId,
       ) as Promise<CashierDashboardSummary>,
+    getManagerDashboardSummary: (userId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getManagerDashboardSummary",
+        userId,
+      ) as Promise<ManagerDashboardSummary>,
+    listManagerStockOverview: (query?: ManagerStockOverviewQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listManagerStockOverview",
+        query ?? {},
+      ) as Promise<PaginatedManagerStockOverview>,
     listBrands: (status?: EntityStatus | "all") =>
       ipcRenderer.invoke("localDb:listBrands", status) as Promise<Brand[]>,
     getBrand: (id: string) =>
@@ -497,6 +535,45 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:upsertSaleReturn",
         detail,
       ) as Promise<{ ok: true }>,
+    lookupSaleReturn: (returnNumber: string) =>
+      ipcRenderer.invoke(
+        "localDb:lookupSaleReturn",
+        returnNumber,
+      ) as Promise<import("@blackbox/shared").SaleReturnLookupSummary>,
+    resolveSaleByNumber: (saleNumber: string) =>
+      ipcRenderer.invoke(
+        "localDb:resolveSaleByNumber",
+        saleNumber,
+      ) as Promise<{ id: string; saleNumber: string } | null>,
+    resolveSaleReturnByNumber: (returnNumber: string) =>
+      ipcRenderer.invoke(
+        "localDb:resolveSaleReturnByNumber",
+        returnNumber,
+      ) as Promise<{ id: string; returnNumber: string } | null>,
+    getSaleReturnCreditForSale: (saleId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getSaleReturnCreditForSale",
+        saleId,
+      ) as Promise<{ returnNumber: string; amount: number } | null>,
+    completeSaleReturnStandalone: (input: {
+      returnId: string;
+      userId: string;
+      userName: string;
+    }) =>
+      ipcRenderer.invoke(
+        "localDb:completeSaleReturnStandalone",
+        input,
+      ) as Promise<SaleReturnDetail>,
+    completeSaleReturnWithSale: (input: {
+      returnId: string;
+      saleId: string;
+      userId: string;
+      userName: string;
+    }) =>
+      ipcRenderer.invoke(
+        "localDb:completeSaleReturnWithSale",
+        input,
+      ) as Promise<SaleReturnDetail>,
     listSaleReturnNumbers: () =>
       ipcRenderer.invoke(
         "localDb:listSaleReturnNumbers",
@@ -562,6 +639,20 @@ contextBridge.exposeInMainWorld("blackbox", {
       deviceId: string;
       instanceId: string;
     }) => ipcRenderer.invoke("identity:bind", identity) as Promise<{ ok: true }>,
+  },
+  pos: {
+    getPrinterSettings: () =>
+      ipcRenderer.invoke("pos:getPrinterSettings") as Promise<PosPrinterSettings>,
+    savePrinterSettings: (settings: PosPrinterSettings) =>
+      ipcRenderer.invoke("pos:savePrinterSettings", settings) as Promise<{
+        ok: true;
+      }>,
+    listPrinters: () =>
+      ipcRenderer.invoke("pos:listPrinters") as Promise<PosPrinterInfo[]>,
+    openCashDrawer: () =>
+      ipcRenderer.invoke("pos:openCashDrawer") as Promise<{ ok: true }>,
+    testDrawer: () =>
+      ipcRenderer.invoke("pos:testDrawer") as Promise<{ ok: true }>,
   },
   sync: {
     listOutbox: (limit?: number) => ipcRenderer.invoke("sync:listOutbox", limit),

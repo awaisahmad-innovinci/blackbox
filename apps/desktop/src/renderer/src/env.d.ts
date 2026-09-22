@@ -6,6 +6,9 @@ import type {
   Category,
   DashboardSummary,
   EntityStatus,
+  ManagerDashboardSummary,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   GoodsReceiptDetail,
   GoodsReceiptListQuery,
   InventoryInOutReport,
@@ -54,6 +57,8 @@ import type {
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PendingVendorReturnLine,
+  PosPrinterInfo,
+  PosPrinterSettings,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -180,6 +185,29 @@ declare global {
         getSaleReturn: (id: string) => Promise<SaleReturnDetail | null>;
         getReturnableSaleLines: (saleId: string) => Promise<ReturnableSaleLine[]>;
         upsertSaleReturn: (detail: SaleReturnDetail) => Promise<{ ok: true }>;
+        lookupSaleReturn: (
+          returnNumber: string,
+        ) => Promise<import("@blackbox/shared").SaleReturnLookupSummary>;
+        resolveSaleByNumber: (
+          saleNumber: string,
+        ) => Promise<{ id: string; saleNumber: string } | null>;
+        resolveSaleReturnByNumber: (
+          returnNumber: string,
+        ) => Promise<{ id: string; returnNumber: string } | null>;
+        getSaleReturnCreditForSale: (
+          saleId: string,
+        ) => Promise<{ returnNumber: string; amount: number } | null>;
+        completeSaleReturnStandalone: (input: {
+          returnId: string;
+          userId: string;
+          userName: string;
+        }) => Promise<SaleReturnDetail>;
+        completeSaleReturnWithSale: (input: {
+          returnId: string;
+          saleId: string;
+          userId: string;
+          userName: string;
+        }) => Promise<SaleReturnDetail>;
         getCurrentTill: (userId: string) => Promise<TillSessionDetail | null>;
         getLatestTillSession: (userId: string) => Promise<TillSessionDetail | null>;
         listTills: (query?: {
@@ -189,6 +217,7 @@ declare global {
         openTill: (input: {
           userId: string;
           userName: string;
+          tillUsername: string;
           body: OpenTillRequest;
           requireApproval: boolean;
         }) => Promise<TillSessionDetail>;
@@ -237,6 +266,22 @@ declare global {
           skipForManager?: boolean;
           cashPaymentTotal: number;
         }) => Promise<{ ok: true }>;
+        applyTillCashRefund: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          refundAmount: number;
+        }) => Promise<{ ok: true }>;
+        applyTillReturnCreditOnSale: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          cashPaymentTotal: number;
+          cashBackFromCredit: number;
+        }) => Promise<{ ok: true }>;
+        assertTillCanPayRefund: (input: {
+          userId: string;
+          skipForManager?: boolean;
+          refundAmount: number;
+        }) => Promise<{ ok: true }>;
         appendPendingActivityLog: (input: {
           id: string;
           payload: import("@blackbox/shared").CreateActivityLogRequest;
@@ -270,6 +315,12 @@ declare global {
         getCashierDashboardSummary: (
           userId: string,
         ) => Promise<CashierDashboardSummary>;
+        getManagerDashboardSummary: (
+          userId: string,
+        ) => Promise<ManagerDashboardSummary>;
+        listManagerStockOverview: (
+          query?: ManagerStockOverviewQuery,
+        ) => Promise<PaginatedManagerStockOverview>;
         listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
         listCategories: (status?: EntityStatus | "all") => Promise<Category[]>;
@@ -376,6 +427,15 @@ declare global {
           deviceId: string;
           instanceId: string;
         }) => Promise<{ ok: true }>;
+      };
+      pos?: {
+        getPrinterSettings: () => Promise<PosPrinterSettings>;
+        savePrinterSettings: (
+          settings: PosPrinterSettings,
+        ) => Promise<{ ok: true }>;
+        listPrinters: () => Promise<PosPrinterInfo[]>;
+        openCashDrawer: () => Promise<{ ok: true }>;
+        testDrawer: () => Promise<{ ok: true }>;
       };
       sync?: {
         listOutbox: (limit?: number) => Promise<unknown>;

@@ -1353,7 +1353,7 @@ export class SyncService {
     const existing = await manager.findOne(SaleReturn, {
       where: { id: entityId, tenantId },
     });
-    if (existing?.status === "POSTED") return;
+    if (existing?.status === "COMPLETED") return;
 
     const row =
       existing ?? manager.create(SaleReturn, { id: entityId, tenantId });
@@ -1366,7 +1366,7 @@ export class SyncService {
       returnDate: String(
         p.returnDate ?? row.returnDate ?? new Date().toISOString().slice(0, 10),
       ),
-      status: String(p.status ?? row.status ?? "POSTED"),
+      status: String(p.status ?? row.status ?? "PENDING"),
       subtotal: String(p.subtotal ?? row.subtotal ?? 0),
       gstRate: String(p.gstRate ?? row.gstRate ?? 0),
       gstAmount: String(p.gstAmount ?? row.gstAmount ?? 0),
@@ -1376,6 +1376,32 @@ export class SyncService {
       refundMethod: String(p.refundMethod ?? row.refundMethod ?? "CASH"),
       notes: String(p.notes ?? row.notes ?? ""),
       processedBy: (p.processedBy as string | null | undefined) ?? row.processedBy ?? null,
+      issuedBy:
+        (p.issuedBy as string | null | undefined) ??
+        row.issuedBy ??
+        (p.processedBy as string | null | undefined) ??
+        row.processedBy ??
+        null,
+      issuedByName:
+        (p.issuedByName as string | null | undefined) ?? row.issuedByName ?? null,
+      refundedBy:
+        (p.refundedBy as string | null | undefined) ?? row.refundedBy ?? null,
+      refundedByName:
+        (p.refundedByName as string | null | undefined) ??
+        row.refundedByName ??
+        null,
+      refundedAt:
+        p.refundedAt != null
+          ? new Date(String(p.refundedAt))
+          : row.refundedAt,
+      appliedToSaleId:
+        (p.appliedToSaleId as string | null | undefined) ??
+        row.appliedToSaleId ??
+        null,
+      completionMode:
+        (p.completionMode as string | null | undefined) ??
+        row.completionMode ??
+        null,
     });
     if (!row.saleId) throw new Error("sale not found");
     if (!row.warehouseId) throw new Error("warehouse not found");
@@ -1405,7 +1431,7 @@ export class SyncService {
             barcode: (item.barcode as string | null | undefined) ?? null,
           }),
         );
-        if (productSkuId && qty > 0 && !existing) {
+        if (productSkuId && qty > 0 && !existing && row.status !== "COMPLETED") {
           const balance = await manager.findOne(InventoryOutItem, {
             where: { tenantId, warehouseId: row.warehouseId, productSkuId },
           });

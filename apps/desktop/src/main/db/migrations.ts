@@ -1296,6 +1296,35 @@ where units_per_purchase_unit > 0;
     id: "032_sale_returns_processed_by_name",
     sql: `alter table sale_returns add column processed_by_name text;`,
   },
+  {
+    id: "033_till_sessions_till_name",
+    sql: `
+      alter table till_sessions add column till_name text not null default '';
+      update till_sessions
+      set till_name = trim(user_name) || ' till'
+      where till_name = '' and trim(user_name) != '';
+    `,
+  },
+  {
+    id: "034_sale_line_quantity_corrected",
+    sql: `
+      alter table sale_lines add column quantity_corrected integer not null default 0;
+    `,
+  },
+  {
+    id: "035_pending_return_vouchers",
+    sql: `
+      alter table sale_returns add column issued_by text;
+      alter table sale_returns add column issued_by_name text;
+      alter table sale_returns add column refunded_by text;
+      alter table sale_returns add column refunded_by_name text;
+      alter table sale_returns add column refunded_at text;
+      alter table sale_returns add column applied_to_sale_id text;
+      alter table sale_returns add column completion_mode text;
+      update sale_returns set issued_by = processed_by where issued_by is null and processed_by is not null;
+      update sale_returns set status = 'COMPLETED' where status = 'POSTED';
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type {
   CashierDashboardSummary,
   DashboardSummary,
+  ManagerDashboardSummary,
   MasterDataImportResult,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -40,6 +42,26 @@ import {
 type LocalDbStatus = Awaited<
   ReturnType<NonNullable<NonNullable<Window["blackbox"]>["localDb"]>["getStatus"]>
 >;
+
+const MANAGER_CARDS: {
+  key: keyof ManagerDashboardSummary;
+  label: string;
+  hint: string;
+  format: "money" | "count";
+}[] = [
+  {
+    key: "tillCashCollectedAmount",
+    label: "Till cash collected (today)",
+    hint: "Cash you collected from tills today",
+    format: "money",
+  },
+  {
+    key: "customerReturnCount",
+    label: "Returns issued (today)",
+    hint: "Pending and completed return vouchers today",
+    format: "count",
+  },
+];
 
 const CARDS: {
   key: keyof DashboardSummary;
@@ -92,6 +114,18 @@ const CASHIER_CARDS: {
     hint: "Your held bills on this device",
     format: "count",
   },
+  {
+    key: "refundTotalAmount",
+    label: "Refunds paid (today)",
+    hint: "Cash refunds you completed today",
+    format: "money",
+  },
+  {
+    key: "cashInHandAmount",
+    label: "Cash in hand (today)",
+    hint: "Cash received minus refunds paid today",
+    format: "money",
+  },
 ];
 
 function formatSyncedAt(iso: string): string {
@@ -105,10 +139,13 @@ function formatSyncedAt(iso: string): string {
 export function DashboardPage() {
   const dataVersion = useSyncDataVersion();
   const { user } = useSession();
-  const { cashierOnly } = useSalesAccess();
+  const { cashierOnly, showManagerDashboard, showInventoryDashboard } =
+    useSalesAccess();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [cashierSummary, setCashierSummary] =
     useState<CashierDashboardSummary | null>(null);
+  const [managerSummary, setManagerSummary] =
+    useState<ManagerDashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
@@ -150,15 +187,47 @@ export function DashboardPage() {
             cashReceivedAmount: 0,
             cardPaymentsAmount: 0,
             heldBillsCount: 0,
+            refundTotalAmount: 0,
+            cashInHandAmount: 0,
           });
         }
         setSummary(null);
-      } else if (mode === "local" && window.blackbox?.localDb?.getDashboardSummary) {
-        setSummary(await window.blackbox.localDb.getDashboardSummary());
-        setCashierSummary(null);
+        setManagerSummary(null);
       } else {
-        setSummary(await dashboardApi.getSummary());
         setCashierSummary(null);
+
+        if (showManagerDashboard && user?.id) {
+          if (
+            mode === "local" &&
+            window.blackbox?.localDb?.getManagerDashboardSummary
+          ) {
+            setManagerSummary(
+              await window.blackbox.localDb.getManagerDashboardSummary(user.id),
+            );
+          } else {
+            try {
+              setManagerSummary(await dashboardApi.getManagerSummary());
+            } catch {
+              setManagerSummary({
+                date: new Date().toISOString().slice(0, 10),
+                tillCashCollectedAmount: 0,
+                customerReturnCount: 0,
+              });
+            }
+          }
+        } else {
+          setManagerSummary(null);
+        }
+
+        if (showInventoryDashboard) {
+          if (mode === "local" && window.blackbox?.localDb?.getDashboardSummary) {
+            setSummary(await window.blackbox.localDb.getDashboardSummary());
+          } else {
+            setSummary(await dashboardApi.getSummary());
+          }
+        } else {
+          setSummary(null);
+        }
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -171,7 +240,7 @@ export function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [cashierOnly, user?.id]);
+  }, [cashierOnly, showInventoryDashboard, showManagerDashboard, user?.id]);
 
   useEffect(() => {
     void loadSummary();
@@ -358,19 +427,27 @@ export function DashboardPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             {cashierOnly
               ? "Today's sales summary."
-              : "Demo Store inventory overview."}
+              : showManagerDashboard && showInventoryDashboard
+                ? "Today's till summary and inventory overview."
+                : showManagerDashboard
+                  ? "Today's till and refund summary."
+                  : "Inventory overview."}
           </p>
           {cashierOnly && cashierSummary ? (
             <p className="text-muted-foreground mt-1 text-xs">
               {new Date(`${cashierSummary.date}T12:00:00`).toLocaleDateString()}
             </p>
-          ) : (
+          ) : showManagerDashboard && managerSummary ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              {new Date(`${managerSummary.date}T12:00:00`).toLocaleDateString()}
+            </p>
+          ) : !cashierOnly ? (
             <p className="text-muted-foreground mt-1 text-xs">
               {dataSource === "local" ? "Showing local data" : "Showing API data"}
             </p>
-          )}
+          ) : null}
         </div>
-        {!cashierOnly ? (
+        {showInventoryDashboard && !cashierOnly ? (
           <Button
             type="button"
             variant="outline"
@@ -382,7 +459,7 @@ export function DashboardPage() {
         ) : null}
       </div>
 
-      {!cashierOnly ? (
+      {!cashierOnly && showInventoryDashboard ? (
         <ImportMasterDataDialog
           open={importOpen}
           onOpenChange={setImportOpen}
@@ -457,49 +534,92 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cashierOnly
-          ? CASHIER_CARDS.map((card) => (
-              <Card key={card.key} className="gap-3 py-5">
-                <CardHeader className="px-5 pb-0">
-                  <CardTitle className="text-muted-foreground text-sm font-medium">
-                    {card.label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-5">
-                  {loading ? (
-                    <Skeleton className="h-9 w-24" />
-                  ) : (
-                    <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                      {card.format === "money"
-                        ? `Rs ${(cashierSummary?.[card.key] ?? 0).toLocaleString()}`
-                        : (cashierSummary?.[card.key] ?? "—")}
+      {cashierOnly ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {CASHIER_CARDS.map((card) => (
+            <Card key={card.key} className="gap-3 py-5">
+              <CardHeader className="px-5 pb-0">
+                <CardTitle className="text-muted-foreground text-sm font-medium">
+                  {card.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-5">
+                {loading ? (
+                  <Skeleton className="h-9 w-24" />
+                ) : (
+                  <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                    {card.format === "money"
+                      ? `Rs ${(cashierSummary?.[card.key] ?? 0).toLocaleString()}`
+                      : (cashierSummary?.[card.key] ?? "—")}
+                  </p>
+                )}
+                <p className="text-muted-foreground mt-1 text-xs">{card.hint}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {showManagerDashboard ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {MANAGER_CARDS.map((card) => (
+                  <Card key={card.key} className="gap-3 py-5">
+                    <CardHeader className="px-5 pb-0">
+                      <CardTitle className="text-muted-foreground text-sm font-medium">
+                        {card.label}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-5">
+                      {loading ? (
+                        <Skeleton className="h-9 w-24" />
+                      ) : (
+                        <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                          {card.format === "money"
+                            ? `Rs ${(managerSummary?.[card.key] ?? 0).toLocaleString()}`
+                            : (managerSummary?.[card.key] ?? "—")}
+                        </p>
+                      )}
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {card.hint}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <Button variant="outline" asChild>
+                <Link to="/sales/stock-overview">View floor &amp; warehouse stock</Link>
+              </Button>
+            </div>
+          ) : null}
+
+          {showInventoryDashboard ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {CARDS.map((card) => (
+                <Card key={card.key} className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      {card.label}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-16" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        {summary?.[card.key] ?? "—"}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {card.hint}
                     </p>
-                  )}
-                  <p className="text-muted-foreground mt-1 text-xs">{card.hint}</p>
-                </CardContent>
-              </Card>
-            ))
-          : CARDS.map((card) => (
-              <Card key={card.key} className="gap-3 py-5">
-                <CardHeader className="px-5 pb-0">
-                  <CardTitle className="text-muted-foreground text-sm font-medium">
-                    {card.label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-5">
-                  {loading ? (
-                    <Skeleton className="h-9 w-16" />
-                  ) : (
-                    <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                      {summary?.[card.key] ?? "—"}
-                    </p>
-                  )}
-                  <p className="text-muted-foreground mt-1 text-xs">{card.hint}</p>
-                </CardContent>
-              </Card>
-            ))}
-      </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <KeyboardHints hints={[KEYBOARD_HINT_APP_NAV]} />
     </div>

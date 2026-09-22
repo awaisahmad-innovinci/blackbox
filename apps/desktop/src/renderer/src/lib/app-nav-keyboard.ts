@@ -58,6 +58,7 @@ type AppNavDropdownSection = {
   shortcut: string;
   kind: "dropdown";
   dropdownId: NavDropdownId;
+  requiresPermission?: string;
   requireCtrl?: boolean;
 };
 
@@ -93,6 +94,7 @@ export const APP_NAV_SECTIONS = [
     shortcut: "w",
     kind: "link",
     to: "/warehouses",
+    requiresPermission: "warehouses.read",
   },
   {
     id: "inventory",
@@ -100,6 +102,7 @@ export const APP_NAV_SECTIONS = [
     shortcut: "i",
     kind: "dropdown",
     dropdownId: "inventory",
+    requiresPermission: "inventory.access",
   },
   {
     id: "purchasing",
@@ -107,6 +110,7 @@ export const APP_NAV_SECTIONS = [
     shortcut: "p",
     kind: "dropdown",
     dropdownId: "purchasing",
+    requiresPermission: "purchasing.access",
   },
   {
     id: "vendors",
@@ -115,6 +119,7 @@ export const APP_NAV_SECTIONS = [
     requireCtrl: true,
     kind: "dropdown",
     dropdownId: "vendors",
+    requiresPermission: "vendors.access",
   },
 ] as const;
 
@@ -260,6 +265,26 @@ function resolveSaleNavSection(permissions: string[]): AppNavLinkSection | null 
   return null;
 }
 
+function navSectionRequiresPermission(
+  section: (typeof APP_NAV_SECTIONS)[number],
+): string | undefined {
+  if ("requiresPermission" in section && section.requiresPermission) {
+    return section.requiresPermission;
+  }
+  return undefined;
+}
+
+function isNavSectionVisible(
+  section: (typeof APP_NAV_SECTIONS)[number],
+  permissions: string[],
+): boolean {
+  const required = navSectionRequiresPermission(section);
+  if (required) {
+    return permissions.includes(required);
+  }
+  return true;
+}
+
 export function visibleNavSections(permissions: string[]): AppNavSection[] {
   if (isCashierOnlyNav(permissions)) {
     return APP_NAV_SECTIONS.filter(
@@ -272,10 +297,8 @@ export function visibleNavSections(permissions: string[]): AppNavSection[] {
       const resolved = resolveSaleNavSection(permissions);
       return resolved ? [resolved] : [];
     }
-    if ("requiresPermission" in section) {
-      return permissions.includes(section.requiresPermission)
-        ? [normalizeNavSection(section)]
-        : [];
+    if (!isNavSectionVisible(section, permissions)) {
+      return [];
     }
     return [normalizeNavSection(section)];
   });
@@ -291,6 +314,9 @@ function normalizeNavSection(
       shortcut: section.shortcut,
       kind: "dropdown",
       dropdownId: section.dropdownId,
+      ...("requiresPermission" in section
+        ? { requiresPermission: section.requiresPermission }
+        : {}),
       ...("requireCtrl" in section ? { requireCtrl: section.requireCtrl } : {}),
     };
   }

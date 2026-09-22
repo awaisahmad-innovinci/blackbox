@@ -15,7 +15,7 @@ import {
   filterSelectProps,
   ListFilterNav,
 } from "@renderer/components/list-filter-nav";
-import { loadSales, loadWarehouses } from "@renderer/lib/local-db/entity-source";
+import { loadSales, loadWarehouses, resolveSaleByNumber } from "@renderer/lib/local-db/entity-source";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -54,6 +54,16 @@ export function SaleReturnPickerPage() {
     enabled: true,
     inputRef: searchRef,
     onScan: setSearch,
+    onComplete: (code) => {
+      void (async () => {
+        const match = await resolveSaleByNumber(code);
+        if (match) {
+          navigate(`/sales/returns/new/${match.id}`);
+          return;
+        }
+        setError(`Sale not found: ${code.trim()}`);
+      })();
+    },
   });
 
   useEffect(() => {

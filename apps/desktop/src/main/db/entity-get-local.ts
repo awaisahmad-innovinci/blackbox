@@ -1655,6 +1655,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
          l.line_total as lineTotal,
          coalesce(l.discount_percent, 0) as discountPercent,
          coalesce(l.foc_quantity, 0) as focQuantity,
+         coalesce(l.quantity_corrected, 0) as quantityCorrected,
          l.sell_unit as sellUnit
        from sale_lines l
        left join product_skus sk on sk.id = l.product_sku_id
@@ -1712,6 +1713,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
       sellUnit: (r.sellUnit as "pc" | "box") ?? "pc",
       discountPercent: num(r.discountPercent),
       focQuantity: num(r.focQuantity),
+      quantityCorrected: Number(r.quantityCorrected) === 1,
     })),
     payments: payments.map((r) => ({
       id: String(r.id),
@@ -1814,6 +1816,13 @@ export function getSaleReturnLocal(id: string): SaleReturnDetail | null {
          r.notes,
          r.processed_by as processedBy,
          r.processed_by_name as processedByName,
+         r.issued_by as issuedBy,
+         r.issued_by_name as issuedByName,
+         r.refunded_by as refundedBy,
+         r.refunded_by_name as refundedByName,
+         r.refunded_at as refundedAt,
+         r.applied_to_sale_id as appliedToSaleId,
+         r.completion_mode as completionMode,
          r.created_at as createdAt,
          r.updated_at as updatedAt
        from sale_returns r
@@ -1858,7 +1867,7 @@ export function getSaleReturnLocal(id: string): SaleReturnDetail | null {
     warehouseId: String(row.warehouseId),
     warehouseName: String(row.warehouseName ?? ""),
     returnDate: String(row.returnDate),
-    status: "POSTED",
+    status: String(row.status) as SaleReturnDetail["status"],
     subtotal: num(row.subtotal),
     gstRate: num(row.gstRate),
     gstAmount: num(row.gstAmount),
@@ -1867,9 +1876,17 @@ export function getSaleReturnLocal(id: string): SaleReturnDetail | null {
     refundTotal: num(row.refundTotal),
     refundMethod: row.refundMethod as SalePaymentMethod,
     notes: String(row.notes ?? ""),
-    processedBy: (row.processedBy as string | null) ?? null,
+    processedBy: (row.processedBy as string | null) ?? (row.issuedBy as string | null) ?? null,
     processedByName:
-      String(row.processedByName ?? "").trim() || null,
+      String(row.processedByName ?? row.issuedByName ?? "").trim() || null,
+    issuedBy: (row.issuedBy as string | null) ?? (row.processedBy as string | null) ?? null,
+    issuedByName:
+      String(row.issuedByName ?? row.processedByName ?? "").trim() || null,
+    refundedBy: (row.refundedBy as string | null) ?? null,
+    refundedByName: String(row.refundedByName ?? "").trim() || null,
+    refundedAt: (row.refundedAt as string | null) ?? null,
+    appliedToSaleId: (row.appliedToSaleId as string | null) ?? null,
+    completionMode: (row.completionMode as SaleReturnDetail["completionMode"]) ?? null,
     sale,
     items: items.map((r) => ({
       id: String(r.id),
@@ -1888,4 +1905,25 @@ export function getSaleReturnLocal(id: string): SaleReturnDetail | null {
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
   };
+}
+
+export function resolveSaleByNumberLocal(
+  saleNumber: string,
+): { id: string; saleNumber: string } | null {
+  const db = getLocalDb();
+  const trimmed = saleNumber.trim();
+  if (!trimmed) return null;
+
+  const row = db
+    .prepare(
+      `select id, sale_number as saleNumber
+       from sales
+       where tenant_id = @tenantId and lower(sale_number) = lower(@saleNumber)
+       limit 1`,
+    )
+    .get({ tenantId: DEMO_STORE_TENANT_ID, saleNumber: trimmed }) as
+    | { id: string; saleNumber: string }
+    | undefined;
+
+  return row ?? null;
 }

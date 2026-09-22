@@ -7,9 +7,20 @@ import type {
   TillStatus,
   WithdrawTillRequest,
 } from "@blackbox/shared";
-import { computeTillDenominationTotal } from "@blackbox/shared";
+import { computeTillDenominationTotal, tillLogoutBlockMessage, tillSessionBlocksLogout } from "@blackbox/shared";
 import { tillsApi } from "@renderer/lib/api/tills";
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
+
+export async function getTillLogoutBlockMessage(input: {
+  userId: string;
+  permissions: string[];
+}): Promise<string | null> {
+  if (!input.permissions.includes("till.read")) return null;
+  if (input.permissions.includes("till.manage")) return null;
+  const session = await loadCurrentTill(input.userId);
+  if (!session || !tillSessionBlocksLogout(session)) return null;
+  return tillLogoutBlockMessage(session);
+}
 
 export async function loadCurrentTill(
   userId: string,
@@ -51,6 +62,7 @@ export async function loadTills(query: {
 export async function openTill(input: {
   userId: string;
   userName: string;
+  tillUsername: string;
   body: OpenTillRequest;
   requireApproval: boolean;
   supervisorDisplayName?: string;
@@ -335,5 +347,36 @@ export async function applyTillCashFromSale(input: {
 }): Promise<void> {
   if (window.blackbox?.localDb?.applyTillCashFromSale) {
     await window.blackbox.localDb.applyTillCashFromSale(input);
+  }
+}
+
+export async function applyTillCashRefund(input: {
+  userId: string;
+  skipForManager?: boolean;
+  refundAmount: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.applyTillCashRefund) {
+    await window.blackbox.localDb.applyTillCashRefund(input);
+  }
+}
+
+export async function applyTillReturnCreditOnSale(input: {
+  userId: string;
+  skipForManager?: boolean;
+  cashPaymentTotal: number;
+  cashBackFromCredit: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.applyTillReturnCreditOnSale) {
+    await window.blackbox.localDb.applyTillReturnCreditOnSale(input);
+  }
+}
+
+export async function assertTillCanPayRefund(input: {
+  userId: string;
+  skipForManager?: boolean;
+  refundAmount: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.assertTillCanPayRefund) {
+    await window.blackbox.localDb.assertTillCanPayRefund(input);
   }
 }

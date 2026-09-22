@@ -83,3 +83,13 @@ export class ListSaleReturnsQueryDto {
   @Min(1)
   pageSize?: number;
 }
+
+export class LookupSaleReturnQueryDto {
+  @IsString()
+  returnNumber!: string;
+}
+
+export class CompleteWithSaleDto {
+  @IsUUID()
+  saleId!: string;
+}

@@ -41,7 +41,7 @@ export class SaleReturn {
   @Column({ name: "return_date", type: "date" })
   returnDate!: string;
 
-  @Column({ type: "text", default: "POSTED" })
+  @Column({ type: "text", default: "PENDING" })
   status!: string;
 
   @Column({ type: "numeric", precision: 14, scale: 4, default: 0 })
@@ -83,6 +83,27 @@ export class SaleReturn {
   @Column({ name: "processed_by", type: "uuid", nullable: true })
   processedBy!: string | null;
 
+  @Column({ name: "issued_by", type: "uuid", nullable: true })
+  issuedBy!: string | null;
+
+  @Column({ name: "issued_by_name", type: "text", nullable: true })
+  issuedByName!: string | null;
+
+  @Column({ name: "refunded_by", type: "uuid", nullable: true })
+  refundedBy!: string | null;
+
+  @Column({ name: "refunded_by_name", type: "text", nullable: true })
+  refundedByName!: string | null;
+
+  @Column({ name: "refunded_at", type: "timestamptz", nullable: true })
+  refundedAt!: Date | null;
+
+  @Column({ name: "applied_to_sale_id", type: "uuid", nullable: true })
+  appliedToSaleId!: string | null;
+
+  @Column({ name: "completion_mode", type: "text", nullable: true })
+  completionMode!: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 
@@ -104,6 +125,18 @@ export class SaleReturn {
   @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "processed_by" })
   processedByUser!: User | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "issued_by" })
+  issuedByUser!: User | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "refunded_by" })
+  refundedByUser!: User | null;
+
+  @ManyToOne(() => Sale, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "applied_to_sale_id" })
+  appliedToSale!: Sale | null;
 
   @OneToMany(() => SaleReturnLine, (line) => line.saleReturn)
   lines!: SaleReturnLine[];

@@ -130,6 +130,39 @@ export interface CashierDashboardSummary {
   cashReceivedAmount: number;
   cardPaymentsAmount: number;
   heldBillsCount: number;
+  refundTotalAmount: number;
+  cashInHandAmount: number;
+}
+
+/** Manager reports — floor (POS out) vs warehouse stock per SKU. */
+export interface ManagerStockOverviewRow {
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  floorQuantity: number;
+  warehouseQuantity: number;
+  totalQuantity: number;
+  reorderLevel: number;
+}
+
+export interface ManagerStockOverviewQuery {
+  warehouseId?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedManagerStockOverview {
+  items: ManagerStockOverviewRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  floorTotal: number;
+  warehouseTotal: number;
 }
 
 export interface VendorContactInput {
@@ -419,6 +452,17 @@ export function formatPoOrderQuantity(item: {
       ? (item.purchaseUnitName ?? "box")
       : (item.baseUnitName ?? "pc");
   return `${displayQty.toLocaleString()} ${unitLabel}`;
+}
+
+export function poOrderUnitLabel(
+  orderUnit?: OrderUnit,
+  purchaseUnitName?: string | null,
+  baseUnitName?: string | null,
+): string {
+  const unit = orderUnit ?? "box";
+  return unit === "box"
+    ? (purchaseUnitName ?? "box")
+    : (baseUnitName ?? "pc");
 }
 
 export function lineTotalForScan(input: {

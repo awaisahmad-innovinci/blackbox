@@ -23,6 +23,7 @@ export function OpenTillDialog({
   onOpenChange,
   cashierUserId,
   cashierName,
+  cashierUsername,
   requireApproval,
   onSuccess,
 }: {
@@ -30,6 +31,7 @@ export function OpenTillDialog({
   onOpenChange: (open: boolean) => void;
   cashierUserId: string;
   cashierName: string;
+  cashierUsername: string;
   requireApproval: boolean;
   onSuccess: (detail: TillSessionDetail) => void;
 }) {
@@ -75,6 +77,7 @@ export function OpenTillDialog({
       const detail = await openTill({
         userId: cashierUserId,
         userName: cashierName,
+        tillUsername: cashierUsername,
         body: {
           ...emptyTillNotes(),
           openingBalance: balance,

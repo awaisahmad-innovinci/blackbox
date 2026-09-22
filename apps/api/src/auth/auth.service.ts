@@ -206,14 +206,21 @@ export class AuthService {
     }
 
     let deviceId: string | null = null;
+    const permissions = await this.permissionsService.getPermissionsForUser(
+      user.id,
+      user.tenantId,
+    );
     if (dto.client === "desktop") {
-      const permissions = await this.permissionsService.getPermissionsForUser(
-        user.id,
-        user.tenantId,
-      );
       if (!permissions.includes("desktop.access")) {
         throw new ForbiddenException(
           "This account is not allowed to sign in on the desktop app",
+        );
+      }
+    }
+    if (dto.client === "web") {
+      if (!permissions.includes("web.access")) {
+        throw new ForbiddenException(
+          "This account is not allowed to sign in to the web admin",
         );
       }
     }
@@ -260,6 +267,13 @@ export class AuthService {
         user.id,
         user.tenantId,
       );
+    if (!stored.deviceId) {
+      if (!userPermissions.includes("web.access")) {
+        throw new UnauthorizedException("Invalid refresh token");
+      }
+    } else if (!userPermissions.includes("desktop.access")) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
     const accessTtl = this.accessTtlSeconds();
     const refreshTtl = this.refreshTtlSeconds();
 

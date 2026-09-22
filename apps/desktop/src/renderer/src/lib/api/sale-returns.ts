@@ -4,6 +4,7 @@ import type {
   ReturnableSaleLine,
   SaleReturnDetail,
   SaleReturnListQuery,
+  SaleReturnLookupSummary,
 } from "@blackbox/shared";
 import { apiFetch } from "./client";
 
@@ -24,6 +25,12 @@ export const saleReturnsApi = {
   get(id: string): Promise<SaleReturnDetail> {
     return apiFetch<SaleReturnDetail>(`/sale-returns/${id}`);
   },
+  lookup(returnNumber: string): Promise<SaleReturnLookupSummary> {
+    const params = new URLSearchParams({ returnNumber: returnNumber.trim() });
+    return apiFetch<SaleReturnLookupSummary>(
+      `/sale-returns/lookup?${params.toString()}`,
+    );
+  },
   returnableLines(saleId: string): Promise<ReturnableSaleLine[]> {
     return apiFetch<ReturnableSaleLine[]>(
       `/sale-returns/returnable-lines/${saleId}`,
@@ -34,5 +41,11 @@ export const saleReturnsApi = {
       method: "POST",
       body: JSON.stringify(body),
     });
+  },
+  completeStandalone(id: string): Promise<SaleReturnDetail> {
+    return apiFetch<SaleReturnDetail>(
+      `/sale-returns/${id}/complete-standalone`,
+      { method: "POST" },
+    );
   },
 };

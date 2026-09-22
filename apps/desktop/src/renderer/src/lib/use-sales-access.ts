@@ -6,8 +6,12 @@ import {
   canManageTill,
   canAccessActivity,
   canAccessSaleReturn,
+  canAccessSaleRefund,
   canVoidSale,
   isCashierOnlyNav,
+  isWarehouseOnlyNav,
+  showInventoryDashboard,
+  showManagerDashboard,
 } from "./sales-access";
 
 export function useSalesAccess() {
@@ -22,6 +26,10 @@ export function useSalesAccess() {
     canReadActivity: canAccessActivity(permissions),
     canVoid: canVoidSale(permissions),
     canReturn: canAccessSaleReturn(permissions),
+    canRefund: canAccessSaleRefund(permissions),
     cashierOnly: isCashierOnlyNav(permissions),
+    warehouseOnly: isWarehouseOnlyNav(permissions),
+    showManagerDashboard: showManagerDashboard(permissions),
+    showInventoryDashboard: showInventoryDashboard(permissions),
   };
 }

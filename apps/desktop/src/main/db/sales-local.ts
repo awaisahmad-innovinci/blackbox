@@ -73,10 +73,10 @@ export function upsertSaleLocal(
     const insertLine = db.prepare(
       `insert into sale_lines (
         id, tenant_id, sale_id, product_sku_id, quantity, unit_price, line_total,
-        discount_percent, foc_quantity, sell_unit, barcode, created_at, updated_at, sync_status, server_updated_at
+        discount_percent, foc_quantity, quantity_corrected, sell_unit, barcode, created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @saleId, @productSkuId, @quantity, @unitPrice, @lineTotal,
-        @discountPercent, @focQuantity, @sellUnit, @barcode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+        @discountPercent, @focQuantity, @quantityCorrected, @sellUnit, @barcode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )`,
     );
 
@@ -91,6 +91,7 @@ export function upsertSaleLocal(
         lineTotal: item.lineTotal,
         discountPercent: item.discountPercent ?? 0,
         focQuantity: item.focQuantity ?? 0,
+        quantityCorrected: item.quantityCorrected ? 1 : 0,
         sellUnit: item.sellUnit,
         barcode: item.barcode,
         createdAt: detail.updatedAt,

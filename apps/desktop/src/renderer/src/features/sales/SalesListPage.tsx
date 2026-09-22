@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { SaleListItem, WarehouseListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
@@ -15,7 +15,7 @@ import {
   filterSelectProps,
   ListFilterNav,
 } from "@renderer/components/list-filter-nav";
-import { loadSales, loadWarehouses } from "@renderer/lib/local-db/entity-source";
+import { loadSales, loadWarehouses, resolveSaleByNumber } from "@renderer/lib/local-db/entity-source";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -53,6 +53,16 @@ export function SalesListPage() {
     enabled: true,
     inputRef: searchRef,
     onScan: setSearch,
+    onComplete: (code) => {
+      void (async () => {
+        const match = await resolveSaleByNumber(code);
+        if (match) {
+          navigate(`/sales/${match.id}`);
+          return;
+        }
+        setError(`Sale not found: ${code.trim()}`);
+      })();
+    },
   });
 
   useEffect(() => {
@@ -131,6 +141,10 @@ export function SalesListPage() {
               </>
             ) : null}
           </div>
+        ) : canReadList ? (
+          <Button variant="outline" asChild>
+            <Link to="/sales/stock-overview">Floor &amp; warehouse stock</Link>
+          </Button>
         ) : null}
       </div>
 

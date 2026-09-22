@@ -5,6 +5,8 @@ import {
   computeTillDenominationTotal,
   emptyTillNotes,
   isTillNearLimit,
+  TILL_MAX_CASH_BALANCE_TO_CLOSE,
+  validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -26,6 +28,7 @@ import {
 import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
 import { CollectCashDialog } from "@renderer/features/sales/CollectCashDialog";
 import { OpenTillDialog } from "@renderer/features/sales/OpenTillDialog";
+import { PosPrinterSettingsDialog } from "@renderer/features/sales/PosPrinterSettingsDialog";
 import { ReopenTillDialog } from "@renderer/features/sales/ReopenTillDialog";
 import {
   approveTill,
@@ -53,7 +56,7 @@ export function TillPage() {
   const navigate = useNavigate();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
-  const { canReadTill, canManageTill } = useSalesAccess();
+  const { canReadTill, canManageTill, canWrite, canRefund } = useSalesAccess();
   const { promptSupervisorTotp } = useSupervisorTotp();
   const requireTillApproval = user?.requireManagerApprovalTillOpen ?? true;
   const requireTillWithdrawApproval =
@@ -76,6 +79,8 @@ export function TillPage() {
   >(null);
   const [managerForm, setManagerForm] = useState(createEmptyTillFormState());
   const [collectDialogOpen, setCollectDialogOpen] = useState(false);
+  const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
+  const [openingDrawer, setOpeningDrawer] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [openDialogOpen, setOpenDialogOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
@@ -127,6 +132,21 @@ export function TillPage() {
     void refresh();
   }, [user?.id, canManageTill]);
 
+  useEffect(() => {
+    function onFocus() {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    }
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [user?.id, canManageTill]);
+
   async function onOpenTillDirect(): Promise<void> {
     if (!user) return;
     const balance = Number(openingBalance);
@@ -142,6 +162,7 @@ export function TillPage() {
       const detail = await openTill({
         userId: user.id,
         userName: user.fullName?.trim() || user.username,
+        tillUsername: user.username,
         body: {
           ...emptyTillNotes(),
           openingBalance: balance,
@@ -271,6 +292,24 @@ export function TillPage() {
       ? Math.min(100, (session.currentCashBalance / session.maxCashLimit) * 100)
       : 0;
 
+  const closeBalanceError = session
+    ? validateTillCanCloseBalance(session.currentCashBalance)
+    : null;
+
+  async function onOpenDrawer(): Promise<void> {
+    setOpeningDrawer(true);
+    setError(null);
+    try {
+      await window.blackbox?.pos?.openCashDrawer?.();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to open cash drawer"));
+    } finally {
+      setOpeningDrawer(false);
+    }
+  }
+
+  const showDrawerControls = canManageTill || canWrite;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -280,9 +319,33 @@ export function TillPage() {
             Cash drawer session and balance
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate("/sales/new")}>
-          Back to sale
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {showDrawerControls ? (
+            <>
+              <Button
+                variant="outline"
+                disabled={openingDrawer}
+                onClick={() => void onOpenDrawer()}
+              >
+                {openingDrawer ? "Opening…" : "Open drawer"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setPrinterSettingsOpen(true)}
+              >
+                Printer settings
+              </Button>
+            </>
+          ) : null}
+          {canRefund ? (
+            <Button variant="outline" onClick={() => navigate("/sales/refund-return")}>
+              Refund return
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={() => navigate("/sales/new")}>
+            Back to sale
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -297,9 +360,9 @@ export function TillPage() {
         <div className="border-border space-y-4 rounded-lg border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="font-medium">{session.userName}</p>
+              <p className="font-medium">{session.tillName}</p>
               <p className="text-muted-foreground text-sm">
-                Status: {statusLabel(session.status)}
+                {session.userName} · Status: {statusLabel(session.status)}
               </p>
             </div>
             {session.status === "CLOSED_LIMIT" ? (
@@ -440,7 +503,7 @@ export function TillPage() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3 font-medium">Cashier</th>
+                    <th className="px-4 py-3 font-medium">Till</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Current cash</th>
                     <th className="px-4 py-3 font-medium">Actions</th>
@@ -449,7 +512,7 @@ export function TillPage() {
                 <tbody>
                   {managerItems.map((row) => (
                     <tr key={row.id} className="border-border border-t">
-                      <td className="px-4 py-3">{row.userName}</td>
+                      <td className="px-4 py-3">{row.tillName}</td>
                       <td className="px-4 py-3">{statusLabel(row.status)}</td>
                       <td className="px-4 py-3 tabular-nums">
                         {row.currentCashBalance.toLocaleString()}
@@ -577,10 +640,22 @@ export function TillPage() {
             until a manager reopens your till.
           </p>
           {session ? (
-            <p className="text-sm font-medium tabular-nums">
-              Current cash in till: Rs{" "}
-              {session.currentCashBalance.toLocaleString()}
-            </p>
+            <>
+              <p className="text-sm font-medium tabular-nums">
+                Current cash in till: Rs{" "}
+                {session.currentCashBalance.toLocaleString()}
+              </p>
+              {closeBalanceError ? (
+                <p className="text-destructive text-sm" role="alert">
+                  {closeBalanceError} Use Withdraw cash first, then try again.
+                </p>
+              ) : session.currentCashBalance <= TILL_MAX_CASH_BALANCE_TO_CLOSE ? (
+                <p className="text-muted-foreground text-sm">
+                  Till balance is Rs {TILL_MAX_CASH_BALANCE_TO_CLOSE} or less. You
+                  can close now.
+                </p>
+              ) : null}
+            </>
           ) : null}
           <DialogFooter>
             <Button
@@ -590,7 +665,10 @@ export function TillPage() {
             >
               Cancel
             </Button>
-            <Button disabled={busy} onClick={() => void onCloseTill()}>
+            <Button
+              disabled={busy || Boolean(closeBalanceError)}
+              onClick={() => void onCloseTill()}
+            >
               {busy ? "Closing…" : "Close till"}
             </Button>
           </DialogFooter>
@@ -603,6 +681,7 @@ export function TillPage() {
           onOpenChange={setOpenDialogOpen}
           cashierUserId={user.id}
           cashierName={user.fullName?.trim() || user.username}
+          cashierUsername={user.username}
           requireApproval={requireTillApproval}
           onSuccess={(detail) => {
             setSession(detail);
@@ -637,6 +716,11 @@ export function TillPage() {
           onSuccess={(updated) => setSession(updated)}
         />
       ) : null}
+
+      <PosPrinterSettingsDialog
+        open={printerSettingsOpen}
+        onOpenChange={setPrinterSettingsOpen}
+      />
     </div>
   );
 }

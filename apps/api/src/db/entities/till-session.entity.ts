@@ -27,6 +27,9 @@ export class TillSession {
   @Column({ name: "user_id", type: "uuid" })
   userId!: string;
 
+  @Column({ name: "till_name", type: "text", default: "" })
+  tillName!: string;
+
   @Column({ type: "text", default: "PENDING_APPROVAL" })
   status!: string;
 

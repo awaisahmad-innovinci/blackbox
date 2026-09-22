@@ -147,6 +147,9 @@ export type {
   GoodsReceiptStatus,
   DashboardSummary,
   CashierDashboardSummary,
+  ManagerStockOverviewRow,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   VendorContactType,
   PaymentTerms,
   VendorContactInput,
@@ -337,6 +340,10 @@ export type {
   PaginatedSaleReturns,
   CreateSaleReturnLineRequest,
   CreateSaleReturnRequest,
+  SaleReturnStatus,
+  SaleReturnCompletionMode,
+  SaleReturnLookupSummary,
+  ManagerDashboardSummary,
 } from "./sales";
 export {
   SALE_STATUSES,
@@ -363,6 +370,8 @@ export {
   TILL_WARNING_EXTRA_CASH,
   TILL_STATUSES,
   TILL_CLOSE_REASON_CASHIER_CLOSED,
+  TILL_MAX_CASH_BALANCE_TO_CLOSE,
+  TILL_ACTIVE_SESSION_STATUSES,
   computeTillDenominationTotal,
   tillMaxLimit,
   tillWarningThreshold,
@@ -371,6 +380,10 @@ export {
   emptyTillNotes,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
+  formatTillName,
+  validateTillCanCloseBalance,
+  tillSessionBlocksLogout,
+  tillLogoutBlockMessage,
 } from "./till";
 export type {
   ActivityLogEventType,
@@ -404,6 +417,7 @@ export {
   defaultOrderUnitForScan,
   lineTotalForPurchase,
   formatPoOrderQuantity,
+  poOrderUnitLabel,
 } from "./inventory";
 export {
   DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS,
@@ -458,3 +472,8 @@ export const normalizeStoredText = normalizeStoredTextFn;
 export const normalizeOptionalStoredText = normalizeOptionalStoredTextFn;
 
 export { buildReceivedAtIso, formatStoredDateTime } from "./datetime";
+
+export type { PosPrinterSettings, PosPrinterInfo } from "./pos-hardware";
+export {
+  DEFAULT_POS_PRINTER_SETTINGS,
+} from "./pos-hardware";

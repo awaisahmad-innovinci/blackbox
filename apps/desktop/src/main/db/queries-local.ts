@@ -4,6 +4,9 @@ import type {
   Category,
   DashboardSummary,
   EntityStatus,
+  ManagerDashboardSummary,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   PaginatedProducts,
   PaginatedPurchaseOrders,
   PaginatedVendors,
@@ -639,12 +642,185 @@ export function getCashierDashboardSummaryLocal(
     )
     .get({ tenantId, userId }) as { cnt: number };
 
+  const refundRow = db
+    .prepare(
+      `select coalesce(sum(refund_total), 0) as amount
+       from sale_returns
+       where tenant_id = @tenantId
+         and status = 'COMPLETED'
+         and refunded_by = @userId
+         and date(refunded_at) = date('now', 'localtime')`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
   return {
     date: todayRow.d,
     totalSalesAmount: roundMoney(Number(totalSalesRow.amount)),
     cashReceivedAmount: roundMoney(Number(cashRow.amount)),
     cardPaymentsAmount: roundMoney(Number(cardRow.amount)),
     heldBillsCount: Number(heldRow.cnt),
+    refundTotalAmount: roundMoney(Number(refundRow.amount)),
+    cashInHandAmount: roundMoney(
+      Number(cashRow.amount) - Number(refundRow.amount),
+    ),
+  };
+}
+
+export function getManagerDashboardSummaryLocal(
+  userId: string,
+): ManagerDashboardSummary {
+  const db = getLocalDb();
+  const tenantId = DEMO_STORE_TENANT_ID;
+  const todayRow = db
+    .prepare(`select date('now', 'localtime') as d`)
+    .get() as { d: string };
+  const today = todayRow.d;
+
+  const tillRow = db
+    .prepare(
+      `select coalesce(sum(withdrawal_total), 0) as amount
+       from till_withdrawals
+       where tenant_id = @tenantId
+         and withdrawn_by_user_id = @userId
+         and date(created_at) = date('now', 'localtime')`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
+  const returnCountRow = db
+    .prepare(
+      `select count(*) as cnt
+       from sale_returns
+       where tenant_id = @tenantId
+         and status in ('PENDING', 'COMPLETED')
+         and return_date = @today`,
+    )
+    .get({ tenantId, today }) as { cnt: number };
+
+  const tillCashCollectedAmount = roundMoney(Number(tillRow.amount));
+
+  return {
+    date: today,
+    tillCashCollectedAmount,
+    customerReturnCount: Number(returnCountRow.cnt),
+  };
+}
+
+export function listManagerStockOverviewLocal(
+  query: ManagerStockOverviewQuery = {},
+): PaginatedManagerStockOverview {
+  const db = getLocalDb();
+  const tenantId = DEMO_STORE_TENANT_ID;
+  const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
+  const warehouseId = query.warehouseId?.trim() ?? "";
+  const search = query.q?.trim().toLowerCase() ?? "";
+
+  const whereParts = [
+    "sku.tenant_id = @tenantId",
+    "p.status = 'active'",
+    "sku.status = 'active'",
+    "w.status = 'active'",
+  ];
+  const params: Record<string, string> = { tenantId };
+
+  if (warehouseId) {
+    whereParts.push("w.id = @warehouseId");
+    params.warehouseId = warehouseId;
+  }
+  if (search) {
+    whereParts.push(
+      `(lower(p.name) like @search
+        or lower(sku.sku) like @search
+        or lower(coalesce(sku.barcode, '')) like @search
+        or lower(sku.variant_name) like @search)`,
+    );
+    params.search = `%${search}%`;
+  }
+
+  const where = whereParts.join(" and ");
+  const fromClause = `
+    from product_skus sku
+    inner join products p on p.id = sku.product_id and p.tenant_id = sku.tenant_id
+    inner join warehouses w on w.tenant_id = sku.tenant_id
+    left join inventory_stock st
+      on st.tenant_id = sku.tenant_id
+      and st.product_sku_id = sku.id
+      and st.warehouse_id = w.id
+    left join inventory_out_items out
+      on out.tenant_id = sku.tenant_id
+      and out.product_sku_id = sku.id
+      and out.warehouse_id = w.id
+  `;
+
+  const countRow = db
+    .prepare(`select count(*) as cnt ${fromClause} where ${where}`)
+    .get(params) as { cnt: number };
+
+  const totalsRow = db
+    .prepare(
+      `select
+         coalesce(sum(coalesce(out.quantity, 0)), 0) as floorTotal,
+         coalesce(sum(coalesce(st.quantity_available, 0)), 0) as warehouseTotal
+       ${fromClause}
+       where ${where}`,
+    )
+    .get(params) as { floorTotal: number; warehouseTotal: number };
+
+  const rows = db
+    .prepare(
+      `select
+         sku.id as productSkuId,
+         p.name as productName,
+         sku.variant_name as variantName,
+         sku.sku as sku,
+         sku.barcode as barcode,
+         w.id as warehouseId,
+         w.name as warehouseName,
+         coalesce(out.quantity, 0) as floorQuantity,
+         coalesce(st.quantity_available, 0) as warehouseQuantity,
+         sku.reorder_level as reorderLevel
+       ${fromClause}
+       where ${where}
+       order by p.name asc, sku.sku asc, w.name asc
+       limit @limit offset @offset`,
+    )
+    .all({ ...params, limit: pageSize, offset }) as Array<{
+      productSkuId: string;
+      productName: string;
+      variantName: string;
+      sku: string;
+      barcode: string | null;
+      warehouseId: string;
+      warehouseName: string;
+      floorQuantity: number;
+      warehouseQuantity: number;
+      reorderLevel: number;
+    }>;
+
+  const items = rows.map((row) => {
+    const floorQuantity = roundMoney(Number(row.floorQuantity));
+    const warehouseQuantity = roundMoney(Number(row.warehouseQuantity));
+    return {
+      productSkuId: row.productSkuId,
+      productName: row.productName,
+      variantName: row.variantName,
+      sku: row.sku,
+      barcode: row.barcode,
+      warehouseId: row.warehouseId,
+      warehouseName: row.warehouseName,
+      floorQuantity,
+      warehouseQuantity,
+      totalQuantity: roundMoney(floorQuantity + warehouseQuantity),
+      reorderLevel: roundMoney(Number(row.reorderLevel)),
+    };
+  });
+
+  return {
+    items,
+    total: Number(countRow.cnt),
+    page,
+    pageSize,
+    floorTotal: roundMoney(Number(totalsRow.floorTotal)),
+    warehouseTotal: roundMoney(Number(totalsRow.warehouseTotal)),
   };
 }
 
@@ -1437,9 +1613,11 @@ export function listSaleReturnsLocal(
          r.warehouse_id as warehouseId,
          coalesce(w.name, '—') as warehouseName,
          r.return_date as returnDate,
+         r.status,
          r.refund_total as refundTotal,
          r.refund_method as refundMethod,
-         r.processed_by_name as processedByName,
+         coalesce(r.issued_by_name, r.processed_by_name, '') as issuedByName,
+         r.refunded_by_name as refundedByName,
          r.created_at as createdAt,
          (
            select count(*) from sale_return_lines l
@@ -1460,9 +1638,11 @@ export function listSaleReturnsLocal(
     warehouseId: string;
     warehouseName: string;
     returnDate: string;
+    status: string;
     refundTotal: number;
     refundMethod: string;
-    processedByName: string;
+    issuedByName: string;
+    refundedByName: string | null;
     lineCount: number;
     createdAt: string;
   }>;
@@ -1475,10 +1655,12 @@ export function listSaleReturnsLocal(
     warehouseId: r.warehouseId,
     warehouseName: r.warehouseName,
     returnDate: r.returnDate,
+    status: r.status as SaleReturnListItem["status"],
     refundTotal: Number(r.refundTotal),
     refundMethod: r.refundMethod as SaleReturnListItem["refundMethod"],
     lineCount: Number(r.lineCount),
-    processedByName: String(r.processedByName ?? "").trim() || null,
+    issuedByName: String(r.issuedByName ?? "").trim() || null,
+    refundedByName: String(r.refundedByName ?? "").trim() || null,
     createdAt: r.createdAt,
   }));
 

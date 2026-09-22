@@ -252,7 +252,7 @@ export function SaleReturnFormPage() {
           warehouseId: sale.warehouseId,
           warehouseName: sale.warehouseName,
           returnDate,
-          status: "POSTED",
+          status: "PENDING",
           subtotal,
           gstRate: sale.gstRate,
           gstAmount: tax.gstAmount,
@@ -263,6 +263,13 @@ export function SaleReturnFormPage() {
           notes: "",
           processedBy: user.id,
           processedByName: processorName,
+          issuedBy: user.id,
+          issuedByName: processorName,
+          refundedBy: null,
+          refundedByName: null,
+          refundedAt: null,
+          appliedToSaleId: null,
+          completionMode: null,
           sale,
           items: builtItems,
           createdAt: now,
@@ -302,15 +309,16 @@ export function SaleReturnFormPage() {
 
         await logActivityEvent(
           {
-            eventType: "sale.return_posted",
+            eventType: "sale.return_issued",
             actorUserId: user.id,
-            summary: `${processorName} processed return ${returnNumber} for sale ${sale.saleNumber}`,
+            summary: `${processorName} issued return ${returnNumber} — refund Rs ${tax.total.toLocaleString()}`,
             metadata: {
               returnNumber,
               returnId: localId,
               saleNumber: sale.saleNumber,
               saleId: sale.id,
               refundTotal: tax.total,
+              issuedByName: processorName,
               lineCount: builtItems.length,
             },
           },
@@ -348,15 +356,16 @@ export function SaleReturnFormPage() {
 
       await logActivityEvent(
         {
-          eventType: "sale.return_posted",
+          eventType: "sale.return_issued",
           actorUserId: user.id,
-          summary: `${processorName} processed return ${detail.returnNumber} for sale ${sale.saleNumber}`,
+          summary: `${processorName} issued return ${detail.returnNumber} — refund Rs ${detail.refundTotal.toLocaleString()}`,
           metadata: {
             returnNumber: detail.returnNumber,
             returnId: detail.id,
             saleNumber: sale.saleNumber,
             saleId: sale.id,
             refundTotal: detail.refundTotal,
+            issuedByName: processorName,
             lineCount: detail.items.length,
           },
         },
@@ -614,12 +623,12 @@ export function SaleReturnFormPage() {
         <Button onClick={() => setScanOpen(true)} disabled={scanBusy || saving}>
           Scan barcode
         </Button>
-        {draftReturnDetail ? <PrintButton /> : null}
+        {draftReturnDetail ? <PrintButton openDrawerOnPrint /> : null}
         <Button
           onClick={() => void onConfirm()}
           disabled={saving || activeLines.length === 0}
         >
-          {saving ? "Posting…" : "Post return"}
+          {saving ? "Issuing…" : "Issue return"}
         </Button>
       </div>
 

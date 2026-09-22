@@ -6,6 +6,9 @@ export const TILL_MAX_EXTRA_CASH = 100_000;
 
 export const TILL_WARNING_EXTRA_CASH = 90_000;
 
+/** Max cash left in till when cashier closes voluntarily (must withdraw above this). */
+export const TILL_MAX_CASH_BALANCE_TO_CLOSE = 1;
+
 export const TILL_STATUSES = [
   "PENDING_APPROVAL",
   "OPEN",
@@ -14,6 +17,13 @@ export const TILL_STATUSES = [
 ] as const;
 
 export type TillStatus = (typeof TILL_STATUSES)[number];
+
+/** Till session still active for a cashier (blocks logout until resolved). */
+export const TILL_ACTIVE_SESSION_STATUSES = [
+  "PENDING_APPROVAL",
+  "OPEN",
+  "CLOSED_LIMIT",
+] as const satisfies readonly TillStatus[];
 
 /** Cashier voluntary end-of-shift close (manager must reopen). */
 export const TILL_CLOSE_REASON_CASHIER_CLOSED = "CASHIER_CLOSED";
@@ -32,6 +42,7 @@ export type TillSessionDetail = TillNoteCounts & {
   id: string;
   userId: string;
   userName: string;
+  tillName: string;
   status: TillStatus;
   openingTotal: number;
   openingBalance: number;
@@ -53,6 +64,7 @@ export type TillListItem = {
   id: string;
   userId: string;
   userName: string;
+  tillName: string;
   status: TillStatus;
   openingBalance: number;
   currentCashBalance: number;
@@ -151,4 +163,44 @@ export function validateTillOpeningBalanceAmount(
     return "Enter a valid opening balance.";
   }
   return null;
+}
+
+export function formatTillName(username: string): string {
+  const trimmed = username.trim();
+  if (!trimmed) return "till";
+  return `${trimmed} till`;
+}
+
+export function validateTillCanCloseBalance(
+  currentCashBalance: number,
+): string | null {
+  if (
+    Number.isFinite(currentCashBalance) &&
+    currentCashBalance > TILL_MAX_CASH_BALANCE_TO_CLOSE
+  ) {
+    return "Withdraw your cash first. Till balance must be Rs 1 or less before closing.";
+  }
+  return null;
+}
+
+export function tillSessionBlocksLogout(
+  session: TillSessionDetail | null,
+): boolean {
+  if (!session) return false;
+  return (TILL_ACTIVE_SESSION_STATUSES as readonly TillStatus[]).includes(
+    session.status,
+  );
+}
+
+export function tillLogoutBlockMessage(session: TillSessionDetail): string {
+  switch (session.status) {
+    case "OPEN":
+      return "Close your till before signing out. Withdraw cash if needed, then use Close till.";
+    case "PENDING_APPROVAL":
+      return "Your till is pending manager approval. Contact a manager before signing out.";
+    case "CLOSED_LIMIT":
+      return "Your till hit the cash limit. Contact a manager before signing out.";
+    default:
+      return "Resolve your till session before signing out.";
+  }
 }

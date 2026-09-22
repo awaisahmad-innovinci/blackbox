@@ -512,7 +512,7 @@ export function applyChange(change: SyncChangeDto): void {
       warehouseId: str(p.warehouseId, sale.warehouseId),
       warehouseName: str(p.warehouseName, sale.warehouseName),
       returnDate: str(p.returnDate, now.slice(0, 10)),
-      status: "POSTED",
+      status: str(p.status, "PENDING") as SaleReturnDetail["status"],
       subtotal: Number(p.subtotal ?? 0),
       gstRate: Number(p.gstRate ?? sale.gstRate),
       gstAmount: Number(p.gstAmount ?? 0),
@@ -521,15 +521,28 @@ export function applyChange(change: SyncChangeDto): void {
       refundTotal: Number(p.refundTotal ?? 0),
       refundMethod: str(p.refundMethod, "CASH") as SaleReturnDetail["refundMethod"],
       notes: str(p.notes),
-      processedBy: (p.processedBy as string | null) ?? null,
-      processedByName: (p.processedByName as string | null) ?? null,
+      processedBy: (p.processedBy as string | null) ?? (p.issuedBy as string | null) ?? null,
+      processedByName:
+        (p.processedByName as string | null) ??
+        (p.issuedByName as string | null) ??
+        null,
+      issuedBy: (p.issuedBy as string | null) ?? (p.processedBy as string | null) ?? null,
+      issuedByName:
+        (p.issuedByName as string | null) ??
+        (p.processedByName as string | null) ??
+        null,
+      refundedBy: (p.refundedBy as string | null) ?? null,
+      refundedByName: (p.refundedByName as string | null) ?? null,
+      refundedAt: (p.refundedAt as string | null) ?? null,
+      appliedToSaleId: (p.appliedToSaleId as string | null) ?? null,
+      completionMode: (p.completionMode as SaleReturnDetail["completionMode"]) ?? null,
       sale,
       items,
       createdAt: str(p.createdAt, now),
       updatedAt: str(p.updatedAt, now),
     });
 
-    if (!existed) {
+    if (!existed && str(p.status, "PENDING") !== "COMPLETED") {
       const warehouseId = str(p.warehouseId, sale.warehouseId);
       for (const item of items) {
         const balanceRow = db
@@ -561,6 +574,7 @@ export function applyChange(change: SyncChangeDto): void {
       id: change.entityId,
       userId: str(p.userId),
       userName: str(p.userName),
+      tillName: str(p.tillName) || `${str(p.userName).trim()} till`.replace(/^ till$/, "till"),
       status: str(p.status, "OPEN") as TillSessionDetail["status"],
       note10: Number(p.note10 ?? 0),
       note20: Number(p.note20 ?? 0),
