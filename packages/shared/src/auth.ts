@@ -10,6 +10,8 @@ export interface AuthUser {
   tenantName?: string;
   /** Formatted business address from onboarding location (receipt header). */
   businessAddress?: string;
+  /** Store contact phone from first location (receipt header). */
+  businessPhone?: string;
   email: string;
   username: string;
   fullName: string;

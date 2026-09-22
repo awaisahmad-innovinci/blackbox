@@ -306,12 +306,14 @@ export class AuthService {
       stored.replacedBy = created.id;
       await manager.save(stored);
 
+      const receiptInfo = await this.getBusinessReceiptInfo(user.tenantId);
       return {
         user: this.toAuthUser(
           user,
           userPermissions,
           tenant.name,
-          await this.getBusinessAddress(user.tenantId),
+          receiptInfo.businessAddress,
+          receiptInfo.businessPhone,
           tenant.requireManagerApprovalRemoveSaleLine,
           tenant.requireManagerApprovalTillOpen,
           tenant.requireManagerApprovalTillWithdraw,
@@ -353,11 +355,13 @@ export class AuthService {
         user.id,
         user.tenantId,
       );
+    const receiptInfo = await this.getBusinessReceiptInfo(user.tenantId);
     return this.toAuthUser(
       user,
       userPermissions,
       tenant.name,
-      await this.getBusinessAddress(user.tenantId),
+      receiptInfo.businessAddress,
+      receiptInfo.businessPhone,
       tenant.requireManagerApprovalRemoveSaleLine,
       tenant.requireManagerApprovalTillOpen,
       tenant.requireManagerApprovalTillWithdraw,
@@ -468,13 +472,14 @@ export class AuthService {
       }
     });
 
-    const businessAddress = await this.getBusinessAddress(user.tenantId);
+    const receiptInfo = await this.getBusinessReceiptInfo(user.tenantId);
     return {
       user: this.toAuthUser(
         user,
         userPermissions,
         tenant?.name,
-        businessAddress,
+        receiptInfo.businessAddress,
+        receiptInfo.businessPhone,
         tenant?.requireManagerApprovalRemoveSaleLine,
         tenant?.requireManagerApprovalTillOpen,
         tenant?.requireManagerApprovalTillWithdraw,
@@ -489,18 +494,29 @@ export class AuthService {
     };
   }
 
-  private async getBusinessAddress(
-    tenantId: string,
-  ): Promise<string | undefined> {
-    const location = await this.locations.findOne({
-      where: { tenantId },
-      order: { createdAt: "ASC" },
-    });
-    if (!location) return undefined;
-    const line = [location.address?.trim(), location.city?.trim()]
-      .filter(Boolean)
-      .join(", ");
-    return line || undefined;
+  private async getBusinessReceiptInfo(tenantId: string): Promise<{
+    businessAddress?: string;
+    businessPhone?: string;
+  }> {
+    const [location, tenant] = await Promise.all([
+      this.locations.findOne({
+        where: { tenantId },
+        order: { createdAt: "ASC" },
+      }),
+      this.tenants.findOne({ where: { id: tenantId } }),
+    ]);
+    if (!location) return {};
+
+    const addressParts = [
+      location.address?.trim(),
+      location.city?.trim(),
+      tenant?.country?.trim(),
+    ].filter(Boolean);
+    const businessAddress =
+      addressParts.length > 0 ? addressParts.join("\n") : undefined;
+    const businessPhone = location.phone?.trim() || undefined;
+
+    return { businessAddress, businessPhone };
   }
 
   private async bindDesktopDevice(
@@ -577,6 +593,7 @@ export class AuthService {
     perms: Permission[],
     tenantName?: string,
     businessAddress?: string,
+    businessPhone?: string,
     requireManagerApprovalRemoveSaleLine?: boolean,
     requireManagerApprovalTillOpen?: boolean,
     requireManagerApprovalTillWithdraw?: boolean,
@@ -588,6 +605,7 @@ export class AuthService {
       tenantId: user.tenantId,
       tenantName: tenantName?.trim() || undefined,
       businessAddress: businessAddress?.trim() || undefined,
+      businessPhone: businessPhone?.trim() || undefined,
       email: user.email,
       username: user.username,
       fullName: user.fullName,

@@ -28,6 +28,9 @@ export class Location {
   @Column({ type: "text", nullable: true })
   address!: string | null;
 
+  @Column({ type: "text", nullable: true })
+  phone!: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

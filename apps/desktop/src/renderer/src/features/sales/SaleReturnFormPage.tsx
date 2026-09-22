@@ -670,6 +670,7 @@ export function SaleReturnFormPage() {
             detail={draftReturnDetail}
             businessName={user?.tenantName?.trim() ?? ""}
             businessAddress={user?.businessAddress}
+            businessPhone={user?.businessPhone}
             managerName={processorName}
           />
         </PrintDocument>

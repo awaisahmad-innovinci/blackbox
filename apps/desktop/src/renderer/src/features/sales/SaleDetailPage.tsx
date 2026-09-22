@@ -213,6 +213,7 @@ export function SaleDetailPage() {
             detail={detail}
             businessName={user?.tenantName?.trim() ?? ""}
             businessAddress={user?.businessAddress}
+            businessPhone={user?.businessPhone}
             cashierName={
               detail.postedByName?.trim() || user?.fullName?.trim() || "—"
             }

@@ -33,12 +33,14 @@ export function SaleThermalReceipt({
   detail,
   businessName,
   businessAddress,
+  businessPhone,
   cashierName,
   returnCredit,
 }: {
   detail: SaleDetail;
   businessName: string;
   businessAddress?: string;
+  businessPhone?: string;
   cashierName: string;
   returnCredit?: SaleReturnCreditReceipt;
 }) {
@@ -73,6 +75,7 @@ export function SaleThermalReceipt({
       <ThermalReceiptHeader
         businessName={businessName}
         businessAddress={businessAddress}
+        businessPhone={businessPhone}
       />
 
       <ThermalRule />
@@ -109,19 +112,19 @@ export function SaleThermalReceipt({
               <td className="py-0.5 pr-1 align-top break-words font-bold">
                 {lineProductLabel(item.productName, item.variantName)}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {item.quantity}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatDiscountPercent(item.discountPercent ?? 0)}%
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatFocQuantity(item.focQuantity ? item.focQuantity : 0)}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatMoney(item.unitPrice)}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatMoney(item.lineTotal)}
               </td>
             </tr>
@@ -213,7 +216,7 @@ export function SaleThermalReceipt({
 
       <ThermalRule />
 
-      <footer className="pb-0.5 text-center text-[9px] leading-tight">
+      <footer className="pb-4 text-center text-[9px] leading-tight font-semibold">
         <p>This software design &amp; developed by</p>
         <p>Innovinci Technologies</p>
         <p>www.innovinci.com</p>
