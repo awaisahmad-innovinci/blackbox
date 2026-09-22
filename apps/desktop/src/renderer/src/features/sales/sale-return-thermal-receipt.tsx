@@ -23,11 +23,13 @@ export function SaleReturnThermalReceipt({
   detail,
   businessName,
   businessAddress,
+  businessPhone,
   managerName,
 }: {
   detail: SaleReturnDetail;
   businessName: string;
   businessAddress?: string;
+  businessPhone?: string;
   managerName: string;
 }) {
   const sale = detail.sale;
@@ -40,6 +42,7 @@ export function SaleReturnThermalReceipt({
       <ThermalReceiptHeader
         businessName={businessName}
         businessAddress={businessAddress}
+        businessPhone={businessPhone}
       />
 
       <ThermalRule />
@@ -87,19 +90,19 @@ export function SaleReturnThermalReceipt({
               <td className="py-0.5 pr-1 align-top break-words font-bold">
                 {lineProductLabel(item.productName, item.variantName)}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {item.quantity}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatDiscountPercent(item.discountPercent ?? 0)}%
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatFocQuantity(item.focQuantity ?? 0)}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatMoney(item.unitPrice)}
               </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-normal">
+              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                 {formatMoney(item.lineTotal)}
               </td>
             </tr>
@@ -131,10 +134,10 @@ export function SaleReturnThermalReceipt({
                 <td className="py-0.5 pr-1 align-top break-words font-bold">
                   {lineProductLabel(item.productName, item.variantName)}
                 </td>
-                <td className="py-0.5 text-right tabular-nums align-top font-normal">
+                <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                   {item.quantity}
                 </td>
-                <td className="py-0.5 text-right tabular-nums align-top font-normal">
+                <td className="py-0.5 text-right tabular-nums align-top font-semibold">
                   {formatMoney(item.lineTotal)}
                 </td>
               </tr>

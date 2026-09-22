@@ -91,6 +91,7 @@ export function completeOnboardingLocation(body: {
   name: string;
   city: string;
   address?: string;
+  phone?: string;
 }) {
   return apiJson<TenantDto>(
     "/tenants/current/onboarding/location",

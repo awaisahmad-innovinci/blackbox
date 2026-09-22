@@ -100,6 +100,10 @@ export class TenantsService {
       dto.address === undefined || dto.address.trim() === ""
         ? null
         : dto.address.trim();
+    const phone =
+      dto.phone === undefined || dto.phone.trim() === ""
+        ? null
+        : dto.phone.trim();
 
     await this.dataSource.transaction(async (manager) => {
       const location = manager.create(Location, {
@@ -107,6 +111,7 @@ export class TenantsService {
         name: dto.name.trim(),
         city: dto.city.trim(),
         address,
+        phone,
       });
       await manager.save(location);
 

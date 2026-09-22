@@ -171,6 +171,7 @@ export function SaleReturnDetailPage() {
           detail={detail}
           businessName={user?.tenantName ?? ""}
           businessAddress={user?.businessAddress}
+          businessPhone={user?.businessPhone}
           managerName={managerName}
         />
       </PrintDocument>

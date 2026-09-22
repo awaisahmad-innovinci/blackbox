@@ -42,7 +42,8 @@ $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public class DocInfoA {
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+public struct DocInfoA {
     [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
     [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
     [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
@@ -53,7 +54,7 @@ public class RawPrinter {
     [DllImport("winspool.drv", SetLastError=true)]
     public static extern bool ClosePrinter(IntPtr hPrinter);
     [DllImport("winspool.drv", EntryPoint="StartDocPrinterA", SetLastError=true, CharSet=CharSet.Ansi)]
-    public static extern bool StartDocPrinter(IntPtr hPrinter, int Level, [In, MarshalAs(UnmanagedType.LPStruct)] DocInfoA di);
+    public static extern bool StartDocPrinter(IntPtr hPrinter, int Level, ref DocInfoA di);
     [DllImport("winspool.drv", SetLastError=true)]
     public static extern bool EndDocPrinter(IntPtr hPrinter);
     [DllImport("winspool.drv", SetLastError=true)]
@@ -71,13 +72,16 @@ if (-not $payloadB64) { throw 'Raw payload is required' }
 $bytes = [Convert]::FromBase64String($payloadB64)
 $doc = New-Object DocInfoA
 $doc.pDocName = 'Blackbox RAW'
+$doc.pOutputFile = $null
 $doc.pDataType = 'RAW'
 $h = [IntPtr]::Zero
 if (-not [RawPrinter]::OpenPrinter($printerName, [ref]$h, [IntPtr]::Zero)) {
-  throw "OpenPrinter failed for '$printerName'"
+  throw "OpenPrinter failed for '$printerName' (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
 }
 try {
-  if (-not [RawPrinter]::StartDocPrinter($h, 1, $doc)) { throw 'StartDocPrinter failed' }
+  if (-not [RawPrinter]::StartDocPrinter($h, 1, [ref]$doc)) {
+    throw "StartDocPrinter failed (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+  }
   try {
     if (-not [RawPrinter]::StartPagePrinter($h)) { throw 'StartPagePrinter failed' }
     try {
@@ -86,7 +90,7 @@ try {
         [Runtime.InteropServices.Marshal]::Copy($bytes, 0, $ptr, $bytes.Length)
         $written = 0
         if (-not [RawPrinter]::WritePrinter($h, $ptr, $bytes.Length, [ref]$written)) {
-          throw 'WritePrinter failed'
+          throw "WritePrinter failed (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
         }
       } finally {
         [Runtime.InteropServices.Marshal]::FreeHGlobal($ptr)
