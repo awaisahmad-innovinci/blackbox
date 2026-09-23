@@ -12,7 +12,7 @@ import type {
   SkuSearchResult,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { normalizeStoredText } from "@blackbox/shared";
+import { costWithGst, normalizeStoredText } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { InventoryStock, ProductSku, Unit } from "../../db/entities";
@@ -106,6 +106,7 @@ export class SkusService {
       barcode: sku.barcode,
       quantityAvailable: availableBySku.get(sku.id) ?? 0,
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
     }));
   }
 
@@ -156,6 +157,7 @@ export class SkusService {
       barcode: sku.barcode,
       quantityAvailable,
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
       scannedQuantityMultiplier: match.quantityMultiplier,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit, 1),
       baseUnitName: sku.baseUnit?.name ?? null,
@@ -198,6 +200,7 @@ export class SkusService {
       purchaseUnitName: sku.purchaseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
       reorderLevel: toNum(sku.reorderLevel),
@@ -226,9 +229,9 @@ export class SkusService {
     if (!sku) throw new NotFoundException("SKU not found");
 
     await this.assertUnits(tenantId, dto.baseUnitId, dto.purchaseUnitId);
-    if (dto.sellingPrice <= dto.costPrice) {
+    if (dto.sellingPrice <= costWithGst(dto.costPrice, dto.gstPercent ?? 0)) {
       throw new BadRequestException(
-        "Selling price must be greater than cost price",
+        "Selling price must be greater than cost + GST",
       );
     }
 
@@ -240,6 +243,7 @@ export class SkusService {
     sku.purchaseUnitId = dto.purchaseUnitId;
     sku.unitsPerPurchaseUnit = String(dto.unitsPerPurchaseUnit);
     sku.costPrice = String(dto.costPrice);
+    sku.gstPercent = String(dto.gstPercent ?? 0);
     sku.sellingPrice = String(dto.sellingPrice);
     sku.sellingPricePerPurchaseUnit =
       dto.sellingPricePerPurchaseUnit == null
@@ -320,6 +324,7 @@ export class SkusService {
       purchaseUnitName: sku.purchaseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
       saleDiscountPercent: toNum(sku.saleDiscountPercent),

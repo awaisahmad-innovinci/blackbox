@@ -16,7 +16,7 @@ import type {
 import {
   DEFAULT_SALE_CUSTOMER_NAME,
   nextSaleNumber,
-  saleBillTotals,
+  saleBillTotalsFromInclusiveLines,
 } from "@blackbox/shared";
 import { randomUUID } from "node:crypto";
 import { DataSource, EntityManager, Repository } from "typeorm";
@@ -191,6 +191,7 @@ export class SalesService {
         quantity: number;
         unitPrice: number;
         lineTotal: number;
+        gstPercent: number;
         sellUnit: "pc" | "box";
         barcode: string | null;
         discountPercent: number;
@@ -204,6 +205,7 @@ export class SalesService {
       const focRaw = Number(item.focQuantity ?? 0);
       const focQuantity = Math.max(0, Math.floor(focRaw));
       const discountPercent = round4(Number(item.discountPercent ?? 0));
+      const gstPercent = round4(Number(item.gstPercent ?? 0));
       if (!(qty > 0)) {
         throw new BadRequestException("Quantity must be greater than zero");
       }
@@ -224,6 +226,7 @@ export class SalesService {
           quantity: qty,
           unitPrice,
           lineTotal,
+          gstPercent,
           sellUnit: item.sellUnit ?? "pc",
           barcode: item.barcode ?? null,
           discountPercent,
@@ -242,17 +245,15 @@ export class SalesService {
       await this.assertSupervisorUser(tenantId, dto.supervisorUserId.trim());
     }
 
-    const tenant = await this.tenants.findOne({ where: { id: tenantId } });
-    if (!tenant) {
-      throw new NotFoundException("Tenant not found");
-    }
-
-    const gstRate = round4(Number(tenant.defaultGstRate ?? 0));
-    const salesTaxRate = round4(Number(tenant.defaultSalesTaxRate ?? 0));
-    const subtotal = round4(
-      [...merged.values()].reduce((sum, line) => sum + line.lineTotal, 0),
-    );
-    const tax = saleBillTotals(subtotal, gstRate, salesTaxRate);
+    // Option A: bill GST comes from per-line SKU GST on inclusive prices only.
+    const billLines = [...merged.values()].map((line) => ({
+      lineTotal: line.lineTotal,
+      gstPercent: line.gstPercent,
+    }));
+    const tax = saleBillTotalsFromInclusiveLines(billLines);
+    const subtotal = tax.subtotal;
+    const gstRate = 0;
+    const salesTaxRate = 0;
 
     let pendingReturn: SaleReturn | null = null;
     let billDue = tax.total;
@@ -413,6 +414,7 @@ export class SalesService {
             quantity: String(line.quantity),
             unitPrice: String(line.unitPrice),
             lineTotal: String(line.lineTotal),
+            gstPercent: String(line.gstPercent),
             discountPercent: String(line.discountPercent),
             focQuantity: String(line.focQuantity),
             sellUnit: line.sellUnit,
@@ -454,6 +456,7 @@ export class SalesService {
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           lineTotal: line.lineTotal,
+          gstPercent: line.gstPercent,
           sellUnit: line.sellUnit,
           discountPercent: line.discountPercent,
           focQuantity: line.focQuantity,
@@ -640,6 +643,7 @@ export class SalesService {
         quantity: toNum(l.quantity),
         unitPrice: toNum(l.unitPrice),
         lineTotal: toNum(l.lineTotal),
+        gstPercent: toNum(l.gstPercent),
         sellUnit: (l.sellUnit as "pc" | "box") ?? "pc",
         discountPercent: toNum(l.discountPercent),
         focQuantity: toNum(l.focQuantity),

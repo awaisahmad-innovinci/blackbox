@@ -16,12 +16,12 @@ import { Label } from "@blackbox/ui/label";
 import {
   optionalNonNegativeMargin,
   pieceCostFromPurchase,
-  sellingFromPurchaseMargin,
-  sellingGreaterThanCost,
+  sellingFromPurchaseMarginGst,
+  sellingGreaterThanCostWithGst,
 } from "@renderer/lib/sku-pricing";
 
 const SALE_GT_PIECE_COST =
-  "Sale price must be greater than cost per piece";
+  "Sale price must be greater than cost + GST per piece";
 
 export function UpdateVendorSkuPriceDialog({
   open,
@@ -30,6 +30,7 @@ export function UpdateVendorSkuPriceDialog({
   currentSellingPrice,
   purchaseUnitName,
   unitsPerPurchaseUnit,
+  gstPercent = 0,
   onClose,
   onSaved,
 }: {
@@ -39,6 +40,7 @@ export function UpdateVendorSkuPriceDialog({
   currentSellingPrice: number;
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
+  gstPercent?: number;
   onClose: () => void;
   onSaved: (newPrice: number, newSellingPrice: number) => void;
 }) {
@@ -46,6 +48,7 @@ export function UpdateVendorSkuPriceDialog({
   const [marginPercent, setMarginPercent] = useState("");
   const [sellingPrice, setSellingPrice] = useState(String(currentSellingPrice));
   const [error, setError] = useState<string | null>(null);
+  const gstPercentText = String(gstPercent ?? 0);
 
   const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
   const unitLabel = purchaseUnitName?.trim() || "purchase unit";
@@ -66,7 +69,12 @@ export function UpdateVendorSkuPriceDialog({
   }, [open, currentPrice, currentSellingPrice]);
 
   function applySaleFromMargin(nextPrice: string, nextMargin: string) {
-    const calculated = sellingFromPurchaseMargin(nextPrice, nextMargin, unitsPer);
+    const calculated = sellingFromPurchaseMarginGst(
+      nextPrice,
+      nextMargin,
+      unitsPer,
+      gstPercentText,
+    );
     if (calculated != null) setSellingPrice(calculated);
   }
 
@@ -97,8 +105,9 @@ export function UpdateVendorSkuPriceDialog({
       return;
     }
     const costPerPiece = pieceCostFromPurchase(next, unitsPer);
-    const saleError = sellingGreaterThanCost(
+    const saleError = sellingGreaterThanCostWithGst(
       String(costPerPiece),
+      gstPercentText,
       String(nextSelling),
       SALE_GT_PIECE_COST,
     );
@@ -113,7 +122,12 @@ export function UpdateVendorSkuPriceDialog({
   const marginError = optionalNonNegativeMargin(marginPercent);
   const saleError =
     pieceCost != null
-      ? sellingGreaterThanCost(String(pieceCost), sellingPrice, SALE_GT_PIECE_COST)
+      ? sellingGreaterThanCostWithGst(
+          String(pieceCost),
+          gstPercentText,
+          sellingPrice,
+          SALE_GT_PIECE_COST,
+        )
       : null;
 
   return (
@@ -132,6 +146,9 @@ export function UpdateVendorSkuPriceDialog({
           <p className="text-muted-foreground text-xs">
             1 {unitLabel} = {unitsPer} pcs
           </p>
+        ) : null}
+        {gstPercent > 0 ? (
+          <p className="text-muted-foreground text-xs">SKU GST: {gstPercent}%</p>
         ) : null}
         {error ? (
           <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
@@ -165,7 +182,7 @@ export function UpdateVendorSkuPriceDialog({
             ) : null}
           </div>
           <div className={`space-y-1.5 ${FORM_DIALOG_FIELD_FULL}`}>
-            <Label>Sale price (per piece)</Label>
+            <Label>Sale price (per piece, GST-inclusive)</Label>
             <Input
               value={sellingPrice}
               aria-invalid={Boolean(saleError)}

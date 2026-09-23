@@ -673,6 +673,7 @@ export class SyncService {
             (p.purchaseUnitId as string | null | undefined) ?? row.purchaseUnitId ?? null,
           unitsPerPurchaseUnit: String(p.unitsPerPurchaseUnit ?? row.unitsPerPurchaseUnit ?? 1),
           costPrice: String(p.costPrice ?? row.costPrice ?? 0),
+          gstPercent: String(p.gstPercent ?? row.gstPercent ?? 0),
           sellingPrice: String(p.sellingPrice ?? row.sellingPrice ?? 0),
           sellingPricePerPurchaseUnit:
             p.sellingPricePerPurchaseUnit == null
@@ -1027,6 +1028,9 @@ export class SyncService {
             poUnitCost: String(item.poUnitCost ?? 0),
             receivingUnitCost: String(item.receivingUnitCost ?? 0),
             discountPercent: String(item.discountPercent ?? 0),
+            saleTax: String(item.saleTax ?? 0),
+            advTax: String(item.advTax ?? 0),
+            gst: String(item.gst ?? 0),
             lineTotal: String(item.lineTotal ?? 0),
           }),
         );
@@ -1144,6 +1148,10 @@ export class SyncService {
       }
 
       if (billedDelta > 0) {
+        const lineTaxes =
+          Number(item.saleTax ?? 0) +
+          Number(item.advTax ?? 0) +
+          Number(item.gst ?? 0);
         const netUnitCost = landedUnitByQuantity(
           received,
           Number(item.receivingUnitCost ?? 0),
@@ -1152,6 +1160,7 @@ export class SyncService {
           voucher.headerDiscount,
           voucher.costCharges,
           voucher.costCredits,
+          lineTaxes,
         );
         const newCost = roundMoney4(netUnitCost / unitsPer);
         state.cost = weightedAvgUnitCost(
@@ -1523,6 +1532,7 @@ export class SyncService {
             quantity: String(qty),
             unitPrice: String(unitPrice),
             lineTotal: String(item.lineTotal ?? qty * unitPrice),
+            gstPercent: String(item.gstPercent ?? 0),
             discountPercent: String(item.discountPercent ?? 0),
             focQuantity: String(focQty),
             sellUnit: String(item.sellUnit ?? "pc"),

@@ -8,7 +8,7 @@ import type {
   VendorDetail,
   VendorSku,
 } from "@blackbox/shared";
-import { normalizeStoredText } from "@blackbox/shared";
+import { normalizeStoredText, costWithGst } from "@blackbox/shared";
 import { FORM_DIALOG_FIELD_FULL, FORM_DIALOG_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -41,8 +41,9 @@ import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-w
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import {
   optionalNonNegativeMargin,
-  sellingFromMargin,
-  sellingGreaterThanCost,
+  optionalGstPercent,
+  sellingFromMarginGst,
+  sellingGreaterThanCostWithGst,
 } from "@renderer/lib/sku-pricing";
 import { createVendorSkuLink } from "@renderer/features/vendors/create-vendor-sku-link";
 
@@ -56,6 +57,7 @@ const emptyForm = {
   purchaseUnitId: "",
   unitsPerPurchaseUnit: "",
   costPrice: "",
+  gstPercent: "0",
   marginPercent: "",
   sellingPrice: "",
   saleDiscountPercent: "0",
@@ -195,7 +197,16 @@ export function AddProductSkuDialog({
   function onCostPriceChange(value: string) {
     setForm((prev) => {
       const next = { ...prev, costPrice: value };
-      const calculated = sellingFromMargin(value, prev.marginPercent);
+      const calculated = sellingFromMarginGst(value, prev.gstPercent, prev.marginPercent);
+      if (calculated != null) next.sellingPrice = calculated;
+      return next;
+    });
+  }
+
+  function onGstPercentChange(value: string) {
+    setForm((prev) => {
+      const next = { ...prev, gstPercent: value };
+      const calculated = sellingFromMarginGst(prev.costPrice, value, prev.marginPercent);
       if (calculated != null) next.sellingPrice = calculated;
       return next;
     });
@@ -204,7 +215,7 @@ export function AddProductSkuDialog({
   function onMarginPercentChange(value: string) {
     setForm((prev) => {
       const next = { ...prev, marginPercent: value };
-      const calculated = sellingFromMargin(prev.costPrice, value);
+      const calculated = sellingFromMarginGst(prev.costPrice, prev.gstPercent, value);
       if (calculated != null) next.sellingPrice = calculated;
       return next;
     });
@@ -231,11 +242,16 @@ export function AddProductSkuDialog({
         form.costPrice.trim() || attempted
           ? requiredNonNegative(form.costPrice, "Cost price/pc")
           : null,
+      gstPercent: optionalGstPercent(form.gstPercent),
       marginPercent: optionalNonNegativeMargin(form.marginPercent),
       sellingPrice:
         form.sellingPrice.trim() || attempted
           ? requiredNonNegative(form.sellingPrice, "Selling price/pc") ||
-            sellingGreaterThanCost(form.costPrice, form.sellingPrice)
+            sellingGreaterThanCostWithGst(
+              form.costPrice,
+              form.gstPercent,
+              form.sellingPrice,
+            )
           : null,
     }),
     [form, attempted],
@@ -248,9 +264,10 @@ export function AddProductSkuDialog({
     !requiredSelect(form.purchaseUnitId, "Purchase unit") &&
     !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
     !requiredNonNegative(form.costPrice, "Cost price/pc") &&
+    !optionalGstPercent(form.gstPercent) &&
     !optionalNonNegativeMargin(form.marginPercent) &&
     !requiredNonNegative(form.sellingPrice, "Selling price/pc") &&
-    !sellingGreaterThanCost(form.costPrice, form.sellingPrice) &&
+    !sellingGreaterThanCostWithGst(form.costPrice, form.gstPercent, form.sellingPrice) &&
     !duplicateLookup &&
     !barcodeChecking;
 
@@ -261,6 +278,7 @@ export function AddProductSkuDialog({
     const nums = {
       unitsPerPurchaseUnit: Number(form.unitsPerPurchaseUnit),
       costPrice: Number(form.costPrice),
+      gstPercent: Number(form.gstPercent || 0),
       sellingPrice: Number(form.sellingPrice),
       reorderLevel: Number(form.reorderLevel),
       minimumStockLevel: Number(form.minimumStockLevel),
@@ -276,8 +294,12 @@ export function AddProductSkuDialog({
         return;
       }
     }
-    if (nums.sellingPrice <= nums.costPrice) {
-      setError("Selling price/pc must be greater than cost price/pc");
+    if (nums.gstPercent > 100) {
+      setError("gstPercent must be between 0 and 100");
+      return;
+    }
+    if (nums.sellingPrice <= costWithGst(nums.costPrice, nums.gstPercent)) {
+      setError("Selling price/pc must be greater than cost + GST");
       return;
     }
 
@@ -291,6 +313,7 @@ export function AddProductSkuDialog({
       purchaseUnitId: form.purchaseUnitId,
       unitsPerPurchaseUnit: nums.unitsPerPurchaseUnit,
       costPrice: nums.costPrice,
+      gstPercent: nums.gstPercent,
       sellingPrice: nums.sellingPrice,
       saleDiscountPercent: Math.min(
         100,
@@ -357,6 +380,7 @@ export function AddProductSkuDialog({
           purchaseUnitName: purchaseUnit?.name ?? null,
           unitsPerPurchaseUnit: body.unitsPerPurchaseUnit,
           costPrice: body.costPrice,
+          gstPercent: body.gstPercent ?? 0,
           sellingPrice: body.sellingPrice,
           saleDiscountPercent: body.saleDiscountPercent ?? 0,
           sellingPricePerPurchaseUnit: body.sellingPricePerPurchaseUnit ?? null,
@@ -620,6 +644,18 @@ export function AddProductSkuDialog({
             />
             {fieldErrors.costPrice ? (
               <p className="text-destructive text-xs">{fieldErrors.costPrice}</p>
+            ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>GST %</Label>
+            <Input
+              value={form.gstPercent}
+              aria-invalid={Boolean(fieldErrors.gstPercent)}
+              placeholder="0"
+              onChange={(e) => onGstPercentChange(e.target.value)}
+            />
+            {fieldErrors.gstPercent ? (
+              <p className="text-destructive text-xs">{fieldErrors.gstPercent}</p>
             ) : null}
           </div>
           <div className="space-y-1.5">

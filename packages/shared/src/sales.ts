@@ -1,3 +1,5 @@
+import { splitInclusiveGst } from "./inventory";
+
 export const SALE_STATUSES = ["DRAFT", "POSTED", "VOID"] as const;
 export type SaleStatus = (typeof SALE_STATUSES)[number];
 
@@ -25,6 +27,7 @@ export interface SaleLineRow {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  gstPercent: number;
   sellUnit: SellUnit;
   discountPercent: number;
   focQuantity: number;
@@ -93,6 +96,7 @@ export interface CreateSaleLineRequest {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  gstPercent?: number;
   sellUnit?: SellUnit;
   barcode?: string | null;
   discountPercent?: number;
@@ -138,6 +142,31 @@ export function saleBillTotals(
     salesTaxAmount,
     total: round4(base + gstAmount + salesTaxAmount),
   };
+}
+
+/** Option A — bill totals from GST-inclusive line totals and per-line GST %. */
+export function saleBillTotalsFromInclusiveLines(
+  lines: { lineTotal: number; gstPercent: number }[],
+): {
+  subtotal: number;
+  gstAmount: number;
+  salesTaxAmount: number;
+  total: number;
+} {
+  let subtotal = 0;
+  let gstAmount = 0;
+  let total = 0;
+  for (const line of lines) {
+    const inclusive = round4(line.lineTotal);
+    const { exGst, gstAmount: lineGst } = splitInclusiveGst(
+      inclusive,
+      line.gstPercent ?? 0,
+    );
+    subtotal = round4(subtotal + exGst);
+    gstAmount = round4(gstAmount + lineGst);
+    total = round4(total + inclusive);
+  }
+  return { subtotal, gstAmount, salesTaxAmount: 0, total };
 }
 
 export function saleLineTotal(quantity: number, unitPrice: number): number {

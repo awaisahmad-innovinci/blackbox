@@ -325,7 +325,7 @@ export function SaleReturnFormPage() {
           { actorName: processorName },
         );
 
-        void syncNow();
+        await syncNow();
         navigate(`/sales/returns/${localId}`);
         return;
       }

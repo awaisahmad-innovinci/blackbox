@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@blackbox/ui/button";
 import { useSession, type DeviceState } from "@renderer/lib/session/context";
+import { readCachedDeviceCode } from "@renderer/lib/device-code";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { useTillGuardedLogout } from "@renderer/lib/use-till-guarded-logout";
 
@@ -22,11 +23,15 @@ export function DeviceSessionCard() {
   const { requestLogout, logoutDialogs } = useTillGuardedLogout();
   const [checking, setChecking] = useState(false);
   const [identity, setIdentity] = useState<string | null>(null);
+  const [registerCode, setRegisterCode] = useState<string | null>(() =>
+    readCachedDeviceCode(),
+  );
 
   useEffect(() => {
     void window.blackbox?.identity?.get().then((row) => {
       setIdentity(row ? `${row.deviceId.slice(0, 8)}…` : null);
     });
+    setRegisterCode(readCachedDeviceCode());
   }, [deviceState]);
 
   if (!window.blackbox?.identity) return null;
@@ -50,6 +55,7 @@ export function DeviceSessionCard() {
           </p>
           <p className="text-muted-foreground mt-1 text-xs">
             {DEVICE_COPY[deviceState]}
+            {registerCode ? ` Register ${registerCode}.` : ""}
             {identity ? ` Device ${identity}` : ""}
           </p>
           <p className="text-muted-foreground mt-1 text-xs">

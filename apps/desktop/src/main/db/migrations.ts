@@ -1325,6 +1325,37 @@ where units_per_purchase_unit > 0;
       update sale_returns set status = 'COMPLETED' where status = 'POSTED';
     `,
   },
+  {
+    id: "036_document_counters",
+    sql: `
+      create table if not exists document_counters (
+        document_type text not null,
+        device_id text not null,
+        next_value integer not null default 1,
+        primary key (document_type, device_id)
+      );
+    `,
+  },
+  {
+    id: "037_gr_item_line_taxes",
+    sql: `
+      alter table goods_receipt_items add column sale_tax real not null default 0;
+      alter table goods_receipt_items add column adv_tax real not null default 0;
+      alter table goods_receipt_items add column gst real not null default 0;
+    `,
+  },
+  {
+    id: "038_product_sku_gst_percent",
+    sql: `
+      alter table product_skus add column gst_percent real not null default 0;
+    `,
+  },
+  {
+    id: "039_sale_line_gst_percent",
+    sql: `
+      alter table sale_lines add column gst_percent real not null default 0;
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

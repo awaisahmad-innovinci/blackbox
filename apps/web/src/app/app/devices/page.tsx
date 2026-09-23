@@ -99,6 +99,7 @@ export default function DevicesPage() {
               <THead>
                 <tr>
                   <Th>Name</Th>
+                  <Th>Code</Th>
                   <Th>Status</Th>
                   <Th>Fingerprint</Th>
                   <Th>Trusted</Th>
@@ -109,6 +110,7 @@ export default function DevicesPage() {
                 {devices.map((d) => (
                   <Tr key={d.id}>
                     <Td className="font-medium">{d.name}</Td>
+                    <Td className="font-mono text-xs">{d.code ?? "—"}</Td>
                     <Td>
                       <DeviceStatusBadge status={d.status} />
                     </Td>

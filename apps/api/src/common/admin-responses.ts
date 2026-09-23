@@ -57,6 +57,7 @@ export type DeviceResponse = {
   tenantId: string;
   fingerprint: string;
   name: string;
+  code: string | null;
   status: string;
   trustedAt: Date | null;
   revokedAt: Date | null;
@@ -135,6 +136,7 @@ export function toDeviceResponse(device: Device): DeviceResponse {
     tenantId: device.tenantId,
     fingerprint: device.fingerprint,
     name: device.name,
+    code: device.code,
     status: device.status,
     trustedAt: device.trustedAt,
     revokedAt: device.revokedAt,

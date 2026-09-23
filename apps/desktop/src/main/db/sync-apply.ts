@@ -197,6 +197,7 @@ export function applyChange(change: SyncChangeDto): void {
       purchaseUnitName: (p.purchaseUnitName as string | null) ?? null,
       unitsPerPurchaseUnit: Number(p.unitsPerPurchaseUnit ?? 1),
       costPrice: Number(p.costPrice ?? 0),
+      gstPercent: Number(p.gstPercent ?? 0),
       sellingPrice: Number(p.sellingPrice ?? 0),
       sellingPricePerPurchaseUnit:
         p.sellingPricePerPurchaseUnit == null

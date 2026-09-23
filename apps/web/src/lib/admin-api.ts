@@ -53,6 +53,7 @@ export type DeviceDto = {
   tenantId: string;
   fingerprint: string;
   name: string;
+  code: string | null;
   status: string;
   trustedAt: string | null;
   revokedAt: string | null;

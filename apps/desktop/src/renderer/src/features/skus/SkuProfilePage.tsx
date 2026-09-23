@@ -38,8 +38,11 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { skusApi } from "@renderer/lib/api/skus";
 import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
-import { normalizeStoredText } from "@blackbox/shared";
-import { sellingFromMargin } from "@renderer/lib/sku-pricing";
+import { costWithGst, normalizeStoredText } from "@blackbox/shared";
+import {
+  optionalGstPercent,
+  sellingFromMarginGst,
+} from "@renderer/lib/sku-pricing";
 import { loadSkuProfile } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -66,6 +69,7 @@ function toProductSkuRow(
     purchaseUnitName: sku.purchaseUnitName,
     unitsPerPurchaseUnit: sku.unitsPerPurchaseUnit,
     costPrice: sku.costPrice,
+    gstPercent: sku.gstPercent,
     sellingPrice: sku.sellingPrice,
     sellingPricePerPurchaseUnit: sku.sellingPricePerPurchaseUnit,
     saleDiscountPercent: sku.saleDiscountPercent,
@@ -105,6 +109,7 @@ export function SkuProfilePage() {
   const [purchaseUnitId, setPurchaseUnitId] = useState("");
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
   const [costPrice, setCostPrice] = useState("0");
+  const [gstPercent, setGstPercent] = useState("0");
   const [marginPercent, setMarginPercent] = useState("");
   const [sellingPrice, setSellingPrice] = useState("0");
   const [boxSellingPrice, setBoxSellingPrice] = useState("");
@@ -153,6 +158,7 @@ export function SkuProfilePage() {
     setPurchaseUnitId(sku.purchaseUnitId ?? "");
     setUnitsPerPurchaseUnit(String(sku.unitsPerPurchaseUnit));
     setCostPrice(String(sku.costPrice));
+    setGstPercent(String(sku.gstPercent ?? 0));
     setMarginPercent("");
     setSellingPrice(String(sku.sellingPrice));
     setBoxSellingPrice(
@@ -175,6 +181,7 @@ export function SkuProfilePage() {
 
   const unitsPerPurchaseUnitN = Number(unitsPerPurchaseUnit);
   const costPriceN = Number(costPrice);
+  const gstPercentN = Number(gstPercent);
   const marginPercentN = marginPercent.trim() === "" ? null : Number(marginPercent);
   const sellingPriceN = Number(sellingPrice);
   const boxSellingPriceN =
@@ -192,6 +199,7 @@ export function SkuProfilePage() {
     !costPrice.trim() || Number.isNaN(costPriceN) || costPriceN < 0
       ? "Cost price is required"
       : null;
+  const gstError = optionalGstPercent(gstPercent);
   const marginError =
     marginPercentN != null &&
     (Number.isNaN(marginPercentN) || marginPercentN < 0)
@@ -200,8 +208,8 @@ export function SkuProfilePage() {
   const sellingError =
     !sellingPrice.trim() || Number.isNaN(sellingPriceN) || sellingPriceN < 0
       ? "Selling price is required"
-      : sellingPriceN <= costPriceN
-        ? "Selling price must be greater than cost price"
+      : sellingPriceN <= costWithGst(costPriceN, Number.isNaN(gstPercentN) ? 0 : gstPercentN)
+        ? "Selling price must be greater than cost + GST"
         : null;
   const boxSellingError =
     boxSellingPriceN != null &&
@@ -222,6 +230,7 @@ export function SkuProfilePage() {
     !purchaseUnitError &&
     !unitsPerError &&
     !costError &&
+    !gstError &&
     !marginError &&
     !sellingError &&
     !boxSellingError &&
@@ -229,13 +238,19 @@ export function SkuProfilePage() {
 
   function onCostPriceChange(value: string) {
     setCostPrice(value);
-    const calculated = sellingFromMargin(value, marginPercent);
+    const calculated = sellingFromMarginGst(value, gstPercent, marginPercent);
+    if (calculated != null) setSellingPrice(calculated);
+  }
+
+  function onGstPercentChange(value: string) {
+    setGstPercent(value);
+    const calculated = sellingFromMarginGst(costPrice, value, marginPercent);
     if (calculated != null) setSellingPrice(calculated);
   }
 
   function onMarginPercentChange(value: string) {
     setMarginPercent(value);
-    const calculated = sellingFromMargin(costPrice, value);
+    const calculated = sellingFromMarginGst(costPrice, gstPercent, value);
     if (calculated != null) setSellingPrice(calculated);
   }
 
@@ -259,6 +274,7 @@ export function SkuProfilePage() {
         sku.purchaseUnitName,
       unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
       costPrice: costPriceN,
+      gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
       sellingPrice: sellingPriceN,
       sellingPricePerPurchaseUnit: boxSellingPriceN,
       saleDiscountPercent: saleDiscountPercentValue,
@@ -294,6 +310,7 @@ export function SkuProfilePage() {
         purchaseUnitId,
         unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
         costPrice: costPriceN,
+        gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
         sellingPrice: sellingPriceN,
         sellingPricePerPurchaseUnit: boxSellingPriceN,
         saleDiscountPercent: saleDiscountPercentValue,
@@ -832,6 +849,18 @@ export function SkuProfilePage() {
               />
               {costError ? (
                 <p className="text-destructive text-xs">{costError}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>GST %</Label>
+              <Input
+                value={gstPercent}
+                aria-invalid={Boolean(gstError)}
+                placeholder="0"
+                onChange={(e) => onGstPercentChange(e.target.value)}
+              />
+              {gstError ? (
+                <p className="text-destructive text-xs">{gstError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">

@@ -172,6 +172,11 @@ declare global {
         listSaleNumbers: () => Promise<string[]>;
         listSaleReturnNumbers: () => Promise<string[]>;
         listHoldNumbers: () => Promise<string[]>;
+        allocateDocumentNumber: (input: {
+          documentType: import("@blackbox/shared").DocumentCounterType;
+          tenantName: string;
+          deviceCode: string;
+        }) => Promise<string>;
         listInventoryOuts: (
           query?: InventoryOutListQuery,
         ) => Promise<PaginatedInventoryOuts>;

@@ -5,12 +5,10 @@ import {
   ThermalReceiptBarcode,
   ThermalReceiptHeader,
   ThermalRule,
+  ThermalSaleLineItems,
   ThermalTotalsRow,
-  formatDiscountPercent,
-  formatFocQuantity,
   formatMoney,
   formatReceiptDateTime,
-  lineProductLabel,
 } from "./thermal-receipt-shared";
 
 function paymentMethodLabel(method: SalePaymentMethod): string {
@@ -69,6 +67,7 @@ export function SaleThermalReceipt({
   const nonCashPayments = detail.payments.filter(
     (payment) => payment.method !== "CASH",
   );
+  const showAllPayments = detail.payments.length > 1;
 
   return (
     <article data-thermal-receipt className={THERMAL_RECEIPT_CLASS}>
@@ -93,46 +92,7 @@ export function SaleThermalReceipt({
 
       <ThermalReceiptBarcode value={detail.saleNumber} />
 
-      <ThermalRule />
-
-      <table className="w-full border-collapse text-left text-[11px]">
-        <thead>
-          <tr className="border-b border-solid border-black">
-            <th className="py-0.5 pr-1 text-left font-bold">Item</th>
-            <th className="w-6 py-0.5 text-right font-bold">Qty</th>
-            <th className="w-6 py-0.5 text-right font-bold">Disc</th>
-            <th className="w-5 py-0.5 text-right font-bold">FOC</th>
-            <th className="w-9 py-0.5 text-right font-bold">Price</th>
-            <th className="w-9 py-0.5 text-right font-bold">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {detail.items.map((item) => (
-            <tr key={item.id}>
-              <td className="py-0.5 pr-1 align-top break-words font-bold">
-                {lineProductLabel(item.productName, item.variantName)}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {item.quantity}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatDiscountPercent(item.discountPercent ?? 0)}%
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatFocQuantity(item.focQuantity ? item.focQuantity : 0)}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatMoney(item.unitPrice)}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatMoney(item.lineTotal)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <ThermalRule />
+      <ThermalSaleLineItems items={detail.items} />
 
       <section className="space-y-0.5">
         <ThermalTotalsRow label="Total Items" value={totalItems} />
@@ -148,10 +108,7 @@ export function SaleThermalReceipt({
           value={formatMoney(detail.subtotal)}
         />
         {detail.gstAmount > 0 ? (
-          <ThermalTotalsRow
-            label={`GST (${detail.gstRate}%)`}
-            value={formatMoney(detail.gstAmount)}
-          />
+          <ThermalTotalsRow label="GST" value={formatMoney(detail.gstAmount)} />
         ) : null}
         {detail.salesTaxAmount > 0 ? (
           <ThermalTotalsRow
@@ -189,13 +146,21 @@ export function SaleThermalReceipt({
           value={formatMoney(netAmount)}
           bold
         />
-        {nonCashPayments.map((payment) => (
-          <ThermalTotalsRow
-            key={payment.id}
-            label={paymentMethodLabel(payment.method)}
-            value={formatMoney(payment.amount)}
-          />
-        ))}
+        {showAllPayments
+          ? detail.payments.map((payment) => (
+              <ThermalTotalsRow
+                key={payment.id}
+                label={paymentMethodLabel(payment.method)}
+                value={formatMoney(payment.amount)}
+              />
+            ))
+          : nonCashPayments.map((payment) => (
+              <ThermalTotalsRow
+                key={payment.id}
+                label={paymentMethodLabel(payment.method)}
+                value={formatMoney(payment.amount)}
+              />
+            ))}
       </section>
 
       <ThermalRule />
@@ -216,11 +181,13 @@ export function SaleThermalReceipt({
 
       <ThermalRule />
 
-      <footer className="pb-4 text-center text-[9px] leading-tight font-semibold">
+      <footer className="text-center text-[9px] leading-tight font-semibold">
         <p>This software design &amp; developed by</p>
         <p>Innovinci Technologies</p>
         <p>www.innovinci.com</p>
       </footer>
+
+      <div className="thermal-receipt-feed" aria-hidden="true" />
     </article>
   );
 }

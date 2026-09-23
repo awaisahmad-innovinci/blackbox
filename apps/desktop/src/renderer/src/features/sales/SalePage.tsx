@@ -13,9 +13,9 @@ import {
   DEFAULT_SALE_CUSTOMER_NAME,
   isTillNearLimit,
   lineTotalAfterDiscount,
-  lineTotalForScan,
   maxCashTender,
-  saleBillTotals,
+  saleBillTotalsFromInclusiveLines,
+  splitInclusiveGst,
   tillRemainingHeadroom,
 } from "@blackbox/shared";
 import { cn } from "@blackbox/ui/lib/utils";
@@ -43,7 +43,7 @@ import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
-import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
+import { bumpDataVersion, syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { loadSkuByBarcode, loadSale, loadWarehouses, loadPosAvailableForSale, lookupSkuByBarcode, lookupSaleReturn } from "@renderer/lib/local-db/entity-source";
 import {
@@ -78,6 +78,7 @@ type DraftSaleLine = {
   unitsPerPurchaseUnit: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  gstPercent: number;
   discountPercent: number;
   focQuantity: number;
   quantityCorrected?: boolean;
@@ -91,7 +92,8 @@ type DraftPayment = {
   reference: string;
 };
 
-const PAYMENT_METHODS: SalePaymentMethod[] = ["CASH", "CARD", "CREDIT"];
+type PaymentMode = "cash" | "card" | "split";
+
 const NO_WAREHOUSE_ERROR = "No active warehouse configured";
 const NOT_ON_BILL_ERROR = "This item is not on the current bill.";
 
@@ -100,17 +102,13 @@ function round4(n: number): number {
 }
 
 function lineUnitPrice(line: DraftSaleLine): number {
-  const pricing = lineTotalForScan({
-    quantityMultiplier:
-      line.lastScanMultiplier ??
-      (line.sellUnit === "box" ? line.unitsPerPurchaseUnit : 1),
-    unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
-    sellingPrice: line.sellingPrice,
-    sellingPricePerPurchaseUnit: line.sellingPricePerPurchaseUnit,
-    quantity: 1,
-    sellUnit: line.sellUnit,
-  });
-  return pricing.unitPrice > 0 ? pricing.unitPrice : line.sellingPrice;
+  if (line.sellingPrice > 0) return line.sellingPrice;
+  const perBox = line.sellingPricePerPurchaseUnit;
+  const units = line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
+  if (perBox != null && perBox > 0 && units > 1) {
+    return round4(perBox / units);
+  }
+  return line.sellingPrice;
 }
 
 function lineInventoryQty(line: DraftSaleLine): number {
@@ -125,10 +123,65 @@ function lineTotal(line: DraftSaleLine): number {
   );
 }
 
-function paymentMethodLabel(method: SalePaymentMethod): string {
-  if (method === "CASH") return "Cash";
-  if (method === "CARD") return "Card";
-  return "Credit";
+function lineGstSplit(line: DraftSaleLine): {
+  exGstUnit: number;
+  gstAmount: number;
+  inclusiveTotal: number;
+} {
+  const inclusiveTotal = lineTotal(line);
+  const { exGst, gstAmount } = splitInclusiveGst(inclusiveTotal, line.gstPercent);
+  const exGstUnit =
+    line.quantity > 0 ? round4(exGst / line.quantity) : round4(exGst);
+  return { exGstUnit, gstAmount, inclusiveTotal };
+}
+
+function inferPaymentMode(rows: DraftPayment[]): PaymentMode {
+  if (rows.length >= 2) {
+    const hasCash = rows.some((row) => row.method === "CASH");
+    const hasCard = rows.some((row) => row.method === "CARD");
+    if (hasCash && hasCard) return "split";
+  }
+  if (rows[0]?.method === "CARD") return "card";
+  return "cash";
+}
+
+function splitPaymentAmounts(
+  rows: DraftPayment[],
+  amountDue: number,
+): { cash: number; card: number; cardReference: string } {
+  const cashRow = rows.find((row) => row.method === "CASH");
+  const cardRow = rows.find((row) => row.method === "CARD");
+  const cash = round4(cashRow?.amount ?? 0);
+  const card = round4(Math.max(0, amountDue - cash));
+  return {
+    cash,
+    card,
+    cardReference: cardRow?.reference ?? "",
+  };
+}
+
+function buildSplitPayments(
+  amountDue: number,
+  cashAmount: number,
+  cardReference: string,
+  existingIds?: { cashId?: string; cardId?: string },
+): DraftPayment[] {
+  const cash = round4(Math.min(Math.max(0, cashAmount), amountDue));
+  const card = round4(Math.max(0, amountDue - cash));
+  return [
+    {
+      id: existingIds?.cashId ?? crypto.randomUUID(),
+      method: "CASH",
+      amount: cash,
+      reference: "",
+    },
+    {
+      id: existingIds?.cardId ?? crypto.randomUUID(),
+      method: "CARD",
+      amount: card,
+      reference: cardReference,
+    },
+  ];
 }
 
 export function SalePage() {
@@ -149,6 +202,7 @@ export function SalePage() {
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<DraftSaleLine[]>([]);
   const [payments, setPayments] = useState<DraftPayment[]>([]);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const [scanDraft, setScanDraft] = useState("");
   const [itemOpen, setItemOpen] = useState(false);
   const [removeScanOpen, setRemoveScanOpen] = useState(false);
@@ -176,6 +230,7 @@ export function SalePage() {
   const paymentsTouchedRef = useRef(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const paymentAmountRef = useRef<HTMLInputElement>(null);
+  const splitCashAmountRef = useRef<HTMLInputElement>(null);
 
   const focusScanInput = useCallback(() => {
     requestAnimationFrame(() => {
@@ -187,6 +242,7 @@ export function SalePage() {
   function resetForNewSale() {
     setLines([]);
     setPayments([]);
+    setPaymentMode("cash");
     setCustomerName("");
     paymentsTouchedRef.current = false;
     holdNumberRef.current = null;
@@ -274,6 +330,7 @@ export function SalePage() {
               unitsPerPurchaseUnit: 1,
               sellingPrice: item.unitPrice,
               sellingPricePerPurchaseUnit: null,
+              gstPercent: item.gstPercent ?? 0,
               discountPercent: item.discountPercent ?? 0,
               focQuantity: item.focQuantity ?? 0,
               quantityCorrected: item.quantityCorrected ?? false,
@@ -283,17 +340,18 @@ export function SalePage() {
         setLines(draftLines);
 
         if (detail.payments.length > 0) {
+          const draftPayments = detail.payments.map((row) => ({
+            id: row.id,
+            method: row.method,
+            amount: row.amount,
+            reference: row.reference,
+          }));
           paymentsTouchedRef.current = true;
-          setPayments(
-            detail.payments.map((row) => ({
-              id: row.id,
-              method: row.method,
-              amount: row.amount,
-              reference: row.reference,
-            })),
-          );
+          setPaymentMode(inferPaymentMode(draftPayments));
+          setPayments(draftPayments);
         } else {
           setPayments([]);
+          setPaymentMode("cash");
           paymentsTouchedRef.current = false;
         }
       })
@@ -311,27 +369,30 @@ export function SalePage() {
     };
   }, [routeDraftId, navigate]);
 
-  const subtotal = useMemo(
-    () => round4(lines.reduce((sum, line) => sum + lineTotal(line), 0)),
+  const billTotals = useMemo(
+    () =>
+      saleBillTotalsFromInclusiveLines(
+        lines.map((line) => ({
+          lineTotal: lineTotal(line),
+          gstPercent: line.gstPercent,
+        })),
+      ),
     [lines],
   );
 
-  const tenantGstRate = user?.defaultGstRate ?? 0;
-  const tenantSalesTaxRate = user?.defaultSalesTaxRate ?? 0;
-
-  const tax = useMemo(
-    () =>
-      saleBillTotals(subtotal, tenantGstRate, tenantSalesTaxRate),
-    [subtotal, tenantGstRate, tenantSalesTaxRate],
-  );
-
-  const billTotal = tax.total;
+  const subtotal = billTotals.subtotal;
+  const billTotal = billTotals.total;
+  const billGstAmount = billTotals.gstAmount;
   const returnCredit = appliedReturn?.refundTotal ?? 0;
   const amountDue = round4(Math.max(0, billTotal - returnCredit));
   const cashBackFromCredit = round4(Math.max(0, returnCredit - billTotal));
-  const payment = payments[0] ?? null;
+  const isSplitPayment = paymentMode === "split";
+  const payment = isSplitPayment ? null : (payments[0] ?? null);
+  const splitAmounts = isSplitPayment
+    ? splitPaymentAmounts(payments, amountDue)
+    : null;
   const tendered = payment ? round4(payment.amount) : 0;
-  const isCashPayment = payment?.method === "CASH";
+  const isCashPayment = paymentMode === "cash";
   const cashMaxTender = maxCashTender(amountDue > 0 ? amountDue : billTotal);
   const cashChange = isCashPayment
     ? round4(Math.max(0, tendered - amountDue))
@@ -339,19 +400,23 @@ export function SalePage() {
   const cashShortfall = isCashPayment
     ? round4(Math.max(0, amountDue - tendered))
     : 0;
-  const cardRemaining = !isCashPayment
-    ? round4(amountDue - tendered)
-    : 0;
+  const cardRemaining =
+    paymentMode === "card" ? round4(amountDue - tendered) : 0;
   const cashOverMax = isCashPayment && amountDue > 0 && tendered > cashMaxTender;
+  const splitCashOverDue =
+    isSplitPayment &&
+    splitAmounts != null &&
+    splitAmounts.cash > amountDue;
 
   function resolvedCashTendered(): number | null {
-    if (!payment || payment.method !== "CASH") return null;
+    if (paymentMode !== "cash" || !payment) return null;
     return tendered;
   }
 
   useEffect(() => {
     if (lines.length === 0) {
       setPayments([]);
+      setPaymentMode("cash");
       paymentsTouchedRef.current = false;
       return;
     }
@@ -363,12 +428,38 @@ export function SalePage() {
       return;
     }
 
+    if (paymentMode === "split") {
+      setPayments((prev) =>
+        buildSplitPayments(
+          amountDue,
+          prev.find((row) => row.method === "CASH")?.amount ?? 0,
+          prev.find((row) => row.method === "CARD")?.reference ?? "",
+          {
+            cashId: prev.find((row) => row.method === "CASH")?.id,
+            cardId: prev.find((row) => row.method === "CARD")?.id,
+          },
+        ),
+      );
+      return;
+    }
+
+    if (paymentMode === "card") {
+      setPayments((prev) => [
+        {
+          id: prev[0]?.id ?? crypto.randomUUID(),
+          method: "CARD",
+          amount: amountDue,
+          reference: prev[0]?.reference ?? "",
+        },
+      ]);
+      return;
+    }
+
     setPayments((prev) => {
       if (prev.length !== 1) {
-        const existing = prev[0];
         return [
           {
-            id: existing?.id ?? crypto.randomUUID(),
+            id: prev[0]?.id ?? crypto.randomUUID(),
             method: "CASH",
             amount: amountDue,
             reference: "",
@@ -380,7 +471,37 @@ export function SalePage() {
       }
       return prev;
     });
-  }, [lines.length, amountDue, appliedReturn]);
+  }, [lines.length, amountDue, appliedReturn, paymentMode]);
+
+  useEffect(() => {
+    if (!isSplitPayment || !(amountDue > 0) || !paymentsTouchedRef.current) {
+      return;
+    }
+    setPayments((prev) => {
+      const cashRow = prev.find((row) => row.method === "CASH");
+      const cardRow = prev.find((row) => row.method === "CARD");
+      let cash = round4(cashRow?.amount ?? 0);
+      if (cash > amountDue) cash = amountDue;
+      const next = buildSplitPayments(
+        amountDue,
+        cash,
+        cardRow?.reference ?? "",
+        {
+          cashId: cashRow?.id,
+          cardId: cardRow?.id,
+        },
+      );
+      const unchanged =
+        next.length === prev.length &&
+        next.every(
+          (row, index) =>
+            row.method === prev[index]?.method &&
+            row.amount === prev[index]?.amount &&
+            row.reference === prev[index]?.reference,
+        );
+      return unchanged ? prev : next;
+    });
+  }, [amountDue, isSplitPayment]);
 
   const canPost = useMemo(() => {
     if (lines.length === 0) return false;
@@ -396,12 +517,30 @@ export function SalePage() {
     if (amountDue === 0) {
       return appliedReturn != null;
     }
+    if (isSplitPayment) {
+      if (!splitAmounts) return false;
+      return (
+        splitAmounts.cash > 0 &&
+        splitAmounts.cash <= amountDue &&
+        round4(splitAmounts.cash + splitAmounts.card) === amountDue
+      );
+    }
     if (!payment) return false;
-    if (payment.method === "CASH") {
+    if (isCashPayment) {
       return tendered >= amountDue && tendered <= cashMaxTender;
     }
     return tendered === amountDue;
-  }, [lines, payment, tendered, amountDue, cashMaxTender, appliedReturn]);
+  }, [
+    lines,
+    payment,
+    tendered,
+    amountDue,
+    cashMaxTender,
+    appliedReturn,
+    isSplitPayment,
+    splitAmounts,
+    isCashPayment,
+  ]);
 
   const canHold = lines.length > 0 && !loadingDraft;
 
@@ -413,8 +552,8 @@ export function SalePage() {
   }): SaleDetail {
     const warehouseName =
       warehouses.find((warehouse) => warehouse.id === warehouseId)?.name ?? "";
-    const gst = tenantGstRate;
-    const salesTax = tenantSalesTaxRate;
+    const gst = 0;
+    const salesTax = 0;
     const now = new Date().toISOString();
     const resolvedCustomerName =
       customerName.trim() || DEFAULT_SALE_CUSTOMER_NAME;
@@ -433,20 +572,12 @@ export function SalePage() {
         focQuantity: line.focQuantity,
         unitPrice,
         lineTotal: lineTotal(line),
+        gstPercent: line.gstPercent,
         sellUnit: line.sellUnit,
         ...(line.quantityCorrected ? { quantityCorrected: true } : {}),
       };
     });
-    const paymentRows = payment
-      ? [
-          {
-            id: payment.id,
-            method: payment.method,
-            amount: round4(payment.amount),
-            reference: payment.reference.trim(),
-          },
-        ]
-      : [];
+    const paymentRows = postedPaymentRows();
 
     return {
       id: options.id,
@@ -456,10 +587,10 @@ export function SalePage() {
       status: options.status,
       subtotal,
       gstRate: gst,
-      gstAmount: tax.gstAmount,
+      gstAmount: billGstAmount,
       salesTaxRate: salesTax,
-      salesTaxAmount: tax.salesTaxAmount,
-      total: tax.total,
+      salesTaxAmount: 0,
+      total: billTotal,
       customerName: resolvedCustomerName,
       cashTendered: resolvedCashTendered(),
       notes: "",
@@ -475,10 +606,29 @@ export function SalePage() {
     };
   }
 
-  function postedPaymentRows() {
-    if (!payment || amountDue <= 0) return [];
+  function postedPaymentRows(): SaleDetail["payments"] {
+    if (amountDue <= 0) return [];
+    if (isSplitPayment && splitAmounts) {
+      const cashRow = payments.find((row) => row.method === "CASH");
+      const cardRow = payments.find((row) => row.method === "CARD");
+      return [
+        {
+          id: cashRow?.id ?? crypto.randomUUID(),
+          method: "CASH",
+          amount: splitAmounts.cash,
+          reference: "",
+        },
+        {
+          id: cardRow?.id ?? crypto.randomUUID(),
+          method: "CARD",
+          amount: splitAmounts.card,
+          reference: splitAmounts.cardReference.trim(),
+        },
+      ];
+    }
+    if (!payment) return [];
     const postedAmount =
-      payment.method === "CASH" ? amountDue : round4(payment.amount);
+      paymentMode === "cash" ? amountDue : round4(payment.amount);
     return [
       {
         id: payment.id,
@@ -559,6 +709,7 @@ export function SalePage() {
           unitsPerPurchaseUnit,
           sellingPrice: row.sellingPrice ?? 0,
           sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit ?? null,
+          gstPercent: row.gstPercent ?? 0,
           discountPercent: row.saleDiscountPercent ?? 0,
           focQuantity: 0,
           lastScanMultiplier: multiplier,
@@ -679,16 +830,65 @@ export function SalePage() {
     );
   }
 
-  function selectPaymentMethod(method: SalePaymentMethod): void {
-    if (!payment) return;
+  function selectPaymentMode(mode: PaymentMode): void {
+    if (!(amountDue > 0) && mode !== "cash") return;
     paymentsTouchedRef.current = true;
+    setPaymentMode(mode);
+    if (mode === "split") {
+      const existingCash =
+        payments.find((row) => row.method === "CASH")?.amount ?? 0;
+      const cardReference =
+        payments.find((row) => row.method === "CARD")?.reference ?? "";
+      setPayments(
+        buildSplitPayments(amountDue, existingCash, cardReference, {
+          cashId: payments.find((row) => row.method === "CASH")?.id,
+          cardId: payments.find((row) => row.method === "CARD")?.id,
+        }),
+      );
+      return;
+    }
+    if (mode === "card") {
+      setPayments([
+        {
+          id: payments[0]?.id ?? crypto.randomUUID(),
+          method: "CARD",
+          amount: amountDue,
+          reference: payments[0]?.reference ?? "",
+        },
+      ]);
+      return;
+    }
     setPayments([
       {
-        ...payment,
-        method,
-        amount: method === "CASH" ? payment.amount : amountDue,
+        id: payments[0]?.id ?? crypto.randomUUID(),
+        method: "CASH",
+        amount: amountDue,
+        reference: "",
       },
     ]);
+  }
+
+  function updateSplitCashAmount(raw: string): void {
+    const cash = round4(parseNumericInputChange(raw));
+    const clamped = round4(Math.min(Math.max(0, cash), amountDue));
+    paymentsTouchedRef.current = true;
+    const cardReference =
+      payments.find((row) => row.method === "CARD")?.reference ?? "";
+    setPayments(
+      buildSplitPayments(amountDue, clamped, cardReference, {
+        cashId: payments.find((row) => row.method === "CASH")?.id,
+        cardId: payments.find((row) => row.method === "CARD")?.id,
+      }),
+    );
+  }
+
+  function updateSplitCardReference(reference: string): void {
+    paymentsTouchedRef.current = true;
+    setPayments((prev) =>
+      prev.map((row) =>
+        row.method === "CARD" ? { ...row, reference } : row,
+      ),
+    );
   }
 
   function findLineByBarcodeOnBill(code: string): DraftSaleLine | null {
@@ -877,6 +1077,7 @@ export function SalePage() {
         status: "DRAFT",
       });
       await window.blackbox?.localDb?.upsertSaleDraft?.(detail);
+      bumpDataVersion();
       resetForNewSale();
       navigate("/sales/new", { replace: true });
       setHolding(false);
@@ -907,9 +1108,11 @@ export function SalePage() {
       setError(
         amountDue === 0 && appliedReturn
           ? "Return credit covers the bill — confirm to pay cash back from till"
-          : payment?.method === "CASH"
-            ? "Enter cash tender at least equal to the amount due (within max limit)"
-            : "Payment amount must match the amount due",
+          : isSplitPayment
+            ? "Enter a cash amount greater than zero and not more than the amount due"
+            : isCashPayment
+              ? "Enter cash tender at least equal to the amount due (within max limit)"
+              : "Payment amount must match the amount due",
       );
       return;
     }
@@ -960,8 +1163,6 @@ export function SalePage() {
 
     setSaving(true);
     try {
-      const gst = tenantGstRate;
-      const salesTax = tenantSalesTaxRate;
       const resolvedCustomerName =
         customerName.trim() || DEFAULT_SALE_CUSTOMER_NAME;
       const resolvedCashierName = user?.fullName?.trim() || "—";
@@ -984,6 +1185,7 @@ export function SalePage() {
             focQuantity: line.focQuantity,
             unitPrice,
             lineTotal: lineTotal(line),
+            gstPercent: line.gstPercent,
             sellUnit: line.sellUnit,
           };
         });
@@ -998,11 +1200,11 @@ export function SalePage() {
           warehouseName,
           status: "POSTED",
           subtotal,
-          gstRate: gst,
-          gstAmount: tax.gstAmount,
-          salesTaxRate: salesTax,
-          salesTaxAmount: tax.salesTaxAmount,
-          total: tax.total,
+          gstRate: 0,
+          gstAmount: billGstAmount,
+          salesTaxRate: 0,
+          salesTaxAmount: 0,
+          total: billTotal,
           customerName: resolvedCustomerName,
           cashTendered: resolvedCashTendered(),
           notes: "",
@@ -1152,8 +1354,6 @@ export function SalePage() {
 
       const detail = await salesApi.create({
         warehouseId,
-        gstRate: gst,
-        salesTaxRate: salesTax,
         customerName: resolvedCustomerName,
         cashTendered: resolvedCashTendered() ?? undefined,
         supervisorUserId: focSupervisorUserId ?? undefined,
@@ -1165,6 +1365,7 @@ export function SalePage() {
           focQuantity: line.focQuantity,
           unitPrice: lineUnitPrice(line),
           lineTotal: lineTotal(line),
+          gstPercent: line.gstPercent,
           sellUnit: line.sellUnit,
           barcode: line.barcode,
         })),
@@ -1208,6 +1409,7 @@ export function SalePage() {
       } catch {
         /* optional cache */
       }
+      bumpDataVersion();
       navigate(`/sales/${detail.id}`);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to post sale"));
@@ -1256,24 +1458,34 @@ export function SalePage() {
       }
       if (event.key === "F4") {
         event.preventDefault();
-        paymentAmountRef.current?.focus();
-        paymentAmountRef.current?.select();
+        if (isSplitPayment) {
+          splitCashAmountRef.current?.focus();
+          splitCashAmountRef.current?.select();
+        } else {
+          paymentAmountRef.current?.focus();
+          paymentAmountRef.current?.select();
+        }
+        return;
+      }
+      if (event.key === "F2") {
+        event.preventDefault();
+        if (amountDue > 0) selectPaymentMode("split");
         return;
       }
       if (event.key === "F5") {
         event.preventDefault();
-        if (payment) selectPaymentMethod("CASH");
+        if (amountDue > 0) selectPaymentMode("cash");
         return;
       }
       if (event.key === "F9") {
         event.preventDefault();
-        if (payment) selectPaymentMethod("CARD");
+        if (amountDue > 0) selectPaymentMode("card");
       }
     }
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [loadingDraft, canHold, holding, navigate, payment, billTotal, lines.length]);
+  }, [loadingDraft, canHold, holding, navigate, payment, billTotal, lines.length, amountDue, isSplitPayment]);
 
   if (loadingDraft) {
     return <p className="text-muted-foreground text-sm">Loading held bill…</p>;
@@ -1496,6 +1708,7 @@ export function SalePage() {
                   <th className="px-3 py-2 font-medium">Disc %</th>
                   <th className="px-3 py-2 font-medium">FOC</th>
                   <th className="px-3 py-2 font-medium">Price</th>
+                  <th className="px-3 py-2 font-medium">GST</th>
                   <th className="px-3 py-2 font-medium">Total</th>
                   <th className="px-3 py-2 w-10" />
                 </tr>
@@ -1504,14 +1717,16 @@ export function SalePage() {
                 {lines.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="text-muted-foreground px-3 py-8 text-center"
                     >
                       Scan or add items to start a sale
                     </td>
                   </tr>
                 ) : (
-                  lines.map((line) => (
+                  lines.map((line) => {
+                    const split = lineGstSplit(line);
+                    return (
                     <tr
                       key={line.productSkuId}
                       className="border-border border-t"
@@ -1570,10 +1785,13 @@ export function SalePage() {
                         />
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {lineUnitPrice(line).toLocaleString()}
+                        {split.exGstUnit.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {split.gstAmount.toLocaleString()}
                       </td>
                       <td className="px-3 py-2 tabular-nums font-medium">
-                        {lineTotal(line).toLocaleString()}
+                        {split.inclusiveTotal.toLocaleString()}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <Button
@@ -1590,7 +1808,8 @@ export function SalePage() {
                         </Button>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1615,25 +1834,15 @@ export function SalePage() {
               <span className="tabular-nums">{subtotal.toLocaleString()}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">
-                GST ({tenantGstRate}%)
-              </span>
+              <span className="text-muted-foreground">GST</span>
               <span className="tabular-nums">
-                {tax.gstAmount.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">
-                Sales tax ({tenantSalesTaxRate}%)
-              </span>
-              <span className="tabular-nums">
-                {tax.salesTaxAmount.toLocaleString()}
+                {billGstAmount.toLocaleString()}
               </span>
             </div>
             <div className="border-border flex justify-between gap-4 border-t pt-3">
               <span className="text-base font-semibold">Total</span>
               <span className="text-3xl font-bold tabular-nums tracking-tight">
-                {tax.total.toLocaleString()}
+                {billTotal.toLocaleString()}
               </span>
             </div>
             {appliedReturn ? (
@@ -1706,7 +1915,7 @@ export function SalePage() {
           <FormEnterNav>
             <div className="space-y-3">
               <h2 className="text-sm font-medium">Payment</h2>
-              {payment ? (
+              {amountDue > 0 && (payment || isSplitPayment) ? (
                 <>
                   <div className="space-y-2">
                     <Label>Method</Label>
@@ -1714,116 +1923,168 @@ export function SalePage() {
                       <Button
                         type="button"
                         variant={
-                          payment.method === "CASH" ? "default" : "outline"
+                          paymentMode === "cash" ? "default" : "outline"
                         }
                         size="sm"
-                        onClick={() => selectPaymentMethod("CASH")}
+                        onClick={() => selectPaymentMode("cash")}
                       >
                         Cash (F5)
                       </Button>
                       <Button
                         type="button"
                         variant={
-                          payment.method === "CARD" ? "default" : "outline"
+                          paymentMode === "card" ? "default" : "outline"
                         }
                         size="sm"
-                        onClick={() => selectPaymentMethod("CARD")}
+                        onClick={() => selectPaymentMode("card")}
                       >
                         Card (F9)
                       </Button>
+                      <Button
+                        type="button"
+                        variant={
+                          paymentMode === "split" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => selectPaymentMode("split")}
+                      >
+                        Split (F2)
+                      </Button>
                     </div>
-                    {/* <select
-                      id="paymentMethod"
-                      className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                      value={payment.method}
-                      onChange={(event) => {
-                        selectPaymentMethod(
-                          event.target.value as SalePaymentMethod,
-                        );
-                      }}
-                    >
-                      {PAYMENT_METHODS.map((method) => (
-                        <option key={method} value={method}>
-                          {paymentMethodLabel(method)}
-                        </option>
-                      ))}
-                    </select> */}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentAmount">
-                      {isCashPayment ? "Cash received" : "Amount"}
-                    </Label>
-                    <Input
-                      ref={paymentAmountRef}
-                      id="paymentAmount"
-                      type="number"
-                      min={0}
-                      max={isCashPayment ? cashMaxTender : amountDue}
-                      step="any"
-                      placeholder={isCashPayment ? "Tendered" : "Amount"}
-                      className="h-12 text-lg tabular-nums"
-                      value={numericInputDisplayValue(payment.amount)}
-                      onFocus={selectZeroNumericOnFocus}
-                      onKeyDown={replaceLeadingZeroOnKeyDown}
-                      onChange={(event) => {
-                        const amount = round4(
-                          parseNumericInputChange(event.target.value),
-                        );
-                        paymentsTouchedRef.current = true;
-                        setPayments([{ ...payment, amount }]);
-                      }}
-                    />
-                    {cashOverMax ? (
-                      <p className="text-destructive text-xs" role="alert">
-                        Max tender {cashMaxTender.toLocaleString()}
-                      </p>
-                    ) : null}
-                  </div>
-                  {payment.method !== "CASH" ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="paymentReference">Reference</Label>
-                      <Input
-                        id="paymentReference"
-                        placeholder="Optional"
-                        value={payment.reference}
-                        onChange={(event) => {
-                          paymentsTouchedRef.current = true;
-                          setPayments([
-                            { ...payment, reference: event.target.value },
-                          ]);
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                  {isCashPayment ? (
-                    <div className="rounded-md bg-muted/50 px-3 py-3 text-lg">
-                      {amountDue === 0 && appliedReturn ? (
-                        <div className="flex justify-between gap-4 font-semibold">
-                          <span>Cash back from credit</span>
-                          <span className="text-xl tabular-nums">
-                            {cashBackFromCredit.toLocaleString()}
-                          </span>
+                  {isSplitPayment && splitAmounts ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="splitCashAmount">Cash amount</Label>
+                        <Input
+                          ref={splitCashAmountRef}
+                          id="splitCashAmount"
+                          type="number"
+                          min={0}
+                          max={amountDue}
+                          step="any"
+                          placeholder="Cash portion"
+                          className="h-12 text-lg tabular-nums"
+                          value={numericInputDisplayValue(splitAmounts.cash)}
+                          onFocus={selectZeroNumericOnFocus}
+                          onKeyDown={replaceLeadingZeroOnKeyDown}
+                          onChange={(event) =>
+                            updateSplitCashAmount(event.target.value)
+                          }
+                        />
+                        {splitCashOverDue ? (
+                          <p className="text-destructive text-xs" role="alert">
+                            Cash cannot exceed amount due (
+                            {amountDue.toLocaleString()})
+                          </p>
+                        ) : splitAmounts.cash <= 0 ? (
+                          <p className="text-muted-foreground text-xs">
+                            Enter cash portion (must be greater than zero)
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="splitCardAmount">Card amount</Label>
+                        <Input
+                          id="splitCardAmount"
+                          type="number"
+                          readOnly
+                          tabIndex={-1}
+                          className="bg-muted/50 h-12 text-lg tabular-nums"
+                          value={numericInputDisplayValue(splitAmounts.card)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="splitCardReference">Card reference</Label>
+                        <Input
+                          id="splitCardReference"
+                          placeholder="Optional"
+                          value={splitAmounts.cardReference}
+                          onChange={(event) =>
+                            updateSplitCardReference(event.target.value)
+                          }
+                        />
+                      </div>
+                    </>
+                  ) : payment ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="paymentAmount">
+                          {isCashPayment ? "Cash received" : "Amount"}
+                        </Label>
+                        <Input
+                          ref={paymentAmountRef}
+                          id="paymentAmount"
+                          type="number"
+                          min={0}
+                          max={isCashPayment ? cashMaxTender : amountDue}
+                          step="any"
+                          placeholder={isCashPayment ? "Tendered" : "Amount"}
+                          className="h-12 text-lg tabular-nums"
+                          value={numericInputDisplayValue(payment.amount)}
+                          onFocus={selectZeroNumericOnFocus}
+                          onKeyDown={replaceLeadingZeroOnKeyDown}
+                          onChange={(event) => {
+                            const amount = round4(
+                              parseNumericInputChange(event.target.value),
+                            );
+                            paymentsTouchedRef.current = true;
+                            setPayments([{ ...payment, amount }]);
+                          }}
+                        />
+                        {cashOverMax ? (
+                          <p className="text-destructive text-xs" role="alert">
+                            Max tender {cashMaxTender.toLocaleString()}
+                          </p>
+                        ) : null}
+                      </div>
+                      {paymentMode === "card" ? (
+                        <div className="space-y-2">
+                          <Label htmlFor="paymentReference">Reference</Label>
+                          <Input
+                            id="paymentReference"
+                            placeholder="Optional"
+                            value={payment.reference}
+                            onChange={(event) => {
+                              paymentsTouchedRef.current = true;
+                              setPayments([
+                                { ...payment, reference: event.target.value },
+                              ]);
+                            }}
+                          />
                         </div>
-                      ) : tendered >= amountDue ? (
-                        <div className="flex justify-between gap-4 font-semibold">
-                          <span>Change</span>
-                          <span className="text-xl text-green-700 tabular-nums dark:text-green-400">
-                            {cashChange.toLocaleString()}
-                          </span>
+                      ) : null}
+                      {isCashPayment ? (
+                        <div className="rounded-md bg-muted/50 px-3 py-3 text-lg">
+                          {amountDue === 0 && appliedReturn ? (
+                            <div className="flex justify-between gap-4 font-semibold">
+                              <span>Cash back from credit</span>
+                              <span className="text-xl tabular-nums">
+                                {cashBackFromCredit.toLocaleString()}
+                              </span>
+                            </div>
+                          ) : tendered >= amountDue ? (
+                            <div className="flex justify-between gap-4 font-semibold">
+                              <span>Change</span>
+                              <span className="text-xl text-green-700 tabular-nums dark:text-green-400">
+                                {cashChange.toLocaleString()}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between gap-4 font-semibold">
+                              <span>Short</span>
+                              <span className="text-xl text-amber-700 tabular-nums dark:text-amber-300">
+                                {cashShortfall.toLocaleString()}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className="flex justify-between gap-4 font-semibold">
-                          <span>Short</span>
-                          <span className="text-xl text-amber-700 tabular-nums dark:text-amber-300">
-                            {cashShortfall.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : cardRemaining !== 0 ? (
-                    <p className="text-amber-700 text-sm dark:text-amber-300">
-                      Remaining: {cardRemaining.toLocaleString()}
-                    </p>
+                      ) : cardRemaining !== 0 ? (
+                        <p className="text-amber-700 text-sm dark:text-amber-300">
+                          Remaining: {cardRemaining.toLocaleString()}
+                        </p>
+                      ) : null}
+                    </>
                   ) : null}
                 </>
               ) : (
@@ -1852,7 +2113,7 @@ export function SalePage() {
         hints={[
           KEYBOARD_HINT_SCAN,
           KEYBOARD_HINT_SAVE,
-          "F1 remove · F8 adjust qty · F4 tender · F5 cash · F9 card · F6 hold · F7 held bills",
+          "F1 remove · F8 adjust qty · F4 tender · F5 cash · F2 split · F9 card · F6 hold · F7 held bills",
           KEYBOARD_HINT_ENTER,
         ]}
       />

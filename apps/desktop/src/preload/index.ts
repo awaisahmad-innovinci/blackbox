@@ -207,6 +207,12 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:listSaleNumbers") as Promise<string[]>,
     listHoldNumbers: () =>
       ipcRenderer.invoke("localDb:listHoldNumbers") as Promise<string[]>,
+    allocateDocumentNumber: (input: {
+      documentType: import("@blackbox/shared").DocumentCounterType;
+      tenantName: string;
+      deviceCode: string;
+    }) =>
+      ipcRenderer.invoke("localDb:allocateDocumentNumber", input) as Promise<string>,
     listInventoryOuts: (query?: InventoryOutListQuery) =>
       ipcRenderer.invoke(
         "localDb:listInventoryOuts",

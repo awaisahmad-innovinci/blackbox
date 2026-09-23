@@ -13,6 +13,7 @@ import {
   fetchCurrentDevice,
   restoreDesktopSession,
 } from "@renderer/lib/api/auth";
+import { writeCachedDeviceCode } from "@renderer/lib/device-code";
 import { getTillLogoutBlockMessage } from "@renderer/lib/local-db/till-source";
 import { setOnSessionCleared } from "@renderer/lib/api/session";
 import { setDeviceRevoked } from "@renderer/lib/local-db/local-write";
@@ -67,6 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     try {
       const device = await fetchCurrentDevice();
+      writeCachedDeviceCode(device?.code ?? null);
       applyDeviceState(
         device?.status === "trusted"
           ? "trusted"
@@ -163,6 +165,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (block) throw new Error(block);
     }
     await desktopLogout();
+    writeCachedDeviceCode(null);
     writeCachedUser(null);
     setUser(null);
     setOffline(false);

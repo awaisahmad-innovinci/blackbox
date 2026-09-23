@@ -180,6 +180,7 @@ export function listProductSkusLocal(productId: string): ProductSkuDetail[] {
          pu.name as purchaseUnitName,
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
+         coalesce(s.gst_percent, 0) as gstPercent,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -221,6 +222,7 @@ function mapProductSkuRow(r: Record<string, unknown>): ProductSkuDetail {
     purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
     unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1),
     costPrice: num(r.costPrice),
+    gstPercent: num(r.gstPercent),
     sellingPrice: num(r.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(r.sellingPricePerPurchaseUnit),
     saleDiscountPercent: num(r.saleDiscountPercent),
@@ -632,6 +634,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
          pu.name as purchaseUnitName,
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
+         coalesce(s.gst_percent, 0) as gstPercent,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -666,6 +669,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
     purchaseUnitName: (row.purchaseUnitName as string | null) ?? null,
     unitsPerPurchaseUnit: num(row.unitsPerPurchaseUnit, 1),
     costPrice: num(row.costPrice),
+    gstPercent: num(row.gstPercent),
     sellingPrice: num(row.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
     saleDiscountPercent: num(row.saleDiscountPercent),
@@ -769,6 +773,7 @@ function mapSkuSearchRow(
     ...(r.saleDiscountPercent != null
       ? { saleDiscountPercent: num(r.saleDiscountPercent) }
       : {}),
+    ...(r.gstPercent != null ? { gstPercent: num(r.gstPercent) } : {}),
     ...(warehouseId
       ? {
           quantityAvailable: num(r.quantityAvailable),
@@ -854,6 +859,7 @@ export function getSkuByBarcodeLocal(
          bu.name as baseUnitName,
          pu.name as purchaseUnitName,
          s.cost_price as costPrice,
+         coalesce(s.gst_percent, 0) as gstPercent,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -898,6 +904,7 @@ export function getSkuByBarcodeLocal(
     sellingPrice: num(row.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
     saleDiscountPercent: num(row.saleDiscountPercent),
+    gstPercent: num(row.gstPercent),
   };
 }
 
@@ -926,6 +933,7 @@ function lookupProductSkuLocal(
          pu.name as purchaseUnitName,
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
+         coalesce(s.gst_percent, 0) as gstPercent,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -1198,7 +1206,8 @@ export function getReceivingDraftLocal(poId: string): ReceivingDraft | null {
       `select
          i.id as purchaseOrderItemId,
          vs.purchase_price as currentVendorPurchasePrice,
-         s.selling_price as currentSellingPrice
+         s.selling_price as currentSellingPrice,
+         coalesce(s.gst_percent, 0) as gstPercent
        from purchase_order_items i
        left join product_skus s on s.id = i.product_sku_id
        left join vendor_skus vs on vs.id = i.vendor_sku_id
@@ -1211,6 +1220,7 @@ export function getReceivingDraftLocal(poId: string): ReceivingDraft | null {
       {
         currentVendorPurchasePrice: numOrNull(r.currentVendorPurchasePrice),
         currentSellingPrice: num(r.currentSellingPrice),
+        gstPercent: num(r.gstPercent),
       },
     ]),
   );
@@ -1231,8 +1241,10 @@ export function getReceivingDraftLocal(poId: string): ReceivingDraft | null {
       orderUnit: item.orderUnit ?? "box",
       orderedQuantity: item.quantity,
       poUnitCost: item.unitCost,
+      poItemTax: item.tax,
       currentVendorPurchasePrice: extra?.currentVendorPurchasePrice ?? null,
       currentSellingPrice: extra?.currentSellingPrice ?? 0,
+      gstPercent: extra?.gstPercent ?? 0,
     };
   });
   return {
@@ -1305,6 +1317,9 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
          i.po_unit_cost as poUnitCost,
          i.receiving_unit_cost as receivingUnitCost,
          i.discount_percent as discountPercent,
+         coalesce(i.sale_tax, 0) as saleTax,
+         coalesce(i.adv_tax, 0) as advTax,
+         coalesce(i.gst, 0) as gst,
          i.line_total as lineTotal
        from goods_receipt_items i
        left join product_skus s on s.id = i.product_sku_id
@@ -1358,6 +1373,9 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
       poUnitCost: num(r.poUnitCost),
       receivingUnitCost: num(r.receivingUnitCost),
       discountPercent: num(r.discountPercent),
+      saleTax: num(r.saleTax),
+      advTax: num(r.advTax),
+      gst: num(r.gst),
       lineTotal: num(r.lineTotal),
     })),
     createdAt: String(row.createdAt),
@@ -1653,6 +1671,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
          l.quantity,
          l.unit_price as unitPrice,
          l.line_total as lineTotal,
+         coalesce(l.gst_percent, 0) as gstPercent,
          coalesce(l.discount_percent, 0) as discountPercent,
          coalesce(l.foc_quantity, 0) as focQuantity,
          coalesce(l.quantity_corrected, 0) as quantityCorrected,
@@ -1710,6 +1729,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
       quantity: num(r.quantity),
       unitPrice: num(r.unitPrice),
       lineTotal: num(r.lineTotal),
+      gstPercent: num(r.gstPercent),
       sellUnit: (r.sellUnit as "pc" | "box") ?? "pc",
       discountPercent: num(r.discountPercent),
       focQuantity: num(r.focQuantity),
