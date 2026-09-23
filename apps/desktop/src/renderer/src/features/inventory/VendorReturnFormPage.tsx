@@ -31,6 +31,8 @@ import { useConfirm } from "@renderer/components/confirm-provider";
 import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import { allocateVendorReturnNumber } from "@renderer/lib/document-numbers";
+import { useSession } from "@renderer/lib/session/context";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -66,6 +68,7 @@ function round4(n: number): number {
 export function VendorReturnFormPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { user } = useSession();
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [vendorId, setVendorId] = useState("");
@@ -324,6 +327,7 @@ export function VendorReturnFormPage() {
       if (await isDeviceBound()) {
         const localId = crypto.randomUUID();
         const now = new Date().toISOString();
+        const returnNumber = await allocateVendorReturnNumber(user?.tenantName ?? "");
         const vendorName = vendors.find((v) => v.id === vendorId)?.name ?? "";
         const warehouseName =
           warehouses.find((w) => w.id === warehouseId)?.name ?? "";
@@ -347,7 +351,7 @@ export function VendorReturnFormPage() {
         }));
         const detail: VendorReturnDetail = {
           id: localId,
-          returnNumber: `LOCAL-${localId.slice(0, 8)}`,
+          returnNumber,
           vendorId,
           vendorName,
           warehouseId,

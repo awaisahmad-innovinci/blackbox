@@ -1,7 +1,55 @@
 import type { SaleDetail } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
-import { getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
+import type Database from "better-sqlite3";
+import { applyInventoryOutBalanceDeltaLocal, getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
 import { getLocalDb } from "./index";
+
+function removeStaleSaleByNumber(
+  db: Database.Database,
+  tenantId: string,
+  saleNumber: string,
+  keepId: string,
+): void {
+  const stale = db
+    .prepare(
+      `select id, status, warehouse_id as warehouseId
+       from sales
+       where tenant_id = @tenantId and sale_number = @saleNumber and id != @keepId
+       limit 1`,
+    )
+    .get({ tenantId, saleNumber, keepId }) as
+    | { id: string; status: string; warehouseId: string }
+    | undefined;
+
+  if (!stale) return;
+
+  if (stale.status === "POSTED") {
+    const lines = db
+      .prepare(
+        `select product_sku_id as productSkuId, quantity, foc_quantity as focQuantity, unit_price as unitPrice
+         from sale_lines where sale_id = ?`,
+      )
+      .all(stale.id) as Array<{
+      productSkuId: string;
+      quantity: number;
+      focQuantity: number;
+      unitPrice: number;
+    }>;
+
+    for (const line of lines) {
+      applyInventoryOutBalanceDeltaLocal(
+        stale.warehouseId,
+        line.productSkuId,
+        line.quantity + (line.focQuantity ?? 0),
+        line.unitPrice,
+      );
+    }
+  }
+
+  db.prepare("delete from sale_payments where sale_id = ?").run(stale.id);
+  db.prepare("delete from sale_lines where sale_id = ?").run(stale.id);
+  db.prepare("delete from sales where id = ?").run(stale.id);
+}
 
 export function upsertSaleLocal(
   detail: SaleDetail,
@@ -10,6 +58,13 @@ export function upsertSaleLocal(
   const syncStatus = options?.syncStatus ?? "synced";
   const db = getLocalDb();
   const tx = db.transaction(() => {
+    removeStaleSaleByNumber(
+      db,
+      DEMO_STORE_TENANT_ID,
+      detail.saleNumber,
+      detail.id,
+    );
+
     db.prepare(
       `insert into sales (
         id, tenant_id, sale_number, warehouse_id, status,
@@ -73,10 +128,10 @@ export function upsertSaleLocal(
     const insertLine = db.prepare(
       `insert into sale_lines (
         id, tenant_id, sale_id, product_sku_id, quantity, unit_price, line_total,
-        discount_percent, foc_quantity, quantity_corrected, sell_unit, barcode, created_at, updated_at, sync_status, server_updated_at
+        gst_percent, discount_percent, foc_quantity, quantity_corrected, sell_unit, barcode, created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @saleId, @productSkuId, @quantity, @unitPrice, @lineTotal,
-        @discountPercent, @focQuantity, @quantityCorrected, @sellUnit, @barcode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+        @gstPercent, @discountPercent, @focQuantity, @quantityCorrected, @sellUnit, @barcode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )`,
     );
 
@@ -89,6 +144,7 @@ export function upsertSaleLocal(
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.lineTotal,
+        gstPercent: item.gstPercent ?? 0,
         discountPercent: item.discountPercent ?? 0,
         focQuantity: item.focQuantity ?? 0,
         quantityCorrected: item.quantityCorrected ? 1 : 0,

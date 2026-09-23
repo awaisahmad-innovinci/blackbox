@@ -108,6 +108,13 @@ export class CreateProductSkuDto {
   @Min(0)
   costPrice!: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  gstPercent?: number;
+
   @Type(() => Number)
   @IsNumber()
   @Min(0)

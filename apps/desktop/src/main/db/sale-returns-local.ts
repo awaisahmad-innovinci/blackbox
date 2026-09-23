@@ -1,12 +1,81 @@
 import type { SaleReturnDetail, SaleReturnLookupSummary } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import type Database from "better-sqlite3";
 import { getSaleReturnLocal } from "./entity-get-local";
+import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
 import { getLocalDb } from "./index";
+
+function removeStaleSaleReturnByNumber(
+  db: Database.Database,
+  tenantId: string,
+  returnNumber: string,
+  keepId: string,
+): void {
+  const stale = db
+    .prepare(
+      `select id, status, warehouse_id as warehouseId
+       from sale_returns
+       where tenant_id = @tenantId and return_number = @returnNumber and id != @keepId
+       limit 1`,
+    )
+    .get({ tenantId, returnNumber, keepId }) as
+    | { id: string; status: string; warehouseId: string }
+    | undefined;
+
+  if (!stale) return;
+
+  if (stale.status === "PENDING") {
+    const lines = db
+      .prepare(
+        `select product_sku_id as productSkuId, quantity, unit_price as unitPrice
+         from sale_return_lines where sale_return_id = ?`,
+      )
+      .all(stale.id) as Array<{
+      productSkuId: string;
+      quantity: number;
+      unitPrice: number;
+    }>;
+
+    for (const line of lines) {
+      const balanceRow = db
+        .prepare(
+          `select unit_cost as unitCost from inventory_out_items
+           where tenant_id = @tenantId and warehouse_id = @warehouseId
+             and product_sku_id = @productSkuId`,
+        )
+        .get({
+          tenantId,
+          warehouseId: stale.warehouseId,
+          productSkuId: line.productSkuId,
+        }) as { unitCost: number } | undefined;
+      const unitCost = balanceRow ? Number(balanceRow.unitCost) : line.unitPrice;
+      applyInventoryOutBalanceDeltaLocal(
+        stale.warehouseId,
+        line.productSkuId,
+        -line.quantity,
+        unitCost,
+      );
+    }
+  }
+
+  db.prepare(
+    `delete from sale_return_lines where sale_return_id = ? and tenant_id = ?`,
+  ).run(stale.id, tenantId);
+  db.prepare(`delete from sale_returns where id = ?`).run(stale.id);
+}
 
 export function upsertSaleReturnLocal(detail: SaleReturnDetail): void {
   const db = getLocalDb();
   const now = new Date().toISOString();
-  db.prepare(
+  const tx = db.transaction(() => {
+    removeStaleSaleReturnByNumber(
+      db,
+      DEMO_STORE_TENANT_ID,
+      detail.returnNumber,
+      detail.id,
+    );
+
+    db.prepare(
     `insert into sale_returns (
       id, tenant_id, return_number, sale_id, warehouse_id, return_date, status,
       subtotal, gst_rate, gst_amount, sales_tax_rate, sales_tax_amount, refund_total,
@@ -106,6 +175,8 @@ export function upsertSaleReturnLocal(detail: SaleReturnDetail): void {
       updatedAt: now,
     });
   }
+  });
+  tx();
 }
 
 export function lookupSaleReturnLocal(

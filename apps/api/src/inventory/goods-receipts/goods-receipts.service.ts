@@ -17,8 +17,8 @@ import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   goodsReceiptGrandTotal,
+  goodsReceiptLineTotal,
   landedUnitByQuantity,
-  lineTotalAfterDiscount,
   roundMoney4,
   weightedAvgUnitCost,
 } from "@blackbox/shared";
@@ -230,8 +230,10 @@ export class GoodsReceiptsService {
         orderUnit: line.orderUnit === "pc" ? "pc" : "box",
         orderedQuantity: toNum(line.quantity),
         poUnitCost: toNum(line.unitCost),
+        poItemTax: toNum(line.tax),
         currentVendorPurchasePrice,
         currentSellingPrice: toNum(line.productSku?.sellingPrice),
+        gstPercent: toNum(line.productSku?.gstPercent),
       });
     }
 
@@ -309,6 +311,9 @@ export class GoodsReceiptsService {
         poUnitCost: string;
         receivingUnitCost: string;
         discountPercent: string;
+        saleTax: string;
+        advTax: string;
+        gst: string;
         lineTotal: string;
         billedDelta: number;
         stockDelta: number;
@@ -342,12 +347,21 @@ export class GoodsReceiptsService {
             "Line discount % must be between 0 and 100",
           );
         }
+        const lineSaleTax = item.saleTax ?? 0;
+        const lineAdvTax = item.advTax ?? 0;
+        const lineGst = item.gst ?? 0;
+        if (lineSaleTax < 0 || lineAdvTax < 0 || lineGst < 0) {
+          throw new BadRequestException("Line tax amounts must be >= 0");
+        }
 
         const unitsPer = toNum(poLine.unitsPerPurchaseUnit) || 1;
-        const lineTotal = lineTotalAfterDiscount(
+        const lineTotal = goodsReceiptLineTotal(
           item.receivedQuantity,
           item.receivingUnitCost,
           discountPercent,
+          lineSaleTax,
+          lineAdvTax,
+          lineGst,
         );
         subtotal = round4(subtotal + lineTotal);
         const billedDelta = round4(item.receivedQuantity * unitsPer);
@@ -367,6 +381,9 @@ export class GoodsReceiptsService {
           poUnitCost: String(toNum(poLine.unitCost)),
           receivingUnitCost: String(item.receivingUnitCost),
           discountPercent: String(discountPercent),
+          saleTax: String(lineSaleTax),
+          advTax: String(lineAdvTax),
+          gst: String(lineGst),
           lineTotal: String(lineTotal),
           billedDelta,
           stockDelta,
@@ -400,6 +417,8 @@ export class GoodsReceiptsService {
       );
 
       for (const line of builtLines) {
+        const lineTaxes =
+          toNum(line.saleTax) + toNum(line.advTax) + toNum(line.gst);
         line.avgNetUnit = landedUnitByQuantity(
           toNum(line.receivedQuantity),
           toNum(line.receivingUnitCost),
@@ -408,6 +427,7 @@ export class GoodsReceiptsService {
           discount,
           costCharges,
           costCredits,
+          lineTaxes,
         );
       }
 
@@ -472,6 +492,9 @@ export class GoodsReceiptsService {
             poUnitCost: line.poUnitCost,
             receivingUnitCost: line.receivingUnitCost,
             discountPercent: line.discountPercent,
+            saleTax: line.saleTax,
+            advTax: line.advTax,
+            gst: line.gst,
             lineTotal: line.lineTotal,
           }),
         );
@@ -608,6 +631,9 @@ export class GoodsReceiptsService {
       poUnitCost: toNum(l.poUnitCost),
       receivingUnitCost: toNum(l.receivingUnitCost),
       discountPercent: toNum(l.discountPercent),
+      saleTax: toNum(l.saleTax),
+      advTax: toNum(l.advTax),
+      gst: toNum(l.gst),
       lineTotal: toNum(l.lineTotal),
     }));
 

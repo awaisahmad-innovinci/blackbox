@@ -1,5 +1,7 @@
+import type { SaleLineRow } from "@blackbox/shared";
+import { splitInclusiveGst } from "@blackbox/shared";
 import JsBarcode from "jsbarcode";
-import { useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, type ReactNode } from "react";
 
 export function formatMoney(value: number): string {
   return value.toLocaleString(undefined, {
@@ -48,8 +50,99 @@ export function lineProductLabel(name: string, variant: string): string {
   return productName;
 }
 
+/** Sale receipt only — variant shown as `(Variant)`. */
+export function saleReceiptProductLabel(name: string, variant: string): string {
+  const productName = name.trim();
+  const variantName = variant.trim();
+  if (variantName) return `${productName} (${variantName})`;
+  return productName;
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
+const THERMAL_SALE_COL_CLASS = {
+  qty: "w-6 py-0.5 text-right tabular-nums align-top font-semibold",
+  disc: "w-6 py-0.5 text-right tabular-nums align-top font-semibold",
+  foc: "w-5 py-0.5 text-right tabular-nums align-top font-semibold",
+  price: "w-9 py-0.5 text-right tabular-nums align-top font-semibold",
+  gst: "w-8 py-0.5 text-right tabular-nums align-top font-semibold",
+  total: "w-9 py-0.5 text-right tabular-nums align-top font-semibold",
+} as const;
+
+export function ThermalSaleLineItems({ items }: { items: SaleLineRow[] }) {
+  return (
+    <>
+      <table className="w-full border-collapse text-left text-[11px]">
+        <thead>
+          <tr>
+            <th className={`${THERMAL_SALE_COL_CLASS.qty} font-bold`}>Qty</th>
+            <th className={`${THERMAL_SALE_COL_CLASS.disc} font-bold`}>Disc</th>
+            <th className={`${THERMAL_SALE_COL_CLASS.foc} font-bold`}>FOC</th>
+            <th className={`${THERMAL_SALE_COL_CLASS.price} font-bold`}>Price</th>
+            <th className={`${THERMAL_SALE_COL_CLASS.gst} font-bold`}>GST</th>
+            <th className={`${THERMAL_SALE_COL_CLASS.total} font-bold`}>Total</th>
+          </tr>
+        </thead>
+      </table>
+
+      <ThermalRule />
+
+      <table className="w-full border-collapse text-left text-[11px]">
+        <tbody>
+          {items.map((item) => {
+            const { exGst, gstAmount } = splitInclusiveGst(
+              item.lineTotal,
+              item.gstPercent ?? 0,
+            );
+            const exGstUnit =
+              item.quantity > 0 ? round4(exGst / item.quantity) : exGst;
+
+            return (
+              <Fragment key={item.id}>
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="py-0.5 text-left align-top break-words font-bold"
+                  >
+                    {saleReceiptProductLabel(item.productName, item.variantName)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className={THERMAL_SALE_COL_CLASS.qty}>{item.quantity}</td>
+                  <td className={THERMAL_SALE_COL_CLASS.disc}>
+                    {formatDiscountPercent(item.discountPercent ?? 0)}%
+                  </td>
+                  <td className={THERMAL_SALE_COL_CLASS.foc}>
+                    {formatFocQuantity(item.focQuantity ?? 0)}
+                  </td>
+                  <td className={THERMAL_SALE_COL_CLASS.price}>
+                    {formatMoney(exGstUnit)}
+                  </td>
+                  <td className={THERMAL_SALE_COL_CLASS.gst}>
+                    {formatMoney(gstAmount)}
+                  </td>
+                  <td className={THERMAL_SALE_COL_CLASS.total}>
+                    {formatMoney(item.lineTotal)}
+                  </td>
+                </tr>
+                <tr>
+                  <td colSpan={6} className="p-0">
+                    <ThermalRule />
+                  </td>
+                </tr>
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
 export const THERMAL_RECEIPT_CLASS =
-  "thermal-receipt mx-auto w-full max-w-[62mm] px-3 pt-2 pb-4 font-mono text-[11px] font-semibold leading-snug text-center text-black";
+  "thermal-receipt mx-auto w-full max-w-[62mm] px-3 pt-2 pb-8 font-mono text-[11px] font-semibold leading-snug text-center text-black";
 
 export function ThermalReceiptHeader({
   businessName,

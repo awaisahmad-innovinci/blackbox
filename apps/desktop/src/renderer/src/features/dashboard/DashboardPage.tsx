@@ -172,13 +172,20 @@ export function DashboardPage() {
     try {
       const mode = await resolveDataSourceMode();
       setDataSource(mode);
+      const localDb = window.blackbox?.localDb;
+      let localDbConnected = false;
+      if (localDb?.getStatus) {
+        try {
+          const status = await localDb.getStatus();
+          localDbConnected = status.connected;
+        } catch {
+          localDbConnected = false;
+        }
+      }
       if (cashierOnly && user?.id) {
-        if (
-          mode === "local" &&
-          window.blackbox?.localDb?.getCashierDashboardSummary
-        ) {
+        if (localDbConnected && localDb?.getCashierDashboardSummary) {
           setCashierSummary(
-            await window.blackbox.localDb.getCashierDashboardSummary(user.id),
+            await localDb.getCashierDashboardSummary(user.id),
           );
         } else {
           setCashierSummary({
@@ -433,9 +440,15 @@ export function DashboardPage() {
                   ? "Today's till and refund summary."
                   : "Inventory overview."}
           </p>
-          {cashierOnly && cashierSummary ? (
+          {cashierOnly ? (
             <p className="text-muted-foreground mt-1 text-xs">
-              {new Date(`${cashierSummary.date}T12:00:00`).toLocaleDateString()}
+              {cashierSummary
+                ? new Date(`${cashierSummary.date}T12:00:00`).toLocaleDateString()
+                : null}
+              {cashierSummary ? " · " : ""}
+              {localDbStatus?.connected
+                ? "Showing local sales data"
+                : "Local database unavailable — totals may be incomplete"}
             </p>
           ) : showManagerDashboard && managerSummary ? (
             <p className="text-muted-foreground mt-1 text-xs">

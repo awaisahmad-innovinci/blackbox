@@ -31,6 +31,26 @@ export function productNameSlug(name: string): string {
   return slug || "SKU";
 }
 
+export const DOCUMENT_COUNTER_TYPES = [
+  "PO",
+  "PV",
+  "IO",
+  "IR",
+  "SB",
+  "SR",
+  "HOLD",
+  "VR",
+  "V",
+] as const;
+
+export type DocumentCounterType = (typeof DOCUMENT_COUNTER_TYPES)[number];
+
+function withDeviceSegment(basePrefix: string, deviceCode?: string | null): string {
+  const code = deviceCode?.trim();
+  if (!code) return basePrefix;
+  return `${basePrefix}${code}-`;
+}
+
 /** Next code `{prefix}{paddedSeq}` scanning existing values with the same prefix. */
 export function nextSequentialCode(
   prefix: string,
@@ -48,44 +68,105 @@ export function nextSequentialCode(
   return `${prefix}${String(max + 1).padStart(pad, "0")}`;
 }
 
-export function vendorCodePrefix(initials: string): string {
-  return `${initials}-V`;
+export function vendorCodePrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-V`, deviceCode);
 }
 
-export function poNumberPrefix(initials: string): string {
-  return `${initials}-PO-`;
+export function poNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-PO-`, deviceCode);
 }
 
-export function receiptNumberPrefix(initials: string): string {
-  return `${initials}-PV-`;
+export function receiptNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-PV-`, deviceCode);
 }
 
-export function outNumberPrefix(initials: string): string {
-  return `${initials}-IO-`;
+export function outNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-IO-`, deviceCode);
 }
 
-export function outReturnNumberPrefix(initials: string): string {
-  return `${initials}-IR-`;
+export function outReturnNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-IR-`, deviceCode);
 }
 
-export function saleNumberPrefix(initials: string): string {
-  return `${initials}-SB-`;
+export function saleNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-SB-`, deviceCode);
 }
 
-export function holdNumberPrefix(initials: string): string {
-  return `${initials}-HOLD-`;
+export function holdNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-HOLD-`, deviceCode);
 }
 
-export function saleReturnNumberPrefix(initials: string): string {
-  return `${initials}-SR-`;
+export function saleReturnNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-SR-`, deviceCode);
+}
+
+export function vendorReturnNumberPrefix(
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  return withDeviceSegment(`${initials}-VR-`, deviceCode);
+}
+
+export function documentNumberPrefix(
+  documentType: DocumentCounterType,
+  initials: string,
+  deviceCode?: string | null,
+): string {
+  switch (documentType) {
+    case "PO":
+      return poNumberPrefix(initials, deviceCode);
+    case "PV":
+      return receiptNumberPrefix(initials, deviceCode);
+    case "IO":
+      return outNumberPrefix(initials, deviceCode);
+    case "IR":
+      return outReturnNumberPrefix(initials, deviceCode);
+    case "SB":
+      return saleNumberPrefix(initials, deviceCode);
+    case "SR":
+      return saleReturnNumberPrefix(initials, deviceCode);
+    case "HOLD":
+      return holdNumberPrefix(initials, deviceCode);
+    case "VR":
+      return vendorReturnNumberPrefix(initials, deviceCode);
+    case "V":
+      return vendorCodePrefix(initials, deviceCode);
+    default:
+      return `${initials}-`;
+  }
 }
 
 export function nextVendorCode(
   businessName: string,
   existingVendorCodes: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    vendorCodePrefix(businessInitials(businessName)),
+    vendorCodePrefix(businessInitials(businessName), deviceCode),
     existingVendorCodes,
   );
 }
@@ -93,9 +174,10 @@ export function nextVendorCode(
 export function nextPoNumber(
   businessName: string,
   existingPoNumbers: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    poNumberPrefix(businessInitials(businessName)),
+    poNumberPrefix(businessInitials(businessName), deviceCode),
     existingPoNumbers,
   );
 }
@@ -103,9 +185,10 @@ export function nextPoNumber(
 export function nextReceiptNumber(
   businessName: string,
   existingReceiptNumbers: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    receiptNumberPrefix(businessInitials(businessName)),
+    receiptNumberPrefix(businessInitials(businessName), deviceCode),
     existingReceiptNumbers,
   );
 }
@@ -113,9 +196,10 @@ export function nextReceiptNumber(
 export function nextOutNumber(
   businessName: string,
   existingOutNumbers: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    outNumberPrefix(businessInitials(businessName)),
+    outNumberPrefix(businessInitials(businessName), deviceCode),
     existingOutNumbers,
   );
 }
@@ -123,9 +207,10 @@ export function nextOutNumber(
 export function nextOutReturnNumber(
   businessName: string,
   existingReturnNumbers: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    outReturnNumberPrefix(businessInitials(businessName)),
+    outReturnNumberPrefix(businessInitials(businessName), deviceCode),
     existingReturnNumbers,
   );
 }
@@ -133,9 +218,10 @@ export function nextOutReturnNumber(
 export function nextSaleNumber(
   businessName: string,
   existingSaleNumbers: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    saleNumberPrefix(businessInitials(businessName)),
+    saleNumberPrefix(businessInitials(businessName), deviceCode),
     existingSaleNumbers,
   );
 }
@@ -143,9 +229,10 @@ export function nextSaleNumber(
 export function nextHoldNumber(
   businessName: string,
   existingHoldNumbers: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    holdNumberPrefix(businessInitials(businessName)),
+    holdNumberPrefix(businessInitials(businessName), deviceCode),
     existingHoldNumbers,
   );
 }
@@ -153,9 +240,21 @@ export function nextHoldNumber(
 export function nextSaleReturnNumber(
   businessName: string,
   existingReturnNumbers: string[],
+  deviceCode?: string | null,
 ): string {
   return nextSequentialCode(
-    saleReturnNumberPrefix(businessInitials(businessName)),
+    saleReturnNumberPrefix(businessInitials(businessName), deviceCode),
+    existingReturnNumbers,
+  );
+}
+
+export function nextVendorReturnNumber(
+  businessName: string,
+  existingReturnNumbers: string[],
+  deviceCode?: string | null,
+): string {
+  return nextSequentialCode(
+    vendorReturnNumberPrefix(businessInitials(businessName), deviceCode),
     existingReturnNumbers,
   );
 }
@@ -167,4 +266,20 @@ export function nextSkuCodeForProduct(
 ): string {
   const slug = productNameSlug(productName);
   return nextSequentialCode(`${slug}-`, existingSkus);
+}
+
+/** Max numeric suffix for codes sharing a prefix (legacy + device-scoped). */
+export function maxSequentialSuffix(
+  prefix: string,
+  existingCodes: string[],
+): number {
+  let max = 0;
+  for (const code of existingCodes) {
+    if (!code.startsWith(prefix)) continue;
+    const suffix = code.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    const n = Number(suffix);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max;
 }

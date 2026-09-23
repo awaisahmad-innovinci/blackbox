@@ -103,6 +103,33 @@ export class GoodsReceiptItem {
   discountPercent!: string;
 
   @Column({
+    name: "sale_tax",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  saleTax!: string;
+
+  @Column({
+    name: "adv_tax",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  advTax!: string;
+
+  @Column({
+    name: "gst",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  gst!: string;
+
+  @Column({
     name: "line_total",
     type: "numeric",
     precision: 14,

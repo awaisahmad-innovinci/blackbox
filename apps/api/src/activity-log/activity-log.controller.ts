@@ -26,7 +26,6 @@ export class ActivityLogController {
   }
 
   @Post()
-  @RequirePermissions("sales.write")
   create(
     @Body() dto: CreateActivityLogDto,
     @CurrentUser() user: TenantContext,

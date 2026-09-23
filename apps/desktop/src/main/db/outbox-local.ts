@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type Database from "better-sqlite3";
 import type { SyncEntityType, SyncOperation, SyncStream } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
@@ -141,9 +142,9 @@ export function markOutboxRejected(changeId: string, error: string): void {
     .run({ changeId, error });
 }
 
-export function resetStalePushing(): void {
-  getLocalDb()
-    .prepare(
+export function resetStalePushing(conn?: Database.Database): void {
+  const db = conn ?? getLocalDb();
+  db.prepare(
       `update local_sync_outbox set status = 'pending'
        where status = 'pushing'
          and datetime(created_at) <= datetime('now', '-2 minutes')`,

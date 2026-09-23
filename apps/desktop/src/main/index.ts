@@ -37,6 +37,7 @@ import type {
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  DocumentCounterType,
 } from "@blackbox/shared";
 import {
   closeLocalDb,
@@ -207,6 +208,7 @@ import {
   vendorReturnableQuantityLocal,
   inventoryOutReturnableQuantityLocal,
 } from "./db/queries-local";
+import { allocateDocumentNumberLocal } from "./db/document-counters-local";
 import {
   getOrCreateFingerprint,
   getStableMachineFingerprint,
@@ -506,6 +508,17 @@ function registerIpc(): void {
   );
   ipcMain.handle("localDb:listSaleNumbers", () => listSaleNumbersLocal());
   ipcMain.handle("localDb:listHoldNumbers", () => listHoldNumbersLocal());
+  ipcMain.handle(
+    "localDb:allocateDocumentNumber",
+    (
+      _event,
+      input: {
+        documentType: DocumentCounterType;
+        tenantName: string;
+        deviceCode: string;
+      },
+    ) => allocateDocumentNumberLocal(input),
+  );
   ipcMain.handle(
     "localDb:listInventoryOuts",
     (_event, query: InventoryOutListQuery = {}) =>
@@ -1092,6 +1105,13 @@ function registerIpc(): void {
 }
 
 app.disableHardwareAcceleration();
+
+function shutdownLocalDbOnSignal(): void {
+  closeLocalDb();
+}
+
+process.once("SIGTERM", shutdownLocalDbOnSignal);
+process.once("SIGINT", shutdownLocalDbOnSignal);
 
 app.whenReady().then(() => {
   try {

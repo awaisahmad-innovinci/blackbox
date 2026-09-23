@@ -17,7 +17,7 @@ import type {
   StockMovementRow,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { nextSkuCodeForProduct } from "@blackbox/shared";
+import { costWithGst, nextSkuCodeForProduct } from "@blackbox/shared";
 import {
   normalizeOptionalStoredText,
   normalizeStoredText,
@@ -325,9 +325,9 @@ export class ProductsService {
     const tenantId = this.fixedTenant.tenantId;
     const product = await this.requireProduct(productId);
     await this.assertUnits(tenantId, dto.baseUnitId, dto.purchaseUnitId);
-    if (dto.sellingPrice <= dto.costPrice) {
+    if (dto.sellingPrice <= costWithGst(dto.costPrice, dto.gstPercent ?? 0)) {
       throw new BadRequestException(
-        "Selling price must be greater than cost price",
+        "Selling price must be greater than cost + GST",
       );
     }
 
@@ -356,6 +356,7 @@ export class ProductsService {
           purchaseUnitId: dto.purchaseUnitId,
           unitsPerPurchaseUnit: String(dto.unitsPerPurchaseUnit),
           costPrice: String(dto.costPrice),
+          gstPercent: String(dto.gstPercent ?? 0),
           sellingPrice: String(dto.sellingPrice),
           sellingPricePerPurchaseUnit:
             dto.sellingPricePerPurchaseUnit == null
@@ -495,6 +496,7 @@ export class ProductsService {
       purchaseUnitName: s.purchaseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(s.unitsPerPurchaseUnit),
       costPrice: toNum(s.costPrice),
+      gstPercent: toNum(s.gstPercent),
       sellingPrice: toNum(s.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(s.sellingPricePerPurchaseUnit),
       saleDiscountPercent: toNum(s.saleDiscountPercent),

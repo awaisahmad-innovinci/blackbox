@@ -348,6 +348,7 @@ export interface SkuSearchResult {
   sellingPricePerPurchaseUnit?: number | null;
   /** Default POS line discount % for this SKU. */
   saleDiscountPercent?: number;
+  gstPercent?: number;
 }
 
 /** Tenant-wide barcode lookup for duplicate detection (any SKU/product status). */
@@ -522,6 +523,7 @@ export interface SkuBarcodeLookupResult {
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   reorderLevel: number;
@@ -550,6 +552,7 @@ export interface SkuDetail {
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   saleDiscountPercent: number;
@@ -686,6 +689,7 @@ export interface ProductSkuDetail {
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   saleDiscountPercent: number;
@@ -706,6 +710,7 @@ export interface CreateProductSkuRequest {
   purchaseUnitId: string;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent?: number;
   sellingPrice: number;
   sellingPricePerPurchaseUnit?: number | null;
   saleDiscountPercent?: number;
@@ -755,6 +760,35 @@ export function sellingPriceFromCostMargin(
   return roundMoney4(cost * (1 + marginPercent / 100));
 }
 
+/** Cost including GST: cost 100 + GST 18% → 118 */
+export function costWithGst(cost: number, gstPercent: number): number {
+  const gst = Number.isFinite(gstPercent) ? Math.max(0, gstPercent) : 0;
+  return roundMoney4(cost * (1 + gst / 100));
+}
+
+/** GST-inclusive selling price: margin applied on cost + GST base. */
+export function sellingPriceFromCostMarginGst(
+  cost: number,
+  gstPercent: number,
+  marginPercent: number,
+): number {
+  const base = costWithGst(cost, gstPercent);
+  return roundMoney4(base * (1 + marginPercent / 100));
+}
+
+/** Split a GST-inclusive amount into ex-GST and GST portions. */
+export function splitInclusiveGst(
+  inclusiveAmount: number,
+  gstPercent: number,
+): { exGst: number; gstAmount: number } {
+  const gst = Number.isFinite(gstPercent) ? Math.max(0, gstPercent) : 0;
+  if (gst <= 0) {
+    return { exGst: roundMoney4(inclusiveAmount), gstAmount: 0 };
+  }
+  const exGst = roundMoney4(inclusiveAmount / (1 + gst / 100));
+  return { exGst, gstAmount: roundMoney4(inclusiveAmount - exGst) };
+}
+
 /** Weighted average unit cost after a purchase receipt (base-unit qty and cost). */
 export function weightedAvgUnitCost(
   oldQty: number,
@@ -780,6 +814,23 @@ export function lineTotalAfterDiscount(
 ): number {
   const pct = clampDiscountPercent(discountPercent);
   return roundMoney4(qty * unitCost * (1 - pct / 100));
+}
+
+/** Goods receipt line total: discounted base + per-line tax amounts. */
+export function goodsReceiptLineTotal(
+  qty: number,
+  unitCost: number,
+  discountPercent: number,
+  saleTax = 0,
+  advTax = 0,
+  gst = 0,
+): number {
+  return roundMoney4(
+    lineTotalAfterDiscount(qty, unitCost, discountPercent) +
+      Number(saleTax ?? 0) +
+      Number(advTax ?? 0) +
+      Number(gst ?? 0),
+  );
 }
 
 /** Net purchase-unit cost after line % and a header discount rate (0–1). */
@@ -871,9 +922,11 @@ export function landedUnitByQuantity(
   headerDiscountAmount: number,
   costCharges: number,
   costCredits = 0,
+  lineTaxes = 0,
 ): number {
   const lineNet = lineTotalAfterDiscount(qty, unitCost, discountPercent);
-  const lineUnit = qty > 0 ? lineNet / qty : 0;
+  const lineWithTaxes = roundMoney4(lineNet + Number(lineTaxes || 0));
+  const lineUnit = qty > 0 ? lineWithTaxes / qty : 0;
   const totalQty =
     Number.isFinite(totalReceivedQty) && totalReceivedQty > 0
       ? totalReceivedQty
@@ -1064,8 +1117,11 @@ export interface ReceivingLineDraft {
   orderUnit?: OrderUnit;
   orderedQuantity: number;
   poUnitCost: number;
+  /** PO line tax amount — pre-fills receive row sale tax. */
+  poItemTax?: number;
   currentVendorPurchasePrice: number | null;
   currentSellingPrice: number;
+  gstPercent?: number;
 }
 
 export interface ReceivingDraft {
@@ -1085,6 +1141,9 @@ export interface CreateGoodsReceiptItemRequest {
   bonusQuantity?: number;
   receivingUnitCost: number;
   discountPercent?: number;
+  saleTax?: number;
+  advTax?: number;
+  gst?: number;
 }
 
 export interface GoodsReceiptReturnAdjustment {
@@ -1128,6 +1187,9 @@ export interface GoodsReceiptItemRow {
   poUnitCost: number;
   receivingUnitCost: number;
   discountPercent: number;
+  saleTax: number;
+  advTax: number;
+  gst: number;
   lineTotal: number;
 }
 

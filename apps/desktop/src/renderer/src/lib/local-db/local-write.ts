@@ -1,5 +1,6 @@
 import type { SyncEntityType, SyncOperation } from "@blackbox/shared";
 import { streamForEntity } from "@blackbox/shared";
+import { bumpDataVersion } from "@renderer/lib/sync/sync-status";
 
 export async function isDeviceBound(): Promise<boolean> {
   const identity = await window.blackbox?.identity?.get();
@@ -39,5 +40,6 @@ export async function commitLocalChange(input: {
       ? { baseEntityVersion: input.baseEntityVersion }
       : {}),
   });
+  bumpDataVersion();
   return result.changeId;
 }

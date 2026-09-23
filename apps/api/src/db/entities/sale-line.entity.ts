@@ -35,6 +35,15 @@ export class SaleLine {
   @Column({ name: "unit_price", type: "numeric", precision: 14, scale: 4, default: 0 })
   unitPrice!: string;
 
+  @Column({
+    name: "gst_percent",
+    type: "numeric",
+    precision: 8,
+    scale: 4,
+    default: 0,
+  })
+  gstPercent!: string;
+
   @Column({ name: "line_total", type: "numeric", precision: 14, scale: 4, default: 0 })
   lineTotal!: string;
 

@@ -16,8 +16,8 @@ import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   goodsReceiptGrandTotal,
+  goodsReceiptLineTotal,
   landedUnitByQuantity,
-  lineTotalAfterDiscount,
   poOrderUnitLabel,
   roundMoney4,
   toPurchaseQuantity,
@@ -55,9 +55,23 @@ type DraftLine = ReceivingLineDraft & {
   bonusQuantity: number;
   receivingUnitCost: number;
   discountPercent: number;
+  saleTax: number;
+  advTax: number;
+  gst: number;
   originalPoUnitCost: number;
   originalSellingPrice: number;
 };
+
+function lineTaxTotal(line: DraftLine): number {
+  return goodsReceiptLineTotal(
+    receivePurchaseQty(line),
+    line.receivingUnitCost,
+    line.discountPercent,
+    line.saleTax,
+    line.advTax,
+    line.gst,
+  );
+}
 
 function costChanged(line: DraftLine): boolean {
   return line.receivingUnitCost !== line.originalPoUnitCost;
@@ -314,6 +328,7 @@ export function ReceivePurchaseOrderPage() {
     purchaseOrderItemId: string;
     purchaseUnitName: string | null;
     unitsPerPurchaseUnit: number;
+    gstPercent: number;
   } | null>(null);
 
   const [pendingReturns, setPendingReturns] = useState<
@@ -341,6 +356,9 @@ export function ReceivePurchaseOrderPage() {
             bonusQuantity: 0,
             receivingUnitCost: item.poUnitCost,
             discountPercent: 0,
+            saleTax: item.poItemTax ?? 0,
+            advTax: 0,
+            gst: 0,
             originalPoUnitCost: item.poUnitCost,
             originalSellingPrice: item.currentSellingPrice,
           })),
@@ -390,18 +408,9 @@ export function ReceivePurchaseOrderPage() {
 
   const subtotal = useMemo(
     () =>
-      Math.round(
-        lines.reduce(
-          (sum, l) =>
-            sum +
-            lineTotalAfterDiscount(
-              receivePurchaseQty(l),
-              l.receivingUnitCost,
-              l.discountPercent,
-            ),
-          0,
-        ) * 10000,
-      ) / 10000,
+      roundMoney4(
+        lines.reduce((sum, line) => sum + lineTaxTotal(line), 0),
+      ),
     [lines],
   );
   const totalReceiveQty = useMemo(
@@ -491,7 +500,15 @@ export function ReceivePurchaseOrderPage() {
   function updateLine(
     purchaseOrderItemId: string,
     patch: Partial<
-      Pick<DraftLine, "receiveQuantity" | "bonusQuantity" | "discountPercent">
+      Pick<
+        DraftLine,
+        | "receiveQuantity"
+        | "bonusQuantity"
+        | "discountPercent"
+        | "saleTax"
+        | "advTax"
+        | "gst"
+      >
     >,
   ) {
     setLines((prev) =>
@@ -532,6 +549,10 @@ export function ReceivePurchaseOrderPage() {
       }
       if (line.discountPercent < 0 || line.discountPercent > 100) {
         setError("Line discount % must be between 0 and 100");
+        return false;
+      }
+      if (line.saleTax < 0 || line.advTax < 0 || line.gst < 0) {
+        setError("Line tax amounts must be >= 0");
         return false;
       }
     }
@@ -598,11 +619,10 @@ export function ReceivePurchaseOrderPage() {
             poUnitCost: l.poUnitCost,
             receivingUnitCost: l.receivingUnitCost,
             discountPercent: l.discountPercent,
-            lineTotal: lineTotalAfterDiscount(
-              receivePurchaseQty(l),
-              l.receivingUnitCost,
-              l.discountPercent,
-            ),
+            saleTax: l.saleTax,
+            advTax: l.advTax,
+            gst: l.gst,
+            lineTotal: lineTaxTotal(l),
           })),
           createdAt: now,
           updatedAt: now,
@@ -638,6 +658,7 @@ export function ReceivePurchaseOrderPage() {
           if (!(stockDelta > 0)) continue;
           const movementId = crypto.randomUUID();
           if (billedDelta > 0) {
+            const lineTaxes = line.saleTax + line.advTax + line.gst;
             const netUnit = landedUnitByQuantity(
               purchaseQty,
               line.receivingUnitCost,
@@ -646,6 +667,7 @@ export function ReceivePurchaseOrderPage() {
               discountAmount,
               costCharges,
               costCredits,
+              lineTaxes,
             );
             const avg = await window.blackbox?.localDb?.applyPurchaseAvgCost(
               line.productSkuId,
@@ -729,6 +751,9 @@ export function ReceivePurchaseOrderPage() {
           bonusQuantity: l.bonusQuantity,
           receivingUnitCost: l.receivingUnitCost,
           discountPercent: l.discountPercent,
+          saleTax: l.saleTax,
+          advTax: l.advTax,
+          gst: l.gst,
         })),
       });
 
@@ -976,6 +1001,9 @@ export function ReceivePurchaseOrderPage() {
                   <th className="px-3 py-2 font-medium">PO price</th>
                   <th className="px-3 py-2 font-medium">Sale price</th>
                   <th className="px-3 py-2 font-medium">Discount %</th>
+                  <th className="px-3 py-2 font-medium">S.Tax</th>
+                  <th className="px-3 py-2 font-medium">Adv tax</th>
+                  <th className="px-3 py-2 font-medium">GST</th>
                   <th className="px-3 py-2 font-medium">Total</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
@@ -1051,12 +1079,47 @@ export function ReceivePurchaseOrderPage() {
                           }}
                         />
                       </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-20"
+                          value={String(line.saleTax)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              saleTax: Number.isNaN(n) ? line.saleTax : n,
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-20"
+                          value={String(line.advTax)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              advTax: Number.isNaN(n) ? line.advTax : n,
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-20"
+                          value={String(line.gst)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              gst: Number.isNaN(n) ? line.gst : n,
+                            });
+                          }}
+                        />
+                      </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {lineTotalAfterDiscount(
-                          receivePurchaseQty(line),
-                          line.receivingUnitCost,
-                          line.discountPercent,
-                        ).toLocaleString()}
+                        {lineTaxTotal(line).toLocaleString()}
                       </td>
                       <td className="px-3 py-2">
                         {line.vendorSkuId ? (
@@ -1072,6 +1135,7 @@ export function ReceivePurchaseOrderPage() {
                                 purchaseOrderItemId: line.purchaseOrderItemId,
                                 purchaseUnitName: line.purchaseUnitName,
                                 unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+                                gstPercent: line.gstPercent ?? 0,
                               })
                             }
                           >
@@ -1196,6 +1260,7 @@ export function ReceivePurchaseOrderPage() {
           currentSellingPrice={priceEdit.currentSellingPrice}
           purchaseUnitName={priceEdit.purchaseUnitName}
           unitsPerPurchaseUnit={priceEdit.unitsPerPurchaseUnit}
+          gstPercent={priceEdit.gstPercent}
           onClose={() => setPriceEdit(null)}
           onSaved={(newPrice, newSellingPrice) => {
             setLines((prev) =>

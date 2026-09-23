@@ -40,6 +40,24 @@ export class CreateGoodsReceiptItemDto {
   @Min(0)
   @Max(100)
   discountPercent?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  saleTax?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  advTax?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  gst?: number;
 }
 
 export class CreateGoodsReceiptDto {

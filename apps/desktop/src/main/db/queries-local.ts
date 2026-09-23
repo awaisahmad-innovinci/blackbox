@@ -600,7 +600,7 @@ export function getCashierDashboardSummaryLocal(
     and s.status = 'POSTED'
     and s.posted_by = @userId
     and s.posted_at is not null
-    and date(s.posted_at) = date('now', 'localtime')
+    and date(s.posted_at, 'localtime') = date('now', 'localtime')
   `;
 
   const totalSalesRow = db
@@ -649,7 +649,7 @@ export function getCashierDashboardSummaryLocal(
        where tenant_id = @tenantId
          and status = 'COMPLETED'
          and refunded_by = @userId
-         and date(refunded_at) = date('now', 'localtime')`,
+         and date(refunded_at, 'localtime') = date('now', 'localtime')`,
     )
     .get({ tenantId, userId }) as { amount: number };
 

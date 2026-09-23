@@ -68,7 +68,12 @@ export function fetchCurrentUser(): Promise<AuthUser> {
   return apiFetch<AuthUser>("/auth/me");
 }
 
-export type CurrentDevice = { id: string; name: string; status: string } | null;
+export type CurrentDevice = {
+  id: string;
+  name: string;
+  code: string | null;
+  status: string;
+} | null;
 
 export function fetchCurrentDevice(): Promise<CurrentDevice> {
   return apiFetch<CurrentDevice>("/devices/me");

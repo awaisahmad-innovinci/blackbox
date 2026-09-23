@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { OFFLINE_AUTHORIZATION_DAYS_DEFAULT } from "@blackbox/shared";
+import { OFFLINE_AUTHORIZATION_DAYS_DEFAULT, nextSequentialCode } from "@blackbox/shared";
 import { DataSource, IsNull, Repository } from "typeorm";
 import {
   toDeviceResponse,
@@ -58,8 +58,12 @@ export class DevicesService {
           fingerprint,
           name,
           status: "pending",
+          code: await this.allocateDeviceCode(tenantId),
         }),
       );
+    } else if (!device.code && device.fingerprint !== "cloud-hub") {
+      device.code = await this.allocateDeviceCode(tenantId);
+      device = await this.devices.save(device);
     }
     const expires = new Date();
     expires.setUTCDate(
@@ -87,6 +91,9 @@ export class DevicesService {
     const device = await this.findTenantDevice(tenantId, deviceId);
     if (device.fingerprint === "cloud-hub") {
       return toDeviceResponse(device);
+    }
+    if (!device.code) {
+      device.code = await this.allocateDeviceCode(tenantId);
     }
     device.status = "trusted";
     device.trustedAt = new Date();
@@ -132,5 +139,16 @@ export class DevicesService {
       throw new NotFoundException("Device not found");
     }
     return device;
+  }
+
+  private async allocateDeviceCode(tenantId: string): Promise<string> {
+    const rows = await this.devices.find({
+      where: { tenantId },
+      select: { code: true },
+    });
+    const existing = rows
+      .map((row) => row.code)
+      .filter((code): code is string => Boolean(code?.trim()));
+    return nextSequentialCode("C", existing, 0);
   }
 }

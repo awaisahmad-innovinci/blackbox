@@ -4,7 +4,7 @@
 
 @media print {
   @page {
-    margin: 4mm 5mm;
+    margin: 4mm 5mm 6mm;
     size: 80mm auto;
   }
 
@@ -62,14 +62,14 @@
   [data-thermal-receipt] {
     box-sizing: border-box !important;
     color: #000 !important;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-family: Arial, Helvetica, sans-serif !important;
     font-size: 13px !important;
     font-weight: 600 !important;
     line-height: 1.35 !important;
-    width: 62mm !important;
-    max-width: 62mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 2mm 4mm 8mm !important;
+    padding: 2mm 4mm 18mm !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -96,5 +96,12 @@
     color: #000 !important;
     fill: #000 !important;
     stroke: #000 !important;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-feed {
+    display: block !important;
+    height: 12mm !important;
+    min-height: 12mm !important;
+    visibility: visible !important;
   }
 }

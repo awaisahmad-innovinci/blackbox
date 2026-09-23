@@ -69,6 +69,15 @@ export class ProductSku {
   costPrice!: string;
 
   @Column({
+    name: "gst_percent",
+    type: "numeric",
+    precision: 8,
+    scale: 4,
+    default: 0,
+  })
+  gstPercent!: string;
+
+  @Column({
     name: "selling_price",
     type: "numeric",
     precision: 14,
