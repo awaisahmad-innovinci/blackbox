@@ -1,3 +1,4 @@
+import { refreshSessionUserFromApi } from "@renderer/lib/session/session-user-refresh";
 import { refreshPendingCount, syncNow } from "./sync-status";
 
 const BASE_INTERVAL_MS = 60_000;
@@ -74,6 +75,7 @@ export function startAutoSync(): void {
   };
 
   void refreshPendingCount().catch(() => undefined);
+  void refreshSessionUserFromApi();
   schedule(0);
 }
 

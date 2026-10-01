@@ -1,3 +1,5 @@
+import type { AuthResponse } from "@blackbox/shared";
+import { applySessionUserFromRefresh } from "@renderer/lib/session/session-user-refresh";
 import {
   clearSessionAndNotify,
   getAccessToken,
@@ -78,11 +80,12 @@ export async function refreshAccessToken(): Promise<boolean> {
         body: JSON.stringify({ refreshToken }),
       });
       if (!res.ok) return false;
-      const body = (await res.json()) as {
-        tokens?: { accessToken?: string; refreshToken?: string };
-      };
+      const body = (await res.json()) as AuthResponse;
       if (!body.tokens?.accessToken || !body.tokens.refreshToken) return false;
       setAuthTokens(body.tokens.accessToken, body.tokens.refreshToken);
+      if (body.user) {
+        applySessionUserFromRefresh(body.user);
+      }
       return true;
     } catch {
       return false;

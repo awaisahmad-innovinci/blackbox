@@ -41,6 +41,10 @@ import {
 } from "@renderer/lib/barcode-scan";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import {
+  requireManagerRemoveSaleLineApproval,
+  requireManagerTillOperationsApproval,
+} from "@renderer/lib/manager-approval";
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
 import { bumpDataVersion, syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
@@ -193,9 +197,8 @@ export function SalePage() {
   const { canWrite, canReadTill, canManageTill } = useSalesAccess();
   const confirm = useConfirm();
   const { promptSupervisorTotp } = useSupervisorTotp();
-  const requireTotp = user?.requireManagerApprovalRemoveSaleLine ?? true;
-  const requireTillWithdrawApproval =
-    user?.requireManagerApprovalTillWithdraw ?? true;
+  const requireTotp = requireManagerRemoveSaleLineApproval(user);
+  const requireTillWithdrawApproval = requireManagerTillOperationsApproval(user);
 
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [customerName, setCustomerName] = useState("");

@@ -41,6 +41,7 @@ import {
   reopenTill,
   withdrawTill,
 } from "@renderer/lib/local-db/till-source";
+import { requireManagerTillOperationsApproval } from "@renderer/lib/manager-approval";
 import { useSession } from "@renderer/lib/session/context";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
@@ -58,9 +59,7 @@ export function TillPage() {
   const permissions = user?.permissions ?? [];
   const { canReadTill, canManageTill, canWrite, canRefund } = useSalesAccess();
   const { promptSupervisorTotp } = useSupervisorTotp();
-  const requireTillApproval = user?.requireManagerApprovalTillOpen ?? true;
-  const requireTillWithdrawApproval =
-    user?.requireManagerApprovalTillWithdraw ?? true;
+  const requireTillOpsApproval = requireManagerTillOperationsApproval(user);
 
   const [session, setSession] = useState<TillSessionDetail | null>(null);
   const [latestClosedSession, setLatestClosedSession] =
@@ -221,7 +220,7 @@ export function TillPage() {
       if (managerDialog.kind === "collect") {
         let supervisorUserId: string | undefined;
         let supervisorDisplayName: string | undefined;
-        if (requireTillWithdrawApproval) {
+        if (requireTillOpsApproval) {
           const totp = await promptSupervisorTotp();
           if (!totp.approved) return;
           supervisorUserId = totp.supervisorUserId;
@@ -456,7 +455,7 @@ export function TillPage() {
       {canOpenNewTill ? (
         <div className="border-border space-y-4 rounded-lg border p-4">
           <h2 className="text-lg font-medium">Open till</h2>
-          {requireTillApproval ? (
+          {requireTillOpsApproval ? (
             <>
               <p className="text-muted-foreground text-sm">
                 Ask a manager to authorize and enter the opening cash balance.
@@ -682,7 +681,7 @@ export function TillPage() {
           cashierUserId={user.id}
           cashierName={user.fullName?.trim() || user.username}
           cashierUsername={user.username}
-          requireApproval={requireTillApproval}
+          requireApproval={requireTillOpsApproval}
           onSuccess={(detail) => {
             setSession(detail);
             setLatestClosedSession(null);
