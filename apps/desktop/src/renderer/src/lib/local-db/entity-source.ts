@@ -63,7 +63,10 @@ import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
-import { resolveDataSourceMode } from "@renderer/lib/local-db/data-source";
+import {
+  resolveDataSourceMode,
+  shouldUseLocalCatalog,
+} from "@renderer/lib/local-db/data-source";
 
 export type ProductProfileData = {
   product: ProductDetail;
@@ -149,6 +152,10 @@ export async function loadVendorProfile(
 export async function loadSkuProfile(id: string): Promise<SkuProfileData> {
   const local = await window.blackbox?.localDb?.getSkuProfile(id);
   if (local) return local;
+
+  if (await shouldUseLocalCatalog()) {
+    throw new ApiError("SKU not found", 404);
+  }
 
   const sku = await skusApi.get(id);
   const [suppliers, inventory] = await Promise.all([
@@ -543,6 +550,15 @@ export async function loadSkuSearch(
   q?: string,
   warehouseId?: string,
 ): Promise<SkuSearchResult[]> {
+  if (await shouldUseLocalCatalog()) {
+    const search = window.blackbox?.localDb?.searchSkus;
+    if (!search) return [];
+    try {
+      return await search(q, warehouseId);
+    } catch {
+      return [];
+    }
+  }
   const mode = await resolveDataSourceMode();
   if (mode === "local" && window.blackbox?.localDb?.searchSkus) {
     return window.blackbox.localDb.searchSkus(q, warehouseId);
@@ -693,6 +709,7 @@ export async function loadSkuByBarcode(
 ): Promise<SkuSearchResult> {
   const balance = options?.balance ?? "stock";
   const excludeDraftSaleId = options?.excludeDraftSaleId ?? null;
+  const useLocalCatalog = await shouldUseLocalCatalog();
   try {
     const local = await window.blackbox?.localDb?.getSkuByBarcode?.(
       barcode,
@@ -702,7 +719,12 @@ export async function loadSkuByBarcode(
     );
     if (local) return local;
   } catch {
-    /* fall through to API */
+    if (useLocalCatalog) {
+      throw new ApiError("SKU not found for barcode", 404);
+    }
+  }
+  if (useLocalCatalog) {
+    throw new ApiError("SKU not found for barcode", 404);
   }
   const remote = await skusApi.byBarcode(barcode, warehouseId, options);
   if (balance === "pos") {
@@ -782,12 +804,14 @@ export async function lookupSkuByBarcode(
 ): Promise<SkuBarcodeLookupResult | null> {
   const code = barcode.trim();
   if (!code) return null;
+  const useLocalCatalog = await shouldUseLocalCatalog();
   try {
     const local = await window.blackbox?.localDb?.lookupSkuByBarcode?.(code);
     if (local) return local;
   } catch {
-    /* fall through to API */
+    if (useLocalCatalog) return null;
   }
+  if (useLocalCatalog) return null;
   try {
     return await skusApi.lookupByBarcode(code);
   } catch (error: unknown) {

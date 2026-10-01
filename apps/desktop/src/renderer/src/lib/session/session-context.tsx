@@ -21,6 +21,10 @@ import { startAutoSync, stopAutoSync } from "@renderer/lib/sync/auto-sync";
 import { refreshPendingCount } from "@renderer/lib/sync/sync-status";
 import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
 import {
+  registerSessionUserRefresh,
+  refreshSessionUserFromApi,
+} from "./session-user-refresh";
+import {
   SessionContext,
   type DeviceState,
   type SessionStatus,
@@ -54,6 +58,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(false);
   const [deviceState, setDeviceState] = useState<DeviceState>("unknown");
   const mounted = useRef(true);
+  const offlineRef = useRef(false);
+  offlineRef.current = offline;
 
   const applyDeviceState = useCallback((next: DeviceState) => {
     setDeviceRevoked(next === "revoked");
@@ -89,6 +95,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       mounted.current = false;
     };
   }, []);
+
+  const applySessionUser = useCallback((next: AuthUser) => {
+    writeCachedUser(next);
+    if (mounted.current) {
+      setUser(next);
+      setOffline(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    registerSessionUserRefresh({
+      applyUser: applySessionUser,
+      isOffline: () => offlineRef.current,
+    });
+    return () => registerSessionUserRefresh(null);
+  }, [applySessionUser]);
 
   useEffect(() => {
     setOnSessionCleared(() => {
@@ -156,6 +178,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [refreshDeviceState],
   );
 
+  const refreshSessionUser = useCallback(async () => {
+    await refreshSessionUserFromApi();
+  }, []);
+
   const signOut = useCallback(async () => {
     if (user) {
       const block = await getTillLogoutBlockMessage({
@@ -182,8 +208,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       refreshDeviceState,
+      refreshSessionUser,
     }),
-    [status, user, offline, deviceState, signIn, signOut, refreshDeviceState],
+    [
+      status,
+      user,
+      offline,
+      deviceState,
+      signIn,
+      signOut,
+      refreshDeviceState,
+      refreshSessionUser,
+    ],
   );
 
   return (

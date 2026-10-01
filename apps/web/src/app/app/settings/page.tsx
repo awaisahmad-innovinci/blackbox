@@ -33,8 +33,7 @@ export default function SettingsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [requireRemoveApproval, setRequireRemoveApproval] = useState(true);
-  const [requireTillOpenApproval, setRequireTillOpenApproval] = useState(true);
-  const [requireTillWithdrawApproval, setRequireTillWithdrawApproval] =
+  const [requireTillOperationsApproval, setRequireTillOperationsApproval] =
     useState(true);
   const [defaultGstRate, setDefaultGstRate] = useState("0");
   const [defaultSalesTaxRate, setDefaultSalesTaxRate] = useState("0");
@@ -46,8 +45,10 @@ export default function SettingsPage() {
       const next = await getCurrentTenant();
       setTenant(next);
       setRequireRemoveApproval(next.requireManagerApprovalRemoveSaleLine);
-      setRequireTillOpenApproval(next.requireManagerApprovalTillOpen);
-      setRequireTillWithdrawApproval(next.requireManagerApprovalTillWithdraw);
+      setRequireTillOperationsApproval(
+        next.requireManagerApprovalTillOpen ||
+          next.requireManagerApprovalTillWithdraw,
+      );
       setDefaultGstRate(String(next.defaultGstRate ?? 0));
       setDefaultSalesTaxRate(String(next.defaultSalesTaxRate ?? 0));
     } catch (err) {
@@ -77,15 +78,17 @@ export default function SettingsPage() {
       const updated = await updateCurrentTenant({
         name,
         requireManagerApprovalRemoveSaleLine: requireRemoveApproval,
-        requireManagerApprovalTillOpen: requireTillOpenApproval,
-        requireManagerApprovalTillWithdraw: requireTillWithdrawApproval,
+        requireManagerApprovalTillOpen: requireTillOperationsApproval,
+        requireManagerApprovalTillWithdraw: requireTillOperationsApproval,
         defaultGstRate: Number(defaultGstRate) || 0,
         defaultSalesTaxRate: Number(defaultSalesTaxRate) || 0,
       });
       setTenant(updated);
       setRequireRemoveApproval(updated.requireManagerApprovalRemoveSaleLine);
-      setRequireTillOpenApproval(updated.requireManagerApprovalTillOpen);
-      setRequireTillWithdrawApproval(updated.requireManagerApprovalTillWithdraw);
+      setRequireTillOperationsApproval(
+        updated.requireManagerApprovalTillOpen ||
+          updated.requireManagerApprovalTillWithdraw,
+      );
       setDefaultGstRate(String(updated.defaultGstRate ?? 0));
       setDefaultSalesTaxRate(String(updated.defaultSalesTaxRate ?? 0));
       setSuccess("Settings saved.");
@@ -161,7 +164,7 @@ export default function SettingsPage() {
               )}
             </SectionCard>
 
-            <SectionCard
+            {/* <SectionCard
               title="Tax rates"
               description="Default percentages applied to every POS sale subtotal. Cashiers cannot change these on the sale screen."
             >
@@ -218,7 +221,7 @@ export default function SettingsPage() {
                   </p>
                 </div>
               )}
-            </SectionCard>
+            </SectionCard> */}
 
             <SectionCard
               title="Manager approval"
@@ -246,40 +249,23 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-start gap-3">
                     <Checkbox
-                      id="requireTillOpenApproval"
-                      checked={requireTillOpenApproval}
+                      id="requireTillOperationsApproval"
+                      checked={requireTillOperationsApproval}
                       onCheckedChange={(checked) =>
-                        setRequireTillOpenApproval(checked === true)
-                      }
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor="requireTillOpenApproval" className="font-normal">
-                        Open cashier till
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        When enabled, cashiers must enter a valid manager Authy
-                        code before their till is opened for the day.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="requireTillWithdrawApproval"
-                      checked={requireTillWithdrawApproval}
-                      onCheckedChange={(checked) =>
-                        setRequireTillWithdrawApproval(checked === true)
+                        setRequireTillOperationsApproval(checked === true)
                       }
                     />
                     <div className="space-y-1">
                       <Label
-                        htmlFor="requireTillWithdrawApproval"
+                        htmlFor="requireTillOperationsApproval"
                         className="font-normal"
                       >
-                        Collect cash from till
+                        Till operations (open till &amp; collect cash)
                       </Label>
                       <p className="text-muted-foreground text-xs">
-                        When enabled, managers must enter a valid manager Authy
-                        code before collecting cash from a cashier till.
+                        When enabled, a valid manager Authy code is required
+                        before opening a cashier till and before collecting
+                        cash from a till.
                       </p>
                     </div>
                   </div>
@@ -303,14 +289,9 @@ export default function SettingsPage() {
                       : "No approval required"}
                   </p>
                   <p>
-                    Open cashier till:{" "}
-                    {tenant.requireManagerApprovalTillOpen
-                      ? "Manager approval required"
-                      : "No approval required"}
-                  </p>
-                  <p>
-                    Collect cash from till:{" "}
-                    {tenant.requireManagerApprovalTillWithdraw
+                    Till operations (open till &amp; collect cash):{" "}
+                    {tenant.requireManagerApprovalTillOpen ||
+                    tenant.requireManagerApprovalTillWithdraw
                       ? "Manager approval required"
                       : "No approval required"}
                   </p>
