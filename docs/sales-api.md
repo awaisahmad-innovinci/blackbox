@@ -121,6 +121,10 @@ No new API routes — held bills are a desktop SQLite workflow only.
 
 Keyboard: **Alt+S** opens Sale when `sales.write` is granted.
 
+## Card terminal (optional, desktop)
+
+When enabled on the till screen, the desktop app can send the **card payment amount** to a locally attached bank EDC (keyboard or serial ECR). This does not change `POST /sales` or sync payloads. See [pos-card-terminal.md](./pos-card-terminal.md).
+
 ## Receipt (thermal POS)
 
 Desktop prints an **80mm** thermal layout: centered business name and address (from onboarding location via session), customer name, line items (**name / qty / price / total** — no SKU), then total items, total qty, and when cash tender exceeds the bill, **Cash** and **Change** lines above gross total, then gross total, cashier name, and non-cash payment lines. Reprints use stored `postedByName` and `cashTendered` when available.

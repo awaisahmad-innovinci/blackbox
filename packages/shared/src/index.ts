@@ -486,7 +486,17 @@ export const normalizeOptionalStoredText = normalizeOptionalStoredTextFn;
 
 export { buildReceivedAtIso, formatStoredDateTime } from "./datetime";
 
-export type { PosPrinterSettings, PosPrinterInfo } from "./pos-hardware";
+export type {
+  PosPrinterSettings,
+  PosPrinterInfo,
+  PosCardTerminalSettings,
+  PosCardTerminalConnection,
+  PosCardTerminalConnectionType,
+  PosCardTerminalAmountScale,
+  PosCardTerminalPushResult,
+  PosSerialPortInfo,
+} from "./pos-hardware";
 export {
   DEFAULT_POS_PRINTER_SETTINGS,
+  DEFAULT_POS_CARD_TERMINAL_SETTINGS,
 } from "./pos-hardware";

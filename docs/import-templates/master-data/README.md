@@ -15,7 +15,7 @@ Rules:
 - unit type: count, weight, volume, length, or other.
 - product_type: STOCK_ITEM, CONSUMABLE, or RESALABLE.
 - payment_terms: CASH, 7_DAYS, 15_DAYS, 30_DAYS, 45_DAYS, BILL_TO_BILL, or CUSTOM.
-- booleans: true or false.
+- booleans: true or false (case insensitive, e.g. TRUE, FALSE).
 - product import_key is a permanent unique identifier for that product; keep using the same value in future uploads and in 07_product_skus.csv.
 - brand_name, category_name, group_name, unit abbreviations, vendor_code, and sku are references and must match exactly.
 - Referenced records must already exist from a previous import (for example, upload units before product SKUs).

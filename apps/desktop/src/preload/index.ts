@@ -55,8 +55,11 @@ import type {
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PendingVendorReturnLine,
+  PosCardTerminalPushResult,
+  PosCardTerminalSettings,
   PosPrinterInfo,
   PosPrinterSettings,
+  PosSerialPortInfo,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -82,6 +85,14 @@ contextBridge.exposeInMainWorld("blackbox", {
   localDb: {
     getStatus: () =>
       ipcRenderer.invoke("localDb:getStatus") as Promise<LocalDbStatus>,
+    rebuildPosBalanceFromDocuments: () =>
+      ipcRenderer.invoke(
+        "localDb:rebuildPosBalanceFromDocuments",
+      ) as Promise<Ok>,
+    revealDatabaseInFolder: () =>
+      ipcRenderer.invoke("localDb:revealDatabaseInFolder") as Promise<
+        Ok | { ok: false; message: string }
+      >,
     getSyncMeta: (key: string) =>
       ipcRenderer.invoke("localDb:getSyncMeta", key) as Promise<string | null>,
     setSyncMeta: (key: string, value: string) =>
@@ -659,6 +670,26 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("pos:openCashDrawer") as Promise<{ ok: true }>,
     testDrawer: () =>
       ipcRenderer.invoke("pos:testDrawer") as Promise<{ ok: true }>,
+    getCardTerminalSettings: () =>
+      ipcRenderer.invoke(
+        "pos:getCardTerminalSettings",
+      ) as Promise<PosCardTerminalSettings>,
+    saveCardTerminalSettings: (settings: PosCardTerminalSettings) =>
+      ipcRenderer.invoke("pos:saveCardTerminalSettings", settings) as Promise<{
+        ok: true;
+      }>,
+    listSerialPorts: () =>
+      ipcRenderer.invoke("pos:listSerialPorts") as Promise<PosSerialPortInfo[]>,
+    pushCardAmount: (amount: number) =>
+      ipcRenderer.invoke(
+        "pos:pushCardAmount",
+        amount,
+      ) as Promise<PosCardTerminalPushResult>,
+    testCardTerminal: (settings?: PosCardTerminalSettings) =>
+      ipcRenderer.invoke(
+        "pos:testCardTerminal",
+        settings,
+      ) as Promise<PosCardTerminalPushResult>,
   },
   sync: {
     listOutbox: (limit?: number) => ipcRenderer.invoke("sync:listOutbox", limit),
