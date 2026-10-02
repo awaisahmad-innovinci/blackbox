@@ -492,10 +492,35 @@ export function DashboardPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="font-medium">Local database connected</p>
-              {/* <p className="text-muted-foreground mt-1 break-all text-xs">
-                {localDbStatus.path} · {localDbStatus.migrationsApplied}{" "}
-                migrations applied
-              </p> */}
+              {/* {localDbStatus.path ? (
+                <>
+                  <p className="text-muted-foreground mt-1 break-all font-mono text-xs">
+                    {localDbStatus.path}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(localDbStatus.path);
+                      }}
+                    >
+                      Copy DB path
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void window.blackbox?.localDb?.revealDatabaseInFolder?.();
+                      }}
+                    >
+                      Show in folder
+                    </Button>
+                  </div>
+                </>
+              ) : null} */}
               <p className="text-muted-foreground mt-1 text-xs">
                 {lastSyncedAt
                   ? `Last synced: ${formatSyncedAt(lastSyncedAt)}`
@@ -526,6 +551,11 @@ export function DashboardPage() {
               ? localDbStatus.error
               : "Unable to reach the local SQLite database."}
           </p>
+          {localDbStatus?.path ? (
+            <p className="mt-2 break-all font-mono text-xs opacity-90">
+              Expected file: {localDbStatus.path}
+            </p>
+          ) : null}
         </div>
       )}
 

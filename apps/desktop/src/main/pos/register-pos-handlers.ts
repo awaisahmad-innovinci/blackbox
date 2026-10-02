@@ -1,5 +1,15 @@
-import type { PosPrinterSettings } from "@blackbox/shared";
+import type {
+  PosCardTerminalSettings,
+  PosPrinterSettings,
+} from "@blackbox/shared";
 import type { BrowserWindow, IpcMain } from "electron";
+import {
+  listPosSerialPorts,
+  loadPosCardTerminalSettings,
+  persistPosCardTerminalSettings,
+  pushCardTerminalAmount,
+  testCardTerminalConnection,
+} from "./card-terminal-service";
 import {
   listOsPrinters,
   loadPosPrinterSettings,
@@ -36,4 +46,28 @@ export function registerPosHandlers(
     await openCashDrawer();
     return { ok: true as const };
   });
+
+  ipcMain.handle("pos:getCardTerminalSettings", () =>
+    loadPosCardTerminalSettings(),
+  );
+
+  ipcMain.handle(
+    "pos:saveCardTerminalSettings",
+    (_event, settings: PosCardTerminalSettings) => {
+      persistPosCardTerminalSettings(settings);
+      return { ok: true as const };
+    },
+  );
+
+  ipcMain.handle("pos:listSerialPorts", async () => listPosSerialPorts());
+
+  ipcMain.handle("pos:pushCardAmount", async (_event, amount: number) =>
+    pushCardTerminalAmount(amount),
+  );
+
+  ipcMain.handle(
+    "pos:testCardTerminal",
+    async (_event, settings?: PosCardTerminalSettings) =>
+      testCardTerminalConnection(settings),
+  );
 }

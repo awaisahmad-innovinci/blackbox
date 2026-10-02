@@ -63,7 +63,10 @@ import {
   upsertInventoryOutLocal,
   upsertInventoryOutsLocal,
 } from "./db/inventory-out-local";
-import { applyInventoryOutBalanceDeltaLocal } from "./db/inventory-out-balance-local";
+import {
+  applyInventoryOutBalanceDeltaLocal,
+  rebuildInventoryOutBalanceFromDocumentsLocal,
+} from "./db/inventory-out-balance-local";
 import {
   upsertInventoryOutReturnLocal,
   upsertInventoryOutReturnsLocal,
@@ -276,6 +279,18 @@ function createWindow(): void {
 
 function registerIpc(): void {
   ipcMain.handle("localDb:getStatus", () => getLocalDbStatus());
+  ipcMain.handle("localDb:rebuildPosBalanceFromDocuments", () => {
+    rebuildInventoryOutBalanceFromDocumentsLocal();
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:revealDatabaseInFolder", () => {
+    const status = getLocalDbStatus();
+    if (!status.connected || !status.path) {
+      return { ok: false as const, message: "Local database is not connected." };
+    }
+    shell.showItemInFolder(status.path);
+    return { ok: true as const };
+  });
   ipcMain.handle("localDb:getSyncMeta", (_event, key: string) =>
     getSyncMeta(key),
   );

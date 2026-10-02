@@ -167,6 +167,16 @@ const REQUIRED: Record<ImportFile, readonly CsvColumn[]> = {
   ],
 };
 
+/** Parses CSV booleans; returns null if raw is non-empty but not true/false (any case). */
+function parseImportBoolean(raw: string): boolean | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (lower === "true") return true;
+  if (lower === "false") return false;
+  return null;
+}
+
 @Injectable()
 export class MasterDataImportService {
   constructor(
@@ -860,7 +870,7 @@ export class MasterDataImportService {
         reorderLevel: value.reorder_level,
         minimumStockLevel: value.minimum_stock_level,
         maximumStockLevel: value.maximum_stock_level || null,
-        trackInventory: value.track_inventory === "true",
+        trackInventory: parseImportBoolean(value.track_inventory) === true,
         status: value.status,
       });
       const saved = await manager.save(item);
@@ -955,7 +965,7 @@ export class MasterDataImportService {
         purchasePrice: value.purchase_price,
         minimumOrderQuantity: value.minimum_order_quantity,
         leadTimeDays: Number(value.lead_time_days),
-        isPreferred: value.is_preferred === "true",
+        isPreferred: parseImportBoolean(value.is_preferred) === true,
         notes: value.notes,
         status: value.status,
       });
@@ -1132,8 +1142,10 @@ export class MasterDataImportService {
     errors: MasterDataImportError[],
   ): void {
     const value = row.values[column];
-    if (value && !["true", "false"].includes(value)) {
-      errors.push(this.rowError(row, column, "Must be true or false"));
+    if (value && parseImportBoolean(value) === null) {
+      errors.push(
+        this.rowError(row, column, "Must be true or false (case insensitive)"),
+      );
     }
   }
 

@@ -57,8 +57,11 @@ import type {
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PendingVendorReturnLine,
+  PosCardTerminalPushResult,
+  PosCardTerminalSettings,
   PosPrinterInfo,
   PosPrinterSettings,
+  PosSerialPortInfo,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -89,6 +92,10 @@ declare global {
       platform: NodeJS.Platform;
       localDb?: {
         getStatus: () => Promise<LocalDbStatus>;
+        rebuildPosBalanceFromDocuments: () => Promise<{ ok: true }>;
+        revealDatabaseInFolder: () => Promise<
+          { ok: true } | { ok: false; message: string }
+        >;
         getSyncMeta: (key: string) => Promise<string | null>;
         setSyncMeta: (key: string, value: string) => Promise<{ ok: true }>;
         upsertBrands: (rows: Brand[]) => Promise<{ ok: true }>;
@@ -441,6 +448,15 @@ declare global {
         listPrinters: () => Promise<PosPrinterInfo[]>;
         openCashDrawer: () => Promise<{ ok: true }>;
         testDrawer: () => Promise<{ ok: true }>;
+        getCardTerminalSettings: () => Promise<PosCardTerminalSettings>;
+        saveCardTerminalSettings: (
+          settings: PosCardTerminalSettings,
+        ) => Promise<{ ok: true }>;
+        listSerialPorts: () => Promise<PosSerialPortInfo[]>;
+        pushCardAmount: (amount: number) => Promise<PosCardTerminalPushResult>;
+        testCardTerminal: (
+          settings?: PosCardTerminalSettings,
+        ) => Promise<PosCardTerminalPushResult>;
       };
       sync?: {
         listOutbox: (limit?: number) => Promise<unknown>;

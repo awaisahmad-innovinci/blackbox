@@ -48,6 +48,8 @@ import {
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
 import { bumpDataVersion, syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
+import { resolveCardTerminalAmount } from "@renderer/features/sales/resolve-card-terminal-amount";
+import { useCardTerminalAmountSync } from "@renderer/features/sales/use-card-terminal-amount-sync";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { loadSkuByBarcode, loadSale, loadWarehouses, loadPosAvailableForSale, lookupSkuByBarcode, lookupSaleReturn } from "@renderer/lib/local-db/entity-source";
 import {
@@ -410,6 +412,28 @@ export function SalePage() {
     isSplitPayment &&
     splitAmounts != null &&
     splitAmounts.cash > amountDue;
+
+  const cardTerminalAmount = useMemo(
+    () =>
+      resolveCardTerminalAmount(
+        paymentMode,
+        amountDue,
+        payment,
+        splitAmounts,
+      ),
+    [
+      paymentMode,
+      amountDue,
+      payment?.amount,
+      splitAmounts?.cash,
+      splitAmounts?.card,
+    ],
+  );
+  const cardTerminalStatus = useCardTerminalAmountSync({
+    paymentMode,
+    cardAmount: cardTerminalAmount,
+    linesCount: lines.length,
+  });
 
   function resolvedCashTendered(): number | null {
     if (paymentMode !== "cash" || !payment) return null;
@@ -1918,6 +1942,17 @@ export function SalePage() {
           <FormEnterNav>
             <div className="space-y-3">
               <h2 className="text-sm font-medium">Payment</h2>
+              {cardTerminalStatus.state === "sent" ? (
+                <p className="text-muted-foreground text-xs">
+                  Card terminal: {cardTerminalStatus.amount.toLocaleString()}{" "}
+                  sent
+                </p>
+              ) : cardTerminalStatus.state === "error" ? (
+                <p className="text-destructive text-xs" role="alert">
+                  {cardTerminalStatus.message} Enter amount on the terminal
+                  manually if needed.
+                </p>
+              ) : null}
               {amountDue > 0 && (payment || isSplitPayment) ? (
                 <>
                   <div className="space-y-2">

@@ -28,6 +28,7 @@ import {
 import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
 import { CollectCashDialog } from "@renderer/features/sales/CollectCashDialog";
 import { OpenTillDialog } from "@renderer/features/sales/OpenTillDialog";
+import { PosCardTerminalSettingsDialog } from "@renderer/features/sales/PosCardTerminalSettingsDialog";
 import { PosPrinterSettingsDialog } from "@renderer/features/sales/PosPrinterSettingsDialog";
 import { ReopenTillDialog } from "@renderer/features/sales/ReopenTillDialog";
 import {
@@ -79,6 +80,7 @@ export function TillPage() {
   const [managerForm, setManagerForm] = useState(createEmptyTillFormState());
   const [collectDialogOpen, setCollectDialogOpen] = useState(false);
   const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
+  const [cardTerminalSettingsOpen, setCardTerminalSettingsOpen] = useState(false);
   const [openingDrawer, setOpeningDrawer] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [openDialogOpen, setOpenDialogOpen] = useState(false);
@@ -333,6 +335,12 @@ export function TillPage() {
                 onClick={() => setPrinterSettingsOpen(true)}
               >
                 Printer settings
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCardTerminalSettingsOpen(true)}
+              >
+                Card terminal
               </Button>
             </>
           ) : null}
@@ -719,6 +727,10 @@ export function TillPage() {
       <PosPrinterSettingsDialog
         open={printerSettingsOpen}
         onOpenChange={setPrinterSettingsOpen}
+      />
+      <PosCardTerminalSettingsDialog
+        open={cardTerminalSettingsOpen}
+        onOpenChange={setCardTerminalSettingsOpen}
       />
     </div>
   );

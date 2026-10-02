@@ -606,6 +606,16 @@ export async function runFullPull(
     );
   }
 
+  try {
+    report("movements", 1, 1, "Rebuilding POS balance from synced documents…");
+    await localDb.rebuildPosBalanceFromDocuments?.();
+  } catch (err: unknown) {
+    throw new SyncPullError(
+      "movements",
+      getApiErrorMessage(err, "Failed to rebuild POS balance"),
+    );
+  }
+
   const lastSyncedAt = new Date().toISOString();
   await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);
   report("done", 1, 1, "Sync complete");
