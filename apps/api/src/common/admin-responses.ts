@@ -16,6 +16,7 @@ export type TenantResponse = {
   requireManagerApprovalRemoveSaleLine: boolean;
   requireManagerApprovalTillOpen: boolean;
   requireManagerApprovalTillWithdraw: boolean;
+  requireManagerApprovalFoc: boolean;
   defaultGstRate: number;
   defaultSalesTaxRate: number;
   createdAt: Date;
@@ -82,6 +83,7 @@ export function toTenantResponse(tenant: Tenant): TenantResponse {
       tenant.requireManagerApprovalRemoveSaleLine,
     requireManagerApprovalTillOpen: tenant.requireManagerApprovalTillOpen,
     requireManagerApprovalTillWithdraw: tenant.requireManagerApprovalTillWithdraw,
+    requireManagerApprovalFoc: tenant.requireManagerApprovalFoc,
     defaultGstRate: tenant.defaultGstRate,
     defaultSalesTaxRate: tenant.defaultSalesTaxRate,
     createdAt: tenant.createdAt,

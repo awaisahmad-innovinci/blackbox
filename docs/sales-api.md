@@ -56,7 +56,9 @@ Body:
       "unitPrice": 100,
       "lineTotal": 100,
       "sellUnit": "pc",
-      "barcode": "optional"
+      "barcode": "optional",
+      "discountPercent": 0,
+      "focQuantity": 0
     }
   ],
   "payments": [
@@ -68,9 +70,12 @@ Body:
 Rules:
 
 - Sum of `payments[].amount` must equal computed bill total (`subtotal` + GST + sales tax).
-- Each line qty must be &gt; 0 and ≤ POS balance for that SKU in the warehouse (`inventory_out_items`).
-- Duplicate `productSkuId` lines in the request are merged by quantity.
-- On post: inserts `sales`, `sale_lines`, `sale_payments`; decrements POS balance; writes `inventory_movements` with `movement_type = 'SALE'`.
+- Each line must have `quantity` &gt; 0 or `focQuantity` &gt; 0, and `quantity + focQuantity` ≤ POS balance for that SKU in the warehouse (`inventory_out_items`).
+- `focQuantity` is a whole number of free units. It is never billed, but it is deducted from POS balance together with `quantity`.
+- **FOC-only line**: `quantity: 0` with `focQuantity > 0` (e.g. a promo item the customer did not buy). `lineTotal` must be `0`. Such lines are not returnable (returnable qty = paid qty = 0). The desktop sale screen adds these via **Add FOC (F10)**.
+- Any line with `focQuantity > 0` requires `supervisorUserId` when the tenant's FOC approval flag is on.
+- Duplicate `productSkuId` lines in the request are merged by quantity and FOC quantity.
+- On post: inserts `sales`, `sale_lines`, `sale_payments`; decrements POS balance by `quantity + focQuantity`; writes `inventory_movements` with `movement_type = 'SALE'`.
 - Bill numbers: `{initials}-SB-##` (see `@blackbox/shared` `nextSaleNumber()`).
 
 Payment methods: `CASH`, `CARD`, `CREDIT`.
@@ -79,7 +84,7 @@ Payment methods: `CASH`, `CARD`, `CREDIT`.
 
 Permission: `sales.void`
 
-Voids a **POSTED** sale and restores POS balance for each line. Idempotent rejection if already void.
+Voids a **POSTED** sale and restores POS balance for each line (`quantity + focQuantity`). Idempotent rejection if already void.
 
 ## Barcode lookup (POS balance)
 

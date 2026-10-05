@@ -45,13 +45,13 @@ export class TenantsService {
     }
     if (dto.requireManagerApprovalTillOpen !== undefined) {
       tenant.requireManagerApprovalTillOpen = dto.requireManagerApprovalTillOpen;
-      tenant.requireManagerApprovalTillWithdraw =
-        dto.requireManagerApprovalTillOpen;
-    } else if (dto.requireManagerApprovalTillWithdraw !== undefined) {
+    }
+    if (dto.requireManagerApprovalTillWithdraw !== undefined) {
       tenant.requireManagerApprovalTillWithdraw =
         dto.requireManagerApprovalTillWithdraw;
-      tenant.requireManagerApprovalTillOpen =
-        dto.requireManagerApprovalTillWithdraw;
+    }
+    if (dto.requireManagerApprovalFoc !== undefined) {
+      tenant.requireManagerApprovalFoc = dto.requireManagerApprovalFoc;
     }
     if (dto.defaultGstRate !== undefined) {
       tenant.defaultGstRate = dto.defaultGstRate;

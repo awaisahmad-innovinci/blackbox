@@ -56,6 +56,13 @@ export class Tenant {
   })
   requireManagerApprovalTillWithdraw!: boolean;
 
+  @Column({
+    name: "require_manager_approval_foc",
+    type: "boolean",
+    default: true,
+  })
+  requireManagerApprovalFoc!: boolean;
+
   /** Percentage applied to every sale subtotal (e.g. 17 = 17%). */
   @Column({ name: "default_gst_rate", type: "real", default: 0 })
   defaultGstRate!: number;

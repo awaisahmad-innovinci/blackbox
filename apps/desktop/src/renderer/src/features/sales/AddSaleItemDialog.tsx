@@ -28,13 +28,17 @@ export function AddSaleItemDialog({
   excludeDraftSaleId,
   onClose,
   onAddMany,
+  mode = "sale",
 }: {
   open: boolean;
   warehouseId: string;
   excludeDraftSaleId?: string | null;
   onClose: () => void;
   onAddMany: (rows: SkuSearchResult[]) => void;
+  /** "foc": items are added free of cost (qty 0, FOC 1), not billed. */
+  mode?: "sale" | "foc";
 }) {
+  const isFocMode = mode === "foc";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SkuSearchResult[]>([]);
   const [posBalanceBySkuId, setPosBalanceBySkuId] = useState<Map<string, number>>(
@@ -154,12 +158,13 @@ export function AddSaleItemDialog({
     >
       <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add items</DialogTitle>
+          <DialogTitle>{isFocMode ? "Add FOC items" : "Add items"}</DialogTitle>
         </DialogHeader>
 
         <p className="text-muted-foreground text-sm">
-          Search by product name, SKU code, or barcode. Only items with POS
-          floor balance can be sold.
+          {isFocMode
+            ? "Items are given free; nothing is added to the bill total, but FOC qty is deducted from POS floor stock. Only items with POS floor balance can be given."
+            : "Search by product name, SKU code, or barcode. Only items with POS floor balance can be sold."}
         </p>
 
         <div className="space-y-3">
@@ -253,9 +258,13 @@ export function AddSaleItemDialog({
           >
             {confirming
               ? "Adding…"
-              : selectedIds.length > 1
-                ? `Add ${selectedIds.length} items`
-                : "Add item"}
+              : isFocMode
+                ? selectedIds.length > 1
+                  ? `Add ${selectedIds.length} as FOC`
+                  : "Add as FOC"
+                : selectedIds.length > 1
+                  ? `Add ${selectedIds.length} items`
+                  : "Add item"}
           </Button>
         </DialogFooter>
       </DialogContent>

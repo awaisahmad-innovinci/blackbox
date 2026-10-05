@@ -1025,7 +1025,7 @@ export function listInventoryInOutReportLocal(
          on m.reference_type = 'goods_receipt' and m.reference_id = gr.id
        left join vendors v on v.id = gr.vendor_id
        where m.tenant_id = ?
-         and m.movement_type in ('PURCHASE_RECEIPT', 'INVENTORY_OUT')
+         and m.movement_type in ('PURCHASE_RECEIPT', 'INVENTORY_OUT', 'INVENTORY_OUT_RETURN')
          and date(m.created_at) >= ?
          and date(m.created_at) <= ?
        order by m.created_at desc`,
@@ -1057,7 +1057,10 @@ export function listInventoryInOutReportLocal(
     };
     const day = String(r.createdAt).slice(0, 10);
     const bucket = qtyByDay.get(day) ?? { inboundQty: 0, outboundQty: 0 };
-    if (item.movementType === "PURCHASE_RECEIPT") {
+    if (
+      item.movementType === "PURCHASE_RECEIPT" ||
+      item.movementType === "INVENTORY_OUT_RETURN"
+    ) {
       inboundItems.push(item);
       bucket.inboundQty += item.quantity;
     } else if (item.movementType === "INVENTORY_OUT") {

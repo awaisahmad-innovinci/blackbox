@@ -168,8 +168,26 @@ Rules: `0 < return qty ≤` current POS out balance for that warehouse + SKU. Re
 
 | Method | Path | Notes |
 |--------|------|-------|
-| `GET` | `/inventory-movements` | Tenant-wide paginated list (`productSkuId`, `warehouseId`, `since`, `page`, `pageSize`); includes `referenceType` / `referenceId` |
+| `GET` | `/inventory-movements` | JWT + `inventory.access`. Tenant-wide paginated list (`productSkuId`, `warehouseId`, `since`, `page`, `pageSize`); includes `referenceType` / `referenceId` |
 | `GET` | `/products/:id/movements` | Product-scoped recent movements (existing) |
+
+## Inventory reports
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `GET` | `/inventory-reports/in-out?dateFrom=&dateTo=` | JWT + `inventory.access`. Tenant from access token. Inclusive date range (`YYYY-MM-DD`). |
+
+Response shape: `InventoryInOutReport` — `inbound` / `outbound` buckets (line items + quantity totals), plus `byDay` aggregates.
+
+Movement types included:
+
+| Type | Report bucket | Reason |
+|------|---------------|--------|
+| `PURCHASE_RECEIPT` | Inbound | GRN-linked text |
+| `INVENTORY_OUT_RETURN` | Inbound | e.g. `Inventory out return IOR-…` |
+| `INVENTORY_OUT` | Outbound | Out bill text |
+
+Sale / sale-return movement types are not included in this report.
 
 ## SKUs / units
 

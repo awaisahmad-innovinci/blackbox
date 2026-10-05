@@ -206,11 +206,21 @@ export class SalesService {
       const focQuantity = Math.max(0, Math.floor(focRaw));
       const discountPercent = round4(Number(item.discountPercent ?? 0));
       const gstPercent = round4(Number(item.gstPercent ?? 0));
-      if (!(qty > 0)) {
-        throw new BadRequestException("Quantity must be greater than zero");
+      if (!(qty >= 0)) {
+        throw new BadRequestException("Quantity cannot be negative");
       }
       if (focRaw !== focQuantity) {
         throw new BadRequestException("FOC quantity must be a whole number");
+      }
+      if (qty === 0 && !(focQuantity > 0)) {
+        throw new BadRequestException(
+          "Line must have a quantity or FOC quantity",
+        );
+      }
+      if (qty === 0 && lineTotal !== 0) {
+        throw new BadRequestException(
+          "FOC-only line cannot have a bill amount",
+        );
       }
       if (discountPercent < 0 || discountPercent > 100) {
         throw new BadRequestException("Discount % must be between 0 and 100");
@@ -563,7 +573,9 @@ export class SalesService {
       });
 
       for (const line of lines) {
-        const qty = toNum(line.quantity);
+        // Restore billed + FOC units (both were deducted on post).
+        const qty = round4(toNum(line.quantity) + toNum(line.focQuantity));
+        if (!(qty > 0)) continue;
         const balance = await manager.getRepository(InventoryOutItem).findOne({
           where: {
             tenantId,

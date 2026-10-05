@@ -1162,6 +1162,7 @@ export function ReceivePurchaseOrderPage() {
             id="discount"
             className="h-8 w-28"
             value={discount}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setDiscount(e.target.value)}
           />
         </div>
@@ -1177,6 +1178,7 @@ export function ReceivePurchaseOrderPage() {
             id="sale-tax"
             className="h-8 w-28"
             value={saleTax}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setSaleTax(e.target.value)}
           />
         </div>
@@ -1186,6 +1188,7 @@ export function ReceivePurchaseOrderPage() {
             id="adv-tax"
             className="h-8 w-28"
             value={advTax}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setAdvTax(e.target.value)}
           />
         </div>
@@ -1195,6 +1198,7 @@ export function ReceivePurchaseOrderPage() {
             id="gst"
             className="h-8 w-28"
             value={gst}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setGst(e.target.value)}
           />
         </div>
@@ -1204,6 +1208,7 @@ export function ReceivePurchaseOrderPage() {
             id="incentive"
             className="h-8 w-28"
             value={incentive}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setIncentive(e.target.value)}
           />
         </div>
@@ -1213,6 +1218,7 @@ export function ReceivePurchaseOrderPage() {
             id="shelf-rent"
             className="h-8 w-28"
             value={shelfRent}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setShelfRent(e.target.value)}
           />
         </div>

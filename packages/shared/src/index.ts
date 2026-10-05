@@ -431,10 +431,13 @@ export {
   lineTotalForPurchase,
   formatPoOrderQuantity,
   poOrderUnitLabel,
+  INVENTORY_MOVEMENT_TYPE_LABELS,
+  inventoryMovementTypeLabel,
 } from "./inventory";
 export {
   DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS,
   matchesInventoryInOutMovement,
+  hasInventoryInOutReportActiveFilters,
   applyInventoryInOutReportFilters,
 } from "./inventory-in-out-report-filters";
 export {

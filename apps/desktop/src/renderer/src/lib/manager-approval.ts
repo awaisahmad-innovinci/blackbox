@@ -1,14 +1,24 @@
 import type { AuthUser } from "@blackbox/shared";
 
-/** Manager Authy before open till or collect cash from till (tenant setting). */
-export function requireManagerTillOperationsApproval(
+/** Manager Authy before opening a cashier till (tenant setting). */
+export function requireManagerTillOpenApproval(
   user: AuthUser | null | undefined,
 ): boolean {
-  if (!user) return false;
-  return (
-    user.requireManagerApprovalTillOpen === true ||
-    user.requireManagerApprovalTillWithdraw === true
-  );
+  return user?.requireManagerApprovalTillOpen === true;
+}
+
+/** Manager Authy before collecting or withdrawing till cash (tenant setting). */
+export function requireManagerTillWithdrawApproval(
+  user: AuthUser | null | undefined,
+): boolean {
+  return user?.requireManagerApprovalTillWithdraw === true;
+}
+
+/** Manager Authy before posting a sale that includes FOC (tenant setting). */
+export function requireManagerFocApproval(
+  user: AuthUser | null | undefined,
+): boolean {
+  return user?.requireManagerApprovalFoc === true;
 }
 
 export function requireManagerRemoveSaleLineApproval(

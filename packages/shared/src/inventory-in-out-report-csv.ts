@@ -3,6 +3,7 @@ import type {
   InventoryInOutReport,
   InventoryMovementListItem,
 } from "./inventory";
+import { inventoryMovementTypeLabel } from "./inventory";
 
 export function escapeCsvField(value: string | number): string {
   const text = String(value);
@@ -26,6 +27,7 @@ function movementRow(
 ): string {
   return csvRow([
     direction,
+    inventoryMovementTypeLabel(item.movementType),
     formatMovementTime(item.createdAt),
     item.productName ?? "",
     item.sku,
@@ -80,6 +82,7 @@ export function buildInventoryInOutReportCsv(
   lines.push(
     csvRow([
       "Direction",
+      "Type",
       "Time",
       "Product",
       "SKU",

@@ -42,8 +42,9 @@ import {
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import {
+  requireManagerFocApproval,
   requireManagerRemoveSaleLineApproval,
-  requireManagerTillOperationsApproval,
+  requireManagerTillWithdrawApproval,
 } from "@renderer/lib/manager-approval";
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
@@ -200,7 +201,8 @@ export function SalePage() {
   const confirm = useConfirm();
   const { promptSupervisorTotp } = useSupervisorTotp();
   const requireTotp = requireManagerRemoveSaleLineApproval(user);
-  const requireTillWithdrawApproval = requireManagerTillOperationsApproval(user);
+  const requireTillWithdrawApproval = requireManagerTillWithdrawApproval(user);
+  const requireFocApproval = requireManagerFocApproval(user);
 
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -210,6 +212,7 @@ export function SalePage() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const [scanDraft, setScanDraft] = useState("");
   const [itemOpen, setItemOpen] = useState(false);
+  const [focItemOpen, setFocItemOpen] = useState(false);
   const [removeScanOpen, setRemoveScanOpen] = useState(false);
   const [adjustScanOpen, setAdjustScanOpen] = useState(false);
   const [adjustQtyOpen, setAdjustQtyOpen] = useState(false);
@@ -280,9 +283,9 @@ export function SalePage() {
   }, []);
 
   useEffect(() => {
-    if (loadingDraft || !warehouseId || itemOpen || removeScanOpen || adjustScanOpen || adjustQtyOpen) return;
+    if (loadingDraft || !warehouseId || itemOpen || focItemOpen || removeScanOpen || adjustScanOpen || adjustQtyOpen) return;
     focusScanInput();
-  }, [loadingDraft, warehouseId, itemOpen, removeScanOpen, adjustScanOpen, adjustQtyOpen, focusScanInput]);
+  }, [loadingDraft, warehouseId, itemOpen, focItemOpen, removeScanOpen, adjustScanOpen, adjustQtyOpen, focusScanInput]);
 
   useEffect(() => {
     if (!routeDraftId) {
@@ -313,7 +316,7 @@ export function SalePage() {
 
         const draftLines: DraftSaleLine[] = await Promise.all(
           detail.items.map(async (item) => {
-            let quantityAvailable = item.quantity;
+            let quantityAvailable = item.quantity + (item.focQuantity ?? 0);
             try {
               quantityAvailable = await loadPosAvailableForSale(
                 detail.warehouseId,
@@ -535,7 +538,7 @@ export function SalePage() {
     if (
       !lines.every(
         (line) =>
-          line.quantity > 0 &&
+          (line.quantity > 0 || line.focQuantity > 0) &&
           lineInventoryQty(line) <= line.quantityAvailable,
       )
     ) {
@@ -768,6 +771,73 @@ export function SalePage() {
     setItemOpen(false);
   }
 
+  /**
+   * Add a product the customer did not buy as a FOC-only line
+   * (qty 0, nothing billed, FOC qty deducted from POS floor stock).
+   * If the SKU is already on the bill, bump its FOC by 1 instead.
+   */
+  function upsertFocLine(row: SkuSearchResult): string | null {
+    const available = row.quantityAvailable ?? 0;
+    if (available <= 0) {
+      return `No POS balance for ${row.sku}`;
+    }
+
+    let focError: string | null = null;
+
+    setLines((prev) => {
+      const existing = prev.find((line) => line.productSkuId === row.id);
+      if (existing) {
+        const nextFoc = existing.focQuantity + 1;
+        if (round4(existing.quantity + nextFoc) > available) {
+          focError = `Cannot exceed POS balance (${available}) for ${row.sku}`;
+          return prev;
+        }
+        return prev.map((line) =>
+          line.productSkuId === row.id
+            ? { ...line, focQuantity: nextFoc }
+            : line,
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          productSkuId: row.id,
+          productName: row.productName,
+          variantName: row.variantName,
+          sku: row.sku,
+          barcode: row.barcode,
+          quantity: 0,
+          quantityAvailable: available,
+          sellUnit: "pc",
+          unitsPerPurchaseUnit: row.unitsPerPurchaseUnit ?? 1,
+          sellingPrice: row.sellingPrice ?? 0,
+          sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit ?? null,
+          gstPercent: row.gstPercent ?? 0,
+          discountPercent: row.saleDiscountPercent ?? 0,
+          focQuantity: 1,
+          lastScanMultiplier: 1,
+        },
+      ];
+    });
+
+    return focError;
+  }
+
+  function onAddManyFocFromDialog(rows: SkuSearchResult[]) {
+    if (!warehouseId) {
+      setError(NO_WAREHOUSE_ERROR);
+      return;
+    }
+    let lastError: string | null = null;
+    for (const row of rows) {
+      const err = upsertFocLine(row);
+      if (err) lastError = err;
+    }
+    setError(lastError);
+    setFocItemOpen(false);
+  }
+
   async function processScanQueue(): Promise<void> {
     if (scanProcessingRef.current) return;
     scanProcessingRef.current = true;
@@ -818,6 +888,7 @@ export function SalePage() {
     enabled:
       !loadingDraft &&
       !itemOpen &&
+      !focItemOpen &&
       !removeScanOpen &&
       !adjustScanOpen &&
       !adjustQtyOpen &&
@@ -842,6 +913,12 @@ export function SalePage() {
       0,
       Math.floor(parseNumericInputChange(raw)),
     );
+    if (line.quantity === 0 && focQuantity < 1) {
+      setError(
+        `FOC-only line must have at least 1 FOC for ${line.sku}; remove the line instead`,
+      );
+      return;
+    }
     const invQty = round4(line.quantity + focQuantity);
     if (invQty > line.quantityAvailable) {
       setError(
@@ -996,6 +1073,10 @@ export function SalePage() {
   }
 
   function openAdjustQtyDialog(line: DraftSaleLine): void {
+    if (line.quantity === 0) {
+      setError("FOC-only line has no billed quantity to adjust");
+      return;
+    }
     if (line.quantityCorrected) {
       setError("Quantity already corrected for this item");
       return;
@@ -1181,7 +1262,7 @@ export function SalePage() {
     const focLines = lines.filter((line) => line.focQuantity > 0);
     let focSupervisorUserId: string | null = null;
     let focSupervisorDisplayName: string | null = null;
-    if (focLines.length > 0) {
+    if (focLines.length > 0 && requireFocApproval) {
       const totp = await promptSupervisorTotp();
       if (!totp.approved) return;
       focSupervisorUserId = totp.supervisorUserId;
@@ -1279,7 +1360,7 @@ export function SalePage() {
 
         void syncNow();
         if (user?.id) {
-          if (focLines.length > 0) {
+          if (focLines.length > 0 && focSupervisorUserId) {
             await logActivityEvent(
               {
                 eventType: "sale.foc_posted",
@@ -1403,7 +1484,7 @@ export function SalePage() {
         })),
       });
 
-      if (focLines.length > 0 && user?.id) {
+      if (focLines.length > 0 && focSupervisorUserId && user?.id) {
         await logActivityEvent(
           {
             eventType: "sale.foc_posted",
@@ -1483,6 +1564,13 @@ export function SalePage() {
         navigate("/sales/held");
         return;
       }
+      if (event.key === "F10") {
+        event.preventDefault();
+        if (warehouseId && !itemOpen && !focItemOpen && !scanBusy) {
+          setFocItemOpen(true);
+        }
+        return;
+      }
       if (event.key === "F4") {
         event.preventDefault();
         if (isSplitPayment) {
@@ -1512,7 +1600,7 @@ export function SalePage() {
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [loadingDraft, canHold, holding, navigate, payment, billTotal, lines.length, amountDue, isSplitPayment]);
+  }, [loadingDraft, canHold, holding, navigate, payment, billTotal, lines.length, amountDue, isSplitPayment, warehouseId, itemOpen, focItemOpen, scanBusy]);
 
   if (loadingDraft) {
     return <p className="text-muted-foreground text-sm">Loading held bill…</p>;
@@ -1681,6 +1769,15 @@ export function SalePage() {
               type="button"
               variant="outline"
               size="sm"
+              disabled={!warehouseId || itemOpen || focItemOpen || scanBusy}
+              onClick={() => setFocItemOpen(true)}
+            >
+              Add FOC (F10)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               disabled={lines.length === 0}
               onClick={() => setRemoveScanOpen(true)}
             >
@@ -1777,11 +1874,16 @@ export function SalePage() {
                             Qty corrected
                           </p>
                         ) : null}
+                        {line.quantity === 0 ? (
+                          <p className="text-muted-foreground text-xs">
+                            FOC only · not billed
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
                         <div className="flex items-center gap-2">
                           <span>{line.quantity.toLocaleString()}</span>
-                          {!line.quantityCorrected ? (
+                          {!line.quantityCorrected && line.quantity > 0 ? (
                             <Button
                               type="button"
                               variant="ghost"
@@ -2212,6 +2314,18 @@ export function SalePage() {
           focusScanInput();
         }}
         onAddMany={onAddManyFromDialog}
+      />
+
+      <AddSaleItemDialog
+        mode="foc"
+        open={focItemOpen}
+        warehouseId={warehouseId}
+        excludeDraftSaleId={editingDraftId}
+        onClose={() => {
+          setFocItemOpen(false);
+          focusScanInput();
+        }}
+        onAddMany={onAddManyFocFromDialog}
       />
 
       {tillSession && user ? (
