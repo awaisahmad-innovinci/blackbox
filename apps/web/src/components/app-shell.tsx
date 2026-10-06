@@ -17,6 +17,7 @@ import {
   BarChart3,
   Warehouse,
   ScrollText,
+  Receipt,
 } from "lucide-react";
 import { Button } from "@blackbox/ui/button";
 import { Separator } from "@blackbox/ui/separator";
@@ -64,6 +65,12 @@ const NAV: {
     label: "Inventory report",
     permission: "inventory.access",
     icon: BarChart3,
+  },
+  {
+    href: "/app/reports/taxes",
+    label: "Tax report",
+    permission: "tax.reports.read",
+    icon: Receipt,
   },
   {
     href: "/app/activity",

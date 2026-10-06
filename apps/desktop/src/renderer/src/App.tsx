@@ -11,6 +11,7 @@ import { BrandsListPage } from "./features/brands/BrandsListPage";
 import { CategoriesListPage } from "./features/categories/CategoriesListPage";
 import { CategoryFormPage } from "./features/categories/CategoryFormPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { TaxReportPage } from "./features/reports/TaxReportPage";
 import { InventoryInOutReportPage } from "./features/inventory/InventoryInOutReportPage";
 import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
 import { InventoryOutListPage } from "./features/inventory/InventoryOutListPage";
@@ -178,6 +179,7 @@ function AuthenticatedApp() {
           <Route path="sales/refund-return" element={<SaleReturnRefundPage />} />
           <Route path="sales/till" element={<TillPage />} />
           <Route path="activity" element={<ActivityLogPage />} />
+          <Route path="reports/taxes" element={<TaxReportPage />} />
           <Route path="sales/new/:draftId" element={<SalePage />} />
           <Route path="sales/new" element={<SalePage />} />
           <Route path="sales/:id" element={<SaleDetailPage />} />

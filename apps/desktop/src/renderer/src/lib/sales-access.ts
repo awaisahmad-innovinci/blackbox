@@ -72,6 +72,10 @@ export function canAccessActivity(permissions: string[]): boolean {
   return permissions.includes("activity.read");
 }
 
+export function canAccessTaxReports(permissions: string[]): boolean {
+  return permissions.includes("tax.reports.read");
+}
+
 export function canVoidSale(permissions: string[]): boolean {
   return permissions.includes("sales.void");
 }
@@ -143,6 +147,10 @@ export function isRouteAllowed(pathname: string, permissions: string[]): boolean
 
   if (pathname === "/activity") {
     return canAccessActivity(permissions);
+  }
+
+  if (pathname === "/reports/taxes" || pathname.startsWith("/reports/")) {
+    return canAccessTaxReports(permissions);
   }
 
   if (pathname === "/sales" || pathname.startsWith("/sales/")) {

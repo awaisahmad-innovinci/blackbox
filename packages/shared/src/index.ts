@@ -459,6 +459,22 @@ export type {
   InventoryInOutPeriodInput,
   InventoryInOutPeriodSummaryRow,
 } from "./inventory-in-out-report-period";
+export {
+  TAX_REPORT_KINDS,
+  DEFAULT_TAX_REPORT_PERIOD,
+  resolveTaxReportRange,
+} from "./tax-report";
+export type {
+  TaxReportKind,
+  TaxReportSummary,
+  TaxReportPaidToVendors,
+  TaxReportCollectedFromCustomers,
+  TaxReportVendorPaidRow,
+  TaxReportMonthPaidRow,
+  TaxReportPeriodInput,
+  TaxReportPeriodMode,
+} from "./tax-report";
+export { buildTaxReportCsv, taxReportCsvFilename } from "./tax-report-csv";
 export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
 export const PAYMENT_TERMS = paymentTermsList;
 export const PAYMENT_TERMS_LABELS = paymentTermsLabels;
