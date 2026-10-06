@@ -21,8 +21,10 @@ export interface AuthUser {
   requireManagerApprovalRemoveSaleLine?: boolean;
   /** When true, POS requires manager Authy before opening a cashier till. */
   requireManagerApprovalTillOpen?: boolean;
-  /** When true, POS requires manager Authy before collecting cash from a till. */
+  /** When true, POS requires manager Authy before collecting or withdrawing till cash. */
   requireManagerApprovalTillWithdraw?: boolean;
+  /** When true, POS requires manager Authy before posting a sale that includes FOC. */
+  requireManagerApprovalFoc?: boolean;
   /** Tenant default GST percentage applied to every sale (e.g. 17 = 17%). */
   defaultGstRate?: number;
   /** Tenant default sales tax percentage applied to every sale. */

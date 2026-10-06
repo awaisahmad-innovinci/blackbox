@@ -26,13 +26,17 @@ export function ReopenTillDialog({
   open,
   onOpenChange,
   closedSessionId,
+  cashierUserId,
   cashierName,
+  requireApproval,
   onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   closedSessionId: string;
+  cashierUserId: string;
   cashierName: string;
+  requireApproval: boolean;
   onSuccess: (detail: TillSessionDetail) => void;
 }) {
   const { promptSupervisorTotp } = useSupervisorTotp();
@@ -51,8 +55,8 @@ export function ReopenTillDialog({
     setOpeningBalance("");
     setSupervisorUserId(undefined);
     setSupervisorDisplayName(undefined);
-    setStep("authorize");
-  }, [open]);
+    setStep(requireApproval ? "authorize" : "balance");
+  }, [open, requireApproval]);
 
   async function onManagerAuthorize(): Promise<void> {
     setError(null);
@@ -64,7 +68,9 @@ export function ReopenTillDialog({
   }
 
   async function onConfirmReopen(): Promise<void> {
-    if (!supervisorUserId || !supervisorDisplayName) return;
+    const actorId = requireApproval ? supervisorUserId : cashierUserId;
+    const actorName = requireApproval ? supervisorDisplayName : cashierName;
+    if (!actorId || !actorName) return;
 
     const balance = Number(openingBalance);
     const validationError = validateTillOpeningBalanceAmount(balance);
@@ -78,14 +84,14 @@ export function ReopenTillDialog({
     try {
       const detail = await reopenTill({
         id: closedSessionId,
-        managerId: supervisorUserId,
-        managerName: supervisorDisplayName,
+        managerId: actorId,
+        managerName: actorName,
         body: {
           ...emptyTillNotes(),
           openingBalance: balance,
-          supervisorUserId,
+          ...(requireApproval ? { supervisorUserId: actorId } : {}),
         },
-        supervisorDisplayName,
+        supervisorDisplayName: requireApproval ? actorName : undefined,
         cashierName,
       });
       onSuccess(detail);
@@ -111,7 +117,9 @@ export function ReopenTillDialog({
           <DialogDescription>
             {step === "authorize"
               ? "Ask a manager or owner to enter their Authy code to reopen this till."
-              : "Manager: enter the opening cash balance for this till."}
+              : requireApproval
+                ? "Manager: enter the opening cash balance for this till."
+                : "Enter the opening cash balance for this till."}
           </DialogDescription>
         </DialogHeader>
 

@@ -12,6 +12,7 @@ export type TenantDto = {
   requireManagerApprovalRemoveSaleLine: boolean;
   requireManagerApprovalTillOpen: boolean;
   requireManagerApprovalTillWithdraw: boolean;
+  requireManagerApprovalFoc: boolean;
   defaultGstRate: number;
   defaultSalesTaxRate: number;
   createdAt: string;
@@ -70,6 +71,7 @@ export function updateCurrentTenant(body: {
   requireManagerApprovalRemoveSaleLine?: boolean;
   requireManagerApprovalTillOpen?: boolean;
   requireManagerApprovalTillWithdraw?: boolean;
+  requireManagerApprovalFoc?: boolean;
   defaultGstRate?: number;
   defaultSalesTaxRate?: number;
 }) {

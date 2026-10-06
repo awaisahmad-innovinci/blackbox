@@ -214,14 +214,14 @@ export function InventoryOutReturnFormPage() {
           operation: "UPSERT",
           payload: detail as unknown as Record<string, unknown>,
         });
+        const returnReason = `Inventory out return ${returnNumber}`;
         for (const item of items) {
-          const movementId = crypto.randomUUID();
           await commitLocalChange({
             entityType: "inventory_movement",
-            entityId: movementId,
+            entityId: item.id,
             operation: "EVENT",
             payload: {
-              id: movementId,
+              id: item.id,
               productSkuId: item.productSkuId,
               sku: item.sku,
               variantName: item.variantName,
@@ -232,7 +232,7 @@ export function InventoryOutReturnFormPage() {
               delta: item.quantity,
               referenceType: "inventory_out_return",
               referenceId: localId,
-              reason: `Return ${detail.returnNumber}`,
+              reason: returnReason,
               createdAt: now,
             },
           });

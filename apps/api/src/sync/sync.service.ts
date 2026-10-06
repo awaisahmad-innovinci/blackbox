@@ -548,11 +548,11 @@ export class SyncService {
       });
       if (existing) return;
       const qty = Number(change.payload.quantity ?? 0);
+      const movementType = String(change.payload.movementType ?? "");
       const signed =
         change.payload.delta != null
           ? Number(change.payload.delta)
-          : String(change.payload.movementType) === "INVENTORY_OUT" ||
-              String(change.payload.movementType) === "RETURN"
+          : movementType === "INVENTORY_OUT" || movementType === "RETURN"
             ? -qty
             : qty;
       const skuId = String(change.payload.productSkuId ?? "");
@@ -1319,6 +1319,9 @@ export class SyncService {
     });
     if (!row.warehouseId) throw new Error("warehouse not found");
     await manager.save(row);
+    const isFirstPost = !existing && String(row.status) === "POSTED";
+    const returnReason = `Inventory out return ${row.returnNumber}`;
+    const stockRepo = manager.getRepository(InventoryStock);
     if (Array.isArray(p.items)) {
       await manager.delete(InventoryOutReturnItem, {
         inventoryOutReturnId: entityId,
@@ -1328,9 +1331,10 @@ export class SyncService {
         const qty = Number(item.quantity ?? 0);
         const unitCost = Number(item.unitCost ?? 0);
         const productSkuId = String(item.productSkuId ?? "");
+        const itemId = String(item.id ?? randomUUID());
         await manager.save(
           manager.create(InventoryOutReturnItem, {
-            id: String(item.id ?? randomUUID()),
+            id: itemId,
             tenantId,
             inventoryOutReturnId: entityId,
             productSkuId,
@@ -1348,6 +1352,48 @@ export class SyncService {
             -qty,
             unitCost,
           );
+          if (isFirstPost) {
+            const movementExists = await manager.findOne(InventoryMovement, {
+              where: { id: itemId, tenantId },
+            });
+            if (!movementExists) {
+              await manager.save(
+                manager.create(InventoryMovement, {
+                  id: itemId,
+                  tenantId,
+                  productSkuId,
+                  warehouseId: row.warehouseId,
+                  movementType: "INVENTORY_OUT_RETURN",
+                  quantity: String(qty),
+                  referenceType: "inventory_out_return",
+                  referenceId: entityId,
+                  reason: returnReason,
+                }),
+              );
+              let stock = await manager.findOne(InventoryStock, {
+                where: {
+                  tenantId,
+                  productSkuId,
+                  warehouseId: row.warehouseId,
+                },
+              });
+              if (!stock) {
+                stock = manager.create(InventoryStock, {
+                  tenantId,
+                  productSkuId,
+                  warehouseId: row.warehouseId,
+                  quantityOnHand: "0",
+                  quantityReserved: "0",
+                  quantityAvailable: "0",
+                });
+              }
+              const onHand = roundMoney4(Number(stock.quantityOnHand) + qty);
+              const reserved = Number(stock.quantityReserved || 0);
+              stock.quantityOnHand = String(onHand);
+              stock.quantityAvailable = String(roundMoney4(onHand - reserved));
+              await stockRepo.save(stock);
+            }
+          }
         }
       }
     }

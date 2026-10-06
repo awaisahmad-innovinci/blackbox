@@ -18,6 +18,7 @@ import { SaleReturnsModule } from "./sales/sale-returns/sale-returns.module";
 import { TillsModule } from "./tills/tills.module";
 import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { TenantsModule } from "./tenants/tenants.module";
+import { TaxReportsModule } from "./tax-reports/tax-reports.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -40,6 +41,7 @@ import { UsersModule } from "./users/users.module";
     SaleReturnsModule,
     TillsModule,
     ActivityLogModule,
+    TaxReportsModule,
   ],
   controllers: [AppController],
   providers: [

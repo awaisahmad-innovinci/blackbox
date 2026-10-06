@@ -68,7 +68,11 @@ async function tryPostActivityLog(
 }
 
 /**
- * Save locally first, queue for sync, then POST when online.
+ * Save locally first, queue for sync, then POST in the background.
+ *
+ * The cloud POST is intentionally not awaited so callers (checkout, returns,
+ * till actions) never block on the network. Anything that fails to post stays
+ * in the pending queue and is flushed by the next incremental sync.
  */
 export async function logActivityEvent(
   body: CreateActivityLogRequest,
@@ -86,7 +90,7 @@ export async function logActivityEvent(
     await window.blackbox.localDb.appendPendingActivityLog({ id, payload });
   }
 
-  await tryPostActivityLog(id, payload);
+  void tryPostActivityLog(id, payload);
 }
 
 /** Flush all pending activity logs to the API. Returns count successfully synced. */

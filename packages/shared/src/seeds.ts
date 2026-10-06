@@ -27,6 +27,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "till.read",
     "till.manage",
     "activity.read",
+    "tax.reports.read",
   ],
   WAREHOUSE_MANAGER: [
     "desktop.access",

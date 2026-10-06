@@ -23,9 +23,10 @@ export class CreateSaleLineDto {
   @IsUUID()
   productSkuId!: string;
 
+  /** May be 0 for a FOC-only line (requires focQuantity > 0, lineTotal 0). */
   @Type(() => Number)
   @IsNumber()
-  @Min(0.0001)
+  @Min(0)
   quantity!: number;
 
   @Type(() => Number)

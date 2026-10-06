@@ -139,7 +139,12 @@ function formatSyncedAt(iso: string): string {
 export function DashboardPage() {
   const dataVersion = useSyncDataVersion();
   const { user } = useSession();
-  const { cashierOnly, showManagerDashboard, showInventoryDashboard } =
+  const {
+    cashierOnly,
+    showManagerDashboard,
+    showInventoryDashboard,
+    canReadTaxReports,
+  } =
     useSalesAccess();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [cashierSummary, setCashierSummary] =
@@ -630,9 +635,16 @@ export function DashboardPage() {
                   </Card>
                 ))}
               </div>
-              <Button variant="outline" asChild>
-                <Link to="/sales/stock-overview">View floor &amp; warehouse stock</Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" asChild>
+                  <Link to="/sales/stock-overview">View floor &amp; warehouse stock</Link>
+                </Button>
+                {canReadTaxReports ? (
+                  <Button variant="outline" asChild>
+                    <Link to="/reports/taxes">Tax report</Link>
+                  </Button>
+                ) : null}
+              </div>
             </div>
           ) : null}
 

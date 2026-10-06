@@ -111,7 +111,7 @@ export function SaleReturnRefundPage() {
           { actorName: cashierName },
         );
 
-        await syncNow();
+        void syncNow();
         setLookup(null);
         const refreshedTill = await loadCurrentTill(user.id);
         setTillSession(refreshedTill);

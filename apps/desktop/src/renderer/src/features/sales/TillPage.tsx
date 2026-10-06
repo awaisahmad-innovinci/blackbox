@@ -42,7 +42,10 @@ import {
   reopenTill,
   withdrawTill,
 } from "@renderer/lib/local-db/till-source";
-import { requireManagerTillOperationsApproval } from "@renderer/lib/manager-approval";
+import {
+  requireManagerTillOpenApproval,
+  requireManagerTillWithdrawApproval,
+} from "@renderer/lib/manager-approval";
 import { useSession } from "@renderer/lib/session/context";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
@@ -60,7 +63,8 @@ export function TillPage() {
   const permissions = user?.permissions ?? [];
   const { canReadTill, canManageTill, canWrite, canRefund } = useSalesAccess();
   const { promptSupervisorTotp } = useSupervisorTotp();
-  const requireTillOpsApproval = requireManagerTillOperationsApproval(user);
+  const requireTillOpenApproval = requireManagerTillOpenApproval(user);
+  const requireTillWithdrawApproval = requireManagerTillWithdrawApproval(user);
 
   const [session, setSession] = useState<TillSessionDetail | null>(null);
   const [latestClosedSession, setLatestClosedSession] =
@@ -222,7 +226,7 @@ export function TillPage() {
       if (managerDialog.kind === "collect") {
         let supervisorUserId: string | undefined;
         let supervisorDisplayName: string | undefined;
-        if (requireTillOpsApproval) {
+        if (requireTillWithdrawApproval) {
           const totp = await promptSupervisorTotp();
           if (!totp.approved) return;
           supervisorUserId = totp.supervisorUserId;
@@ -239,6 +243,10 @@ export function TillPage() {
           },
         });
       } else if (managerDialog.kind === "withdraw") {
+        if (requireTillWithdrawApproval) {
+          const totp = await promptSupervisorTotp();
+          if (!totp.approved) return;
+        }
         await withdrawTill({
           id: managerDialog.tillId,
           managerId: user.id,
@@ -445,8 +453,9 @@ export function TillPage() {
         <div className="border-border space-y-4 rounded-lg border p-4">
           <h2 className="text-lg font-medium">Till closed</h2>
           <p className="text-muted-foreground text-sm">
-            Your till was closed. Open it again with manager authorization before
-            you can post sales.
+            {requireTillOpenApproval
+              ? "Your till was closed. Open it again with manager authorization before you can post sales."
+              : "Your till was closed. Enter an opening balance to open it again before you can post sales."}
           </p>
           <div>
             <p className="text-muted-foreground text-xs">Last session cash</p>
@@ -463,7 +472,7 @@ export function TillPage() {
       {canOpenNewTill ? (
         <div className="border-border space-y-4 rounded-lg border p-4">
           <h2 className="text-lg font-medium">Open till</h2>
-          {requireTillOpsApproval ? (
+          {requireTillOpenApproval ? (
             <>
               <p className="text-muted-foreground text-sm">
                 Ask a manager to authorize and enter the opening cash balance.
@@ -689,7 +698,7 @@ export function TillPage() {
           cashierUserId={user.id}
           cashierName={user.fullName?.trim() || user.username}
           cashierUsername={user.username}
-          requireApproval={requireTillOpsApproval}
+          requireApproval={requireTillOpenApproval}
           onSuccess={(detail) => {
             setSession(detail);
             setLatestClosedSession(null);
@@ -703,7 +712,9 @@ export function TillPage() {
           open={reopenDialogOpen}
           onOpenChange={setReopenDialogOpen}
           closedSessionId={latestClosedSession.id}
+          cashierUserId={user.id}
           cashierName={user.fullName?.trim() || user.username}
+          requireApproval={requireTillOpenApproval}
           onSuccess={(detail) => {
             setSession(detail);
             setLatestClosedSession(null);
@@ -719,7 +730,7 @@ export function TillPage() {
           session={session}
           cashierUserId={user.id}
           cashierName={user.fullName?.trim() || user.username}
-          requireApproval={true}
+          requireApproval={requireTillWithdrawApproval}
           onSuccess={(updated) => setSession(updated)}
         />
       ) : null}

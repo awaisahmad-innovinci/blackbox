@@ -20,6 +20,29 @@ export const INVENTORY_MOVEMENT_TYPES = [
 ] as const;
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 
+/** Human-readable labels for in/out report and movement lists. */
+export const INVENTORY_MOVEMENT_TYPE_LABELS: Record<
+  InventoryMovementType,
+  string
+> = {
+  OPENING_BALANCE: "Opening balance",
+  PURCHASE_RECEIPT: "Purchase receipt",
+  SALE: "Sale",
+  SALE_RETURN: "Sale return",
+  STOCK_ADJUSTMENT: "Stock adjustment",
+  TRANSFER_IN: "Transfer in",
+  TRANSFER_OUT: "Transfer out",
+  RETURN: "Vendor return",
+  INVENTORY_OUT: "Inventory out",
+  INVENTORY_OUT_RETURN: "Inventory out return",
+};
+
+export function inventoryMovementTypeLabel(
+  type: InventoryMovementType,
+): string {
+  return INVENTORY_MOVEMENT_TYPE_LABELS[type] ?? type;
+}
+
 export const INVENTORY_OUT_STATUSES = ["POSTED", "CANCELLED"] as const;
 export type InventoryOutStatus = (typeof INVENTORY_OUT_STATUSES)[number];
 

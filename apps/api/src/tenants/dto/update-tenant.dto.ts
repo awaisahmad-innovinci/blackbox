@@ -27,6 +27,10 @@ export class UpdateTenantDto {
   requireManagerApprovalTillWithdraw?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  requireManagerApprovalFoc?: boolean;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)

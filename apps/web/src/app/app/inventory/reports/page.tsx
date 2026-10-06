@@ -14,7 +14,9 @@ import {
   DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS,
   applyInventoryInOutReportFilters,
   buildInventoryInOutReportCsv,
+  hasInventoryInOutReportActiveFilters,
   inventoryInOutReportCsvFilename,
+  inventoryMovementTypeLabel,
   resolveInventoryInOutReportRange,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -162,7 +164,7 @@ export default function InventoryReportsPage() {
       <div className="space-y-8">
       <PageHeader
         title="Inventory in / out"
-        description="Purchase receipts and inventory out for a date, month, or year range."
+        description="Purchase receipts, inventory out returns (counted as in), and inventory out for a date, month, or year range."
         actions={
           !loading && !periodError ? (
             <Button
@@ -380,7 +382,9 @@ export default function InventoryReportsPage() {
           <p className="text-muted-foreground text-sm">Period: {rangeLabel}</p>
           <DayTables
             report={filteredReport}
+            rawReport={data}
             direction={filters.direction}
+            filtersActive={hasInventoryInOutReportActiveFilters(filters)}
           />
         </>
       )}
@@ -431,13 +435,33 @@ function Totals({
   );
 }
 
+function movementTableEmptyMessage(
+  items: InventoryMovementListItem[],
+  unfilteredCount: number,
+  filtersActive: boolean,
+): string {
+  if (items.length > 0) return "";
+  if (unfilteredCount === 0) return "No movements in this period.";
+  if (filtersActive) return "No movements match the current filters.";
+  return "No movements in this section.";
+}
+
 function MovementTable({
   title,
   items,
+  unfilteredCount,
+  filtersActive,
 }: {
   title: string;
   items: InventoryMovementListItem[];
+  unfilteredCount: number;
+  filtersActive: boolean;
 }) {
+  const emptyMessage = movementTableEmptyMessage(
+    items,
+    unfilteredCount,
+    filtersActive,
+  );
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-medium">{title}</h2>
@@ -446,6 +470,7 @@ function MovementTable({
           <thead className="bg-muted/40 text-muted-foreground">
             <tr>
               <th className="px-4 py-3 font-medium">Time</th>
+              <th className="px-4 py-3 font-medium">Type</th>
               <th className="px-4 py-3 font-medium">Product</th>
               <th className="px-4 py-3 font-medium">SKU</th>
               <th className="px-4 py-3 font-medium">Vendor</th>
@@ -458,10 +483,10 @@ function MovementTable({
             {items.length === 0 ? (
               <tr className="border-border border-t">
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="text-muted-foreground px-4 py-6 text-center"
                 >
-                  No movements match filters.
+                  {emptyMessage}
                 </td>
               </tr>
             ) : (
@@ -469,6 +494,9 @@ function MovementTable({
                 <tr key={item.id} className="border-border border-t">
                   <td className="px-4 py-3 tabular-nums">
                     {item.createdAt.replace("T", " ").slice(0, 19)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {inventoryMovementTypeLabel(item.movementType)}
                   </td>
                   <td className="px-4 py-3">{item.productName || "—"}</td>
                   <td className="px-4 py-3">
@@ -496,10 +524,14 @@ function MovementTable({
 
 function DayTables({
   report,
+  rawReport,
   direction,
+  filtersActive,
 }: {
   report: InventoryInOutReport;
+  rawReport: InventoryInOutReport;
   direction: InventoryInOutDirection;
+  filtersActive: boolean;
 }) {
   const showIn = direction === "both" || direction === "in";
   const showOut = direction === "both" || direction === "out";
@@ -508,10 +540,20 @@ function DayTables({
     <div className="space-y-8">
       <Totals report={report} direction={direction} />
       {showIn ? (
-        <MovementTable title="Inventory in" items={report.inbound.items} />
+        <MovementTable
+          title="Inventory in"
+          items={report.inbound.items}
+          unfilteredCount={rawReport.inbound.lineCount}
+          filtersActive={filtersActive}
+        />
       ) : null}
       {showOut ? (
-        <MovementTable title="Inventory out" items={report.outbound.items} />
+        <MovementTable
+          title="Inventory out"
+          items={report.outbound.items}
+          unfilteredCount={rawReport.outbound.lineCount}
+          filtersActive={filtersActive}
+        />
       ) : null}
     </div>
   );

@@ -37,6 +37,7 @@ export type AppNavSectionId =
   | "dashboard"
   | "sale"
   | "activity"
+  | "taxReport"
   | "warehouses"
   | "inventory"
   | "purchasing"
@@ -87,6 +88,14 @@ export const APP_NAV_SECTIONS = [
     kind: "link",
     to: "/activity",
     requiresPermission: "activity.read",
+  },
+  {
+    id: "taxReport",
+    label: "Tax report",
+    shortcut: "t",
+    kind: "link",
+    to: "/reports/taxes",
+    requiresPermission: "tax.reports.read",
   },
   {
     id: "warehouses",

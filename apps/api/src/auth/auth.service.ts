@@ -317,6 +317,7 @@ export class AuthService {
           tenant.requireManagerApprovalRemoveSaleLine,
           tenant.requireManagerApprovalTillOpen,
           tenant.requireManagerApprovalTillWithdraw,
+          tenant.requireManagerApprovalFoc,
           tenant.defaultGstRate,
           tenant.defaultSalesTaxRate,
         ),
@@ -365,6 +366,7 @@ export class AuthService {
       tenant.requireManagerApprovalRemoveSaleLine,
       tenant.requireManagerApprovalTillOpen,
       tenant.requireManagerApprovalTillWithdraw,
+      tenant.requireManagerApprovalFoc,
       tenant.defaultGstRate,
       tenant.defaultSalesTaxRate,
     );
@@ -483,6 +485,7 @@ export class AuthService {
         tenant?.requireManagerApprovalRemoveSaleLine,
         tenant?.requireManagerApprovalTillOpen,
         tenant?.requireManagerApprovalTillWithdraw,
+        tenant?.requireManagerApprovalFoc,
         tenant?.defaultGstRate,
         tenant?.defaultSalesTaxRate,
       ),
@@ -597,6 +600,7 @@ export class AuthService {
     requireManagerApprovalRemoveSaleLine?: boolean,
     requireManagerApprovalTillOpen?: boolean,
     requireManagerApprovalTillWithdraw?: boolean,
+    requireManagerApprovalFoc?: boolean,
     defaultGstRate?: number,
     defaultSalesTaxRate?: number,
   ): AuthUser {
@@ -613,6 +617,7 @@ export class AuthService {
       requireManagerApprovalRemoveSaleLine,
       requireManagerApprovalTillOpen,
       requireManagerApprovalTillWithdraw,
+      requireManagerApprovalFoc,
       defaultGstRate,
       defaultSalesTaxRate,
     };
