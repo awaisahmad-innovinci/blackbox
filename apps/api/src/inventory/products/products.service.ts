@@ -17,7 +17,11 @@ import type {
   StockMovementRow,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { costWithGst, nextSkuCodeForProduct } from "@blackbox/shared";
+import {
+  costWithGst,
+  nextSkuCodeForProduct,
+  normalizeUnitsPerPurchaseUnit,
+} from "@blackbox/shared";
 import {
   normalizeOptionalStoredText,
   normalizeStoredText,
@@ -342,6 +346,12 @@ export class ProductsService {
         existing.map((row) => row.sku),
       );
 
+    const unitsPerPurchaseUnit = await this.resolveUnitsPerPurchaseUnit(
+      tenantId,
+      dto.purchaseUnitId,
+      dto.unitsPerPurchaseUnit,
+    );
+
     try {
       const saved = await this.skus.save(
         this.skus.create({
@@ -354,7 +364,7 @@ export class ProductsService {
           sizeUnit: dto.sizeUnit?.trim() || null,
           baseUnitId: dto.baseUnitId,
           purchaseUnitId: dto.purchaseUnitId,
-          unitsPerPurchaseUnit: String(dto.unitsPerPurchaseUnit),
+          unitsPerPurchaseUnit: String(unitsPerPurchaseUnit),
           costPrice: String(dto.costPrice),
           gstPercent: String(dto.gstPercent ?? 0),
           sellingPrice: String(dto.sellingPrice),
@@ -568,6 +578,21 @@ export class ProductsService {
       const unit = await this.units.findOne({ where: { id: unitId, tenantId } });
       if (!unit) throw new BadRequestException("Invalid unit");
     }
+  }
+
+  private async resolveUnitsPerPurchaseUnit(
+    tenantId: string,
+    purchaseUnitId: string,
+    raw: number,
+  ): Promise<number> {
+    const unit = await this.units.findOne({
+      where: { id: purchaseUnitId, tenantId },
+    });
+    if (!unit) return normalizeUnitsPerPurchaseUnit(raw, {});
+    return normalizeUnitsPerPurchaseUnit(raw, {
+      name: unit.name,
+      abbreviation: unit.abbreviation,
+    });
   }
 
   private async nameMap(

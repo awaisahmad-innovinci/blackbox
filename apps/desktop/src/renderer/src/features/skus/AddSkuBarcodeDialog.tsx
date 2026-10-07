@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { SkuBarcode, SkuBarcodeLookupResult } from "@blackbox/shared";
+import { poAllowsOrderUnitChoice } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -40,12 +41,14 @@ export function AddSkuBarcodeDialog({
   open,
   skuId,
   unitsPerPurchaseUnit = 1,
+  purchaseUnitName = null,
   onClose,
   onAdded,
 }: {
   open: boolean;
   skuId: string;
   unitsPerPurchaseUnit?: number;
+  purchaseUnitName?: string | null;
   onClose: () => void;
   onAdded: (row: SkuBarcode) => void;
 }) {
@@ -175,7 +178,7 @@ export function AddSkuBarcodeDialog({
           />
           {multiplierError ? (
             <p className="text-destructive text-xs">{multiplierError}</p>
-          ) : unitsPerPurchaseUnit > 1 ? (
+          ) : poAllowsOrderUnitChoice({ purchaseUnitName }) ? (
             <p className="text-muted-foreground text-xs">
               Use 1 for piece barcode, {unitsPerPurchaseUnit} for box barcode.
             </p>

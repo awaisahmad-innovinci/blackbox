@@ -15,9 +15,11 @@
     "start:api": "pnpm --filter @blackbox/api start:prod",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "build:import-templates-xlsx": "node scripts/build-import-templates-workbook.mjs"
   },
   "devDependencies": {
+    "exceljs": "^4.4.0",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   },

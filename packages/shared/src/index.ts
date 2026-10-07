@@ -260,6 +260,7 @@ export type {
   MasterDataImportFileResult,
   MasterDataImportResult,
   MasterDataImportFailure,
+  MasterData07ProductSkuColumn,
 } from "./inventory";
 
 /** Own bindings so Vite/Rollup CJS interop sees named exports. */
@@ -407,6 +408,9 @@ export {
 } from "./activity-log";
 export {
   MASTER_DATA_IMPORT_FILES,
+  MASTER_DATA_07_PRODUCT_SKU_HEADERS,
+  LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
+  formatMasterDataHeaderMismatchMessage,
   nextSkuCode,
   roundMoney4,
   pieceCostFromPurchase,
@@ -428,6 +432,10 @@ export {
   toDisplayQuantity,
   displayPurchaseUnitCost,
   defaultOrderUnitForScan,
+  isBoxUnit,
+  purchaseUnitAllowsPackSize,
+  poAllowsOrderUnitChoice,
+  normalizeUnitsPerPurchaseUnit,
   lineTotalForPurchase,
   formatPoOrderQuantity,
   poOrderUnitLabel,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type {
   ManagerStockOverviewRow,
@@ -8,6 +8,7 @@ import type {
 import { Badge } from "@blackbox/ui/badge";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
+import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import {
   FILTER_SELECT_CLASS,
@@ -34,6 +35,13 @@ function formatQty(value: number): string {
   });
 }
 
+function parseOptionalQtyFilter(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return n;
+}
+
 function StockHint({ row }: { row: ManagerStockOverviewRow }) {
   if (row.floorQuantity === 0 && row.warehouseQuantity > 0) {
     return (
@@ -56,10 +64,14 @@ export function ManagerStockOverviewPage() {
   const navigate = useNavigate();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
-  const { canReadList } = useSalesAccess();
+  const { canAccessStockOverview } = useSalesAccess();
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
+  const [product, setProduct] = useState("");
+  const [sku, setSku] = useState("");
   const [search, setSearch] = useState("");
+  const [floorQtyAtMostInput, setFloorQtyAtMostInput] = useState("");
+  const [warehouseQtyAtMostInput, setWarehouseQtyAtMostInput] = useState("");
   const [result, setResult] = useState<PaginatedManagerStockOverview | null>(
     null,
   );
@@ -69,9 +81,20 @@ export function ManagerStockOverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const floorQtyAtMost = useMemo(
+    () => parseOptionalQtyFilter(floorQtyAtMostInput),
+    [floorQtyAtMostInput],
+  );
+  const warehouseQtyAtMost = useMemo(
+    () => parseOptionalQtyFilter(warehouseQtyAtMostInput),
+    [warehouseQtyAtMostInput],
+  );
+
   useEffect(() => {
-    if (!canReadList) navigate(defaultRouteForUser(permissions), { replace: true });
-  }, [canReadList, navigate, permissions]);
+    if (!canAccessStockOverview) {
+      navigate(defaultRouteForUser(permissions), { replace: true });
+    }
+  }, [canAccessStockOverview, navigate, permissions]);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -83,7 +106,14 @@ export function ManagerStockOverviewPage() {
       .catch(() => undefined);
   }, []);
 
-  useResetPageOnFilterChange(setPage, [warehouseId, search]);
+  useResetPageOnFilterChange(setPage, [
+    warehouseId,
+    product,
+    sku,
+    search,
+    floorQtyAtMostInput,
+    warehouseQtyAtMostInput,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +121,11 @@ export function ManagerStockOverviewPage() {
       setLoading(true);
       void loadManagerStockOverview({
         warehouseId: warehouseId || undefined,
+        product: product.trim() || undefined,
+        sku: sku.trim() || undefined,
         q: search.trim() || undefined,
+        floorQtyAtMost,
+        warehouseQtyAtMost,
         page,
         pageSize,
       })
@@ -114,7 +148,16 @@ export function ManagerStockOverviewPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [warehouseId, search, page, pageSize]);
+  }, [
+    warehouseId,
+    product,
+    sku,
+    search,
+    floorQtyAtMost,
+    warehouseQtyAtMost,
+    page,
+    pageSize,
+  ]);
 
   const items = result?.items ?? [];
   const total = result?.total ?? 0;
@@ -137,8 +180,18 @@ export function ManagerStockOverviewPage() {
 
       <ListFilterNav>
         <Input
+          placeholder="Product"
+          value={product}
+          onChange={(event) => setProduct(event.target.value)}
+        />
+        <Input
+          placeholder="SKU"
+          value={sku}
+          onChange={(event) => setSku(event.target.value)}
+        />
+        <Input
           ref={searchRef}
-          placeholder="Search product, SKU, barcode…"
+          placeholder="Barcode or variant…"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -155,7 +208,37 @@ export function ManagerStockOverviewPage() {
             </option>
           ))}
         </select>
+        <div className="space-y-1">
+          <Label className="text-muted-foreground text-xs">Min floor qty</Label>
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            placeholder="At or below…"
+            value={floorQtyAtMostInput}
+            onChange={(event) => setFloorQtyAtMostInput(event.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-muted-foreground text-xs">
+            Min warehouse qty
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            placeholder="At or below…"
+            value={warehouseQtyAtMostInput}
+            onChange={(event) =>
+              setWarehouseQtyAtMostInput(event.target.value)
+            }
+          />
+        </div>
       </ListFilterNav>
+      <p className="text-muted-foreground -mt-4 text-xs">
+        Min floor / warehouse qty filters show rows with quantity at or below
+        the value you enter.
+      </p>
 
       {error ? (
         <p className="text-destructive text-sm" role="alert">
@@ -198,7 +281,10 @@ export function ManagerStockOverviewPage() {
               </tr>
             ) : (
               items.map((row) => (
-                <tr key={`${row.productSkuId}-${row.warehouseId}`} className="border-border border-t">
+                <tr
+                  key={`${row.productSkuId}-${row.warehouseId}`}
+                  className="border-border border-t"
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium">{row.productName}</div>
                     {row.variantName ? (

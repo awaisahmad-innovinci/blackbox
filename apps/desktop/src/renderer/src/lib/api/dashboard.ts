@@ -14,6 +14,14 @@ export const dashboardApi = {
     const params = new URLSearchParams();
     if (query.warehouseId) params.set("warehouseId", query.warehouseId);
     if (query.q) params.set("q", query.q);
+    if (query.product) params.set("product", query.product);
+    if (query.sku) params.set("sku", query.sku);
+    if (query.floorQtyAtMost != null) {
+      params.set("floorQtyAtMost", String(query.floorQtyAtMost));
+    }
+    if (query.warehouseQtyAtMost != null) {
+      params.set("warehouseQtyAtMost", String(query.warehouseQtyAtMost));
+    }
     if (query.page) params.set("page", String(query.page));
     if (query.pageSize) params.set("pageSize", String(query.pageSize));
     const qs = params.toString();

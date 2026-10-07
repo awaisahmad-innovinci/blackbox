@@ -38,7 +38,12 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { skusApi } from "@renderer/lib/api/skus";
 import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
-import { costWithGst, normalizeStoredText } from "@blackbox/shared";
+import {
+  costWithGst,
+  normalizeStoredText,
+  purchaseUnitAllowsPackSize,
+  normalizeUnitsPerPurchaseUnit,
+} from "@blackbox/shared";
 import {
   optionalGstPercent,
   sellingFromMarginGst,
@@ -179,7 +184,22 @@ export function SkuProfilePage() {
     setEditOpen(true);
   }
 
-  const unitsPerPurchaseUnitN = Number(unitsPerPurchaseUnit);
+  const selectedPurchaseUnit = units.find((u) => u.id === purchaseUnitId);
+  const packSizeEditable = selectedPurchaseUnit
+    ? purchaseUnitAllowsPackSize(selectedPurchaseUnit)
+    : false;
+
+  function onPurchaseUnitChange(nextId: string) {
+    const unit = units.find((u) => u.id === nextId);
+    const allowsPack = unit ? purchaseUnitAllowsPackSize(unit) : false;
+    setPurchaseUnitId(nextId);
+    if (!allowsPack) setUnitsPerPurchaseUnit("1");
+  }
+
+  const unitsPerPurchaseUnitN = normalizeUnitsPerPurchaseUnit(
+    Number(unitsPerPurchaseUnit),
+    selectedPurchaseUnit ?? {},
+  );
   const costPriceN = Number(costPrice);
   const gstPercentN = Number(gstPercent);
   const marginPercentN = marginPercent.trim() === "" ? null : Number(marginPercent);
@@ -816,7 +836,7 @@ export function SkuProfilePage() {
                 {...formSelectPickerProps()}
                 value={purchaseUnitId}
                 aria-invalid={Boolean(purchaseUnitError)}
-                onChange={(e) => setPurchaseUnitId(e.target.value)}
+                onChange={(e) => onPurchaseUnitChange(e.target.value)}
               >
                 <option value="">—</option>
                 {units.map((u) => (
@@ -832,10 +852,17 @@ export function SkuProfilePage() {
             <div className="space-y-1.5">
               <Label>Units / purchase unit *</Label>
               <Input
-                value={unitsPerPurchaseUnit}
+                value={packSizeEditable ? unitsPerPurchaseUnit : "1"}
+                readOnly={!packSizeEditable}
+                disabled={!packSizeEditable}
                 aria-invalid={Boolean(unitsPerError)}
                 onChange={(e) => setUnitsPerPurchaseUnit(e.target.value)}
               />
+              {!packSizeEditable && purchaseUnitId ? (
+                <p className="text-muted-foreground text-xs">
+                  Fixed at 1 when purchase unit is not Box.
+                </p>
+              ) : null}
               {unitsPerError ? (
                 <p className="text-destructive text-xs">{unitsPerError}</p>
               ) : null}
@@ -982,6 +1009,7 @@ export function SkuProfilePage() {
           open={addBarcodeOpen}
           skuId={id}
           unitsPerPurchaseUnit={sku?.unitsPerPurchaseUnit ?? 1}
+          purchaseUnitName={sku?.purchaseUnitName ?? null}
           onClose={() => setAddBarcodeOpen(false)}
           onAdded={onBarcodeAdded}
         />

@@ -713,6 +713,8 @@ export function listManagerStockOverviewLocal(
   const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
   const warehouseId = query.warehouseId?.trim() ?? "";
   const search = query.q?.trim().toLowerCase() ?? "";
+  const product = query.product?.trim().toLowerCase() ?? "";
+  const skuFilter = query.sku?.trim().toLowerCase() ?? "";
 
   const whereParts = [
     "sku.tenant_id = @tenantId",
@@ -720,20 +722,42 @@ export function listManagerStockOverviewLocal(
     "sku.status = 'active'",
     "w.status = 'active'",
   ];
-  const params: Record<string, string> = { tenantId };
+  const params: Record<string, string | number> = { tenantId };
 
   if (warehouseId) {
     whereParts.push("w.id = @warehouseId");
     params.warehouseId = warehouseId;
   }
+  if (product) {
+    whereParts.push("lower(p.name) like @productTerm");
+    params.productTerm = `%${product}%`;
+  }
+  if (skuFilter) {
+    whereParts.push("lower(sku.sku) like @skuTerm");
+    params.skuTerm = `%${skuFilter}%`;
+  }
   if (search) {
     whereParts.push(
-      `(lower(p.name) like @search
-        or lower(sku.sku) like @search
-        or lower(coalesce(sku.barcode, '')) like @search
+      `(lower(coalesce(sku.barcode, '')) like @search
         or lower(sku.variant_name) like @search)`,
     );
     params.search = `%${search}%`;
+  }
+  if (
+    query.floorQtyAtMost != null &&
+    Number.isFinite(query.floorQtyAtMost) &&
+    query.floorQtyAtMost >= 0
+  ) {
+    whereParts.push("coalesce(out.quantity, 0) <= @floorMax");
+    params.floorMax = query.floorQtyAtMost;
+  }
+  if (
+    query.warehouseQtyAtMost != null &&
+    Number.isFinite(query.warehouseQtyAtMost) &&
+    query.warehouseQtyAtMost >= 0
+  ) {
+    whereParts.push("coalesce(st.quantity_available, 0) <= @warehouseMax");
+    params.warehouseMax = query.warehouseQtyAtMost;
   }
 
   const where = whereParts.join(" and ");
