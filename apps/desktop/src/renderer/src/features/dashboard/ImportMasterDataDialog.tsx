@@ -1,5 +1,8 @@
 import { useMemo, useRef, useState } from "react";
-import { MASTER_DATA_IMPORT_FILES } from "@blackbox/shared";
+import {
+  MASTER_DATA_07_PRODUCT_SKU_HEADERS,
+  MASTER_DATA_IMPORT_FILES,
+} from "@blackbox/shared";
 import type {
   MasterDataImportError,
   MasterDataImportResult,
@@ -96,6 +99,13 @@ export function ImportMasterDataDialog({
     }
     return Array.from(groups.entries());
   }, [errors]);
+
+  const show07HeaderHint = errors.some(
+    (error) =>
+      error.file === "07_product_skus.csv" &&
+      error.line === 1 &&
+      error.message.includes("Headers must exactly match"),
+  );
 
   function reset() {
     setSelection(null);
@@ -264,6 +274,12 @@ export function ImportMasterDataDialog({
                       </li>
                     ))}
                   </ul>
+                  {fileName === "07_product_skus.csv" && show07HeaderHint ? (
+                    <p className="text-muted-foreground mt-3 text-xs break-all">
+                      Current template header:{" "}
+                      {MASTER_DATA_07_PRODUCT_SKU_HEADERS.join(",")}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>

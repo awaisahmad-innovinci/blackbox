@@ -8,7 +8,12 @@ import type {
   VendorDetail,
   VendorSku,
 } from "@blackbox/shared";
-import { normalizeStoredText, costWithGst } from "@blackbox/shared";
+import {
+  normalizeStoredText,
+  costWithGst,
+  purchaseUnitAllowsPackSize,
+  normalizeUnitsPerPurchaseUnit,
+} from "@blackbox/shared";
 import { FORM_DIALOG_FIELD_FULL, FORM_DIALOG_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -194,6 +199,21 @@ export function AddProductSkuDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function onPurchaseUnitChange(purchaseUnitId: string) {
+    const unit = units.find((u) => u.id === purchaseUnitId);
+    const allowsPack = unit ? purchaseUnitAllowsPackSize(unit) : false;
+    setForm((prev) => ({
+      ...prev,
+      purchaseUnitId,
+      unitsPerPurchaseUnit: allowsPack ? prev.unitsPerPurchaseUnit || "1" : "1",
+    }));
+  }
+
+  const selectedPurchaseUnit = units.find((u) => u.id === form.purchaseUnitId);
+  const packSizeEditable = selectedPurchaseUnit
+    ? purchaseUnitAllowsPackSize(selectedPurchaseUnit)
+    : false;
+
   function onCostPriceChange(value: string) {
     setForm((prev) => {
       const next = { ...prev, costPrice: value };
@@ -275,8 +295,14 @@ export function AddProductSkuDialog({
     setAttempted(true);
     if (!canSave) return;
 
+    const purchaseUnit = units.find((u) => u.id === form.purchaseUnitId);
+    const unitsPerNormalized = normalizeUnitsPerPurchaseUnit(
+      Number(form.unitsPerPurchaseUnit),
+      purchaseUnit ?? {},
+    );
+
     const nums = {
-      unitsPerPurchaseUnit: Number(form.unitsPerPurchaseUnit),
+      unitsPerPurchaseUnit: unitsPerNormalized,
       costPrice: Number(form.costPrice),
       gstPercent: Number(form.gstPercent || 0),
       sellingPrice: Number(form.sellingPrice),
@@ -607,7 +633,7 @@ export function AddProductSkuDialog({
               {...formSelectPickerProps()}
               value={form.purchaseUnitId}
               aria-invalid={Boolean(fieldErrors.purchaseUnitId)}
-              onChange={(e) => setField("purchaseUnitId", e.target.value)}
+              onChange={(e) => onPurchaseUnitChange(e.target.value)}
             >
               <option value="">—</option>
               {units.map((u) => (
@@ -625,10 +651,17 @@ export function AddProductSkuDialog({
           <div className="space-y-1.5">
             <Label>Units / purchase unit *</Label>
             <Input
-              value={form.unitsPerPurchaseUnit}
+              value={packSizeEditable ? form.unitsPerPurchaseUnit : "1"}
+              readOnly={!packSizeEditable}
+              disabled={!packSizeEditable}
               aria-invalid={Boolean(fieldErrors.unitsPerPurchaseUnit)}
               onChange={(e) => setField("unitsPerPurchaseUnit", e.target.value)}
             />
+            {!packSizeEditable && form.purchaseUnitId ? (
+              <p className="text-muted-foreground text-xs">
+                Fixed at 1 when purchase unit is not Box.
+              </p>
+            ) : null}
             {fieldErrors.unitsPerPurchaseUnit ? (
               <p className="text-destructive text-xs">
                 {fieldErrors.unitsPerPurchaseUnit}

@@ -60,6 +60,13 @@ export function canAccessSalesList(permissions: string[]): boolean {
   return permissions.includes("sales.read");
 }
 
+export function canAccessStockOverview(permissions: string[]): boolean {
+  return (
+    permissions.includes("sales.read") ||
+    permissions.includes("inventory.access")
+  );
+}
+
 export function canAccessTill(permissions: string[]): boolean {
   return permissions.includes("till.read");
 }
@@ -123,7 +130,7 @@ export function defaultRouteForUser(permissions: string[]): string {
 
 function isSalesPathAllowed(pathname: string, permissions: string[]): boolean {
   if (pathname === "/sales/stock-overview" || pathname.startsWith("/sales/stock-overview/")) {
-    return canAccessSalesList(permissions);
+    return canAccessStockOverview(permissions);
   }
   if (pathname.startsWith("/sales/returns")) {
     return canAccessSaleReturn(permissions);

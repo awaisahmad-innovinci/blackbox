@@ -174,7 +174,16 @@ export interface ManagerStockOverviewRow {
 
 export interface ManagerStockOverviewQuery {
   warehouseId?: string;
+  /** Barcode or variant name substring. */
   q?: string;
+  /** Product name substring. */
+  product?: string;
+  /** SKU code substring. */
+  sku?: string;
+  /** Show rows where floor qty is at or below this value. */
+  floorQtyAtMost?: number;
+  /** Show rows where warehouse qty is at or below this value. */
+  warehouseQtyAtMost?: number;
   page?: number;
   pageSize?: number;
 }
@@ -390,6 +399,42 @@ export interface CreateSkuBarcodeRequest {
 
 export type SellUnit = "pc" | "box";
 export type OrderUnit = SellUnit;
+
+export function isBoxUnit(unit: {
+  name?: string | null;
+  abbreviation?: string | null;
+}): boolean {
+  const abbr = (unit.abbreviation ?? "").trim().toLowerCase();
+  const name = (unit.name ?? "").trim().toLowerCase();
+  return abbr === "box" || name === "box";
+}
+
+export function purchaseUnitAllowsPackSize(input: {
+  name?: string | null;
+  abbreviation?: string | null;
+}): boolean {
+  return isBoxUnit(input);
+}
+
+export function poAllowsOrderUnitChoice(input: {
+  purchaseUnitName?: string | null;
+  purchaseUnitAbbreviation?: string | null;
+}): boolean {
+  return purchaseUnitAllowsPackSize({
+    name: input.purchaseUnitName,
+    abbreviation: input.purchaseUnitAbbreviation,
+  });
+}
+
+export function normalizeUnitsPerPurchaseUnit(
+  unitsPer: number,
+  purchaseUnit: { name?: string | null; abbreviation?: string | null },
+): number {
+  if (!purchaseUnitAllowsPackSize(purchaseUnit)) return 1;
+  const n = Number(unitsPer);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return n;
+}
 
 export function toPurchaseQuantity(
   displayQuantity: number,
@@ -1601,9 +1646,84 @@ export const MASTER_DATA_IMPORT_FILES = [
   "07_product_skus.csv",
   "08_vendors.csv",
   "09_vendor_skus.csv",
+  "10_product_sku_barcodes.csv",
 ] as const;
 
 export type MasterDataImportFile = (typeof MASTER_DATA_IMPORT_FILES)[number];
+
+/** Canonical header row for 07_product_skus.csv (keep in sync with docs template). */
+export const MASTER_DATA_07_PRODUCT_SKU_HEADERS = [
+  "product_import_key",
+  "sku",
+  "barcode",
+  "barcode_quantity_multiplier",
+  "variant_name",
+  "size_value",
+  "size_unit",
+  "base_unit_abbreviation",
+  "purchase_unit_abbreviation",
+  "units_per_purchase_unit",
+  "cost_price",
+  "selling_price",
+  "selling_price_per_purchase_unit",
+  "gst_percent",
+  "reorder_level",
+  "minimum_stock_level",
+  "maximum_stock_level",
+  "track_inventory",
+  "status",
+] as const;
+
+/** Legacy 07 template before barcode_quantity_multiplier and gst_percent. */
+export const LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS = [
+  "product_import_key",
+  "sku",
+  "barcode",
+  "variant_name",
+  "size_value",
+  "size_unit",
+  "base_unit_abbreviation",
+  "purchase_unit_abbreviation",
+  "units_per_purchase_unit",
+  "cost_price",
+  "selling_price",
+  "selling_price_per_purchase_unit",
+  "reorder_level",
+  "minimum_stock_level",
+  "maximum_stock_level",
+  "track_inventory",
+  "status",
+] as const;
+
+export type MasterData07ProductSkuColumn =
+  (typeof MASTER_DATA_07_PRODUCT_SKU_HEADERS)[number];
+
+export function formatMasterDataHeaderMismatchMessage(input: {
+  file: MasterDataImportFile;
+  actualColumnCount: number;
+  expectedHeaders: readonly string[];
+}): string {
+  const expectedLen = input.expectedHeaders.length;
+  let message = `Headers must exactly match: ${input.expectedHeaders.join(",")}. Got ${input.actualColumnCount} columns, expected ${expectedLen}.`;
+  if (input.file !== "07_product_skus.csv") return message;
+
+  const currentLen = MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
+  const legacyLen = LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
+  if (
+    input.actualColumnCount === currentLen &&
+    expectedLen === legacyLen
+  ) {
+    message +=
+      " Restart or redeploy the API — this server uses an older 07_product_skus template.";
+  } else if (
+    input.actualColumnCount === legacyLen &&
+    expectedLen === currentLen
+  ) {
+    message +=
+      " Use the current template (includes barcode_quantity_multiplier and gst_percent) or a legacy 17-column file.";
+  }
+  return message;
+}
 
 export interface MasterDataImportError {
   file: MasterDataImportFile | "archive";

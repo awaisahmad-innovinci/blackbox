@@ -30,7 +30,8 @@ export function SalesListPage() {
   const navigate = useNavigate();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
-  const { canReadList, canWrite, canReturn } = useSalesAccess();
+  const { canReadList, canWrite, canReturn, canAccessStockOverview } =
+    useSalesAccess();
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -141,7 +142,7 @@ export function SalesListPage() {
               </>
             ) : null}
           </div>
-        ) : canReadList ? (
+        ) : canAccessStockOverview ? (
           <Button variant="outline" asChild>
             <Link to="/sales/stock-overview">Floor &amp; warehouse stock</Link>
           </Button>

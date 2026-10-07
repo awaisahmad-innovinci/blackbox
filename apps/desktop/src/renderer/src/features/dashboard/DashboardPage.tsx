@@ -144,6 +144,7 @@ export function DashboardPage() {
     showManagerDashboard,
     showInventoryDashboard,
     canReadTaxReports,
+    canAccessStockOverview,
   } =
     useSalesAccess();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -649,7 +650,17 @@ export function DashboardPage() {
           ) : null}
 
           {showInventoryDashboard ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-4">
+              {canAccessStockOverview ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" asChild>
+                    <Link to="/sales/stock-overview">
+                      Floor &amp; warehouse stock
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {CARDS.map((card) => (
                 <Card key={card.key} className="gap-3 py-5">
                   <CardHeader className="px-5 pb-0">
@@ -671,6 +682,7 @@ export function DashboardPage() {
                   </CardContent>
                 </Card>
               ))}
+              </div>
             </div>
           ) : null}
         </div>

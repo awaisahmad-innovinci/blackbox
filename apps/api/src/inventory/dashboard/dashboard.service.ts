@@ -161,15 +161,45 @@ export class DashboardService {
       qb.andWhere("w.id = :warehouseId", { warehouseId: query.warehouseId });
     }
 
+    if (query.product?.trim()) {
+      qb.andWhere("LOWER(p.name) LIKE :productTerm", {
+        productTerm: `%${query.product.trim().toLowerCase()}%`,
+      });
+    }
+
+    if (query.sku?.trim()) {
+      qb.andWhere("LOWER(sku.sku) LIKE :skuTerm", {
+        skuTerm: `%${query.sku.trim().toLowerCase()}%`,
+      });
+    }
+
     if (query.q?.trim()) {
       const term = `%${query.q.trim().toLowerCase()}%`;
       qb.andWhere(
-        `(LOWER(p.name) LIKE :term
-          OR LOWER(sku.sku) LIKE :term
-          OR LOWER(COALESCE(sku.barcode, '')) LIKE :term
+        `(LOWER(COALESCE(sku.barcode, '')) LIKE :term
           OR LOWER(sku.variant_name) LIKE :term)`,
         { term },
       );
+    }
+
+    if (
+      query.floorQtyAtMost != null &&
+      Number.isFinite(query.floorQtyAtMost) &&
+      query.floorQtyAtMost >= 0
+    ) {
+      qb.andWhere("COALESCE(out.quantity, 0) <= :floorMax", {
+        floorMax: query.floorQtyAtMost,
+      });
+    }
+
+    if (
+      query.warehouseQtyAtMost != null &&
+      Number.isFinite(query.warehouseQtyAtMost) &&
+      query.warehouseQtyAtMost >= 0
+    ) {
+      qb.andWhere("COALESCE(st.quantity_available, 0) <= :warehouseMax", {
+        warehouseMax: query.warehouseQtyAtMost,
+      });
     }
 
     const countRow = await qb

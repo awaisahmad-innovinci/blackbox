@@ -2,6 +2,7 @@ import { useSession } from "@renderer/lib/session/context";
 import {
   canAccessSale,
   canAccessSalesList,
+  canAccessStockOverview,
   canAccessTill,
   canManageTill,
   canAccessActivity,
@@ -22,6 +23,7 @@ export function useSalesAccess() {
   return {
     canWrite: canAccessSale(permissions),
     canReadList: canAccessSalesList(permissions),
+    canAccessStockOverview: canAccessStockOverview(permissions),
     canReadTill: canAccessTill(permissions),
     canManageTill: canManageTill(permissions),
     canReadActivity: canAccessActivity(permissions),

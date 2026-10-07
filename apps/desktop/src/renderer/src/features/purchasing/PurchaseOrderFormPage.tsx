@@ -10,6 +10,7 @@ import {
   defaultOrderUnitForScan,
   displayPurchaseUnitCost,
   lineTotalForPurchase,
+  poAllowsOrderUnitChoice,
   toDisplayQuantity,
   toPurchaseQuantity,
 } from "@blackbox/shared";
@@ -115,10 +116,15 @@ export function PurchaseOrderFormPage() {
         setError("Already added — update its quantity");
         return;
       }
-      const orderUnit = defaultOrderUnitForScan(
+      let orderUnit = defaultOrderUnitForScan(
         result.scannedQuantityMultiplier,
         match.unitsPerPurchaseUnit,
       );
+      if (
+        !poAllowsOrderUnitChoice({ purchaseUnitName: match.purchaseUnitName })
+      ) {
+        orderUnit = "box";
+      }
       const displayQty =
         orderUnit === "box" && match.unitsPerPurchaseUnit > 1
           ? round4(
@@ -604,7 +610,9 @@ export function PurchaseOrderFormPage() {
                   </td>
                   <td className="px-3 py-2">{line.sku}</td>
                   <td className="px-3 py-2">
-                    {line.unitsPerPurchaseUnit > 1 ? (
+                    {poAllowsOrderUnitChoice({
+                      purchaseUnitName: line.purchaseUnitName,
+                    }) ? (
                       <select
                         className="border-input bg-background h-8 rounded-md border px-2 text-sm"
                         {...formSelectPickerProps()}
@@ -627,7 +635,9 @@ export function PurchaseOrderFormPage() {
                       </select>
                     ) : (
                       <span className="text-muted-foreground">
-                        {line.baseUnitName ?? "pc"}
+                        {line.purchaseUnitName ??
+                          line.baseUnitName ??
+                          "pc"}
                       </span>
                     )}
                   </td>

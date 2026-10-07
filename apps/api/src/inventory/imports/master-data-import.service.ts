@@ -1,6 +1,9 @@
 import { Injectable, UnprocessableEntityException } from "@nestjs/common";
 import {
   ENTITY_STATUSES,
+  formatMasterDataHeaderMismatchMessage,
+  LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
+  MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   MASTER_DATA_IMPORT_FILES,
   PAYMENT_TERMS,
   PRODUCT_TYPES,
@@ -8,6 +11,7 @@ import {
   normalizeOptionalStoredText,
   normalizeStoredText,
 } from "@blackbox/shared";
+import type { MasterData07ProductSkuColumn } from "@blackbox/shared";
 import type {
   MasterDataImportError,
   MasterDataImportResult,
@@ -19,6 +23,7 @@ import {
   Category,
   Product,
   ProductSku,
+  ProductSkuBarcode,
   Unit,
   Vendor,
   VendorContact,
@@ -47,25 +52,7 @@ const HEADERS = {
     "description",
     "status",
   ],
-  "07_product_skus.csv": [
-    "product_import_key",
-    "sku",
-    "barcode",
-    "variant_name",
-    "size_value",
-    "size_unit",
-    "base_unit_abbreviation",
-    "purchase_unit_abbreviation",
-    "units_per_purchase_unit",
-    "cost_price",
-    "selling_price",
-    "selling_price_per_purchase_unit",
-    "reorder_level",
-    "minimum_stock_level",
-    "maximum_stock_level",
-    "track_inventory",
-    "status",
-  ],
+  "07_product_skus.csv": [...MASTER_DATA_07_PRODUCT_SKU_HEADERS],
   "08_vendors.csv": [
     "vendor_code",
     "name",
@@ -107,7 +94,50 @@ const HEADERS = {
     "notes",
     "status",
   ],
+  "10_product_sku_barcodes.csv": [
+    "sku",
+    "barcode",
+    "quantity_multiplier",
+    "status",
+  ],
 } as const satisfies Record<ImportFile, readonly string[]>;
+
+function csvHeadersMatch(
+  actual: string[],
+  expected: readonly string[],
+): boolean {
+  return (
+    actual.length === expected.length &&
+    actual.join("\0") === expected.join("\0")
+  );
+}
+
+function legacy07RowToValues(
+  record: string[],
+): Record<MasterData07ProductSkuColumn, string> {
+  const cell = (index: number) => (record[index] ?? "").trim();
+  return {
+    product_import_key: cell(0),
+    sku: cell(1),
+    barcode: cell(2),
+    barcode_quantity_multiplier: "1",
+    variant_name: cell(3),
+    size_value: cell(4),
+    size_unit: cell(5),
+    base_unit_abbreviation: cell(6),
+    purchase_unit_abbreviation: cell(7),
+    units_per_purchase_unit: cell(8),
+    cost_price: cell(9),
+    selling_price: cell(10),
+    selling_price_per_purchase_unit: cell(11),
+    gst_percent: "",
+    reorder_level: cell(12),
+    minimum_stock_level: cell(13),
+    maximum_stock_level: cell(14),
+    track_inventory: cell(15),
+    status: cell(16),
+  };
+}
 
 type CsvColumn = (typeof HEADERS)[ImportFile][number];
 type CsvRow = {
@@ -163,6 +193,12 @@ const REQUIRED: Record<ImportFile, readonly CsvColumn[]> = {
     "minimum_order_quantity",
     "lead_time_days",
     "is_preferred",
+    "status",
+  ],
+  "10_product_sku_barcodes.csv": [
+    "sku",
+    "barcode",
+    "quantity_multiplier",
     "status",
   ],
 };
@@ -333,25 +369,61 @@ export class MasterDataImportService {
     }
     const actual = records[0]!.record;
     const expected = HEADERS[file];
-    if (
-      actual.length !== expected.length ||
-      actual.join("\0") !== expected.join("\0")
-    ) {
+    const legacy07 =
+      file === "07_product_skus.csv" &&
+      !csvHeadersMatch(actual, expected) &&
+      csvHeadersMatch(actual, LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS);
+
+    if (!csvHeadersMatch(actual, expected) && !legacy07) {
       errors.push({
         file,
         line: 1,
         column: null,
-        message: `Headers must exactly match: ${expected.join(",")}`,
+        message: formatMasterDataHeaderMismatchMessage({
+          file,
+          actualColumnCount: actual.length,
+          expectedHeaders: expected,
+        }),
       });
       return [];
     }
-    return records.slice(1).map(({ record, info }) => ({
-      file,
-      line: info.lines,
-      values: Object.fromEntries(
-        expected.map((header, index) => [header, record[index]!.trim()]),
-      ) as Record<CsvColumn, string>,
-    }));
+
+    return records.slice(1).map(({ record, info }) => {
+      if (legacy07) {
+        if (
+          record.length !== LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length
+        ) {
+          errors.push({
+            file,
+            line: info.lines,
+            column: null,
+            message: `Expected ${LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length} columns for legacy 07_product_skus.csv row`,
+          });
+          return null;
+        }
+        return {
+          file,
+          line: info.lines,
+          values: legacy07RowToValues(record),
+        };
+      }
+      if (record.length !== expected.length) {
+        errors.push({
+          file,
+          line: info.lines,
+          column: null,
+          message: `Expected ${expected.length} columns`,
+        });
+        return null;
+      }
+      return {
+        file,
+        line: info.lines,
+        values: Object.fromEntries(
+          expected.map((header, index) => [header, record[index]!.trim()]),
+        ) as Record<CsvColumn, string>,
+      };
+    }).filter((row): row is CsvRow => row != null);
   }
 
   private validateRows(
@@ -402,10 +474,39 @@ export class MasterDataImportService {
         optional: true,
         min: 0,
       });
+      this.number(row, "gst_percent", errors, {
+        optional: true,
+        min: 0,
+        max: 100,
+      });
       this.number(row, "units_per_purchase_unit", errors, {
         min: Number.EPSILON,
       });
       this.boolean(row, "track_inventory", errors);
+      if (row.values.barcode_quantity_multiplier.trim()) {
+        this.number(row, "barcode_quantity_multiplier", errors, {
+          min: Number.EPSILON,
+        });
+      } else if (row.values.barcode.trim()) {
+        row.values.barcode_quantity_multiplier = "1";
+      }
+      if (
+        row.values.barcode_quantity_multiplier.trim() &&
+        !row.values.barcode.trim()
+      ) {
+        errors.push(
+          this.rowError(
+            row,
+            "barcode_quantity_multiplier",
+            "Set barcode when quantity multiplier is provided",
+          ),
+        );
+      }
+    }
+    for (const row of files["10_product_sku_barcodes.csv"]) {
+      this.number(row, "quantity_multiplier", errors, {
+        min: Number.EPSILON,
+      });
     }
     for (const row of files["09_vendor_skus.csv"]) {
       this.number(row, "units_per_purchase_unit", errors, {
@@ -439,6 +540,26 @@ export class MasterDataImportService {
       ["vendor_code", "sku"],
       errors,
     );
+    this.duplicates(files["10_product_sku_barcodes.csv"], ["barcode"], errors);
+    const barcodeFirstUse = new Map<string, CsvRow>();
+    for (const row of [
+      ...files["07_product_skus.csv"].filter((item) => item.values.barcode),
+      ...files["10_product_sku_barcodes.csv"],
+    ]) {
+      const code = row.values.barcode.trim();
+      const prior = barcodeFirstUse.get(code);
+      if (prior) {
+        errors.push(
+          this.rowError(
+            row,
+            "barcode",
+            `Duplicate barcode across upload (first used on line ${prior.line} in ${prior.file})`,
+          ),
+        );
+      } else {
+        barcodeFirstUse.set(code, row);
+      }
+    }
   }
 
   private entityLoadsForFiles(
@@ -453,6 +574,7 @@ export class MasterDataImportService {
     | "skus"
     | "vendors"
     | "vendorSkus"
+    | "skuBarcodes"
   > {
     const need = new Set<
       | "units"
@@ -464,6 +586,7 @@ export class MasterDataImportService {
       | "skus"
       | "vendors"
       | "vendorSkus"
+      | "skuBarcodes"
     >();
     for (const file of selectedFiles) {
       switch (file) {
@@ -491,6 +614,11 @@ export class MasterDataImportService {
           need.add("skus");
           need.add("products");
           need.add("units");
+          need.add("skuBarcodes");
+          break;
+        case "10_product_sku_barcodes.csv":
+          need.add("skus");
+          need.add("skuBarcodes");
           break;
         case "08_vendors.csv":
           need.add("vendors");
@@ -540,6 +668,9 @@ export class MasterDataImportService {
     const existingVendorSkus = need.has("vendorSkus")
       ? await manager.find(VendorSku, { where: { tenantId } })
       : [];
+    const existingSkuBarcodes = need.has("skuBarcodes")
+      ? await manager.find(ProductSkuBarcode, { where: { tenantId } })
+      : [];
     return {
       existingUnits,
       existingBrands,
@@ -550,6 +681,7 @@ export class MasterDataImportService {
       existingSkus,
       existingVendors,
       existingVendorSkus,
+      existingSkuBarcodes,
     };
   }
 
@@ -569,6 +701,7 @@ export class MasterDataImportService {
       existingSkus,
       existingVendors,
       existingVendorSkus,
+      existingSkuBarcodes,
     } = await this.loadExistingEntities(manager, tenantId, selectedFiles);
 
     const errors: MasterDataImportError[] = [];
@@ -664,20 +797,27 @@ export class MasterDataImportService {
           ),
         );
       }
-      if (row.values.barcode) {
-        const barcodeOwner = existingSkus.find(
-          (candidate) => candidate.barcode === row.values.barcode,
+      if (row.values.barcode.trim()) {
+        this.assertBarcodeAvailableForSku(
+          row,
+          row.values.barcode,
+          row.values.sku,
+          existingSkus,
+          existingSkuBarcodes,
+          errors,
         );
-        if (barcodeOwner && barcodeOwner.sku !== row.values.sku) {
-          errors.push(
-            this.rowError(
-              row,
-              "barcode",
-              "Barcode is already assigned to another SKU",
-            ),
-          );
-        }
       }
+    }
+    for (const row of files["10_product_sku_barcodes.csv"]) {
+      this.reference(row, "sku", skuNames, errors);
+      this.assertBarcodeAvailableForSku(
+        row,
+        row.values.barcode,
+        row.values.sku,
+        existingSkus,
+        existingSkuBarcodes,
+        errors,
+      );
     }
     for (const row of files["08_vendors.csv"]) {
       this.nameReference(row, "group_name", groupNames, errors, true);
@@ -867,6 +1007,9 @@ export class MasterDataImportService {
         costPrice: value.cost_price,
         sellingPrice: value.selling_price,
         sellingPricePerPurchaseUnit: value.selling_price_per_purchase_unit || null,
+        gstPercent: value.gst_percent.trim()
+          ? String(Number(value.gst_percent))
+          : "0",
         reorderLevel: value.reorder_level,
         minimumStockLevel: value.minimum_stock_level,
         maximumStockLevel: value.maximum_stock_level || null,
@@ -876,7 +1019,35 @@ export class MasterDataImportService {
       const saved = await manager.save(item);
       skus.set(saved.sku, saved);
       counts[row.file][created ? "created" : "updated"]++;
+      const barcodeCode = value.barcode.trim();
+      if (barcodeCode) {
+        const multiplier = Number(value.barcode_quantity_multiplier || 1);
+        await this.upsertSkuBarcodeFromImport(
+          manager,
+          tenantId,
+          saved.id,
+          barcodeCode,
+          multiplier,
+          value.status === "inactive" ? "inactive" : "active",
+        );
+      }
     }
+    }
+
+    if (files["10_product_sku_barcodes.csv"].length > 0) {
+      for (const row of files["10_product_sku_barcodes.csv"]) {
+        const value = row.values;
+        const sku = skus.get(value.sku)!;
+        const created = await this.upsertSkuBarcodeFromImport(
+          manager,
+          tenantId,
+          sku.id,
+          value.barcode.trim(),
+          Number(value.quantity_multiplier),
+          value.status,
+        );
+        counts[row.file][created ? "created" : "updated"]++;
+      }
     }
 
     const vendors = new Map(
@@ -1174,6 +1345,92 @@ export class MasterDataImportService {
 
   private baseName(name: string): string {
     return name.split(/[\\/]/).pop() ?? name;
+  }
+
+  private assertBarcodeAvailableForSku(
+    row: CsvRow,
+    barcode: string,
+    skuCode: string,
+    existingSkus: ProductSku[],
+    existingSkuBarcodes: ProductSkuBarcode[],
+    errors: MasterDataImportError[],
+  ): void {
+    const code = barcode.trim();
+    if (!code) return;
+
+    const activeRow = existingSkuBarcodes.find(
+      (item) => item.barcode === code && item.status === "active",
+    );
+    if (activeRow) {
+      const owner = existingSkus.find((sku) => sku.id === activeRow.productSkuId);
+      if (owner && owner.sku !== skuCode) {
+        errors.push(
+          this.rowError(
+            row,
+            "barcode",
+            `Barcode is already assigned to SKU ${owner.sku}`,
+          ),
+        );
+        return;
+      }
+    }
+
+    const legacyOwner = existingSkus.find((sku) => sku.barcode === code);
+    if (legacyOwner && legacyOwner.sku !== skuCode && !activeRow) {
+      errors.push(
+        this.rowError(
+          row,
+          "barcode",
+          `Barcode is already assigned to SKU ${legacyOwner.sku}`,
+        ),
+      );
+    }
+  }
+
+  private async upsertSkuBarcodeFromImport(
+    manager: EntityManager,
+    tenantId: string,
+    skuId: string,
+    barcode: string,
+    quantityMultiplier: number,
+    status: string,
+  ): Promise<boolean> {
+    const code = barcode.trim();
+    const repo = manager.getRepository(ProductSkuBarcode);
+    let row = await repo.findOne({ where: { tenantId, barcode: code } });
+    const created = !row;
+    if (!row) {
+      row = repo.create({
+        tenantId,
+        productSkuId: skuId,
+        barcode: code,
+        quantityMultiplier: String(quantityMultiplier),
+        status: status === "inactive" ? "inactive" : "active",
+      });
+    } else {
+      row.productSkuId = skuId;
+      row.quantityMultiplier = String(quantityMultiplier);
+      row.status = status === "inactive" ? "inactive" : "active";
+    }
+    await repo.save(row);
+    await this.refreshDisplayBarcodeFromImport(manager, tenantId, skuId);
+    return created;
+  }
+
+  private async refreshDisplayBarcodeFromImport(
+    manager: EntityManager,
+    tenantId: string,
+    skuId: string,
+  ): Promise<void> {
+    const repo = manager.getRepository(ProductSkuBarcode);
+    const first = await repo.findOne({
+      where: { tenantId, productSkuId: skuId, status: "active" },
+      order: { createdAt: "ASC" },
+    });
+    await manager.getRepository(ProductSku).update(
+      { id: skuId, tenantId },
+      { barcode: first?.barcode ?? null },
+    );
   }
 
   private fail(errors: MasterDataImportError[]): never {
