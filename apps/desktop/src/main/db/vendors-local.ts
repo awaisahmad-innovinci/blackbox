@@ -133,6 +133,29 @@ export function upsertVendorSkuLocal(row: VendorSku): void {
   });
 }
 
+/** Keep vendor link purchase packaging aligned with product SKU after SKU edits. */
+export function syncVendorSkusPurchaseFromProductSkuLocal(input: {
+  productSkuId: string;
+  purchaseUnitId: string | null;
+  unitsPerPurchaseUnit: number;
+}): void {
+  const db = getLocalDb();
+  const ts = nowIso();
+  db.prepare(
+    `update vendor_skus set
+       purchase_unit_id = @purchaseUnitId,
+       units_per_purchase_unit = @unitsPerPurchaseUnit,
+       updated_at = @updatedAt,
+       sync_status = 'synced'
+     where product_sku_id = @productSkuId`,
+  ).run({
+    productSkuId: input.productSkuId,
+    purchaseUnitId: input.purchaseUnitId,
+    unitsPerPurchaseUnit: input.unitsPerPurchaseUnit,
+    updatedAt: ts,
+  });
+}
+
 export function deactivateVendorSkuLocal(id: string): void {
   const db = getLocalDb();
   db.prepare(

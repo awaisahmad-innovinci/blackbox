@@ -443,6 +443,7 @@ export {
   poOrderUnitLabel,
   INVENTORY_MOVEMENT_TYPE_LABELS,
   inventoryMovementTypeLabel,
+  inventoryMovementAffectsWarehouseStock,
 } from "./inventory";
 export {
   DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS,

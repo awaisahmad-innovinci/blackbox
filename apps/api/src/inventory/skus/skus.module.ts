@@ -5,6 +5,7 @@ import {
   ProductSku,
   ProductSkuBarcode,
   Unit,
+  VendorSku,
 } from "../../db/entities";
 import { VendorsModule } from "../vendors/vendors.module";
 import { SkuBarcodesService } from "./sku-barcodes.service";
@@ -18,6 +19,7 @@ import { SkusService } from "./skus.service";
       ProductSkuBarcode,
       Unit,
       InventoryStock,
+      VendorSku,
     ]),
     VendorsModule,
   ],

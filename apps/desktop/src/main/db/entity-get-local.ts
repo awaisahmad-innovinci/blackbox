@@ -482,6 +482,7 @@ export function listVendorSkusLocal(
          vs.purchase_price as purchasePrice,
          vs.purchase_unit_id as purchaseUnitId,
          pu.name as purchaseUnitName,
+         pu.abbreviation as purchaseUnitAbbreviation,
          vs.units_per_purchase_unit as unitsPerPurchaseUnit,
          vs.minimum_order_quantity as minimumOrderQuantity,
          vs.lead_time_days as leadTimeDays,
@@ -540,6 +541,8 @@ export function listVendorSkusLocal(
     purchasePrice: num(r.purchasePrice),
     purchaseUnitId: (r.purchaseUnitId as string | null) ?? null,
     purchaseUnitName: (r.purchaseUnitName as string | null) ?? null,
+    purchaseUnitAbbreviation:
+      (r.purchaseUnitAbbreviation as string | null) ?? null,
     baseUnitName: (r.baseUnitName as string | null) ?? null,
     unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1),
     minimumOrderQuantity: num(r.minimumOrderQuantity),
