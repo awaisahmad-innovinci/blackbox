@@ -701,6 +701,8 @@ export interface ProductDetail {
   id: string;
   name: string;
   productCode: string;
+  /** Stable CSV / master-data key; matches cloud `products.import_key`. */
+  importKey?: string | null;
   brandId: string | null;
   brandName: string | null;
   categoryId: string | null;

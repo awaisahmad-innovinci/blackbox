@@ -101,6 +101,13 @@ export function CollectCashDialog({
             {step === "authorize"
               ? "Ask a manager or owner to enter their Authy code to authorize a cash withdrawal."
               : "Manager: enter the cash amount you received from this till."}
+            {session.status === "CLOSED_LIMIT" ? (
+              <>
+                {" "}
+                When enough cash is removed, the till reopens automatically for
+                sales.
+              </>
+            ) : null}
           </DialogDescription>
         </DialogHeader>
 

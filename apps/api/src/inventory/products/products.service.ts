@@ -240,6 +240,7 @@ export class ProductsService {
       id: product.id,
       name: product.name,
       productCode: product.productCode,
+      importKey: product.importKey ?? null,
       brandId: product.brandId,
       brandName,
       categoryId: product.categoryId,

@@ -25,6 +25,7 @@ import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
+import { seedEntityVersionHeadsFromCloud } from "@renderer/lib/sync/entity-version-seed";
 
 export const LAST_FULL_PULL_AT_KEY = "last_full_pull_at";
 
@@ -255,6 +256,7 @@ export async function runMasterDataImportPull(
 
   const lastSyncedAt = new Date().toISOString();
   await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);
+  await seedEntityVersionHeadsFromCloud().catch(() => undefined);
   report("done", 1, 1, "Import sync complete");
   return { lastSyncedAt };
 }
@@ -618,6 +620,7 @@ export async function runFullPull(
 
   const lastSyncedAt = new Date().toISOString();
   await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);
+  await seedEntityVersionHeadsFromCloud().catch(() => undefined);
   report("done", 1, 1, "Sync complete");
   return { lastSyncedAt };
 }

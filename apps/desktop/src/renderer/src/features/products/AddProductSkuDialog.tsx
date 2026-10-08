@@ -43,6 +43,7 @@ import { productsApi } from "@renderer/lib/api/products";
 import { allocateSkuCode } from "@renderer/lib/document-numbers";
 import { loadUnits, lookupSkuByBarcode, lookupSkuByCode } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import {
   optionalNonNegativeMargin,
@@ -389,7 +390,11 @@ export function AddProductSkuDialog({
           setForm((prev) => ({ ...prev, sku: skuCode }));
         }
 
-        const localId = crypto.randomUUID();
+        const existingSkuId = await resolveCanonicalEntityId({
+          entityType: "product_sku",
+          sku: skuCode,
+        });
+        const localId = existingSkuId ?? crypto.randomUUID();
         const baseUnit = units.find((u) => u.id === body.baseUnitId);
         const purchaseUnit = units.find((u) => u.id === body.purchaseUnitId);
         row = {

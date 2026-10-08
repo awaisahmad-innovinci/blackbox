@@ -29,10 +29,7 @@ export function enqueueOutbox(input: {
   }
   const changeId = randomUUID();
   const db = getLocalDb();
-  const baseVersion =
-    input.baseEntityVersion !== undefined
-      ? input.baseEntityVersion
-      : getLocalEntityVersion(input.entityType, input.entityId);
+  const baseVersion = getLocalEntityVersion(input.entityType, input.entityId);
   db.prepare(
     `insert into local_sync_outbox (
       change_id, tenant_id, origin_device_id, stream, entity_type, entity_id,
@@ -52,6 +49,9 @@ export function enqueueOutbox(input: {
     payload: JSON.stringify(input.payload),
     baseVersion,
   });
+  if (input.operation !== "EVENT") {
+    bumpLocalEntityVersion(input.entityType, input.entityId, baseVersion);
+  }
   return changeId;
 }
 

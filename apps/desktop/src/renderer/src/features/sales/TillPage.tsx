@@ -382,7 +382,9 @@ export function TillPage() {
             </div>
             {session.status === "CLOSED_LIMIT" ? (
               <p className="text-destructive text-sm">
-                Contact a manager to withdraw cash and reopen your till.
+                {requireTillWithdrawApproval
+                  ? "Cash limit reached. Tap Withdraw cash — a manager must authorize with Authy first; the till reopens when cash is below the limit."
+                  : "Cash limit reached. Tap Withdraw cash to remove enough cash; the till reopens for sales when below the limit."}
               </p>
             ) : isTillNearLimit(session) ? (
               <p className="text-amber-700 text-sm dark:text-amber-400">
@@ -392,7 +394,8 @@ export function TillPage() {
             ) : null}
           </div>
 
-          {!canManageTill && session.status === "OPEN" ? (
+          {!canManageTill &&
+          (session.status === "OPEN" || session.status === "CLOSED_LIMIT") ? (
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -402,14 +405,16 @@ export function TillPage() {
               >
                 Withdraw cash
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => setCloseDialogOpen(true)}
-              >
-                Close till
-              </Button>
+              {session.status === "OPEN" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setCloseDialogOpen(true)}
+                >
+                  Close till
+                </Button>
+              ) : null}
             </div>
           ) : null}
 

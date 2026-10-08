@@ -792,14 +792,6 @@ export function assertTillCanPostSaleLocal(input: {
   }
 
   if (input.cashPaymentTotal <= 0) return;
-  const nextBalance =
-    Math.round((row.current_cash_balance + input.cashPaymentTotal) * 10000) /
-    10000;
-  if (nextBalance > row.max_cash_limit) {
-    throw new Error(
-      "This sale would exceed the till cash limit. Contact a manager.",
-    );
-  }
 }
 
 export function applyTillCashRefundLocal(input: {

@@ -125,6 +125,7 @@ export function isTillNearLimit(session: {
   return session.currentCashBalance >= tillWarningThreshold(session.openingBalance);
 }
 
+/** Informational only. While the till is OPEN, a sale may still post when cash exceeds this headroom; applyCashFromSale then sets CLOSED_LIMIT and blocks further sales until a manager collects/reopens. */
 export function tillRemainingHeadroom(session: {
   currentCashBalance: number;
   maxCashLimit: number;

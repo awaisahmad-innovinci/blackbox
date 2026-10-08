@@ -102,10 +102,6 @@ export function commitLocalMutation(input: {
   baseEntityVersion?: number;
 }): string {
   const db = getLocalDb();
-  const baseEntityVersion =
-    input.baseEntityVersion !== undefined
-      ? input.baseEntityVersion
-      : getLocalEntityVersion(input.entityType, input.entityId);
   let changeId = "";
   const run = db.transaction(() => {
     applyChange({
@@ -120,7 +116,7 @@ export function commitLocalMutation(input: {
       payload: input.payload,
       createdAt: new Date().toISOString(),
     });
-    changeId = enqueueOutbox({ ...input, baseEntityVersion });
+    changeId = enqueueOutbox(input);
   });
   run();
   return changeId;
@@ -166,6 +162,10 @@ export function applyChange(change: SyncChangeDto): void {
       id: change.entityId,
       name: str(p.name),
       productCode: str(p.productCode),
+      importKey:
+        (p.importKey as string | null | undefined) ??
+        (p.import_key as string | null | undefined) ??
+        null,
       brandId: (p.brandId as string | null) ?? null,
       brandName: (p.brandName as string | null) ?? null,
       categoryId: (p.categoryId as string | null) ?? null,
