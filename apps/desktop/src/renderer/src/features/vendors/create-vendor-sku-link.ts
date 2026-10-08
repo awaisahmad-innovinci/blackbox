@@ -1,16 +1,9 @@
 import type { ProductSkuDetail, VendorSku } from "@blackbox/shared";
+import { vendorPurchasePriceFromSku } from "@blackbox/shared";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { syncNow } from "@renderer/lib/sync/sync-status";
-
-export function purchasePriceFromSku(sku: ProductSkuDetail): number {
-  const unitsPer =
-    sku.unitsPerPurchaseUnit != null && sku.unitsPerPurchaseUnit > 0
-      ? sku.unitsPerPurchaseUnit
-      : 1;
-  return (sku.costPrice ?? 0) * unitsPer;
-}
 
 export type CreateVendorSkuLinkInput = {
   vendorId: string;
@@ -36,7 +29,10 @@ export async function createVendorSkuLink(
     sku.unitsPerPurchaseUnit != null && sku.unitsPerPurchaseUnit > 0
       ? sku.unitsPerPurchaseUnit
       : 1;
-  const price = purchasePriceFromSku(sku);
+  const price = vendorPurchasePriceFromSku({
+    costPrice: sku.costPrice ?? 0,
+    unitsPerPurchaseUnit: unitsPerUnit,
+  });
 
   let row: VendorSku;
   if (await isDeviceBound()) {

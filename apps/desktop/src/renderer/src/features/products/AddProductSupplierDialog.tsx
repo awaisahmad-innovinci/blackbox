@@ -5,6 +5,7 @@ import type {
   VendorListItem,
   VendorSku,
 } from "@blackbox/shared";
+import { vendorPurchasePriceFromSku } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -32,11 +33,10 @@ import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-w
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 function purchasePriceFromSku(sku: ProductSkuDetail | undefined): number {
-  const unitsPer =
-    sku?.unitsPerPurchaseUnit != null && sku.unitsPerPurchaseUnit > 0
-      ? sku.unitsPerPurchaseUnit
-      : 1;
-  return (sku?.costPrice ?? 0) * unitsPer;
+  return vendorPurchasePriceFromSku({
+    costPrice: sku?.costPrice ?? 0,
+    unitsPerPurchaseUnit: sku?.unitsPerPurchaseUnit ?? 1,
+  });
 }
 
 function packagingFromSku(sku: ProductSkuDetail | undefined) {

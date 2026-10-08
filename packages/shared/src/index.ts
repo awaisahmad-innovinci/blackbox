@@ -416,6 +416,7 @@ export {
   nextSkuCode,
   roundMoney4,
   pieceCostFromPurchase,
+  vendorPurchasePriceFromSku,
   sellingPriceFromCostMargin,
   costWithGst,
   sellingPriceFromCostMarginGst,

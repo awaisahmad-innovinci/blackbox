@@ -830,6 +830,16 @@ export function pieceCostFromPurchase(
   return roundMoney4(purchasePrice / unitsPer);
 }
 
+/** Vendor link purchase price per purchase unit from catalog cost per base unit. */
+export function vendorPurchasePriceFromSku(input: {
+  costPrice: number;
+  unitsPerPurchaseUnit: number;
+}): number {
+  const unitsPer =
+    input.unitsPerPurchaseUnit > 0 ? input.unitsPerPurchaseUnit : 1;
+  return roundMoney4(input.costPrice * unitsPer);
+}
+
 /** Markup on cost: cost 100 + margin 40% → 140 */
 export function sellingPriceFromCostMargin(
   cost: number,
