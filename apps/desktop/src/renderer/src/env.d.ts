@@ -98,6 +98,16 @@ declare global {
         >;
         getSyncMeta: (key: string) => Promise<string | null>;
         setSyncMeta: (key: string, value: string) => Promise<{ ok: true }>;
+        resolveCanonicalEntityId: (input: {
+          entityType: import("@blackbox/shared").SyncEntityType;
+          vendorCode?: string;
+          name?: string;
+          sku?: string;
+          abbreviation?: string;
+          warehouseCode?: string;
+          importKey?: string;
+          productCode?: string;
+        }) => Promise<string | null>;
         upsertBrands: (rows: Brand[]) => Promise<{ ok: true }>;
         upsertCategories: (rows: Category[]) => Promise<{ ok: true }>;
         upsertUnits: (rows: UnitListItem[]) => Promise<{ ok: true }>;
@@ -482,6 +492,13 @@ declare global {
         pendingCount: () => Promise<number>;
         enqueue: (input: unknown) => Promise<{ changeId: string }>;
         commit: (input: unknown) => Promise<{ changeId: string }>;
+        seedEntityVersions: (
+          items: Array<{
+            entityType: string;
+            entityId: string;
+            entityVersion: number;
+          }>,
+        ) => Promise<{ ok: true }>;
       };
       totp?: {
         verifySupervisorCode: (

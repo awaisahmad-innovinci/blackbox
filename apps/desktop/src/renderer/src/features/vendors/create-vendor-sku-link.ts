@@ -1,6 +1,7 @@
 import type { ProductSkuDetail, VendorSku } from "@blackbox/shared";
 import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 export function purchasePriceFromSku(sku: ProductSkuDetail): number {
@@ -39,7 +40,12 @@ export async function createVendorSkuLink(
 
   let row: VendorSku;
   if (await isDeviceBound()) {
-    const localId = crypto.randomUUID();
+    const existingId = await resolveCanonicalEntityId({
+      entityType: "vendor_sku",
+      vendorId,
+      productSkuId: sku.id,
+    });
+    const localId = existingId ?? crypto.randomUUID();
     row = {
       id: localId,
       vendorId,

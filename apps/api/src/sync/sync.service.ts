@@ -18,6 +18,7 @@ import {
   type SyncEntityType,
   type SyncPushItemResult,
   type SyncPushResponse,
+  type SyncEntityVersionHeadsResponse,
   type SyncPullResponse,
   type SyncStatusResponse,
   type SyncStream,
@@ -269,6 +270,65 @@ export class SyncService {
     };
   }
 
+  async entityVersionHeads(
+    user: TenantContext,
+    stream: string,
+    options?: {
+      page?: number;
+      pageSize?: number;
+      entityType?: string;
+      entityId?: string;
+    },
+  ): Promise<SyncEntityVersionHeadsResponse> {
+    await this.requireTrustedDevice(user);
+    if (!SYNC_STREAMS.includes(stream as SyncStream)) {
+      throw new BadRequestException("Unknown sync stream");
+    }
+    const page = Math.max(Number(options?.page) || 1, 1);
+    const pageSize = Math.min(Math.max(Number(options?.pageSize) || 2000, 1), 5000);
+    const offset = (page - 1) * pageSize;
+
+    const qb = this.changes
+      .createQueryBuilder("c")
+      .select("c.entity_type", "entityType")
+      .addSelect("c.entity_id", "entityId")
+      .addSelect("MAX(c.entity_version)", "entityVersion")
+      .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+      .andWhere("c.stream = :stream", { stream })
+      .andWhere("c.operation != :eventOp", { eventOp: "EVENT" })
+      .groupBy("c.entity_type")
+      .addGroupBy("c.entity_id")
+      .orderBy("c.entity_type", "ASC")
+      .addOrderBy("c.entity_id", "ASC")
+      .offset(offset)
+      .limit(pageSize + 1);
+
+    if (options?.entityType) {
+      qb.andWhere("c.entity_type = :entityType", {
+        entityType: options.entityType,
+      });
+    }
+    if (options?.entityId) {
+      qb.andWhere("c.entity_id = :entityId", { entityId: options.entityId });
+    }
+
+    const rows = await qb.getRawMany<{
+      entityType: string;
+      entityId: string;
+      entityVersion: string;
+    }>();
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+    return {
+      items: pageRows.map((row) => ({
+        entityType: row.entityType as SyncEntityType,
+        entityId: row.entityId,
+        entityVersion: Number(row.entityVersion) || 0,
+      })),
+      hasMore,
+    };
+  }
+
   /**
    * Clears `needs_full_resync` after the device rebuilt its local database
    * from REST. Without this the flag would keep `pull` returning empty pages.
@@ -316,6 +376,12 @@ export class SyncService {
     if (!originDeviceId) return;
 
     await this.dataSource.transaction(async (manager) => {
+      const head = await this.entityVersionHead(
+        manager,
+        tenantId,
+        input.entityType,
+        input.entityId,
+      );
       await this.insertChange(manager, {
         tenantId,
         originDeviceId,
@@ -325,7 +391,7 @@ export class SyncService {
         entityId: input.entityId,
         operation: input.operation,
         payload: input.payload,
-        baseEntityVersion: 0,
+        baseEntityVersion: head,
       });
     });
   }
@@ -422,13 +488,16 @@ export class SyncService {
               message: "Document is immutable after post",
             };
           }
-          const head = await manager
+          const headRow = await manager
             .createQueryBuilder(SyncChange, "c")
             .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+            .andWhere("c.entity_type = :entityType", {
+              entityType: item.entityType,
+            })
             .andWhere("c.entity_id = :entityId", { entityId: item.entityId })
             .orderBy("c.entity_version", "DESC")
             .getOne();
-          const currentVersion = head?.entityVersion ?? 0;
+          const currentVersion = headRow?.entityVersion ?? 0;
           if (
             item.baseEntityVersion < currentVersion &&
             stream !== "inventory"
@@ -441,10 +510,10 @@ export class SyncService {
                 entityType: item.entityType,
                 entityId: item.entityId,
                 localChangeId: item.changeId,
-                cloudChangeId: head?.changeId ?? null,
+                cloudChangeId: headRow?.changeId ?? null,
                 reason: "entity_version mismatch",
                 localPayload: item.payload,
-                cloudPayload: head?.payload ?? null,
+                cloudPayload: headRow?.payload ?? null,
                 resolution: "pending",
               }),
             );
@@ -1785,6 +1854,22 @@ export class SyncService {
       { id: deviceId, tenantId },
       { lastSyncAt: new Date(), lastSyncError: error },
     );
+  }
+
+  private async entityVersionHead(
+    manager: EntityManager,
+    tenantId: string,
+    entityType: string,
+    entityId: string,
+  ): Promise<number> {
+    const head = await manager
+      .createQueryBuilder(SyncChange, "c")
+      .where("c.tenant_id = :tenantId", { tenantId })
+      .andWhere("c.entity_type = :entityType", { entityType })
+      .andWhere("c.entity_id = :entityId", { entityId })
+      .orderBy("c.entity_version", "DESC")
+      .getOne();
+    return head?.entityVersion ?? 0;
   }
 
   private toDto(row: SyncChange): SyncChangeDto {

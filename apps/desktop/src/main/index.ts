@@ -232,6 +232,11 @@ import {
   resetStalePushing,
 } from "./db/outbox-local";
 import { applyPullBatch, commitLocalMutation } from "./db/sync-apply";
+import {
+  resolveCanonicalEntityId,
+  type CanonicalEntityLookup,
+} from "./db/canonical-id-local";
+import { seedLocalEntityVersions } from "./db/entity-versions-local";
 import { registerPosHandlers } from "./pos/register-pos-handlers";
 
 let appMainWindow: BrowserWindow | null = null;
@@ -1096,6 +1101,25 @@ function registerIpc(): void {
       _event,
       input: Parameters<typeof commitLocalMutation>[0],
     ) => ({ changeId: commitLocalMutation(input) }),
+  );
+  ipcMain.handle(
+    "sync:seedEntityVersions",
+    (
+      _event,
+      items: Array<{
+        entityType: string;
+        entityId: string;
+        entityVersion: number;
+      }>,
+    ) => {
+      seedLocalEntityVersions(items);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:resolveCanonicalEntityId",
+    (_event, input: CanonicalEntityLookup) =>
+      resolveCanonicalEntityId(input),
   );
 
   ipcMain.handle("totp:verifySupervisorCode", (_event, code: string) =>

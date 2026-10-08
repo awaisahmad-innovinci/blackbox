@@ -577,13 +577,6 @@ export class TillsService {
     }
 
     if (cashPaymentTotal <= 0) return;
-
-    const nextBalance = round4(toNum(row.currentCashBalance) + cashPaymentTotal);
-    if (nextBalance > round4(toNum(row.maxCashLimit))) {
-      throw new BadRequestException(
-        "This sale would exceed the till cash limit. Contact a manager.",
-      );
-    }
   }
 
   async applyCashFromSale(

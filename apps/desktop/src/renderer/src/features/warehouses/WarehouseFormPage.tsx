@@ -11,6 +11,7 @@ import {
   commitLocalChange,
   isDeviceBound,
 } from "@renderer/lib/local-db/local-write";
+import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { loadWarehouse } from "@renderer/lib/local-db/entity-source";
 import { useSession } from "@renderer/lib/session/context";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -79,7 +80,14 @@ export function WarehouseFormPage() {
         status,
       };
       if (canWrite && (await isDeviceBound())) {
-        const rowId = isEdit && id ? id : crypto.randomUUID();
+        let rowId = isEdit && id ? id : null;
+        if (!rowId) {
+          const existingId = await resolveCanonicalEntityId({
+            entityType: "warehouse",
+            warehouseCode: code.trim(),
+          });
+          rowId = existingId ?? crypto.randomUUID();
+        }
         await commitLocalChange({
           entityType: "warehouse",
           entityId: rowId,

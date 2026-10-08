@@ -97,6 +97,11 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:getSyncMeta", key) as Promise<string | null>,
     setSyncMeta: (key: string, value: string) =>
       ipcRenderer.invoke("localDb:setSyncMeta", key, value) as Promise<Ok>,
+    resolveCanonicalEntityId: (input: unknown) =>
+      ipcRenderer.invoke(
+        "localDb:resolveCanonicalEntityId",
+        input,
+      ) as Promise<string | null>,
     upsertBrands: (rows: Brand[]) =>
       ipcRenderer.invoke("localDb:upsertBrands", rows) as Promise<Ok>,
     upsertCategories: (rows: Category[]) =>
@@ -720,6 +725,16 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("sync:enqueue", input) as Promise<{ changeId: string }>,
     commit: (input: unknown) =>
       ipcRenderer.invoke("sync:commit", input) as Promise<{ changeId: string }>,
+    seedEntityVersions: (
+      items: Array<{
+        entityType: string;
+        entityId: string;
+        entityVersion: number;
+      }>,
+    ) =>
+      ipcRenderer.invoke("sync:seedEntityVersions", items) as Promise<{
+        ok: true;
+      }>,
   },
   totp: {
     verifySupervisorCode: (code: string) =>

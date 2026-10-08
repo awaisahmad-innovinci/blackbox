@@ -1206,6 +1206,16 @@ export function SalePage() {
     !tillBlocked &&
     isTillNearLimit(tillSession);
 
+  const cashierCanWithdrawCash =
+    !canManageTill &&
+    tillSession != null &&
+    (tillSession.status === "OPEN" || tillSession.status === "CLOSED_LIMIT");
+
+  const tillLimitWithdrawHint =
+    requireTillWithdrawApproval
+      ? "Use Withdraw cash — a manager must authorize with Authy first."
+      : "Use Withdraw cash to remove enough cash; the till reopens for sales when below the limit.";
+
   async function onConfirm() {
     setError(null);
     if (!warehouseId) {
@@ -1227,7 +1237,7 @@ export function SalePage() {
     if (tillBlocked) {
       setError(
         tillSession?.status === "CLOSED_LIMIT"
-          ? "Till cash limit reached. Contact a manager to withdraw and reopen."
+          ? `Till cash limit reached. ${tillLimitWithdrawHint}`
           : tillSession?.status === "PENDING_APPROVAL"
             ? "Till is pending manager approval."
             : "Open your till before posting sales.",
@@ -1663,7 +1673,7 @@ export function SalePage() {
               {holdNumberRef.current ?? "Held bill"}
             </span>
           ) : null}
-          {!canManageTill && tillSession?.status === "OPEN" ? (
+          {cashierCanWithdrawCash ? (
             <Button
               type="button"
               variant="ghost"
@@ -1692,18 +1702,29 @@ export function SalePage() {
           className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
         >
           {tillSession?.status === "CLOSED_LIMIT"
-            ? "Till cash limit reached. Contact a manager to withdraw and reopen before posting more sales."
+            ? `Till cash limit reached — sales are paused. ${tillLimitWithdrawHint}`
             : tillSession?.status === "PENDING_APPROVAL"
               ? "Till is pending manager approval."
               : "Open your till before posting sales."}{" "}
-          <Button
-            type="button"
-            variant="link"
-            className="text-destructive h-auto p-0"
-            onClick={() => navigate("/sales/till")}
-          >
-            Go to My till
-          </Button>
+          {tillSession?.status === "CLOSED_LIMIT" ? (
+            <Button
+              type="button"
+              variant="link"
+              className="text-destructive h-auto p-0"
+              onClick={() => setCollectDialogOpen(true)}
+            >
+              Withdraw cash
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="link"
+              className="text-destructive h-auto p-0"
+              onClick={() => navigate("/sales/till")}
+            >
+              Go to My till
+            </Button>
+          )}
         </div>
       ) : null}
 
@@ -1714,6 +1735,9 @@ export function SalePage() {
         >
           Till is near the cash limit — Rs{" "}
           {tillRemainingHeadroom(tillSession!).toLocaleString()} headroom left.
+          You can still complete this sale even if cash exceeds the limit; the
+          till will close afterward and a manager must collect cash before more
+          sales.
         </div>
       ) : null}
 

@@ -1,9 +1,11 @@
 import type {
   SyncChangeInput,
+  SyncEntityVersionHeadsResponse,
   SyncPushResponse,
   SyncPullResponse,
   SyncStatusResponse,
   SyncStream,
+  SyncEntityType,
 } from "@blackbox/shared";
 import { SYNC_STREAMS } from "@blackbox/shared";
 import { apiFetch } from "./client";
@@ -29,6 +31,26 @@ export const syncApi = {
       method: "POST",
     });
   },
+  entityVersionHeads(
+    stream: SyncStream,
+    page = 1,
+    options?: {
+      pageSize?: number;
+      entityType?: SyncEntityType;
+      entityId?: string;
+    },
+  ) {
+    const q = new URLSearchParams({
+      stream,
+      page: String(page),
+    });
+    if (options?.pageSize) q.set("pageSize", String(options.pageSize));
+    if (options?.entityType) q.set("entityType", options.entityType);
+    if (options?.entityId) q.set("entityId", options.entityId);
+    return apiFetch<SyncEntityVersionHeadsResponse>(
+      `/sync/entity-version-heads?${q.toString()}`,
+    );
+  },
 };
 
 export type IncrementalSyncResult = {
@@ -49,6 +71,27 @@ type OutboxRow = {
   baseEntityVersion: number;
   stream: SyncStream;
 };
+
+const VERSION_HEAD_STREAMS: SyncStream[] = ["master_data", "purchasing"];
+
+async function refreshEntityVersionHeadAfterReject(
+  bridge: SyncBridge,
+  entityType: SyncEntityType,
+  entityId: string,
+): Promise<void> {
+  if (!bridge.seedEntityVersions) return;
+  for (const stream of VERSION_HEAD_STREAMS) {
+    const response = await syncApi.entityVersionHeads(stream, 1, {
+      entityType,
+      entityId,
+      pageSize: 1,
+    });
+    if (response.items.length > 0) {
+      await bridge.seedEntityVersions(response.items);
+      return;
+    }
+  }
+}
 
 async function pushOutboxBatch(
   bridge: SyncBridge,
@@ -77,6 +120,14 @@ async function pushOutboxBatch(
         pushed += 1;
       } else if (item.status === "conflict" || item.status === "rejected") {
         await bridge.markRejected(item.changeId, item.message ?? item.status);
+        const row = batch.find((entry) => entry.changeId === item.changeId);
+        if (row) {
+          await refreshEntityVersionHeadAfterReject(
+            bridge,
+            row.entityType as SyncEntityType,
+            row.entityId,
+          ).catch(() => undefined);
+        }
       }
     }
     return pushed;

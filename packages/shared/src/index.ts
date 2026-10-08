@@ -131,6 +131,8 @@ export type {
   SyncStreamStatus,
   SyncStatusResponse,
   SyncConflictAckRequest,
+  SyncEntityVersionHead,
+  SyncEntityVersionHeadsResponse,
 } from "./sync";
 export type {
   BusinessType,

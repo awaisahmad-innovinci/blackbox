@@ -66,3 +66,7 @@ Retry of the same `changeId` is a cloud unique `(tenant_id, change_id)` no-op (`
 `POST /sync/retain` (permission `devices.manage`) marks trusted devices silent for 30 days as `needs_full_resync`, then deletes log rows older than 90 days **and** behind every remaining live trusted device cursor.
 
 Full resync: dashboard Sync falls back to REST `runFullPull` when `needsFullResync` is set or no prior pull exists, then advances per-stream cursors to `serverSeq` and calls `POST /sync/full-resync-complete` to clear the flag. Without that call `pull` would keep returning empty pages and incremental sync would never resume.
+
+REST full pull does **not** replay the sync change log, so `local_entity_versions` would stay stale without a follow-up **`GET /sync/entity-version-heads`** (streams `master_data` and `purchasing`). The desktop seeds those heads after full pull, master-data import pull, and full-resync-complete. Push uses `baseEntityVersion` from `local_entity_versions` at commit time.
+
+Desktop creates must reuse the same entity UUID as CSV/cloud rows (match keys: `vendor_code`, taxonomy `name`, `sku`, warehouse `code`, etc.) via `resolveCanonicalEntityId` before `sync.commit`.

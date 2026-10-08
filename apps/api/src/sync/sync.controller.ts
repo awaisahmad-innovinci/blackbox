@@ -46,6 +46,24 @@ export class SyncController {
     return this.sync.status(user);
   }
 
+  @Get("entity-version-heads")
+  @RequirePermissions("sync.use")
+  entityVersionHeads(
+    @CurrentUser() user: TenantContext,
+    @Query("stream") stream: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("entityType") entityType?: string,
+    @Query("entityId") entityId?: string,
+  ) {
+    return this.sync.entityVersionHeads(user, stream, {
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+      entityType,
+      entityId,
+    });
+  }
+
   @Post("full-resync-complete")
   @RequirePermissions("sync.use")
   completeFullResync(@CurrentUser() user: TenantContext) {

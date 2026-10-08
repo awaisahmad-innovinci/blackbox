@@ -7,6 +7,7 @@ import { brandsApi } from "@renderer/lib/api/brands";
 import { categoriesApi } from "@renderer/lib/api/categories";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 
 export type TaxonomyKind = "brand" | "category" | "vendor_group";
@@ -41,7 +42,11 @@ export async function createTaxonomy(
   const body = { name, description, status: "active" as const };
 
   if (await isDeviceBound()) {
-    const localId = crypto.randomUUID();
+    const existingId = await resolveCanonicalEntityId({
+      entityType: kind,
+      name,
+    });
+    const localId = existingId ?? crypto.randomUUID();
     const row = buildRow(kind, localId, body);
     await commitLocalChange({
       entityType: kind,

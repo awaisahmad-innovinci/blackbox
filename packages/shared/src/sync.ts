@@ -119,6 +119,17 @@ export interface SyncConflictAckRequest {
   resolution: "accepted_local" | "accepted_cloud" | "merged";
 }
 
+export interface SyncEntityVersionHead {
+  entityType: SyncEntityType;
+  entityId: string;
+  entityVersion: number;
+}
+
+export interface SyncEntityVersionHeadsResponse {
+  items: SyncEntityVersionHead[];
+  hasMore: boolean;
+}
+
 export function streamForEntity(entityType: SyncEntityType): SyncStream {
   if (entityType === "auth_snapshot") return "auth_snapshot";
   if (

@@ -10,15 +10,16 @@ export function upsertProductLocal(detail: ProductDetail): void {
   const db = getLocalDb();
   db.prepare(
     `insert into products (
-      id, tenant_id, name, product_code, brand_id, category_id, product_type,
+      id, tenant_id, name, product_code, import_key, brand_id, category_id, product_type,
       description, image_path, status, created_at, updated_at, sync_status, server_updated_at
     ) values (
-      @id, @tenantId, @name, @productCode, @brandId, @categoryId, @productType,
+      @id, @tenantId, @name, @productCode, @importKey, @brandId, @categoryId, @productType,
       @description, @imagePath, @status, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
     on conflict(id) do update set
       name = excluded.name,
       product_code = excluded.product_code,
+      import_key = coalesce(excluded.import_key, products.import_key),
       brand_id = excluded.brand_id,
       category_id = excluded.category_id,
       product_type = excluded.product_type,
@@ -33,6 +34,7 @@ export function upsertProductLocal(detail: ProductDetail): void {
     tenantId: DEMO_STORE_TENANT_ID,
     name: detail.name,
     productCode: detail.productCode,
+    importKey: detail.importKey?.trim() || null,
     brandId: detail.brandId,
     categoryId: detail.categoryId,
     productType: detail.productType,

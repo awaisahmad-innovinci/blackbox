@@ -1356,6 +1356,23 @@ where units_per_purchase_unit > 0;
       alter table sale_lines add column gst_percent real not null default 0;
     `,
   },
+  {
+    id: "040_products_import_key",
+    sql: `-- column added in after()`,
+    after: (db) => {
+      const cols = (
+        db.prepare("pragma table_info(products)").all() as { name: string }[]
+      ).map((c) => c.name);
+      if (!cols.includes("import_key")) {
+        db.exec(`alter table products add column import_key text`);
+      }
+      db.exec(
+        `create unique index if not exists products_tenant_import_key_idx
+         on products (tenant_id, import_key)
+         where import_key is not null and import_key != ''`,
+      );
+    },
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

@@ -30,6 +30,7 @@ import {
   SyncPullError,
   type SyncProgress,
 } from "@renderer/lib/local-db/pull";
+import { seedEntityVersionHeadsFromCloud } from "@renderer/lib/sync/entity-version-seed";
 import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { ImportMasterDataDialog } from "./ImportMasterDataDialog";
@@ -365,6 +366,7 @@ export function DashboardPage() {
             });
           }
           await syncApi.completeFullResync();
+          await seedEntityVersionHeadsFromCloud().catch(() => undefined);
         } catch {
           /* cursors optional until device is trusted */
         }
