@@ -16,6 +16,7 @@ import {
   costWithGst,
   normalizeStoredText,
   normalizeUnitsPerPurchaseUnit,
+  vendorPurchasePriceFromSku,
 } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
@@ -271,11 +272,16 @@ export class SkusService {
 
     try {
       await this.skus.save(sku);
+      const purchasePrice = vendorPurchasePriceFromSku({
+        costPrice: toNum(sku.costPrice),
+        unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit, 1),
+      });
       await this.vendorSkus.update(
         { tenantId, productSkuId: id },
         {
           purchaseUnitId: sku.purchaseUnitId,
           unitsPerPurchaseUnit: sku.unitsPerPurchaseUnit,
+          purchasePrice: String(purchasePrice),
         },
       );
       return this.getById(id);

@@ -115,6 +115,7 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
     productSkuId: row.id,
     purchaseUnitId: row.purchaseUnitId,
     unitsPerPurchaseUnit: row.unitsPerPurchaseUnit,
+    costPrice: row.costPrice,
   });
 }
 

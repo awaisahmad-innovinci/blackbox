@@ -223,6 +223,7 @@ export function applyChange(change: SyncChangeDto): void {
       productSkuId: change.entityId,
       purchaseUnitId: (p.purchaseUnitId as string | null) ?? null,
       unitsPerPurchaseUnit: Number(p.unitsPerPurchaseUnit ?? 1),
+      costPrice: Number(p.costPrice ?? 0),
     });
     return;
   }

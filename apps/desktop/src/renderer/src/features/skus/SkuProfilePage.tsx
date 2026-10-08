@@ -36,7 +36,6 @@ import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { skusApi } from "@renderer/lib/api/skus";
-import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
 import {
   costWithGst,
@@ -48,7 +47,7 @@ import {
   optionalGstPercent,
   sellingFromMarginGst,
 } from "@renderer/lib/sku-pricing";
-import { loadSkuProfile } from "@renderer/lib/local-db/entity-source";
+import { loadSkuProfile, loadUnits } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { SupplierPriceCells } from "@renderer/features/inventory/supplier-price-cells";
@@ -117,7 +116,6 @@ export function SkuProfilePage() {
   const [gstPercent, setGstPercent] = useState("0");
   const [marginPercent, setMarginPercent] = useState("");
   const [sellingPrice, setSellingPrice] = useState("0");
-  const [boxSellingPrice, setBoxSellingPrice] = useState("");
   const [saleDiscountPercent, setSaleDiscountPercent] = useState("0");
   const [reorderLevel, setReorderLevel] = useState("0");
   const [minimumStockLevel, setMinimumStockLevel] = useState("0");
@@ -147,6 +145,11 @@ export function SkuProfilePage() {
         setError(getApiErrorMessage(err, "Failed to load SKU"));
       }
     });
+    void loadUnits()
+      .then((rows) => {
+        if (!cancelled) setUnits(rows);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -166,11 +169,6 @@ export function SkuProfilePage() {
     setGstPercent(String(sku.gstPercent ?? 0));
     setMarginPercent("");
     setSellingPrice(String(sku.sellingPrice));
-    setBoxSellingPrice(
-      sku.sellingPricePerPurchaseUnit == null
-        ? ""
-        : String(sku.sellingPricePerPurchaseUnit),
-    );
     setSaleDiscountPercent(String(sku.saleDiscountPercent ?? 0));
     setReorderLevel(String(sku.reorderLevel));
     setMinimumStockLevel(String(sku.minimumStockLevel));
@@ -180,7 +178,6 @@ export function SkuProfilePage() {
     setTrackInventory(sku.trackInventory);
     setStatus(sku.status);
     setFormError(null);
-    void unitsApi.list().then(setUnits).catch(() => undefined);
     setEditOpen(true);
   }
 
@@ -204,8 +201,6 @@ export function SkuProfilePage() {
   const gstPercentN = Number(gstPercent);
   const marginPercentN = marginPercent.trim() === "" ? null : Number(marginPercent);
   const sellingPriceN = Number(sellingPrice);
-  const boxSellingPriceN =
-    boxSellingPrice.trim() === "" ? null : Number(boxSellingPrice);
   const saleDiscountPercentN = Number(saleDiscountPercent);
   const baseUnitError = baseUnitId ? null : "Base unit is required";
   const purchaseUnitError = purchaseUnitId ? null : "Purchase unit is required";
@@ -231,11 +226,6 @@ export function SkuProfilePage() {
       : sellingPriceN <= costWithGst(costPriceN, Number.isNaN(gstPercentN) ? 0 : gstPercentN)
         ? "Selling price must be greater than cost + GST"
         : null;
-  const boxSellingError =
-    boxSellingPriceN != null &&
-    (Number.isNaN(boxSellingPriceN) || boxSellingPriceN < 0)
-      ? "Box selling price must be zero or greater"
-      : null;
   const saleDiscountError =
     saleDiscountPercent.trim() !== "" &&
     (Number.isNaN(saleDiscountPercentN) ||
@@ -253,7 +243,6 @@ export function SkuProfilePage() {
     !gstError &&
     !marginError &&
     !sellingError &&
-    !boxSellingError &&
     !saleDiscountError;
 
   function onCostPriceChange(value: string) {
@@ -296,7 +285,7 @@ export function SkuProfilePage() {
       costPrice: costPriceN,
       gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
       sellingPrice: sellingPriceN,
-      sellingPricePerPurchaseUnit: boxSellingPriceN,
+      sellingPricePerPurchaseUnit: null,
       saleDiscountPercent: saleDiscountPercentValue,
       reorderLevel: Number(reorderLevel),
       minimumStockLevel: Number(minimumStockLevel),
@@ -332,7 +321,7 @@ export function SkuProfilePage() {
         costPrice: costPriceN,
         gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
         sellingPrice: sellingPriceN,
-        sellingPricePerPurchaseUnit: boxSellingPriceN,
+        sellingPricePerPurchaseUnit: null,
         saleDiscountPercent: saleDiscountPercentValue,
         reorderLevel: next.reorderLevel,
         minimumStockLevel: next.minimumStockLevel,
@@ -584,10 +573,7 @@ export function SkuProfilePage() {
           <div>
             <dt className="text-muted-foreground">Cost / Selling</dt>
             <dd className="font-medium tabular-nums">
-              {sku.costPrice} / {sku.sellingPrice}
-              {sku.sellingPricePerPurchaseUnit != null
-                ? ` (box ${sku.sellingPricePerPurchaseUnit})`
-                : ""}
+              {sku.costPrice} / {sku.sellingPrice} per pc
             </dd>
           </div>
           <div>
@@ -868,7 +854,7 @@ export function SkuProfilePage() {
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Cost price *</Label>
+              <Label>Cost price / pc *</Label>
               <Input
                 value={costPrice}
                 aria-invalid={Boolean(costError)}
@@ -903,7 +889,7 @@ export function SkuProfilePage() {
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Selling price *</Label>
+              <Label>Selling price / pc *</Label>
               <Input
                 value={sellingPrice}
                 aria-invalid={Boolean(sellingError)}
@@ -911,18 +897,6 @@ export function SkuProfilePage() {
               />
               {sellingError ? (
                 <p className="text-destructive text-xs">{sellingError}</p>
-              ) : null}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Box selling price</Label>
-              <Input
-                value={boxSellingPrice}
-                aria-invalid={Boolean(boxSellingError)}
-                placeholder="Optional fixed box price"
-                onChange={(e) => setBoxSellingPrice(e.target.value)}
-              />
-              {boxSellingError ? (
-                <p className="text-destructive text-xs">{boxSellingError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
