@@ -283,6 +283,7 @@ export class VendorSkusService {
       purchaseUnitName: row.purchaseUnit
         ? `${row.purchaseUnit.name} (${row.purchaseUnit.abbreviation})`
         : null,
+      purchaseUnitAbbreviation: row.purchaseUnit?.abbreviation ?? null,
       unitsPerPurchaseUnit: toNum(row.unitsPerPurchaseUnit),
       baseUnitName: row.productSku.baseUnit?.name ?? null,
       minimumOrderQuantity: toNum(row.minimumOrderQuantity),

@@ -1,6 +1,7 @@
 import type { ProductDetail, ProductSkuDetail } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
+import { syncVendorSkusPurchaseFromProductSkuLocal } from "./vendors-local";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -109,6 +110,11 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
     createdAt: ts,
     updatedAt: ts,
     serverUpdatedAt: ts,
+  });
+  syncVendorSkusPurchaseFromProductSkuLocal({
+    productSkuId: row.id,
+    purchaseUnitId: row.purchaseUnitId,
+    unitsPerPurchaseUnit: row.unitsPerPurchaseUnit,
   });
 }
 

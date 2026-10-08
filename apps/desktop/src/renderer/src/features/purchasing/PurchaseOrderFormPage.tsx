@@ -45,7 +45,9 @@ import { useSession } from "@renderer/lib/session/context";
 import {
   AddPurchaseOrderItemDialog,
   recomputePoLine,
+  refreshPoLinesWithVendorSkus,
   toDraftPoLine,
+  vendorSkuPoChoiceInput,
   type DraftPoLine,
 } from "./AddPurchaseOrderItemDialog";
 import { PendingVendorReturnsSection } from "./PendingVendorReturnsSection";
@@ -120,10 +122,8 @@ export function PurchaseOrderFormPage() {
         result.scannedQuantityMultiplier,
         match.unitsPerPurchaseUnit,
       );
-      if (
-        !poAllowsOrderUnitChoice({ purchaseUnitName: match.purchaseUnitName })
-      ) {
-        orderUnit = "box";
+      if (!poAllowsOrderUnitChoice(vendorSkuPoChoiceInput(match))) {
+        orderUnit = "pc";
       }
       const displayQty =
         orderUnit === "box" && match.unitsPerPurchaseUnit > 1
@@ -187,18 +187,15 @@ export function PurchaseOrderFormPage() {
           setError("Only DRAFT purchase orders can be edited");
           return;
         }
-        const availabilityBySku = new Map<string, number>();
+        let currentVendorSkus: Awaited<ReturnType<typeof loadVendorSkus>> = [];
         try {
-          const currentVendorSkus = await loadVendorSkus(
+          currentVendorSkus = await loadVendorSkus(
             po.vendorId,
             "",
             po.warehouseId,
           );
-          for (const row of currentVendorSkus) {
-            availabilityBySku.set(row.productSkuId, row.quantityAvailable ?? 0);
-          }
         } catch {
-          /* availability is informational */
+          /* catalog refresh is best-effort */
         }
         if (cancelled) return;
         setPoNumber(po.poNumber);
@@ -207,37 +204,42 @@ export function PurchaseOrderFormPage() {
         setWarehouseId(po.warehouseId);
         setOrderDate(po.orderDate);
         setExpectedDate(po.expectedDate ?? "");
-        setLines(
-          po.items.map((i) => {
-            const orderUnit = (i.orderUnit ?? "box") as OrderUnit;
-            return recomputePoLine({
-              productSkuId: i.productSkuId,
-              vendorSkuId: i.vendorSkuId,
-              productName: i.productName,
-              variantName: i.variantName,
-              sku: i.sku,
-              purchaseUnitId: i.purchaseUnitId,
-              purchaseUnitName: i.purchaseUnitName,
-              baseUnitName: i.baseUnitName ?? null,
-              unitsPerPurchaseUnit: i.unitsPerPurchaseUnit,
-              orderUnit,
-              purchasePrice: i.unitCost,
-              quantityAvailable: availabilityBySku.get(i.productSkuId) ?? 0,
-              quantity: toDisplayQuantity(
-                i.quantity,
-                orderUnit,
-                i.unitsPerPurchaseUnit,
-              ),
-              unitCost: displayPurchaseUnitCost(
-                i.unitCost,
-                orderUnit,
-                i.unitsPerPurchaseUnit,
-              ),
-              minimumOrderQuantity: i.minimumOrderQuantity,
-              lineTotal: i.lineTotal,
-            });
-          }),
+        const availabilityBySku = new Map(
+          currentVendorSkus.map((row) => [
+            row.productSkuId,
+            row.quantityAvailable ?? 0,
+          ]),
         );
+        const storedLines = po.items.map((i) => {
+          const orderUnit = (i.orderUnit ?? "box") as OrderUnit;
+          return recomputePoLine({
+            productSkuId: i.productSkuId,
+            vendorSkuId: i.vendorSkuId,
+            productName: i.productName,
+            variantName: i.variantName,
+            sku: i.sku,
+            purchaseUnitId: i.purchaseUnitId,
+            purchaseUnitName: i.purchaseUnitName,
+            baseUnitName: i.baseUnitName ?? null,
+            unitsPerPurchaseUnit: i.unitsPerPurchaseUnit,
+            orderUnit,
+            purchasePrice: i.unitCost,
+            quantityAvailable: availabilityBySku.get(i.productSkuId) ?? 0,
+            quantity: toDisplayQuantity(
+              i.quantity,
+              orderUnit,
+              i.unitsPerPurchaseUnit,
+            ),
+            unitCost: displayPurchaseUnitCost(
+              i.unitCost,
+              orderUnit,
+              i.unitsPerPurchaseUnit,
+            ),
+            minimumOrderQuantity: i.minimumOrderQuantity,
+            lineTotal: i.lineTotal,
+          });
+        });
+        setLines(refreshPoLinesWithVendorSkus(storedLines, currentVendorSkus));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -251,6 +253,20 @@ export function PurchaseOrderFormPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (loading || !vendorId || !warehouseId || lines.length === 0) return;
+    let cancelled = false;
+    void loadVendorSkus(vendorId, "", warehouseId)
+      .then((rows) => {
+        if (cancelled) return;
+        setLines((prev) => refreshPoLinesWithVendorSkus(prev, rows));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [vendorId, warehouseId, loading, lines.length]);
 
   const subtotal = useMemo(
     () =>
@@ -612,6 +628,7 @@ export function PurchaseOrderFormPage() {
                   <td className="px-3 py-2">
                     {poAllowsOrderUnitChoice({
                       purchaseUnitName: line.purchaseUnitName,
+                      purchaseUnitAbbreviation: line.purchaseUnitAbbreviation,
                     }) ? (
                       <select
                         className="border-input bg-background h-8 rounded-md border px-2 text-sm"

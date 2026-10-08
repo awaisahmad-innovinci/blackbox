@@ -32,7 +32,7 @@ Cloud `sync_cursors` stores the **committed** cursor the device sent, not the de
 ## Streams
 
 - `master_data` — LWW via `entity_version` on the change log
-- `inventory` — `EVENT` movements; stock is a projection (`delta` or INVENTORY_OUT sign)
+- `inventory` — `EVENT` movements; warehouse `inventory_stock` is a projection from movement `delta` (or INVENTORY_OUT / RETURN sign). **`SALE` and `SALE_RETURN` movements are audit-only** — they do not change warehouse stock; floor qty is updated by `sale` / `sale_return` entity UPSERTs (`inventory_out_items` balance).
 - `purchasing` — document UPSERT snapshots
 - `auth_snapshot` — reserved (pull-only later)
 

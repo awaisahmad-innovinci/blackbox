@@ -43,6 +43,13 @@ export function inventoryMovementTypeLabel(
   return INVENTORY_MOVEMENT_TYPE_LABELS[type] ?? type;
 }
 
+/** POS sales/returns adjust floor balance via sale entities, not warehouse stock. */
+export function inventoryMovementAffectsWarehouseStock(
+  movementType: InventoryMovementType,
+): boolean {
+  return movementType !== "SALE" && movementType !== "SALE_RETURN";
+}
+
 export const INVENTORY_OUT_STATUSES = ["POSTED", "CANCELLED"] as const;
 export type InventoryOutStatus = (typeof INVENTORY_OUT_STATUSES)[number];
 
@@ -319,6 +326,7 @@ export interface VendorSku {
   purchasePrice: number;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  purchaseUnitAbbreviation?: string | null;
   unitsPerPurchaseUnit: number;
   /** Base unit label from product SKU (for pc ordering). */
   baseUnitName?: string | null;

@@ -22,6 +22,8 @@ import {
   type SyncPullResponse,
   type SyncStatusResponse,
   type SyncStream,
+  inventoryMovementAffectsWarehouseStock,
+  type InventoryMovementType,
 } from "@blackbox/shared";
 import {
   normalizeOptionalStoredText,
@@ -617,7 +619,9 @@ export class SyncService {
       });
       if (existing) return;
       const qty = Number(change.payload.quantity ?? 0);
-      const movementType = String(change.payload.movementType ?? "");
+      const movementType = String(
+        change.payload.movementType ?? "STOCK_ADJUSTMENT",
+      ) as InventoryMovementType;
       const signed =
         change.payload.delta != null
           ? Number(change.payload.delta)
@@ -635,35 +639,35 @@ export class SyncService {
           tenantId,
           productSkuId: skuId,
           warehouseId,
-          movementType: String(
-            change.payload.movementType ?? "STOCK_ADJUSTMENT",
-          ),
+          movementType,
           quantity: String(qty),
           referenceType: (change.payload.referenceType as string) ?? null,
           referenceId: (change.payload.referenceId as string) ?? null,
           reason: String(change.payload.reason ?? ""),
         }),
       );
-      let stock = await manager.findOne(InventoryStock, {
-        where: { tenantId, productSkuId: skuId, warehouseId },
-      });
-      if (!stock) {
-        stock = manager.create(InventoryStock, {
-          tenantId,
-          productSkuId: skuId,
-          warehouseId,
-          quantityOnHand: "0",
-          quantityReserved: "0",
-          quantityAvailable: "0",
+      if (inventoryMovementAffectsWarehouseStock(movementType)) {
+        let stock = await manager.findOne(InventoryStock, {
+          where: { tenantId, productSkuId: skuId, warehouseId },
         });
+        if (!stock) {
+          stock = manager.create(InventoryStock, {
+            tenantId,
+            productSkuId: skuId,
+            warehouseId,
+            quantityOnHand: "0",
+            quantityReserved: "0",
+            quantityAvailable: "0",
+          });
+        }
+        const next = Number(stock.quantityOnHand) + signed;
+        if (next < 0) throw new Error("Insufficient stock");
+        stock.quantityOnHand = String(next);
+        stock.quantityAvailable = String(
+          next - Number(stock.quantityReserved || 0),
+        );
+        await manager.save(stock);
       }
-      const next = Number(stock.quantityOnHand) + signed;
-      if (next < 0) throw new Error("Insufficient stock");
-      stock.quantityOnHand = String(next);
-      stock.quantityAvailable = String(
-        next - Number(stock.quantityReserved || 0),
-      );
-      await manager.save(stock);
       return;
     }
 

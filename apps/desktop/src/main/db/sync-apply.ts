@@ -17,10 +17,14 @@ import type {
   VendorDetail,
   VendorGroup,
   VendorReturnDetail,
+  InventoryMovementType,
+} from "@blackbox/shared";
+import {
+  DEMO_STORE_TENANT_ID,
+  inventoryMovementAffectsWarehouseStock,
 } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
-import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import {
   enqueueOutbox,
   recordApplied,
@@ -37,7 +41,11 @@ import { upsertWarehouseLocal } from "./warehouses-local";
 import { upsertInventoryMovementLocal } from "./movements-local";
 import { applyStockDeltaLocal } from "./stock-local";
 import { upsertProductLocal, upsertProductSkuLocal } from "./products-local";
-import { upsertVendorLocal, upsertVendorSkuLocal } from "./vendors-local";
+import {
+  syncVendorSkusPurchaseFromProductSkuLocal,
+  upsertVendorLocal,
+  upsertVendorSkuLocal,
+} from "./vendors-local";
 import {
   deleteSkuBarcodeLocal,
   upsertSkuBarcodeLocal,
@@ -210,6 +218,11 @@ export function applyChange(change: SyncChangeDto): void {
         p.maximumStockLevel == null ? null : Number(p.maximumStockLevel),
       trackInventory: Boolean(p.trackInventory ?? true),
       status: statusOf(p, change.operation),
+    });
+    syncVendorSkusPurchaseFromProductSkuLocal({
+      productSkuId: change.entityId,
+      purchaseUnitId: (p.purchaseUnitId as string | null) ?? null,
+      unitsPerPurchaseUnit: Number(p.unitsPerPurchaseUnit ?? 1),
     });
     return;
   }
@@ -624,11 +637,13 @@ export function applyChange(change: SyncChangeDto): void {
   }
   if (change.entityType === "inventory_movement") {
     const qty = Number(p.quantity ?? 0);
+    const movementType = String(
+      p.movementType ?? "STOCK_ADJUSTMENT",
+    ) as InventoryMovementType;
     const signed =
       p.delta != null
         ? Number(p.delta)
-        : String(p.movementType) === "INVENTORY_OUT" ||
-            String(p.movementType) === "RETURN"
+        : movementType === "INVENTORY_OUT" || movementType === "RETURN"
           ? -qty
           : qty;
     upsertInventoryMovementLocal({
@@ -638,14 +653,16 @@ export function applyChange(change: SyncChangeDto): void {
       variantName: str(p.variantName),
       warehouseId: str(p.warehouseId),
       warehouseName: str(p.warehouseName),
-      movementType: String(p.movementType ?? "STOCK_ADJUSTMENT") as never,
+      movementType,
       quantity: qty,
       referenceType: (p.referenceType as string | null) ?? null,
       referenceId: (p.referenceId as string | null) ?? null,
       reason: str(p.reason),
       createdAt: str(p.createdAt, now),
     });
-    applyStockDeltaLocal(str(p.productSkuId), str(p.warehouseId), signed);
+    if (inventoryMovementAffectsWarehouseStock(movementType)) {
+      applyStockDeltaLocal(str(p.productSkuId), str(p.warehouseId), signed);
+    }
   }
 }
 

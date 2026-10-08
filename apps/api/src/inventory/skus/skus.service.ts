@@ -19,7 +19,7 @@ import {
 } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
-import { InventoryStock, ProductSku, Unit } from "../../db/entities";
+import { InventoryStock, ProductSku, Unit, VendorSku } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { getInventoryOutBalanceQty } from "../inventory-out/inventory-out-balance";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
@@ -46,6 +46,8 @@ export class SkusService {
     private readonly units: Repository<Unit>,
     @InjectRepository(InventoryStock)
     private readonly stock: Repository<InventoryStock>,
+    @InjectRepository(VendorSku)
+    private readonly vendorSkus: Repository<VendorSku>,
     private readonly skuBarcodes: SkuBarcodesService,
   ) {}
 
@@ -269,6 +271,13 @@ export class SkusService {
 
     try {
       await this.skus.save(sku);
+      await this.vendorSkus.update(
+        { tenantId, productSkuId: id },
+        {
+          purchaseUnitId: sku.purchaseUnitId,
+          unitsPerPurchaseUnit: sku.unitsPerPurchaseUnit,
+        },
+      );
       return this.getById(id);
     } catch (error) {
       if (isUniqueViolation(error)) {
