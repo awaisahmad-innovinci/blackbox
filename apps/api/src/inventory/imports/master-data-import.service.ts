@@ -2,8 +2,10 @@ import { Injectable, UnprocessableEntityException } from "@nestjs/common";
 import {
   ENTITY_STATUSES,
   formatMasterDataHeaderMismatchMessage,
+  HS_CODE_PATTERN,
   LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   MASTER_DATA_07_PRODUCT_SKU_HEADERS,
+  PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   MASTER_DATA_IMPORT_FILES,
   PAYMENT_TERMS,
   PRODUCT_TYPES,
@@ -112,6 +114,34 @@ function csvHeadersMatch(
   );
 }
 
+function previous07RowToValues(
+  record: string[],
+): Record<MasterData07ProductSkuColumn, string> {
+  const cell = (index: number) => (record[index] ?? "").trim();
+  return {
+    product_import_key: cell(0),
+    sku: cell(1),
+    barcode: cell(2),
+    barcode_quantity_multiplier: cell(3),
+    variant_name: cell(4),
+    size_value: cell(5),
+    size_unit: cell(6),
+    base_unit_abbreviation: cell(7),
+    purchase_unit_abbreviation: cell(8),
+    units_per_purchase_unit: cell(9),
+    cost_price: cell(10),
+    selling_price: cell(11),
+    selling_price_per_purchase_unit: cell(12),
+    gst_percent: cell(13),
+    hs_code: "",
+    reorder_level: cell(14),
+    minimum_stock_level: cell(15),
+    maximum_stock_level: cell(16),
+    track_inventory: cell(17),
+    status: cell(18),
+  };
+}
+
 function legacy07RowToValues(
   record: string[],
 ): Record<MasterData07ProductSkuColumn, string> {
@@ -131,6 +161,7 @@ function legacy07RowToValues(
     selling_price: cell(10),
     selling_price_per_purchase_unit: cell(11),
     gst_percent: "",
+    hs_code: "",
     reorder_level: cell(12),
     minimum_stock_level: cell(13),
     maximum_stock_level: cell(14),
@@ -373,8 +404,13 @@ export class MasterDataImportService {
       file === "07_product_skus.csv" &&
       !csvHeadersMatch(actual, expected) &&
       csvHeadersMatch(actual, LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS);
+    const previous07 =
+      file === "07_product_skus.csv" &&
+      !csvHeadersMatch(actual, expected) &&
+      !legacy07 &&
+      csvHeadersMatch(actual, PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS);
 
-    if (!csvHeadersMatch(actual, expected) && !legacy07) {
+    if (!csvHeadersMatch(actual, expected) && !legacy07 && !previous07) {
       errors.push({
         file,
         line: 1,
@@ -405,6 +441,24 @@ export class MasterDataImportService {
           file,
           line: info.lines,
           values: legacy07RowToValues(record),
+        };
+      }
+      if (previous07) {
+        if (
+          record.length !== PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length
+        ) {
+          errors.push({
+            file,
+            line: info.lines,
+            column: null,
+            message: `Expected ${PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length} columns for previous 07_product_skus.csv row`,
+          });
+          return null;
+        }
+        return {
+          file,
+          line: info.lines,
+          values: previous07RowToValues(record),
         };
       }
       if (record.length !== expected.length) {
@@ -479,6 +533,12 @@ export class MasterDataImportService {
         min: 0,
         max: 100,
       });
+      const hsCode = row.values.hs_code.trim();
+      if (hsCode && !HS_CODE_PATTERN.test(hsCode)) {
+        errors.push(
+          this.rowError(row, "hs_code", "HS code must look like 0101.2100"),
+        );
+      }
       this.number(row, "units_per_purchase_unit", errors, {
         min: Number.EPSILON,
       });
@@ -1010,6 +1070,11 @@ export class MasterDataImportService {
         gstPercent: value.gst_percent.trim()
           ? String(Number(value.gst_percent))
           : "0",
+        hsCode: value.hs_code.trim()
+          ? value.hs_code.trim()
+          : created
+            ? null
+            : item.hsCode,
         reorderLevel: value.reorder_level,
         minimumStockLevel: value.minimum_stock_level,
         maximumStockLevel: value.maximum_stock_level || null,

@@ -54,12 +54,12 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
   db.prepare(
     `insert into product_skus (
       id, tenant_id, product_id, sku, barcode, variant_name, size_value, size_unit,
-      base_unit_id, purchase_unit_id, units_per_purchase_unit, cost_price, gst_percent, selling_price,
+      base_unit_id, purchase_unit_id, units_per_purchase_unit, cost_price, gst_percent, hs_code, selling_price,
       selling_price_per_purchase_unit, sale_discount_percent, reorder_level, minimum_stock_level, maximum_stock_level, track_inventory, status,
       created_at, updated_at, sync_status, server_updated_at
     ) values (
       @id, @tenantId, @productId, @sku, @barcode, @variantName, @sizeValue, @sizeUnit,
-      @baseUnitId, @purchaseUnitId, @unitsPerPurchaseUnit, @costPrice, @gstPercent, @sellingPrice,
+      @baseUnitId, @purchaseUnitId, @unitsPerPurchaseUnit, @costPrice, @gstPercent, @hsCode, @sellingPrice,
       @sellingPricePerPurchaseUnit, @saleDiscountPercent, @reorderLevel, @minimumStockLevel, @maximumStockLevel, @trackInventory, @status,
       @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
@@ -74,6 +74,7 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
       units_per_purchase_unit = excluded.units_per_purchase_unit,
       cost_price = excluded.cost_price,
       gst_percent = excluded.gst_percent,
+      hs_code = excluded.hs_code,
       selling_price = excluded.selling_price,
       selling_price_per_purchase_unit = excluded.selling_price_per_purchase_unit,
       sale_discount_percent = excluded.sale_discount_percent,
@@ -99,6 +100,7 @@ export function upsertProductSkuLocal(row: ProductSkuDetail): void {
     unitsPerPurchaseUnit: row.unitsPerPurchaseUnit,
     costPrice: row.costPrice,
     gstPercent: row.gstPercent ?? 0,
+    hsCode: row.hsCode ?? null,
     sellingPrice: row.sellingPrice,
     sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit,
     saleDiscountPercent: row.saleDiscountPercent ?? 0,

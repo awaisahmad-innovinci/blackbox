@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import type { SaleDetail, SalePaymentMethod } from "@blackbox/shared";
 import {
   THERMAL_RECEIPT_CLASS,
@@ -10,6 +12,35 @@ import {
   formatMoney,
   formatReceiptDateTime,
 } from "./thermal-receipt-shared";
+
+function FbrInvoiceQr({ value }: { value: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void QRCode.toDataURL(value, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 160,
+    })
+      .then((url) => {
+        if (!cancelled) setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value]);
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt="FBR invoice QR"
+      className="mx-auto h-[1in] w-[1in]"
+    />
+  );
+}
 
 function paymentMethodLabel(method: SalePaymentMethod): string {
   if (method === "CASH") return "Cash";
@@ -34,6 +65,7 @@ export function SaleThermalReceipt({
   businessPhone,
   cashierName,
   returnCredit,
+  fbrEnabled = false,
 }: {
   detail: SaleDetail;
   businessName: string;
@@ -41,6 +73,7 @@ export function SaleThermalReceipt({
   businessPhone?: string;
   cashierName: string;
   returnCredit?: SaleReturnCreditReceipt;
+  fbrEnabled?: boolean;
 }) {
   const totalItems = detail.items.length;
   const totalQty = detail.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -68,6 +101,12 @@ export function SaleThermalReceipt({
     (payment) => payment.method !== "CASH",
   );
   const showAllPayments = detail.payments.length > 1;
+  const showFbrNumber = Boolean(detail.fbrInvoiceNumber);
+  const showFbrError =
+    fbrEnabled &&
+    !showFbrNumber &&
+    detail.fbrStatus === "failed" &&
+    Boolean(detail.fbrError);
 
   return (
     <article data-thermal-receipt className={THERMAL_RECEIPT_CLASS}>
@@ -85,6 +124,9 @@ export function SaleThermalReceipt({
         <ThermalMetaRow label="At" value={time} />
         <ThermalMetaRow label="Cashier" value={cashierName} />
         <ThermalMetaRow label="Customer" value={detail.customerName} />
+        {detail.fbrSellerNtn ? (
+          <ThermalMetaRow label="NTN" value={detail.fbrSellerNtn} />
+        ) : null}
         {detail.status === "VOID" ? (
           <p className="pt-0.5 text-center text-sm font-bold">*** VOID ***</p>
         ) : null}
@@ -162,6 +204,23 @@ export function SaleThermalReceipt({
               />
             ))}
       </section>
+
+      {showFbrNumber || showFbrError ? (
+        <>
+          <ThermalRule />
+          <section className="space-y-1 text-center">
+            {showFbrNumber && detail.fbrInvoiceNumber ? (
+              <>
+                <p className="text-sm font-bold">FBR Invoice No</p>
+                <p className="font-mono text-xs break-all">{detail.fbrInvoiceNumber}</p>
+                <FbrInvoiceQr value={detail.fbrInvoiceNumber} />
+              </>
+            ) : (
+              <p className="text-xs font-bold">{detail.fbrError}</p>
+            )}
+          </section>
+        </>
+      ) : null}
 
       <ThermalRule />
 

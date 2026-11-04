@@ -9,12 +9,12 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       `insert into goods_receipts (
         id, tenant_id, receipt_number, purchase_order_id, vendor_id, warehouse_id,
         status, received_at, voucher_number, subtotal, discount, tax, adv_tax, gst,
-        incentive, shelf_rent, other_charges, return_credit, total, notes,
+        incentive, shelf_rent, other_charges, return_credit, total, amount_paid, notes,
         created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @receiptNumber, @purchaseOrderId, @vendorId, @warehouseId,
         @status, @receivedAt, @voucherNumber, @subtotal, @discount, @tax, @advTax, @gst,
-        @incentive, @shelfRent, @otherCharges, @returnCredit, @total, @notes,
+        @incentive, @shelfRent, @otherCharges, @returnCredit, @total, @amountPaid, @notes,
         @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )
       on conflict(id) do update set
@@ -35,6 +35,7 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
         other_charges = excluded.other_charges,
         return_credit = excluded.return_credit,
         total = excluded.total,
+        amount_paid = excluded.amount_paid,
         notes = excluded.notes,
         updated_at = excluded.updated_at,
         sync_status = 'synced',
@@ -59,6 +60,7 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       otherCharges: 0,
       returnCredit: detail.returnCredit ?? 0,
       total: detail.total,
+      amountPaid: detail.amountPaid ?? detail.total,
       notes: "",
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,

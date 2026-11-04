@@ -20,6 +20,7 @@ import type {
   InventoryMovementType,
 } from "@blackbox/shared";
 import {
+  asFbrInvoiceStatus,
   DEMO_STORE_TENANT_ID,
   inventoryMovementAffectsWarehouseStock,
 } from "@blackbox/shared";
@@ -52,6 +53,8 @@ import {
 } from "./sku-barcodes-local";
 import { upsertPurchaseOrderLocal } from "./purchase-orders-local";
 import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
+import { upsertVendorLedgerEntryLocal } from "./vendor-ledger-local";
+import { upsertCashExpenseLocal } from "./cash-flow-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
 import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
 import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
@@ -206,6 +209,7 @@ export function applyChange(change: SyncChangeDto): void {
       unitsPerPurchaseUnit: Number(p.unitsPerPurchaseUnit ?? 1),
       costPrice: Number(p.costPrice ?? 0),
       gstPercent: Number(p.gstPercent ?? 0),
+      hsCode: (p.hsCode as string | null | undefined) ?? null,
       sellingPrice: Number(p.sellingPrice ?? 0),
       sellingPricePerPurchaseUnit:
         p.sellingPricePerPurchaseUnit == null
@@ -348,12 +352,48 @@ export function applyChange(change: SyncChangeDto): void {
       otherCharges: 0,
       returnCredit: Number(p.returnCredit ?? 0),
       total: Number(p.total ?? 0),
+      amountPaid:
+        p.amountPaid != null && p.amountPaid !== ""
+          ? Number(p.amountPaid)
+          : Number(p.total ?? 0),
       notes: "",
       items: Array.isArray(p.items)
         ? (p.items as GoodsReceiptDetail["items"])
         : [],
       createdAt: str(p.createdAt, now),
       updatedAt: str(p.updatedAt, now),
+    });
+    return;
+  }
+  if (change.entityType === "cash_expense") {
+    const nowIso = now;
+    upsertCashExpenseLocal({
+      id: change.entityId,
+      recordedByUserId: str(p.recordedByUserId),
+      recordedByName: str(p.recordedByName),
+      category: str(p.category, "Other"),
+      amount: Number(p.amount ?? 0),
+      note: str(p.note),
+      occurredAt: str(p.occurredAt, nowIso),
+      createdAt: str(p.createdAt, nowIso),
+      updatedAt: str(p.updatedAt, nowIso),
+    });
+    return;
+  }
+  if (change.entityType === "vendor_ledger_entry") {
+    const entryType = p.entryType === "PAYMENT" ? "PAYMENT" : "CHARGE";
+    const nowIso = now;
+    upsertVendorLedgerEntryLocal({
+      id: change.entityId,
+      vendorId: str(p.vendorId),
+      entryType,
+      amount: Number(p.amount ?? 0),
+      goodsReceiptId: (p.goodsReceiptId as string | null) ?? null,
+      receiptNumber: (p.receiptNumber as string | null) ?? null,
+      note: str(p.note),
+      occurredAt: str(p.occurredAt, nowIso),
+      createdAt: str(p.createdAt, nowIso),
+      updatedAt: str(p.updatedAt, nowIso),
     });
     return;
   }
@@ -463,6 +503,11 @@ export function applyChange(change: SyncChangeDto): void {
       postedBy: (p.postedBy as string | null) ?? null,
       postedByName: (p.postedByName as string | null) ?? null,
       postedAt: (p.postedAt as string | null) ?? null,
+      fbrInvoiceNumber: (p.fbrInvoiceNumber as string | null) ?? null,
+      fbrStatus: asFbrInvoiceStatus(p.fbrStatus),
+      fbrError: (p.fbrError as string | null) ?? null,
+      fbrSubmittedAt: (p.fbrSubmittedAt as string | null) ?? null,
+      fbrSellerNtn: (p.fbrSellerNtn as string | null) ?? null,
       items,
       payments,
       createdAt: str(p.createdAt, now),

@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
@@ -62,6 +64,7 @@ export class SaleReturnsService {
   constructor(
     private readonly fixedTenant: FixedTenantContext,
     private readonly dataSource: DataSource,
+    @Inject(forwardRef(() => SalesService))
     private readonly salesService: SalesService,
     private readonly tills: TillsService,
     private readonly activityLog: ActivityLogService,

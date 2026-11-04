@@ -1,1 +1,17 @@
 import_key,name,brand_name,category_name,product_type,description,status
+1,SHAHQAM,SHAHQAM,DATES,STOCK_ITEM,,active
+2,National,National Foods,Spices & Masalas,STOCK_ITEM,National Foods ,active
+3,Shan Foods,Shan Foods,Spices & Masalas,STOCK_ITEM,Shan Foods,active
+4,Olper's,Olper's,"""Dairy (UHT Milk, Milk powder, Flavoured Milk)""",STOCK_ITEM,Olper's,active
+18,Hamdard,Hamdard,Spices & Masalas,STOCK_ITEM,Hamdard,active
+19,Oreal,Oreal,Spices & Masalas,STOCK_ITEM,Oreal,active
+20,Meezan,Meezan,Cooking Oil,STOCK_ITEM,Meezan,active
+21,Laziza,Laziza,Baking Ingredients,STOCK_ITEM,Laziza,active
+22,Rafhan,Rafhan,Baking Ingredients,STOCK_ITEM,Rafhan,active
+23,Bakea,Bakea,Baking Ingredients,STOCK_ITEM,Bakea,active
+24,SATANAJ,SATANAJ FLOUR,"""Flour, Grains, Spices & Seasonings""",STOCK_ITEM,SATANAJ Flour,active
+25,Hassan,Hassan,DATES,STOCK_ITEM,Hassan,active
+26,IQBAL FOODS,Iqbal Foods,"""Spices, Dry Fruits & Masalas""",STOCK_ITEM,IQBAL FOODS,active
+27,Sugarie,Sugarie,Baking Ingredients,STOCK_ITEM,Sugarie,active
+28,Rossmoor,Rossmoor,Baking Ingredients,STOCK_ITEM,Rossmoor,active
+29,Salman's,Salman's,Baking Ingredients,STOCK_ITEM,Salman's,active

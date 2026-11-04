@@ -315,6 +315,8 @@ export function ReceivePurchaseOrderPage() {
   const [incentive, setIncentive] = useState("0");
   const [shelfRent, setShelfRent] = useState("0");
   const [discount, setDiscount] = useState("0");
+  const [paidInput, setPaidInput] = useState("");
+  const [paidTouched, setPaidTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -492,6 +494,15 @@ export function ReceivePurchaseOrderPage() {
       returnCredit,
     ],
   );
+  const paidDisplay = paidTouched ? paidInput : String(grandTotal);
+  const amountPaid = useMemo(() => {
+    const n = Number(paidDisplay);
+    return Number.isFinite(n) ? roundMoney4(n) : Number.NaN;
+  }, [paidDisplay]);
+  const receiptCredit = useMemo(() => {
+    if (!Number.isFinite(amountPaid)) return 0;
+    return roundMoney4(Math.max(0, grandTotal - amountPaid));
+  }, [amountPaid, grandTotal]);
   const returnAdjustments = useMemo(
     () => buildReturnAdjustments(pendingReturns, returnSettlements),
     [pendingReturns, returnSettlements],
@@ -564,6 +575,10 @@ export function ReceivePurchaseOrderPage() {
       setError("You cannot receive with 0 quantity.");
       return false;
     }
+    if (!Number.isFinite(amountPaid) || amountPaid < 0 || amountPaid > grandTotal) {
+      setError("Paid amount must be between 0 and the grand total");
+      return false;
+    }
     return true;
   }
 
@@ -600,6 +615,7 @@ export function ReceivePurchaseOrderPage() {
           otherCharges: 0,
           returnCredit,
           total: grandTotal,
+          amountPaid,
           notes: "",
           items: lines.map((l) => ({
             id: crypto.randomUUID(),
@@ -636,6 +652,46 @@ export function ReceivePurchaseOrderPage() {
             returnAdjustments,
           },
         });
+        if (header.vendorId && grandTotal > 0) {
+          const chargeId = crypto.randomUUID();
+          await commitLocalChange({
+            entityType: "vendor_ledger_entry",
+            entityId: chargeId,
+            operation: "UPSERT",
+            payload: {
+              id: chargeId,
+              vendorId: header.vendorId,
+              entryType: "CHARGE",
+              amount: grandTotal,
+              goodsReceiptId: localId,
+              receiptNumber,
+              note: `Receipt ${receiptNumber}`,
+              occurredAt: now,
+              createdAt: now,
+              updatedAt: now,
+            },
+          });
+        }
+        if (header.vendorId && amountPaid > 0) {
+          const paymentId = crypto.randomUUID();
+          await commitLocalChange({
+            entityType: "vendor_ledger_entry",
+            entityId: paymentId,
+            operation: "UPSERT",
+            payload: {
+              id: paymentId,
+              vendorId: header.vendorId,
+              entryType: "PAYMENT",
+              amount: amountPaid,
+              goodsReceiptId: localId,
+              receiptNumber,
+              note: `Payment on receipt ${receiptNumber}`,
+              occurredAt: now,
+              createdAt: now,
+              updatedAt: now,
+            },
+          });
+        }
         const poPayload = await buildReceivedPurchaseOrderPayload(
           id,
           header,
@@ -743,6 +799,7 @@ export function ReceivePurchaseOrderPage() {
         gst: gstN,
         incentive: incentiveN,
         shelfRent: shelfRentN,
+        amountPaid,
         returnAdjustments:
           returnAdjustments.length > 0 ? returnAdjustments : undefined,
         items: lines.map((l) => ({
@@ -1234,6 +1291,26 @@ export function ReceivePurchaseOrderPage() {
           <span>Grand total</span>
           <span className="tabular-nums">{grandTotal.toLocaleString()}</span>
         </div>
+        <div className="flex items-center justify-between gap-6">
+          <Label htmlFor="amount-paid">Paid</Label>
+          <Input
+            id="amount-paid"
+            className="h-8 w-28"
+            inputMode="decimal"
+            value={paidDisplay}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => {
+              setPaidTouched(true);
+              setPaidInput(e.target.value);
+            }}
+          />
+        </div>
+        {header?.vendorId ? (
+          <div className="flex justify-between gap-6">
+            <span className="text-muted-foreground">Credit for this vendor</span>
+            <span className="tabular-nums">{receiptCredit.toLocaleString()}</span>
+          </div>
+        ) : null}
       </section>
 
       <div className="flex flex-wrap gap-3">
@@ -1302,6 +1379,8 @@ export function ReceivePurchaseOrderPage() {
               </p>
               <p>Return credit: {returnCredit.toLocaleString()}</p>
               <p>Total: {grandTotal.toLocaleString()}</p>
+              <p>Paid: {Number.isFinite(amountPaid) ? amountPaid.toLocaleString() : "—"}</p>
+              <p>Vendor credit: {receiptCredit.toLocaleString()}</p>
             </>
           ) : null
         }

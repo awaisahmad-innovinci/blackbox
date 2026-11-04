@@ -95,6 +95,21 @@ export class Sale {
   @Column({ type: "text", default: "" })
   notes!: string;
 
+  @Column({ name: "fbr_invoice_number", type: "text", nullable: true })
+  fbrInvoiceNumber!: string | null;
+
+  @Column({ name: "fbr_status", type: "text", default: "pending" })
+  fbrStatus!: string;
+
+  @Column({ name: "fbr_error", type: "text", nullable: true })
+  fbrError!: string | null;
+
+  @Column({ name: "fbr_submitted_at", type: "timestamptz", nullable: true })
+  fbrSubmittedAt!: Date | null;
+
+  @Column({ name: "fbr_seller_ntn", type: "text", nullable: true })
+  fbrSellerNtn!: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

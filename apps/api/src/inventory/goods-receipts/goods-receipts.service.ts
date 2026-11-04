@@ -33,6 +33,7 @@ import {
   PurchaseOrder,
   PurchaseOrderItem,
   Vendor,
+  VendorLedgerEntry,
   VendorReturn,
   VendorReturnItem,
   VendorSku,
@@ -448,6 +449,13 @@ export class GoodsReceiptsService {
         shelfRent,
         returnCredit,
       });
+      const amountPaid =
+        dto.amountPaid == null ? total : round4(Number(dto.amountPaid));
+      if (amountPaid < 0 || amountPaid > total) {
+        throw new BadRequestException(
+          "Paid amount must be between 0 and the grand total",
+        );
+      }
 
       const receiptNumber = await allocateReceiptNumber(manager, tenantId);
       const receivedAt = new Date();
@@ -472,9 +480,39 @@ export class GoodsReceiptsService {
           otherCharges: "0",
           returnCredit: String(returnCredit),
           total: String(total),
+          amountPaid: String(amountPaid),
           notes: "",
         }),
       );
+
+      if (po.vendorId && total > 0) {
+        await manager.getRepository(VendorLedgerEntry).save(
+          manager.getRepository(VendorLedgerEntry).create({
+            tenantId,
+            vendorId: po.vendorId,
+            entryType: "CHARGE",
+            amount: String(total),
+            goodsReceiptId: receipt.id,
+            receiptNumber,
+            note: `Receipt ${receiptNumber}`,
+            occurredAt: receivedAt,
+          }),
+        );
+      }
+      if (po.vendorId && amountPaid > 0) {
+        await manager.getRepository(VendorLedgerEntry).save(
+          manager.getRepository(VendorLedgerEntry).create({
+            tenantId,
+            vendorId: po.vendorId,
+            entryType: "PAYMENT",
+            amount: String(amountPaid),
+            goodsReceiptId: receipt.id,
+            receiptNumber,
+            note: `Payment on receipt ${receiptNumber}`,
+            occurredAt: receivedAt,
+          }),
+        );
+      }
 
       for (const line of builtLines) {
         await manager.getRepository(GoodsReceiptItem).save(
@@ -660,6 +698,7 @@ export class GoodsReceiptsService {
       otherCharges: toNum(receipt.otherCharges),
       returnCredit: toNum(receipt.returnCredit),
       total: toNum(receipt.total),
+      amountPaid: toNum(receipt.amountPaid),
       notes: receipt.notes,
       items,
       createdAt: receipt.createdAt.toISOString(),

@@ -16,6 +16,7 @@ import {
   FormSuccess,
   SectionCard,
 } from "@/components/section-card";
+import { FBR_PROVINCES } from "@blackbox/shared";
 import {
   getCurrentTenant,
   updateCurrentTenant,
@@ -39,6 +40,15 @@ export default function SettingsPage() {
   const [requireFocApproval, setRequireFocApproval] = useState(true);
   const [defaultGstRate, setDefaultGstRate] = useState("0");
   const [defaultSalesTaxRate, setDefaultSalesTaxRate] = useState("0");
+  const [fbrEnabled, setFbrEnabled] = useState(false);
+  const [fbrEnvironment, setFbrEnvironment] = useState<"sandbox" | "production">(
+    "sandbox",
+  );
+  const [fbrSellerNtn, setFbrSellerNtn] = useState("");
+  const [fbrSellerProvince, setFbrSellerProvince] = useState("");
+  const [fbrSellerAddress, setFbrSellerAddress] = useState("");
+  const [fbrScenarioId, setFbrScenarioId] = useState("SN026");
+  const [fbrToken, setFbrToken] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,6 +62,7 @@ export default function SettingsPage() {
       setRequireFocApproval(next.requireManagerApprovalFoc);
       setDefaultGstRate(String(next.defaultGstRate ?? 0));
       setDefaultSalesTaxRate(String(next.defaultSalesTaxRate ?? 0));
+      applyFbr(next);
     } catch (err) {
       setError(err);
     } finally {
@@ -62,6 +73,43 @@ export default function SettingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  function applyFbr(next: TenantDto) {
+    setFbrEnabled(next.fbrEnabled === true);
+    setFbrEnvironment(next.fbrEnvironment === "production" ? "production" : "sandbox");
+    setFbrSellerNtn(next.fbrSellerNtn ?? "");
+    setFbrSellerProvince(next.fbrSellerProvince ?? "");
+    setFbrSellerAddress(next.fbrSellerAddress ?? "");
+    setFbrScenarioId(next.fbrScenarioId || "SN026");
+    setFbrToken("");
+  }
+
+  async function onSaveFbr(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!tenant) return;
+    setBusy(true);
+    setSuccess(null);
+    setFormError(null);
+    try {
+      const updated = await updateCurrentTenant({
+        name: tenant.name,
+        fbrEnabled,
+        fbrEnvironment,
+        fbrSellerNtn: fbrSellerNtn.trim(),
+        fbrSellerProvince: fbrSellerProvince,
+        fbrSellerAddress: fbrSellerAddress.trim(),
+        fbrScenarioId: fbrScenarioId.trim() || "SN026",
+        ...(fbrToken.trim() ? { fbrToken: fbrToken.trim() } : {}),
+      });
+      setTenant(updated);
+      applyFbr(updated);
+      setSuccess("FBR settings saved.");
+    } catch (err) {
+      setFormError(toUserFacingError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -223,6 +271,146 @@ export default function SettingsPage() {
                 </div>
               )}
             </SectionCard> */}
+
+            <SectionCard
+              title="FBR digital invoicing"
+              description="Turn this on to send each posted sale to FBR and print the invoice number on the bill. Leave it off and bills stay as they are."
+            >
+              {hasPermission("tenant.settings.write") ? (
+                <form className="space-y-4" onSubmit={(e) => void onSaveFbr(e)}>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="fbrEnabled"
+                      checked={fbrEnabled}
+                      onCheckedChange={(checked) => setFbrEnabled(checked === true)}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="fbrEnabled" className="font-normal">
+                        Enable FBR invoicing
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        When this is off, sales are not sent to FBR and the bill
+                        does not include an FBR line.
+                      </p>
+                    </div>
+                  </div>
+                  {fbrEnabled ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="fbrEnvironment">Environment</Label>
+                      <select
+                        id="fbrEnvironment"
+                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                        value={fbrEnvironment}
+                        onChange={(event) =>
+                          setFbrEnvironment(
+                            event.target.value === "production"
+                              ? "production"
+                              : "sandbox",
+                          )
+                        }
+                      >
+                        <option value="sandbox">Sandbox</option>
+                        <option value="production">Production</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fbrScenarioId">Sandbox scenario</Label>
+                      <Input
+                        id="fbrScenarioId"
+                        value={fbrScenarioId}
+                        placeholder="SN026"
+                        onChange={(event) => setFbrScenarioId(event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fbrSellerNtn">Seller NTN</Label>
+                      <Input
+                        id="fbrSellerNtn"
+                        value={fbrSellerNtn}
+                        inputMode="numeric"
+                        placeholder="7, 9, or 13 digits"
+                        onChange={(event) => setFbrSellerNtn(event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fbrSellerProvince">Seller province</Label>
+                      <select
+                        id="fbrSellerProvince"
+                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                        value={fbrSellerProvince}
+                        onChange={(event) =>
+                          setFbrSellerProvince(event.target.value)
+                        }
+                      >
+                        <option value="">Select province</option>
+                        {FBR_PROVINCES.map((province) => (
+                          <option key={province} value={province}>
+                            {province}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="fbrSellerAddress">Seller address</Label>
+                      <Input
+                        id="fbrSellerAddress"
+                        value={fbrSellerAddress}
+                        onChange={(event) =>
+                          setFbrSellerAddress(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="fbrToken">Security token</Label>
+                      <Input
+                        id="fbrToken"
+                        type="password"
+                        autoComplete="off"
+                        value={fbrToken}
+                        placeholder={
+                          tenant.fbrTokenConfigured
+                            ? "Token saved — leave blank to keep it"
+                            : "Paste the IRIS sandbox token"
+                        }
+                        onChange={(event) => setFbrToken(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                  ) : null}
+                  <Button type="submit" disabled={busy}>
+                    {busy ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save FBR settings"
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  <p>FBR invoicing: {tenant.fbrEnabled ? "On" : "Off"}</p>
+                  {tenant.fbrEnabled ? (
+                    <>
+                  <p>Environment: {tenant.fbrEnvironment || "sandbox"}</p>
+                  <p>Seller NTN: {tenant.fbrSellerNtn || "—"}</p>
+                  <p>Province: {tenant.fbrSellerProvince || "—"}</p>
+                  <p>Address: {tenant.fbrSellerAddress || "—"}</p>
+                  <p>Scenario: {tenant.fbrScenarioId || "SN026"}</p>
+                  <p>
+                    Token: {tenant.fbrTokenConfigured ? "Saved" : "Not set"}
+                  </p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Bills do not include an FBR line.
+                    </p>
+                  )}
+                </div>
+              )}
+            </SectionCard>
 
             <SectionCard
               title="Manager approval"

@@ -41,8 +41,9 @@ import type {
   SaleStatus,
   WarehouseListItem,
 } from "@blackbox/shared";
-import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
+import { listDrawerBalancesLocal } from "./cash-flow-local";
 import { getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
 
 function pageParams(page?: number, pageSize?: number) {
@@ -611,6 +612,15 @@ export function getCashierDashboardSummaryLocal(
     )
     .get({ tenantId, userId }) as { amount: number };
 
+  const nonFbrSalesRow = db
+    .prepare(
+      `select coalesce(sum(s.total), 0) as amount
+       from sales s
+       where ${saleFilters}
+         and s.fbr_status = 'excluded'`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
   const cashRow = db
     .prepare(
       `select coalesce(sum(sp.amount), 0) as amount
@@ -656,6 +666,7 @@ export function getCashierDashboardSummaryLocal(
   return {
     date: todayRow.d,
     totalSalesAmount: roundMoney(Number(totalSalesRow.amount)),
+    nonFbrSalesAmount: roundMoney(Number(nonFbrSalesRow.amount)),
     cashReceivedAmount: roundMoney(Number(cashRow.amount)),
     cardPaymentsAmount: roundMoney(Number(cardRow.amount)),
     heldBillsCount: Number(heldRow.cnt),
@@ -668,6 +679,8 @@ export function getCashierDashboardSummaryLocal(
 
 export function getManagerDashboardSummaryLocal(
   userId: string,
+  seeAll = false,
+  managerName = "",
 ): ManagerDashboardSummary {
   const db = getLocalDb();
   const tenantId = DEMO_STORE_TENANT_ID;
@@ -697,11 +710,19 @@ export function getManagerDashboardSummaryLocal(
     .get({ tenantId, today }) as { cnt: number };
 
   const tillCashCollectedAmount = roundMoney(Number(tillRow.amount));
+  const drawers = listDrawerBalancesLocal({
+    userId,
+    managerName,
+    seeAll,
+  });
+  const own = drawers.find((row) => row.managerUserId === userId);
 
   return {
     date: today,
     tillCashCollectedAmount,
     customerReturnCount: Number(returnCountRow.cnt),
+    drawerBalance: own?.balance ?? 0,
+    drawers,
   };
 }
 
@@ -1521,6 +1542,7 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
          coalesce(w.name, '—') as warehouseName,
          s.status,
          s.total,
+         s.fbr_status as fbrStatus,
          s.posted_at as postedAt,
          (
            select count(*) from sale_lines l
@@ -1541,6 +1563,7 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
     warehouseName: string;
     status: string;
     total: number;
+    fbrStatus: string | null;
     postedAt: string | null;
     itemCount: number;
   }>;
@@ -1555,6 +1578,7 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
       total: Number(r.total),
       itemCount: Number(r.itemCount),
       postedAt: r.postedAt,
+      fbrStatus: asFbrInvoiceStatus(r.fbrStatus),
     })),
     total,
     page,

@@ -71,6 +71,9 @@ export class SaleLine {
   @Column({ type: "text", nullable: true })
   barcode!: string | null;
 
+  @Column({ name: "hs_code", type: "text", nullable: true })
+  hsCode!: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

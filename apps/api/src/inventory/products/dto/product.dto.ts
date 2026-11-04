@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsNumber,
+  Matches,
   IsOptional,
   IsString,
   IsUUID,
@@ -114,6 +115,12 @@ export class CreateProductSkuDto {
   @Min(0)
   @Max(100)
   gstPercent?: number;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value != null && String(value).trim() !== "")
+  @IsString()
+  @Matches(/^\d{4}\.\d{4}$/, { message: "HS code must look like 0101.2100" })
+  hsCode?: string | null;
 
   @Type(() => Number)
   @IsNumber()

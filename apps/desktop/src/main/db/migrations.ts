@@ -1357,6 +1357,53 @@ where units_per_purchase_unit > 0;
     `,
   },
   {
+    id: "041_fbr_digital_invoicing",
+    sql: `-- columns added in after()`,
+    after: (db) => {
+      const add = (table: string, column: string, ddl: string) => {
+        const cols = (
+          db.prepare(`pragma table_info(${table})`).all() as { name: string }[]
+        ).map((c) => c.name);
+        if (!cols.includes(column)) {
+          db.exec(`alter table ${table} add column ${ddl}`);
+        }
+      };
+      add("product_skus", "hs_code", "hs_code text");
+      add("sale_lines", "hs_code", "hs_code text");
+      add("sales", "fbr_invoice_number", "fbr_invoice_number text");
+      add("sales", "fbr_status", "fbr_status text not null default 'pending'");
+      add("sales", "fbr_error", "fbr_error text");
+      add("sales", "fbr_submitted_at", "fbr_submitted_at text");
+      add("sales", "fbr_seller_ntn", "fbr_seller_ntn text");
+    },
+  },
+  {
+    id: "042_vendor_ledger",
+    sql: `
+      alter table goods_receipts add column amount_paid real not null default 0;
+      update goods_receipts set amount_paid = total;
+      create table if not exists vendor_ledger_entries (
+        id text primary key,
+        tenant_id text not null,
+        vendor_id text not null,
+        entry_type text not null,
+        amount real not null,
+        goods_receipt_id text,
+        receipt_number text,
+        note text not null default '',
+        occurred_at text not null,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists vendor_ledger_entries_tenant_vendor_idx
+        on vendor_ledger_entries (tenant_id, vendor_id);
+      create index if not exists vendor_ledger_entries_goods_receipt_id_idx
+        on vendor_ledger_entries (goods_receipt_id);
+    `,
+  },
+  {
     id: "040_products_import_key",
     sql: `-- column added in after()`,
     after: (db) => {
@@ -1372,6 +1419,31 @@ where units_per_purchase_unit > 0;
          where import_key is not null and import_key != ''`,
       );
     },
+  },
+  {
+    id: "043_cash_expenses",
+    sql: `
+      create table if not exists cash_expenses (
+        id text primary key,
+        tenant_id text not null,
+        recorded_by_user_id text not null,
+        recorded_by_name text not null default '',
+        category text not null,
+        amount real not null,
+        note text not null default '',
+        occurred_at text not null,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists cash_expenses_tenant_id_idx
+        on cash_expenses (tenant_id);
+      create index if not exists cash_expenses_recorded_by_idx
+        on cash_expenses (tenant_id, recorded_by_user_id);
+      create index if not exists cash_expenses_occurred_at_idx
+        on cash_expenses (tenant_id, occurred_at);
+    `,
   },
 ];
 

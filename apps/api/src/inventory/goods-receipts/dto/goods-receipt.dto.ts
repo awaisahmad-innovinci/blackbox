@@ -123,6 +123,12 @@ export class CreateGoodsReceiptDto {
   @Min(0)
   otherCharges?: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  amountPaid?: number;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

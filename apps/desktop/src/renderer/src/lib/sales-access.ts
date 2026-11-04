@@ -156,6 +156,10 @@ export function isRouteAllowed(pathname: string, permissions: string[]): boolean
     return canAccessActivity(permissions);
   }
 
+  if (pathname === "/cash-flow") {
+    return showManagerDashboard(permissions);
+  }
+
   if (pathname === "/reports/taxes" || pathname.startsWith("/reports/")) {
     return canAccessTaxReports(permissions);
   }

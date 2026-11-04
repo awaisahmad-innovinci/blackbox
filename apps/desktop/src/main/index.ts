@@ -32,6 +32,8 @@ import type {
   VendorDetail,
   VendorGroup,
   VendorListQuery,
+  VendorCreditQuery,
+  VendorPaymentListQuery,
   VendorReturnDetail,
   VendorReturnListQuery,
   VendorSku,
@@ -59,6 +61,11 @@ import {
   upsertGoodsReceiptLocal,
   upsertGoodsReceiptsLocal,
 } from "./db/goods-receipts-local";
+import {
+  getVendorLedgerLocal,
+  listVendorCreditsLocal,
+  listVendorPaymentsLocal,
+} from "./db/vendor-ledger-local";
 import {
   upsertInventoryOutLocal,
   upsertInventoryOutsLocal,
@@ -151,6 +158,7 @@ import {
   getInventoryOutLocal,
   getInventoryOutReturnLocal,
   getSaleLocal,
+  listPendingFbrSalesLocal,
   getReturnableSaleLinesLocal,
   getSaleReturnLocal,
   resolveSaleByNumberLocal,
@@ -177,6 +185,7 @@ import {
   listSkuBarcodesLocal,
   upsertSkuBarcodeLocal,
 } from "./db/sku-barcodes-local";
+import { getCashFlowLocal } from "./db/cash-flow-local";
 import {
   getCashierDashboardSummaryLocal,
   getDashboardSummaryLocal,
@@ -223,6 +232,7 @@ import {
 import {
   enqueueOutbox,
   listPendingOutbox,
+  listPendingOutboxForEntity,
   markOutboxAcked,
   markOutboxPending,
   markOutboxPushing,
@@ -517,6 +527,18 @@ function registerIpc(): void {
     (_event, query: GoodsReceiptListQuery = {}) =>
       listGoodsReceiptsLocal(query),
   );
+  ipcMain.handle("localDb:getVendorLedger", (_event, vendorId: string) =>
+    getVendorLedgerLocal(vendorId),
+  );
+  ipcMain.handle(
+    "localDb:listVendorPayments",
+    (_event, query: VendorPaymentListQuery = {}) =>
+      listVendorPaymentsLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listVendorCredits",
+    (_event, query: VendorCreditQuery = {}) => listVendorCreditsLocal(query),
+  );
   ipcMain.handle("localDb:listPoNumbers", () => listPoNumbersLocal());
   ipcMain.handle("localDb:listSkuCodes", () => listSkuCodesLocal());
   ipcMain.handle("localDb:listReceiptNumbers", () =>
@@ -794,7 +816,25 @@ function registerIpc(): void {
   );
   ipcMain.handle(
     "localDb:getManagerDashboardSummary",
-    (_event, userId: string) => getManagerDashboardSummaryLocal(userId),
+    (_event, userId: string, seeAll?: boolean, managerName?: string) =>
+      getManagerDashboardSummaryLocal(
+        userId,
+        Boolean(seeAll),
+        managerName ?? "",
+      ),
+  );
+  ipcMain.handle(
+    "localDb:getCashFlow",
+    (
+      _event,
+      query: {
+        userId: string;
+        managerName: string;
+        seeAll: boolean;
+        from: string;
+        to: string;
+      },
+    ) => getCashFlowLocal(query),
   );
   ipcMain.handle(
     "localDb:listManagerStockOverview",
@@ -935,6 +975,9 @@ function registerIpc(): void {
     getInventoryOutReturnLocal(id),
   );
   ipcMain.handle("localDb:getSale", (_event, id: string) => getSaleLocal(id));
+  ipcMain.handle("localDb:listPendingFbrSales", () =>
+    listPendingFbrSalesLocal(),
+  );
   ipcMain.handle(
     "localDb:resolveSaleByNumber",
     (_event, saleNumber: string) => resolveSaleByNumberLocal(saleNumber),
@@ -1044,6 +1087,11 @@ function registerIpc(): void {
   );
   ipcMain.handle("sync:listOutbox", (_event, limit?: number) =>
     listPendingOutbox(limit ?? 100),
+  );
+  ipcMain.handle(
+    "sync:listOutboxForEntity",
+    (_event, entityType: string, entityId: string) =>
+      listPendingOutboxForEntity(entityType, entityId),
   );
   ipcMain.handle("sync:markPushing", (_event, ids: string[]) => {
     markOutboxPushing(ids);

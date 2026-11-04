@@ -7,10 +7,16 @@ import type {
   DashboardSummary,
   EntityStatus,
   ManagerDashboardSummary,
+  CashFlowReport,
   ManagerStockOverviewQuery,
   PaginatedManagerStockOverview,
   GoodsReceiptDetail,
   GoodsReceiptListQuery,
+  PaginatedVendorPayments,
+  VendorCreditLedger,
+  VendorCreditQuery,
+  VendorLedger,
+  VendorPaymentListQuery,
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
@@ -181,6 +187,13 @@ declare global {
         listGoodsReceipts: (
           query?: GoodsReceiptListQuery,
         ) => Promise<PaginatedGoodsReceipts>;
+        getVendorLedger: (vendorId: string) => Promise<VendorLedger>;
+        listVendorPayments: (
+          query?: VendorPaymentListQuery,
+        ) => Promise<PaginatedVendorPayments>;
+        listVendorCredits: (
+          query?: VendorCreditQuery,
+        ) => Promise<VendorCreditLedger>;
         listPoNumbers: () => Promise<string[]>;
         listSkuCodes: () => Promise<string[]>;
         listReceiptNumbers: () => Promise<string[]>;
@@ -339,7 +352,16 @@ declare global {
         ) => Promise<CashierDashboardSummary>;
         getManagerDashboardSummary: (
           userId: string,
+          seeAll?: boolean,
+          managerName?: string,
         ) => Promise<ManagerDashboardSummary>;
+        getCashFlow: (query: {
+          userId: string;
+          managerName: string;
+          seeAll: boolean;
+          from: string;
+          to: string;
+        }) => Promise<CashFlowReport>;
         listManagerStockOverview: (
           query?: ManagerStockOverviewQuery,
         ) => Promise<PaginatedManagerStockOverview>;
@@ -414,6 +436,7 @@ declare global {
           id: string,
         ) => Promise<InventoryOutReturnDetail | null>;
         getSale: (id: string) => Promise<SaleDetail | null>;
+        listPendingFbrSales: () => Promise<SaleDetail[]>;
         listVendorReturns: (
           query?: VendorReturnListQuery,
         ) => Promise<PaginatedVendorReturns>;
@@ -470,6 +493,10 @@ declare global {
       };
       sync?: {
         listOutbox: (limit?: number) => Promise<unknown>;
+        listOutboxForEntity: (
+          entityType: string,
+          entityId: string,
+        ) => Promise<unknown>;
         markPushing: (ids: string[]) => Promise<{ ok: true }>;
         markAcked: (
           changeId: string,

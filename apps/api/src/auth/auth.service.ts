@@ -320,6 +320,7 @@ export class AuthService {
           tenant.requireManagerApprovalFoc,
           tenant.defaultGstRate,
           tenant.defaultSalesTaxRate,
+          tenant.fbrEnabled,
         ),
         tokens: {
           accessToken,
@@ -369,6 +370,7 @@ export class AuthService {
       tenant.requireManagerApprovalFoc,
       tenant.defaultGstRate,
       tenant.defaultSalesTaxRate,
+      tenant.fbrEnabled,
     );
   }
 
@@ -488,6 +490,7 @@ export class AuthService {
         tenant?.requireManagerApprovalFoc,
         tenant?.defaultGstRate,
         tenant?.defaultSalesTaxRate,
+        tenant?.fbrEnabled,
       ),
       tokens: {
         accessToken,
@@ -603,6 +606,7 @@ export class AuthService {
     requireManagerApprovalFoc?: boolean,
     defaultGstRate?: number,
     defaultSalesTaxRate?: number,
+    fbrEnabled?: boolean,
   ): AuthUser {
     return {
       id: user.id,
@@ -620,6 +624,7 @@ export class AuthService {
       requireManagerApprovalFoc,
       defaultGstRate,
       defaultSalesTaxRate,
+      fbrEnabled,
     };
   }
 

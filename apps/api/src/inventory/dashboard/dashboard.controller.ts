@@ -46,7 +46,11 @@ export class DashboardController {
   getManagerSummary(
     @CurrentUser() user: TenantContext,
   ): Promise<ManagerDashboardSummary> {
-    return this.dashboardService.getManagerSummary(user.userId, user.tenantId);
+    return this.dashboardService.getManagerSummary(
+      user.userId,
+      user.tenantId,
+      user.permissions.includes("web.access"),
+    );
   }
 
   @Get("manager-stock-overview")

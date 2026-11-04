@@ -15,6 +15,13 @@ export type TenantDto = {
   requireManagerApprovalFoc: boolean;
   defaultGstRate: number;
   defaultSalesTaxRate: number;
+  fbrEnabled: boolean;
+  fbrEnvironment: "sandbox" | "production";
+  fbrTokenConfigured: boolean;
+  fbrSellerNtn: string | null;
+  fbrSellerProvince: string | null;
+  fbrSellerAddress: string | null;
+  fbrScenarioId: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -74,6 +81,13 @@ export function updateCurrentTenant(body: {
   requireManagerApprovalFoc?: boolean;
   defaultGstRate?: number;
   defaultSalesTaxRate?: number;
+  fbrEnabled?: boolean;
+  fbrEnvironment?: "sandbox" | "production";
+  fbrToken?: string;
+  fbrSellerNtn?: string;
+  fbrSellerProvince?: string;
+  fbrSellerAddress?: string;
+  fbrScenarioId?: string;
 }) {
   return apiJson<TenantDto>("/tenants/current", "PATCH", body);
 }

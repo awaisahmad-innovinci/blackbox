@@ -223,6 +223,16 @@ export function GoodsReceiptProfilePage() {
           <span>Grand total</span>
           <span className="tabular-nums">{receipt.total.toLocaleString()}</span>
         </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-muted-foreground">Paid</span>
+          <span className="tabular-nums">{receipt.amountPaid.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-muted-foreground">Vendor credit</span>
+          <span className="tabular-nums">
+            {Math.max(0, receipt.total - receipt.amountPaid).toLocaleString()}
+          </span>
+        </div>
       </section>
     </PrintDocument>
   );

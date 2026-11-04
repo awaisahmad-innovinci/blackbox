@@ -19,6 +19,7 @@ import type {
 } from "@blackbox/shared";
 import {
   costWithGst,
+  normalizeHsCode,
   nextSkuCodeForProduct,
   normalizeUnitsPerPurchaseUnit,
 } from "@blackbox/shared";
@@ -335,6 +336,10 @@ export class ProductsService {
         "Selling price must be greater than cost + GST",
       );
     }
+    const hsCode = normalizeHsCode(dto.hsCode);
+    if (!hsCode) {
+      throw new BadRequestException("HS code is required");
+    }
 
     const existing = await this.skus.find({
       where: { tenantId, productId },
@@ -368,6 +373,7 @@ export class ProductsService {
           unitsPerPurchaseUnit: String(unitsPerPurchaseUnit),
           costPrice: String(dto.costPrice),
           gstPercent: String(dto.gstPercent ?? 0),
+          hsCode,
           sellingPrice: String(dto.sellingPrice),
           sellingPricePerPurchaseUnit:
             dto.sellingPricePerPurchaseUnit == null
@@ -508,6 +514,7 @@ export class ProductsService {
       unitsPerPurchaseUnit: toNum(s.unitsPerPurchaseUnit),
       costPrice: toNum(s.costPrice),
       gstPercent: toNum(s.gstPercent),
+      hsCode: s.hsCode,
       sellingPrice: toNum(s.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(s.sellingPricePerPurchaseUnit),
       saleDiscountPercent: toNum(s.saleDiscountPercent),

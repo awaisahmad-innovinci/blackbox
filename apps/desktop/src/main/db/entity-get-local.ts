@@ -40,7 +40,7 @@ import type {
   VendorSku,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import {
   findBarcodeMatchLocal,
@@ -181,6 +181,7 @@ export function listProductSkusLocal(productId: string): ProductSkuDetail[] {
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
          coalesce(s.gst_percent, 0) as gstPercent,
+         s.hs_code as hsCode,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -223,6 +224,7 @@ function mapProductSkuRow(r: Record<string, unknown>): ProductSkuDetail {
     unitsPerPurchaseUnit: num(r.unitsPerPurchaseUnit, 1),
     costPrice: num(r.costPrice),
     gstPercent: num(r.gstPercent),
+    hsCode: (r.hsCode as string | null) ?? null,
     sellingPrice: num(r.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(r.sellingPricePerPurchaseUnit),
     saleDiscountPercent: num(r.saleDiscountPercent),
@@ -638,6 +640,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
          coalesce(s.gst_percent, 0) as gstPercent,
+         s.hs_code as hsCode,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -673,6 +676,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
     unitsPerPurchaseUnit: num(row.unitsPerPurchaseUnit, 1),
     costPrice: num(row.costPrice),
     gstPercent: num(row.gstPercent),
+    hsCode: (row.hsCode as string | null) ?? null,
     sellingPrice: num(row.sellingPrice),
     sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
     saleDiscountPercent: num(row.saleDiscountPercent),
@@ -777,6 +781,9 @@ function mapSkuSearchRow(
       ? { saleDiscountPercent: num(r.saleDiscountPercent) }
       : {}),
     ...(r.gstPercent != null ? { gstPercent: num(r.gstPercent) } : {}),
+    ...(r.hsCode != null && String(r.hsCode).trim() !== ""
+      ? { hsCode: String(r.hsCode) }
+      : {}),
     ...(warehouseId
       ? {
           quantityAvailable: num(r.quantityAvailable),
@@ -803,6 +810,11 @@ export function searchSkusLocal(
          s.sku,
          s.barcode,
          s.cost_price as costPrice,
+         coalesce(s.gst_percent, 0) as gstPercent,
+         coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
+         s.hs_code as hsCode,
+         s.selling_price as sellingPrice,
+         s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(st.quantity_available, 0) as quantityAvailable
        from product_skus s
        inner join products p on p.id = s.product_id
@@ -863,6 +875,7 @@ export function getSkuByBarcodeLocal(
          pu.name as purchaseUnitName,
          s.cost_price as costPrice,
          coalesce(s.gst_percent, 0) as gstPercent,
+         s.hs_code as hsCode,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -908,6 +921,7 @@ export function getSkuByBarcodeLocal(
     sellingPricePerPurchaseUnit: numOrNull(row.sellingPricePerPurchaseUnit),
     saleDiscountPercent: num(row.saleDiscountPercent),
     gstPercent: num(row.gstPercent),
+    hsCode: (row.hsCode as string | null) ?? null,
   };
 }
 
@@ -937,6 +951,7 @@ function lookupProductSkuLocal(
          s.units_per_purchase_unit as unitsPerPurchaseUnit,
          s.cost_price as costPrice,
          coalesce(s.gst_percent, 0) as gstPercent,
+         s.hs_code as hsCode,
          s.selling_price as sellingPrice,
          s.selling_price_per_purchase_unit as sellingPricePerPurchaseUnit,
          coalesce(s.sale_discount_percent, 0) as saleDiscountPercent,
@@ -1291,6 +1306,7 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
          gr.other_charges as otherCharges,
          coalesce(gr.return_credit, 0) as returnCredit,
          gr.total,
+         coalesce(gr.amount_paid, gr.total) as amountPaid,
          coalesce(gr.notes, '') as notes,
          gr.created_at as createdAt,
          gr.updated_at as updatedAt
@@ -1360,6 +1376,7 @@ export function getGoodsReceiptLocal(id: string): GoodsReceiptDetail | null {
     otherCharges: num(row.otherCharges),
     returnCredit: num(row.returnCredit),
     total: num(row.total),
+    amountPaid: num(row.amountPaid),
     notes: String(row.notes ?? ""),
     items: items.map((r) => ({
       id: String(r.id),
@@ -1656,6 +1673,11 @@ export function getSaleLocal(id: string): SaleDetail | null {
          s.posted_by_name as postedByName,
          s.cash_tendered as cashTendered,
          coalesce(s.notes, '') as notes,
+         s.fbr_invoice_number as fbrInvoiceNumber,
+         s.fbr_status as fbrStatus,
+         s.fbr_error as fbrError,
+         s.fbr_submitted_at as fbrSubmittedAt,
+         s.fbr_seller_ntn as fbrSellerNtn,
          s.created_at as createdAt,
          s.updated_at as updatedAt
        from sales s
@@ -1678,6 +1700,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
          l.unit_price as unitPrice,
          l.line_total as lineTotal,
          coalesce(l.gst_percent, 0) as gstPercent,
+         l.hs_code as hsCode,
          coalesce(l.discount_percent, 0) as discountPercent,
          coalesce(l.foc_quantity, 0) as focQuantity,
          coalesce(l.quantity_corrected, 0) as quantityCorrected,
@@ -1725,6 +1748,11 @@ export function getSaleLocal(id: string): SaleDetail | null {
         ? num(row.cashTendered)
         : null,
     notes: String(row.notes ?? ""),
+    fbrInvoiceNumber: (row.fbrInvoiceNumber as string | null) ?? null,
+    fbrStatus: asFbrInvoiceStatus(row.fbrStatus),
+    fbrError: (row.fbrError as string | null) ?? null,
+    fbrSubmittedAt: (row.fbrSubmittedAt as string | null) ?? null,
+    fbrSellerNtn: (row.fbrSellerNtn as string | null) ?? null,
     items: items.map((r) => ({
       id: String(r.id),
       productSkuId: String(r.productSkuId),
@@ -1736,6 +1764,7 @@ export function getSaleLocal(id: string): SaleDetail | null {
       unitPrice: num(r.unitPrice),
       lineTotal: num(r.lineTotal),
       gstPercent: num(r.gstPercent),
+      hsCode: (r.hsCode as string | null) ?? null,
       sellUnit: (r.sellUnit as "pc" | "box") ?? "pc",
       discountPercent: num(r.discountPercent),
       focQuantity: num(r.focQuantity),
@@ -1750,6 +1779,23 @@ export function getSaleLocal(id: string): SaleDetail | null {
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
   };
+}
+
+export function listPendingFbrSalesLocal(): SaleDetail[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select id
+       from sales
+       where tenant_id = ?
+         and status = 'POSTED'
+         and fbr_status = 'pending'
+       order by posted_at asc, created_at asc`,
+    )
+    .all(DEMO_STORE_TENANT_ID) as { id: string }[];
+  return rows
+    .map((row) => getSaleLocal(row.id))
+    .filter((sale): sale is SaleDetail => sale != null);
 }
 
 export function getReturnableSaleLinesLocal(

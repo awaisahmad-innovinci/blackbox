@@ -59,6 +59,27 @@ export class TenantsService {
     if (dto.defaultSalesTaxRate !== undefined) {
       tenant.defaultSalesTaxRate = dto.defaultSalesTaxRate;
     }
+    if (dto.fbrEnabled !== undefined) {
+      tenant.fbrEnabled = dto.fbrEnabled;
+    }
+    if (dto.fbrEnvironment !== undefined) {
+      tenant.fbrEnvironment = dto.fbrEnvironment;
+    }
+    if (dto.fbrToken !== undefined && dto.fbrToken.trim() !== "") {
+      tenant.fbrToken = dto.fbrToken.trim();
+    }
+    if (dto.fbrSellerNtn !== undefined) {
+      tenant.fbrSellerNtn = dto.fbrSellerNtn.trim() || null;
+    }
+    if (dto.fbrSellerProvince !== undefined) {
+      tenant.fbrSellerProvince = dto.fbrSellerProvince || null;
+    }
+    if (dto.fbrSellerAddress !== undefined) {
+      tenant.fbrSellerAddress = dto.fbrSellerAddress.trim() || null;
+    }
+    if (dto.fbrScenarioId !== undefined && dto.fbrScenarioId.trim()) {
+      tenant.fbrScenarioId = dto.fbrScenarioId.trim();
+    }
     await this.tenants.save(tenant);
     return toTenantResponse(tenant);
   }

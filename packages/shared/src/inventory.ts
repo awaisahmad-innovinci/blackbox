@@ -98,6 +98,74 @@ export const GOODS_RECEIPT_STATUSES = [
 ] as const;
 export type GoodsReceiptStatus = (typeof GOODS_RECEIPT_STATUSES)[number];
 
+export const VENDOR_LEDGER_ENTRY_TYPES = ["CHARGE", "PAYMENT"] as const;
+export type VendorLedgerEntryType = (typeof VENDOR_LEDGER_ENTRY_TYPES)[number];
+
+/** One charge or payment on a vendor's account. Credit owed is charges minus payments. */
+export interface VendorLedgerEntry {
+  id: string;
+  vendorId: string;
+  entryType: VendorLedgerEntryType;
+  amount: number;
+  goodsReceiptId: string | null;
+  receiptNumber: string | null;
+  note: string;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorLedger {
+  credit: number;
+  entries: VendorLedgerEntry[];
+}
+
+export interface RecordVendorPaymentRequest {
+  amount: number;
+  note?: string;
+}
+
+export interface VendorPaymentListItem {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  amount: number;
+  receiptNumber: string | null;
+  note: string;
+  occurredAt: string;
+}
+
+export interface VendorPaymentListQuery {
+  search?: string;
+  vendorId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedVendorPayments {
+  items: VendorPaymentListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface VendorCreditSummary {
+  vendorId: string;
+  vendorName: string;
+  charges: number;
+  payments: number;
+  credit: number;
+}
+
+export interface VendorCreditLedger {
+  totalCredit: number;
+  vendors: VendorCreditSummary[];
+}
+
+export interface VendorCreditQuery {
+  vendorId?: string;
+}
+
 export const VENDOR_CONTACT_TYPES = [
   "PRIMARY",
   "OTHER",
@@ -157,6 +225,8 @@ export interface CashierDashboardSummary {
   /** Local calendar date (YYYY-MM-DD). */
   date: string;
   totalSalesAmount: number;
+  /** Posted simple bills (not sent to FBR) for today. */
+  nonFbrSalesAmount: number;
   cashReceivedAmount: number;
   cardPaymentsAmount: number;
   heldBillsCount: number;
@@ -389,6 +459,7 @@ export interface SkuSearchResult {
   /** Default POS line discount % for this SKU. */
   saleDiscountPercent?: number;
   gstPercent?: number;
+  hsCode?: string | null;
 }
 
 /** Tenant-wide barcode lookup for duplicate detection (any SKU/product status). */
@@ -600,6 +671,7 @@ export interface SkuBarcodeLookupResult {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   gstPercent: number;
+  hsCode: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   reorderLevel: number;
@@ -629,6 +701,7 @@ export interface SkuDetail {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   gstPercent: number;
+  hsCode: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   saleDiscountPercent: number;
@@ -768,6 +841,7 @@ export interface ProductSkuDetail {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   gstPercent: number;
+  hsCode: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   saleDiscountPercent: number;
@@ -789,6 +863,7 @@ export interface CreateProductSkuRequest {
   unitsPerPurchaseUnit: number;
   costPrice: number;
   gstPercent?: number;
+  hsCode?: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit?: number | null;
   saleDiscountPercent?: number;
@@ -1253,6 +1328,8 @@ export interface CreateGoodsReceiptRequest {
   tax?: number;
   /** @deprecated ignored; always stored as 0 */
   otherCharges?: number;
+  /** Cash paid now. Defaults to the grand total. The remainder is vendor credit. */
+  amountPaid?: number;
   items: CreateGoodsReceiptItemRequest[];
   returnAdjustments?: GoodsReceiptReturnAdjustment[];
 }
@@ -1306,6 +1383,8 @@ export interface GoodsReceiptDetail {
   otherCharges: number;
   returnCredit: number;
   total: number;
+  /** Cash paid when the receipt was posted. */
+  amountPaid: number;
   notes: string;
   items: GoodsReceiptItemRow[];
   createdAt: string;
@@ -1687,6 +1766,30 @@ export const MASTER_DATA_07_PRODUCT_SKU_HEADERS = [
   "selling_price",
   "selling_price_per_purchase_unit",
   "gst_percent",
+  "hs_code",
+  "reorder_level",
+  "minimum_stock_level",
+  "maximum_stock_level",
+  "track_inventory",
+  "status",
+] as const;
+
+/** 07 template after GST, before hs_code. */
+export const PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS = [
+  "product_import_key",
+  "sku",
+  "barcode",
+  "barcode_quantity_multiplier",
+  "variant_name",
+  "size_value",
+  "size_unit",
+  "base_unit_abbreviation",
+  "purchase_unit_abbreviation",
+  "units_per_purchase_unit",
+  "cost_price",
+  "selling_price",
+  "selling_price_per_purchase_unit",
+  "gst_percent",
   "reorder_level",
   "minimum_stock_level",
   "maximum_stock_level",
@@ -1728,19 +1831,21 @@ export function formatMasterDataHeaderMismatchMessage(input: {
   if (input.file !== "07_product_skus.csv") return message;
 
   const currentLen = MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
+  const previousLen = PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
   const legacyLen = LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
   if (
     input.actualColumnCount === currentLen &&
-    expectedLen === legacyLen
+    (expectedLen === legacyLen || expectedLen === previousLen)
   ) {
     message +=
       " Restart or redeploy the API — this server uses an older 07_product_skus template.";
   } else if (
-    input.actualColumnCount === legacyLen &&
+    (input.actualColumnCount === legacyLen ||
+      input.actualColumnCount === previousLen) &&
     expectedLen === currentLen
   ) {
     message +=
-      " Use the current template (includes barcode_quantity_multiplier and gst_percent) or a legacy 17-column file.";
+      " Use the current template (includes hs_code) or an older 17- or 19-column file.";
   }
   return message;
 }

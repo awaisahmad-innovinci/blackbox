@@ -8,6 +8,7 @@ import type {
   SkuSupplier,
   WarehouseStockRow,
 } from "@blackbox/shared";
+import { hsCodeError } from "@blackbox/shared";
 import { BackButton } from "@renderer/app/BackButton";
 import {
   FORM_DIALOG_FIELD_FULL,
@@ -74,6 +75,7 @@ function toProductSkuRow(
     unitsPerPurchaseUnit: sku.unitsPerPurchaseUnit,
     costPrice: sku.costPrice,
     gstPercent: sku.gstPercent,
+    hsCode: sku.hsCode ?? null,
     sellingPrice: sku.sellingPrice,
     sellingPricePerPurchaseUnit: sku.sellingPricePerPurchaseUnit,
     saleDiscountPercent: sku.saleDiscountPercent,
@@ -114,6 +116,7 @@ export function SkuProfilePage() {
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
   const [costPrice, setCostPrice] = useState("0");
   const [gstPercent, setGstPercent] = useState("0");
+  const [hsCode, setHsCode] = useState("");
   const [marginPercent, setMarginPercent] = useState("");
   const [sellingPrice, setSellingPrice] = useState("0");
   const [saleDiscountPercent, setSaleDiscountPercent] = useState("0");
@@ -167,6 +170,7 @@ export function SkuProfilePage() {
     setUnitsPerPurchaseUnit(String(sku.unitsPerPurchaseUnit));
     setCostPrice(String(sku.costPrice));
     setGstPercent(String(sku.gstPercent ?? 0));
+    setHsCode(sku.hsCode ?? "");
     setMarginPercent("");
     setSellingPrice(String(sku.sellingPrice));
     setSaleDiscountPercent(String(sku.saleDiscountPercent ?? 0));
@@ -215,6 +219,7 @@ export function SkuProfilePage() {
       ? "Cost price is required"
       : null;
   const gstError = optionalGstPercent(gstPercent);
+  const hsError = hsCodeError(hsCode, false);
   const marginError =
     marginPercentN != null &&
     (Number.isNaN(marginPercentN) || marginPercentN < 0)
@@ -241,6 +246,7 @@ export function SkuProfilePage() {
     !unitsPerError &&
     !costError &&
     !gstError &&
+    !hsError &&
     !marginError &&
     !sellingError &&
     !saleDiscountError;
@@ -284,6 +290,7 @@ export function SkuProfilePage() {
       unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
       costPrice: costPriceN,
       gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
+      hsCode: hsCode.trim() || sku.hsCode || null,
       sellingPrice: sellingPriceN,
       sellingPricePerPurchaseUnit: null,
       saleDiscountPercent: saleDiscountPercentValue,
@@ -320,6 +327,7 @@ export function SkuProfilePage() {
         unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
         costPrice: costPriceN,
         gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
+        hsCode: hsCode.trim() || undefined,
         sellingPrice: sellingPriceN,
         sellingPricePerPurchaseUnit: null,
         saleDiscountPercent: saleDiscountPercentValue,
@@ -575,6 +583,10 @@ export function SkuProfilePage() {
             <dd className="font-medium tabular-nums">
               {sku.costPrice} / {sku.sellingPrice} per pc
             </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">HS code</dt>
+            <dd className="font-medium tabular-nums">{sku.hsCode || "—"}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Sale discount %</dt>
@@ -874,6 +886,18 @@ export function SkuProfilePage() {
               />
               {gstError ? (
                 <p className="text-destructive text-xs">{gstError}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>HS code</Label>
+              <Input
+                value={hsCode}
+                aria-invalid={Boolean(hsError)}
+                placeholder="0101.2100"
+                onChange={(e) => setHsCode(e.target.value)}
+              />
+              {hsError ? (
+                <p className="text-destructive text-xs">{hsError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">

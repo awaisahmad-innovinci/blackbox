@@ -14,6 +14,7 @@ import type {
 } from "@blackbox/shared";
 import {
   costWithGst,
+  normalizeHsCode,
   normalizeStoredText,
   normalizeUnitsPerPurchaseUnit,
   vendorPurchasePriceFromSku,
@@ -94,6 +95,7 @@ export class SkusService {
         variantName: sku.variantName,
         sku: sku.sku,
         barcode: sku.barcode,
+        hsCode: sku.hsCode,
       }));
     }
 
@@ -114,6 +116,7 @@ export class SkusService {
       quantityAvailable: availableBySku.get(sku.id) ?? 0,
       costPrice: toNum(sku.costPrice),
       gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
     }));
   }
 
@@ -165,6 +168,7 @@ export class SkusService {
       quantityAvailable,
       costPrice: toNum(sku.costPrice),
       gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
       scannedQuantityMultiplier: match.quantityMultiplier,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit, 1),
       baseUnitName: sku.baseUnit?.name ?? null,
@@ -208,6 +212,7 @@ export class SkusService {
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
       gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
       reorderLevel: toNum(sku.reorderLevel),
@@ -257,6 +262,8 @@ export class SkusService {
     );
     sku.costPrice = String(dto.costPrice);
     sku.gstPercent = String(dto.gstPercent ?? 0);
+    const nextHsCode = normalizeHsCode(dto.hsCode);
+    if (nextHsCode) sku.hsCode = nextHsCode;
     sku.sellingPrice = String(dto.sellingPrice);
     sku.sellingPricePerPurchaseUnit =
       dto.sellingPricePerPurchaseUnit == null
@@ -350,6 +357,7 @@ export class SkusService {
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
       gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
       saleDiscountPercent: toNum(sku.saleDiscountPercent),

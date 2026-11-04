@@ -29,6 +29,7 @@ export const NAV_DROPDOWN_MENUS: Record<NavDropdownId, NavDropdownItem[]> = {
   vendors: [
     { label: "Add Vendor", to: "/vendors/new" },
     { label: "See Vendors", to: "/vendors" },
+    { label: "Vendor Payments", to: "/vendors/payments" },
     { label: "Vendor Groups", to: "/vendor-groups" },
   ],
 };

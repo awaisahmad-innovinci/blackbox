@@ -49,6 +49,7 @@ import {
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
 import { bumpDataVersion, syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
+import { submitPostedSaleToFbr } from "@renderer/lib/sales/submit-fbr";
 import { resolveCardTerminalAmount } from "@renderer/features/sales/resolve-card-terminal-amount";
 import { useCardTerminalAmountSync } from "@renderer/features/sales/use-card-terminal-amount-sync";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -86,6 +87,7 @@ type DraftSaleLine = {
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   gstPercent: number;
+  hsCode: string | null;
   discountPercent: number;
   focQuantity: number;
   quantityCorrected?: boolean;
@@ -240,6 +242,10 @@ export function SalePage() {
   const paymentAmountRef = useRef<HTMLInputElement>(null);
   const splitCashAmountRef = useRef<HTMLInputElement>(null);
 
+  const nonFbrSale =
+    user?.fbrEnabled === true &&
+    (user.permissions ?? []).includes("sales.non_fbr");
+
   const focusScanInput = useCallback(() => {
     requestAnimationFrame(() => {
       scanInputRef.current?.focus();
@@ -339,6 +345,7 @@ export function SalePage() {
               sellingPrice: item.unitPrice,
               sellingPricePerPurchaseUnit: null,
               gstPercent: item.gstPercent ?? 0,
+              hsCode: item.hsCode ?? null,
               discountPercent: item.discountPercent ?? 0,
               focQuantity: item.focQuantity ?? 0,
               quantityCorrected: item.quantityCorrected ?? false,
@@ -603,6 +610,7 @@ export function SalePage() {
         unitPrice,
         lineTotal: lineTotal(line),
         gstPercent: line.gstPercent,
+        hsCode: line.hsCode,
         sellUnit: line.sellUnit,
         ...(line.quantityCorrected ? { quantityCorrected: true } : {}),
       };
@@ -740,6 +748,7 @@ export function SalePage() {
           sellingPrice: row.sellingPrice ?? 0,
           sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit ?? null,
           gstPercent: row.gstPercent ?? 0,
+          hsCode: row.hsCode ?? null,
           discountPercent: row.saleDiscountPercent ?? 0,
           focQuantity: 0,
           lastScanMultiplier: multiplier,
@@ -814,6 +823,7 @@ export function SalePage() {
           sellingPrice: row.sellingPrice ?? 0,
           sellingPricePerPurchaseUnit: row.sellingPricePerPurchaseUnit ?? null,
           gstPercent: row.gstPercent ?? 0,
+          hsCode: row.hsCode ?? null,
           discountPercent: row.saleDiscountPercent ?? 0,
           focQuantity: 1,
           lastScanMultiplier: 1,
@@ -1304,6 +1314,7 @@ export function SalePage() {
             unitPrice,
             lineTotal: lineTotal(line),
             gstPercent: line.gstPercent,
+            hsCode: line.hsCode,
             sellUnit: line.sellUnit,
           };
         });
@@ -1334,6 +1345,13 @@ export function SalePage() {
           payments: paymentRows,
           createdAt: now,
           updatedAt: now,
+          ...(user?.fbrEnabled
+            ? {
+                fbrStatus: nonFbrSale
+                  ? ("excluded" as const)
+                  : ("pending" as const),
+              }
+            : {}),
         };
 
         await commitLocalChange({
@@ -1368,7 +1386,6 @@ export function SalePage() {
           });
         }
 
-        void syncNow();
         if (user?.id) {
           if (focLines.length > 0 && focSupervisorUserId) {
             await logActivityEvent(
@@ -1461,12 +1478,16 @@ export function SalePage() {
             /* draft cleanup is best-effort */
           }
         }
-        try {
-          await window.blackbox?.localDb?.upsertSale?.(detail);
-        } catch {
-          /* optional cache */
-        }
-        navigate(`/sales/${detail.id}`);
+        const registerOffline =
+          offline ||
+          sync.offline ||
+          (typeof navigator !== "undefined" && navigator.onLine === false);
+        const withFbr =
+          user?.fbrEnabled && !nonFbrSale && !registerOffline
+            ? await submitPostedSaleToFbr(detail)
+            : detail;
+        navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
+        void syncNow();
         return;
       }
 
@@ -1484,6 +1505,7 @@ export function SalePage() {
           unitPrice: lineUnitPrice(line),
           lineTotal: lineTotal(line),
           gstPercent: line.gstPercent,
+          hsCode: line.hsCode,
           sellUnit: line.sellUnit,
           barcode: line.barcode,
         })),
@@ -1522,13 +1544,13 @@ export function SalePage() {
         }
       }
 
-      try {
-        await window.blackbox?.localDb?.upsertSale?.(detail);
-      } catch {
-        /* optional cache */
-      }
+      const withFbr =
+        user?.fbrEnabled && !nonFbrSale
+          ? await submitPostedSaleToFbr(detail)
+          : detail;
       bumpDataVersion();
-      navigate(`/sales/${detail.id}`);
+      navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
+      void syncNow();
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to post sale"));
     } finally {

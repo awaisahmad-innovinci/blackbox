@@ -39,7 +39,7 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { loadPurchaseOrder, loadVendors, loadVendorSkus, loadWarehouses, findVendorSkuByBarcode } from "@renderer/lib/local-db/entity-source";
+import { loadPurchaseOrder, loadVendors, loadVendorLedger, loadVendorSkus, loadWarehouses, findVendorSkuByBarcode } from "@renderer/lib/local-db/entity-source";
 import { allocatePoNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
 import {
@@ -72,6 +72,7 @@ export function PurchaseOrderFormPage() {
   const { user } = useSession();
   const [status, setStatus] = useState("DRAFT");
   const [vendorId, setVendorId] = useState("");
+  const [vendorCredit, setVendorCredit] = useState<number | null>(null);
   const [warehouseId, setWarehouseId] = useState("");
   const [orderDate, setOrderDate] = useState(todayIso());
   const [expectedDate, setExpectedDate] = useState("");
@@ -144,6 +145,24 @@ export function PurchaseOrderFormPage() {
       setScanBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!vendorId) {
+      setVendorCredit(null);
+      return;
+    }
+    let cancelled = false;
+    void loadVendorLedger(vendorId)
+      .then((ledger) => {
+        if (!cancelled) setVendorCredit(ledger.credit);
+      })
+      .catch(() => {
+        if (!cancelled) setVendorCredit(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vendorId]);
 
   useEffect(() => {
     void loadVendors({ status: "active", pageSize: 100 })
@@ -529,6 +548,14 @@ export function PurchaseOrderFormPage() {
               </option>
             ))}
           </select>
+          {vendorId && vendorCredit != null ? (
+            <p className="text-muted-foreground text-sm">
+              Vendor credit:{" "}
+              <span className="text-foreground tabular-nums">
+                {vendorCredit.toLocaleString()}
+              </span>
+            </p>
+          ) : null}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="po-warehouse">Receive into warehouse *</Label>

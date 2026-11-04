@@ -35,6 +35,9 @@ export class ProductSku {
   @Column({ type: "text", nullable: true })
   barcode!: string | null;
 
+  @Column({ name: "hs_code", type: "text", nullable: true })
+  hsCode!: string | null;
+
   @Column({ name: "variant_name", type: "text", default: "" })
   variantName!: string;
 

@@ -31,6 +31,11 @@ import type {
   EntityStatus,
   UnitListItem,
   VendorDetail,
+  PaginatedVendorPayments,
+  VendorCreditLedger,
+  VendorCreditQuery,
+  VendorLedger,
+  VendorPaymentListQuery,
   VendorListQuery,
   VendorReturnDetail,
   VendorReturnListQuery,
@@ -67,6 +72,7 @@ import {
   resolveDataSourceMode,
   shouldUseLocalCatalog,
 } from "@renderer/lib/local-db/data-source";
+import { isDeviceBound } from "@renderer/lib/local-db/local-write";
 
 export type ProductProfileData = {
   product: ProductDetail;
@@ -147,6 +153,34 @@ export async function loadVendorProfile(
   const vendor = await vendorsApi.get(id);
   const skus = await relatedOrEmpty(vendorSkusApi.listByVendor(id));
   return { vendor, skus };
+}
+
+export async function loadVendorCredits(
+  query: VendorCreditQuery = {},
+): Promise<VendorCreditLedger> {
+  if (await isDeviceBound()) {
+    const local = await window.blackbox?.localDb?.listVendorCredits?.(query);
+    if (local) return local;
+  }
+  return vendorsApi.listCredits(query);
+}
+
+export async function loadVendorPayments(
+  query: VendorPaymentListQuery = {},
+): Promise<PaginatedVendorPayments> {
+  if (await isDeviceBound()) {
+    const local = await window.blackbox?.localDb?.listVendorPayments?.(query);
+    if (local) return local;
+  }
+  return vendorsApi.listPayments(query);
+}
+
+export async function loadVendorLedger(vendorId: string): Promise<VendorLedger> {
+  if (await isDeviceBound()) {
+    const local = await window.blackbox?.localDb?.getVendorLedger?.(vendorId);
+    if (local) return local;
+  }
+  return vendorsApi.ledger(vendorId);
 }
 
 export async function loadSkuProfile(id: string): Promise<SkuProfileData> {
