@@ -1356,6 +1356,29 @@ where units_per_purchase_unit > 0;
       alter table sale_lines add column gst_percent real not null default 0;
     `,
   },
+  {
+    id: "040_payment_terminal_transactions",
+    sql: `
+      create table if not exists payment_terminal_transactions (
+        id text primary key,
+        invoice_id text not null,
+        transaction_id text not null,
+        provider_id text not null,
+        amount real not null,
+        currency text not null default 'PKR',
+        status text not null,
+        terminal_txn_id text,
+        request_json text,
+        response_json text,
+        created_at text not null,
+        updated_at text not null
+      );
+      create index if not exists payment_terminal_transactions_invoice_id_idx
+        on payment_terminal_transactions (invoice_id);
+      create index if not exists payment_terminal_transactions_status_idx
+        on payment_terminal_transactions (status);
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

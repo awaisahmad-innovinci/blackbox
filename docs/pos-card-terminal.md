@@ -38,6 +38,10 @@ Until then, use keyboard mode or enter amounts manually.
 
 Stored locally in SQLite sync meta key `pos.card_terminal_settings` (same pattern as receipt printer settings). Not synced to the cloud.
 
+## Integrated pay (separate feature)
+
+For **authorize-on-device** checkout (pay / inquiry / cancel, post sale only on `APPROVED`), see [payment-terminal.md](./payment-terminal.md). Amount pre-fill above can stay enabled for keyboard mode while integrated pay is off.
+
 ## Related code
 
 | Area | Path |
@@ -46,3 +50,4 @@ Stored locally in SQLite sync meta key `pos.card_terminal_settings` (same patter
 | Main / IPC | `apps/desktop/src/main/pos/card-terminal*` |
 | Checkout hook | `apps/desktop/src/renderer/src/features/sales/use-card-terminal-amount-sync.ts` |
 | Settings UI | `apps/desktop/src/renderer/src/features/sales/PosCardTerminalSettingsDialog.tsx` |
+| Integrated terminal | [payment-terminal.md](./payment-terminal.md) |

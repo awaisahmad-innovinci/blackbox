@@ -232,6 +232,8 @@ import {
   resetStalePushing,
 } from "./db/outbox-local";
 import { applyPullBatch, commitLocalMutation } from "./db/sync-apply";
+import { registerPaymentTerminalHandlers } from "./payments/register-payment-terminal-handlers";
+import { reconcilePendingPaymentTerminalTransactions } from "./payments/reconcile-startup";
 import { registerPosHandlers } from "./pos/register-pos-handlers";
 
 let appMainWindow: BrowserWindow | null = null;
@@ -1117,6 +1119,7 @@ function registerIpc(): void {
   ipcMain.handle("localDb:hasSupervisorTotp", () => hasSupervisorTotpLocal());
 
   registerPosHandlers(ipcMain, () => appMainWindow);
+  registerPaymentTerminalHandlers(ipcMain);
 }
 
 app.disableHardwareAcceleration();
@@ -1141,6 +1144,9 @@ app.whenReady().then(() => {
     console.log(
       `[localDb] connected ${status.path} (${status.migrationsApplied} migrations, latest ${status.latestMigration ?? "none"})`,
     );
+    void reconcilePendingPaymentTerminalTransactions().catch((err: unknown) => {
+      console.warn("[payment-terminal] startup reconcile failed", err);
+    });
   } else {
     console.error(`[localDb] not connected: ${status.error}`);
   }

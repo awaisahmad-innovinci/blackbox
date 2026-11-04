@@ -1,4 +1,5 @@
 import type { PosSerialPortInfo } from "@blackbox/shared";
+import { serialPortOpenOptions } from "./serial-port-options";
 
 type WriteSerialOptions = {
   /** Open the port and close without writing (connection test). */
@@ -29,11 +30,7 @@ export async function writeSerialFrame(
   const { SerialPort } = await import("serialport");
 
   await new Promise<void>((resolve, reject) => {
-    const port = new SerialPort({
-      path: portPath,
-      baudRate,
-      autoOpen: false,
-    });
+    const port = new SerialPort(serialPortOpenOptions(portPath, baudRate));
 
     port.open((openErr) => {
       if (openErr) {

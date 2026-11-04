@@ -168,7 +168,7 @@ Rules: `0 < return qty ≤` current POS out balance for that warehouse + SKU. Re
 
 | Method | Path | Notes |
 |--------|------|-------|
-| `GET` | `/inventory-movements` | JWT + `inventory.access`. Tenant-wide paginated list (`productSkuId`, `warehouseId`, `since`, `page`, `pageSize`); includes `referenceType` / `referenceId` |
+| `GET` | `/inventory-movements` | JWT + (`inventory.access` or `sync.use`). Tenant-wide paginated list (`productSkuId`, `warehouseId`, `since`, `page`, `pageSize`); includes `referenceType` / `referenceId` |
 | `GET` | `/products/:id/movements` | Product-scoped recent movements (existing) |
 
 ## Inventory reports

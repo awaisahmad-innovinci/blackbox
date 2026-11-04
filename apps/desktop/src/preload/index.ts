@@ -60,6 +60,10 @@ import type {
   PosPrinterInfo,
   PosPrinterSettings,
   PosSerialPortInfo,
+  PaymentRequest,
+  PaymentResult,
+  PaymentTerminalConnectResult,
+  PaymentTerminalSettings,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -690,6 +694,38 @@ contextBridge.exposeInMainWorld("blackbox", {
         "pos:testCardTerminal",
         settings,
       ) as Promise<PosCardTerminalPushResult>,
+  },
+  paymentTerminal: {
+    getSettings: () =>
+      ipcRenderer.invoke(
+        "paymentTerminal:getSettings",
+      ) as Promise<PaymentTerminalSettings>,
+    saveSettings: (settings: PaymentTerminalSettings) =>
+      ipcRenderer.invoke("paymentTerminal:saveSettings", settings) as Promise<{
+        ok: true;
+      }>,
+    connect: () =>
+      ipcRenderer.invoke(
+        "paymentTerminal:connect",
+      ) as Promise<PaymentTerminalConnectResult>,
+    disconnect: () =>
+      ipcRenderer.invoke("paymentTerminal:disconnect") as Promise<void>,
+    status: () =>
+      ipcRenderer.invoke("paymentTerminal:status") as Promise<boolean>,
+    isLinkUp: () =>
+      ipcRenderer.invoke("paymentTerminal:isLinkUp") as Promise<boolean>,
+    pay: (request: PaymentRequest) =>
+      ipcRenderer.invoke("paymentTerminal:pay", request) as Promise<PaymentResult>,
+    inquiry: (invoiceId: string) =>
+      ipcRenderer.invoke(
+        "paymentTerminal:inquiry",
+        invoiceId,
+      ) as Promise<PaymentResult>,
+    cancel: (invoiceId: string) =>
+      ipcRenderer.invoke(
+        "paymentTerminal:cancel",
+        invoiceId,
+      ) as Promise<PaymentResult>,
   },
   sync: {
     listOutbox: (limit?: number) => ipcRenderer.invoke("sync:listOutbox", limit),

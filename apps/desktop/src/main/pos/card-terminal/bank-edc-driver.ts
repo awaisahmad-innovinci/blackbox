@@ -4,6 +4,9 @@ import type {
 } from "@blackbox/shared";
 import { amountToTerminalPayload } from "./amount-format";
 import { pushAmountViaHidKeys } from "./hid-keys-driver";
+import { agentDebugLog } from "../../payments/agent-debug-log";
+import { wrongEdcPortMessage } from "./serial-port-edc";
+import { formatSerialPortOpenError } from "./serial-port-error";
 import { writeSerialFrame } from "./serial-transport";
 
 /**
@@ -30,6 +33,19 @@ export async function pushBankEdcAmount(
 ): Promise<PosCardTerminalPushResult> {
   const payload = amountToTerminalPayload(amount, settings.amountScale);
 
+  // #region agent log
+  agentDebugLog(
+    "bank-edc-driver.ts:push",
+    "pushBankEdcAmount",
+    {
+      type: settings.connection.type,
+      portPath: settings.connection.portPath,
+      baudRate: settings.connection.baudRate,
+    },
+    "H4",
+  );
+  // #endregion
+
   if (settings.connection.type === "hid-keys") {
     return pushAmountViaHidKeys(payload);
   }
@@ -40,6 +56,11 @@ export async function pushBankEdcAmount(
       ok: false,
       message: "Select a serial port for the card terminal.",
     };
+  }
+
+  const wrongPort = wrongEdcPortMessage(portPath);
+  if (wrongPort) {
+    return { ok: false, message: wrongPort };
   }
 
   if (!BANK_EDC_SERIAL_PROTOCOL_READY) {
@@ -55,9 +76,10 @@ export async function pushBankEdcAmount(
     await writeSerialFrame(portPath, settings.connection.baudRate, frame);
     return { ok: true };
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "Failed to send amount to terminal.";
-    return { ok: false, message };
+    return {
+      ok: false,
+      message: formatSerialPortOpenError(err, portPath),
+    };
   }
 }
 
@@ -80,8 +102,9 @@ export async function testBankEdcSerialPort(
     );
     return { ok: true };
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "Could not open serial port.";
-    return { ok: false, message };
+    return {
+      ok: false,
+      message: formatSerialPortOpenError(err, portPath),
+    };
   }
 }

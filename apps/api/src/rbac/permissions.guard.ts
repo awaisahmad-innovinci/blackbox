@@ -9,7 +9,10 @@ import { Reflector } from "@nestjs/core";
 import type { Permission } from "@blackbox/shared";
 import type { TenantContext } from "../common/tenant-context";
 import { PermissionsService } from "./permissions.service";
-import { PERMISSIONS_KEY } from "./require-permissions.decorator";
+import {
+  PERMISSIONS_ANY_KEY,
+  PERMISSIONS_KEY,
+} from "./require-permissions.decorator";
 
 /**
  * Enforces @RequirePermissions(...) with AND semantics.
@@ -23,12 +26,16 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const requiredAny = this.reflector.getAllAndOverride<Permission[]>(
+      PERMISSIONS_ANY_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     const required = this.reflector.getAllAndOverride<Permission[]>(
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
 
-    if (!required?.length) {
+    if (!requiredAny?.length && !required?.length) {
       return true;
     }
 
@@ -45,7 +52,14 @@ export class PermissionsGuard implements CanActivate {
       ctx.tenantId,
     );
 
-    const missing = required.filter((p) => !effective.includes(p));
+    if (requiredAny?.length) {
+      const hasAny = requiredAny.some((p) => effective.includes(p));
+      if (!hasAny) {
+        throw new ForbiddenException("Insufficient permissions");
+      }
+    }
+
+    const missing = (required ?? []).filter((p) => !effective.includes(p));
     if (missing.length > 0) {
       throw new ForbiddenException("Insufficient permissions");
     }

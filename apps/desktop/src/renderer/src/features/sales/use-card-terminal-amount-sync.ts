@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { DEFAULT_POS_CARD_TERMINAL_SETTINGS } from "@blackbox/shared";
+import {
+  DEFAULT_PAYMENT_TERMINAL_SETTINGS,
+  DEFAULT_POS_CARD_TERMINAL_SETTINGS,
+} from "@blackbox/shared";
 import type { SalePaymentMode } from "./resolve-card-terminal-amount";
 
 const DEBOUNCE_MS = 300;
@@ -25,17 +28,23 @@ export function useCardTerminalAmountSync({
     state: "idle",
   });
   const integrationEnabledRef = useRef(false);
+  const integratedCheckoutRef = useRef(false);
   const lastSentRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const saved =
-        (await window.blackbox?.pos?.getCardTerminalSettings?.()) ??
-        DEFAULT_POS_CARD_TERMINAL_SETTINGS;
+      const [saved, paymentTerminal] = await Promise.all([
+        window.blackbox?.pos?.getCardTerminalSettings?.() ??
+          DEFAULT_POS_CARD_TERMINAL_SETTINGS,
+        window.blackbox?.paymentTerminal?.getSettings?.() ??
+          DEFAULT_PAYMENT_TERMINAL_SETTINGS,
+      ]);
       if (!cancelled) {
         integrationEnabledRef.current = saved.enabled === true;
+        integratedCheckoutRef.current =
+          paymentTerminal.integratedCheckout === true;
       }
     })();
     return () => {
@@ -68,7 +77,10 @@ export function useCardTerminalAmountSync({
     setStatus({ state: "pending" });
     timerRef.current = setTimeout(() => {
       void (async () => {
-        if (!integrationEnabledRef.current) {
+        if (
+          !integrationEnabledRef.current ||
+          integratedCheckoutRef.current
+        ) {
           setStatus({ state: "idle" });
           return;
         }

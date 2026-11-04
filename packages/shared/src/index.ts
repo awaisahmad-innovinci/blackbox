@@ -503,3 +503,15 @@ export {
   DEFAULT_POS_PRINTER_SETTINGS,
   DEFAULT_POS_CARD_TERMINAL_SETTINGS,
 } from "./pos-hardware";
+export type {
+  PaymentTerminalTransport,
+  PaymentTerminalFramerId,
+  PaymentStatus,
+  PaymentTerminalProviderId,
+  PaymentRequest,
+  PaymentResult,
+  PaymentTerminalSettings,
+  PaymentTerminalConnectResult,
+  PaymentTerminalAttemptStatus,
+} from "./payment-terminal";
+export { DEFAULT_PAYMENT_TERMINAL_SETTINGS } from "./payment-terminal";

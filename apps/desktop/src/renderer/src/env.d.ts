@@ -62,6 +62,10 @@ import type {
   PosPrinterInfo,
   PosPrinterSettings,
   PosSerialPortInfo,
+  PaymentRequest,
+  PaymentResult,
+  PaymentTerminalConnectResult,
+  PaymentTerminalSettings,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
@@ -457,6 +461,19 @@ declare global {
         testCardTerminal: (
           settings?: PosCardTerminalSettings,
         ) => Promise<PosCardTerminalPushResult>;
+      };
+      paymentTerminal?: {
+        getSettings: () => Promise<PaymentTerminalSettings>;
+        saveSettings: (
+          settings: PaymentTerminalSettings,
+        ) => Promise<{ ok: true }>;
+        connect: () => Promise<PaymentTerminalConnectResult>;
+        disconnect: () => Promise<void>;
+        status: () => Promise<boolean>;
+        isLinkUp: () => Promise<boolean>;
+        pay: (request: PaymentRequest) => Promise<PaymentResult>;
+        inquiry: (invoiceId: string) => Promise<PaymentResult>;
+        cancel: (invoiceId: string) => Promise<PaymentResult>;
       };
       sync?: {
         listOutbox: (limit?: number) => Promise<unknown>;

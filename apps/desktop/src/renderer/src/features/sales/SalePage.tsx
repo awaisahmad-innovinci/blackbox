@@ -48,6 +48,8 @@ import {
 } from "@renderer/lib/manager-approval";
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
+import { payCardOnTerminal } from "@renderer/lib/payment-terminal/checkout";
+import { DEFAULT_PAYMENT_TERMINAL_SETTINGS } from "@blackbox/shared";
 import { bumpDataVersion, syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { resolveCardTerminalAmount } from "@renderer/features/sales/resolve-card-terminal-amount";
 import { useCardTerminalAmountSync } from "@renderer/features/sales/use-card-terminal-amount-sync";
@@ -636,11 +638,14 @@ export function SalePage() {
     };
   }
 
-  function postedPaymentRows(): SaleDetail["payments"] {
+  function postedPaymentRows(cardReferenceOverride?: string): SaleDetail["payments"] {
     if (amountDue <= 0) return [];
     if (isSplitPayment && splitAmounts) {
       const cashRow = payments.find((row) => row.method === "CASH");
       const cardRow = payments.find((row) => row.method === "CARD");
+      const cardReference =
+        cardReferenceOverride?.trim() ||
+        splitAmounts.cardReference.trim();
       return [
         {
           id: cashRow?.id ?? crypto.randomUUID(),
@@ -652,19 +657,23 @@ export function SalePage() {
           id: cardRow?.id ?? crypto.randomUUID(),
           method: "CARD",
           amount: splitAmounts.card,
-          reference: splitAmounts.cardReference.trim(),
+          reference: cardReference,
         },
       ];
     }
     if (!payment) return [];
     const postedAmount =
       paymentMode === "cash" ? amountDue : round4(payment.amount);
+    const reference =
+      payment.method === "CARD" && cardReferenceOverride
+        ? cardReferenceOverride.trim()
+        : payment.reference.trim();
     return [
       {
         id: payment.id,
         method: payment.method,
         amount: postedAmount,
-        reference: payment.reference.trim(),
+        reference,
       },
     ];
   }
@@ -1269,6 +1278,35 @@ export function SalePage() {
       focSupervisorDisplayName = totp.supervisorDisplayName;
     }
 
+    let terminalCardReference: string | undefined;
+    const terminalSettings =
+      (await window.blackbox?.paymentTerminal?.getSettings?.()) ??
+      DEFAULT_PAYMENT_TERMINAL_SETTINGS;
+    const terminalCardAmount =
+      cardTerminalAmount != null && cardTerminalAmount > 0
+        ? cardTerminalAmount
+        : 0;
+    if (
+      terminalSettings.integratedCheckout &&
+      terminalCardAmount > 0 &&
+      (paymentMode === "card" || paymentMode === "split")
+    ) {
+      const invoiceId = editingDraftId ?? crypto.randomUUID();
+      const payResult = await payCardOnTerminal(
+        invoiceId,
+        terminalCardAmount,
+      );
+      if (payResult.status !== "APPROVED") {
+        setError(
+          payResult.message ??
+            `Card payment not approved (${payResult.status}). Sale was not posted.`,
+        );
+        return;
+      }
+      terminalCardReference =
+        payResult.transactionId?.trim() || invoiceId;
+    }
+
     setSaving(true);
     try {
       const resolvedCustomerName =
@@ -1297,7 +1335,7 @@ export function SalePage() {
             sellUnit: line.sellUnit,
           };
         });
-        const paymentRows = postedPaymentRows();
+        const paymentRows = postedPaymentRows(terminalCardReference);
         const warehouseName =
           warehouses.find((warehouse) => warehouse.id === warehouseId)?.name ??
           "";
@@ -1477,7 +1515,7 @@ export function SalePage() {
           sellUnit: line.sellUnit,
           barcode: line.barcode,
         })),
-        payments: postedPaymentRows().map((row) => ({
+        payments: postedPaymentRows(terminalCardReference).map((row) => ({
           method: row.method,
           amount: row.amount,
           reference: row.reference || undefined,
