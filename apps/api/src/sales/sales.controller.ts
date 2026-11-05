@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -14,13 +16,17 @@ import type { TenantContext } from "../common/tenant-context";
 import { CurrentUser } from "../common/current-user.decorator";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
-import { CreateSaleDto, ListSalesQueryDto } from "./dto/sale.dto";
+import { FbrService } from "../fbr/fbr.service";
+import { CreateSaleDto, ListSalesQueryDto, SubmitSaleFbrDto } from "./dto/sale.dto";
 import { SalesService } from "./sales.service";
 
 @Controller("sales")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SalesController {
-  constructor(private readonly sales: SalesService) {}
+  constructor(
+    private readonly sales: SalesService,
+    private readonly fbr: FbrService,
+  ) {}
 
   @Get()
   @RequirePermissions("sales.read")
@@ -41,6 +47,23 @@ export class SalesController {
     @CurrentUser() user: TenantContext,
   ): Promise<SaleDetail> {
     return this.sales.create(dto, user);
+  }
+
+  @Post(":id/fbr")
+  @HttpCode(200)
+  submitFbr(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: SubmitSaleFbrDto,
+    @CurrentUser() user: TenantContext,
+  ): Promise<SaleDetail> {
+    const permissions = user.permissions ?? [];
+    if (
+      !permissions.includes("sales.read") &&
+      !permissions.includes("sales.write")
+    ) {
+      throw new ForbiddenException("Insufficient permissions");
+    }
+    return this.fbr.submitSale(id, body.sale);
   }
 
   @Post(":id/void")

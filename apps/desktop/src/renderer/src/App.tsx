@@ -11,6 +11,7 @@ import { BrandsListPage } from "./features/brands/BrandsListPage";
 import { CategoriesListPage } from "./features/categories/CategoriesListPage";
 import { CategoryFormPage } from "./features/categories/CategoryFormPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { CashFlowPage } from "./features/cash-flow/CashFlowPage";
 import { TaxReportPage } from "./features/reports/TaxReportPage";
 import { InventoryInOutReportPage } from "./features/inventory/InventoryInOutReportPage";
 import { InventoryOutDetailPage } from "./features/inventory/InventoryOutDetailPage";
@@ -35,6 +36,7 @@ import { SkuProfilePage } from "./features/skus/SkuProfilePage";
 import { VendorGroupFormPage } from "./features/vendor-groups/VendorGroupFormPage";
 import { VendorGroupsListPage } from "./features/vendor-groups/VendorGroupsListPage";
 import { VendorFormPage } from "./features/vendors/VendorFormPage";
+import { VendorPaymentsPage } from "./features/vendors/VendorPaymentsPage";
 import { VendorProfilePage } from "./features/vendors/VendorProfilePage";
 import { VendorsListPage } from "./features/vendors/VendorsListPage";
 import { WarehouseFormPage } from "./features/warehouses/WarehouseFormPage";
@@ -85,6 +87,7 @@ function AuthenticatedApp() {
         <Routes>
           <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
+          <Route path="cash-flow" element={<CashFlowPage />} />
           <Route path="products" element={<ProductsListPage />} />
           <Route path="products/new" element={<ProductFormPage />} />
           <Route path="products/:id" element={<ProductProfilePage />} />
@@ -97,6 +100,7 @@ function AuthenticatedApp() {
           <Route path="categories/:id/edit" element={<CategoryFormPage />} />
           <Route path="vendors" element={<VendorsListPage />} />
           <Route path="vendors/new" element={<VendorFormPage />} />
+          <Route path="vendors/payments" element={<VendorPaymentsPage />} />
           <Route path="vendors/:id" element={<VendorProfilePage />} />
           <Route path="vendors/:id/edit" element={<VendorFormPage />} />
           <Route path="vendor-groups" element={<VendorGroupsListPage />} />

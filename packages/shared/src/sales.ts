@@ -1,3 +1,5 @@
+import type { ManagerDrawerBalance } from "./cash-flow";
+import type { FbrInvoiceStatus } from "./fbr";
 import { splitInclusiveGst } from "./inventory";
 
 export const SALE_STATUSES = ["DRAFT", "POSTED", "VOID"] as const;
@@ -31,6 +33,8 @@ export interface SaleLineRow {
   sellUnit: SellUnit;
   discountPercent: number;
   focQuantity: number;
+  /** Harmonized System code snapshotted from the SKU when the sale is posted. */
+  hsCode?: string | null;
   /** Draft bill only: one manager-approved qty correction already used on this line. */
   quantityCorrected?: boolean;
 }
@@ -59,6 +63,11 @@ export interface SaleDetail {
   payments: SalePaymentRow[];
   createdAt: string;
   updatedAt: string;
+  fbrInvoiceNumber?: string | null;
+  fbrStatus?: FbrInvoiceStatus | null;
+  fbrError?: string | null;
+  fbrSubmittedAt?: string | null;
+  fbrSellerNtn?: string | null;
 }
 
 export interface SaleListItem {
@@ -70,6 +79,7 @@ export interface SaleListItem {
   total: number;
   itemCount: number;
   postedAt: string | null;
+  fbrStatus?: FbrInvoiceStatus | null;
 }
 
 export interface SaleListQuery {
@@ -101,6 +111,7 @@ export interface CreateSaleLineRequest {
   barcode?: string | null;
   discountPercent?: number;
   focQuantity?: number;
+  hsCode?: string | null;
 }
 
 export interface CreateSalePaymentRequest {
@@ -121,6 +132,8 @@ export interface CreateSaleRequest {
   supervisorUserId?: string;
   /** Pending return voucher to apply as credit when posting this sale. */
   pendingReturnId?: string;
+  /** When true, post a simple bill and do not report the sale to FBR. */
+  fbrExcluded?: boolean;
   items: CreateSaleLineRequest[];
   payments: CreateSalePaymentRequest[];
 }
@@ -318,4 +331,8 @@ export interface ManagerDashboardSummary {
   date: string;
   tillCashCollectedAmount: number;
   customerReturnCount: number;
+  /** Signed-in manager's all-time drawer (collections minus expenses). */
+  drawerBalance: number;
+  /** Owner sees every manager. A manager sees only their own row. */
+  drawers: ManagerDrawerBalance[];
 }

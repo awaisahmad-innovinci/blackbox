@@ -14,6 +14,7 @@ import type {
   SaleStatus,
 } from "@blackbox/shared";
 import {
+  asFbrInvoiceStatus,
   DEFAULT_SALE_CUSTOMER_NAME,
   nextSaleNumber,
   saleBillTotalsFromInclusiveLines,
@@ -159,6 +160,7 @@ export class SalesService {
       total: toNum(r.total),
       itemCount: countById.get(r.id) ?? 0,
       postedAt: r.postedAt?.toISOString() ?? null,
+      fbrStatus: asFbrInvoiceStatus(r.fbrStatus),
     }));
 
     return { items, total, page, pageSize };
@@ -192,6 +194,7 @@ export class SalesService {
         unitPrice: number;
         lineTotal: number;
         gstPercent: number;
+        hsCode: string | null;
         sellUnit: "pc" | "box";
         barcode: string | null;
         discountPercent: number;
@@ -206,6 +209,7 @@ export class SalesService {
       const focQuantity = Math.max(0, Math.floor(focRaw));
       const discountPercent = round4(Number(item.discountPercent ?? 0));
       const gstPercent = round4(Number(item.gstPercent ?? 0));
+      const hsCode = item.hsCode?.trim() || null;
       if (!(qty >= 0)) {
         throw new BadRequestException("Quantity cannot be negative");
       }
@@ -237,6 +241,7 @@ export class SalesService {
           unitPrice,
           lineTotal,
           gstPercent,
+          hsCode,
           sellUnit: item.sellUnit ?? "pc",
           barcode: item.barcode ?? null,
           discountPercent,
@@ -376,6 +381,9 @@ export class SalesService {
         cashTendered:
           cashTendered != null ? String(cashTendered) : null,
         notes: dto.notes?.trim() ?? "",
+        fbrStatus: user.permissions.includes("sales.non_fbr")
+          ? "excluded"
+          : "pending",
       });
       await manager.save(header);
 
@@ -425,6 +433,7 @@ export class SalesService {
             unitPrice: String(line.unitPrice),
             lineTotal: String(line.lineTotal),
             gstPercent: String(line.gstPercent),
+            hsCode: line.hsCode || productSku.hsCode || null,
             discountPercent: String(line.discountPercent),
             focQuantity: String(line.focQuantity),
             sellUnit: line.sellUnit,
@@ -467,6 +476,7 @@ export class SalesService {
           unitPrice: line.unitPrice,
           lineTotal: line.lineTotal,
           gstPercent: line.gstPercent,
+          hsCode: line.hsCode || productSku.hsCode || null,
           sellUnit: line.sellUnit,
           discountPercent: line.discountPercent,
           focQuantity: line.focQuantity,
@@ -656,6 +666,7 @@ export class SalesService {
         unitPrice: toNum(l.unitPrice),
         lineTotal: toNum(l.lineTotal),
         gstPercent: toNum(l.gstPercent),
+        hsCode: l.hsCode,
         sellUnit: (l.sellUnit as "pc" | "box") ?? "pc",
         discountPercent: toNum(l.discountPercent),
         focQuantity: toNum(l.focQuantity),
@@ -666,6 +677,11 @@ export class SalesService {
         amount: toNum(p.amount),
         reference: p.reference,
       })),
+      fbrInvoiceNumber: header.fbrInvoiceNumber,
+      fbrStatus: asFbrInvoiceStatus(header.fbrStatus),
+      fbrError: header.fbrError,
+      fbrSubmittedAt: header.fbrSubmittedAt?.toISOString() ?? null,
+      fbrSellerNtn: header.fbrSellerNtn,
       createdAt: header.createdAt.toISOString(),
       updatedAt: header.updatedAt.toISOString(),
     };

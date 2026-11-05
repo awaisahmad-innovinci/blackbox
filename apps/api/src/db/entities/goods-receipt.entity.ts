@@ -115,6 +115,15 @@ export class GoodsReceipt {
   @Column({ type: "numeric", precision: 14, scale: 4, default: 0 })
   total!: string;
 
+  @Column({
+    name: "amount_paid",
+    type: "numeric",
+    precision: 14,
+    scale: 4,
+    default: 0,
+  })
+  amountPaid!: string;
+
   @Column({ type: "text", default: "" })
   notes!: string;
 

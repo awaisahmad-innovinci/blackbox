@@ -32,4 +32,10 @@ export const salesApi = {
   void(id: string): Promise<SaleDetail> {
     return apiFetch<SaleDetail>(`/sales/${id}/void`, { method: "POST" });
   },
+  submitFbr(id: string, sale?: SaleDetail): Promise<SaleDetail> {
+    return apiFetch<SaleDetail>(`/sales/${id}/fbr`, {
+      method: "POST",
+      body: JSON.stringify(sale ? { sale } : {}),
+    });
+  },
 };

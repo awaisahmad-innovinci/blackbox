@@ -23,6 +23,7 @@ Rules:
 - Empty optional values are allowed. Do not add extra files or folders to the upload.
 - **Barcode qty per scan:** On `07_product_skus.csv`, optional `barcode_quantity_multiplier` (default 1) sets how many base units one scan adds when using the SKU’s `barcode`. Use `10_product_sku_barcodes.csv` for extra barcodes on the same SKU (upload **after** `07_product_skus.csv`). `quantity_multiplier` must be greater than zero (e.g. 6 = six pieces per scan).
 - **GST on SKU:** Optional `gst_percent` on `07_product_skus.csv` (0–100). Used for GST on inclusive sale line totals; leave empty for 0.
+- **HS code:** Optional `hs_code` on `07_product_skus.csv` (`0101.2100`). Required before FBR can invoice a sale of that SKU. Leave empty to keep an existing code on update.
 
 Uploading the same rows again updates the existing records instead of creating duplicates. The upload is atomic: if any row is invalid, nothing from that file is imported.
 
@@ -57,8 +58,8 @@ import_key,name,brand_name,category_name,product_type,description,status
 shirt-001,Classic Shirt,Acme,Shirts,STOCK_ITEM,Cotton shirt,active
 
 # 07_product_skus.csv
-# Header must match exactly. Legacy 17-column files (without barcode_quantity_multiplier and gst_percent) are still accepted; missing values default to multiplier 1 and GST empty/0.
-product_import_key,sku,barcode,barcode_quantity_multiplier,variant_name,size_value,size_unit,base_unit_abbreviation,purchase_unit_abbreviation,units_per_purchase_unit,cost_price,selling_price,selling_price_per_purchase_unit,gst_percent,reorder_level,minimum_stock_level,maximum_stock_level,track_inventory,status
+# Header must match exactly. Older 19-column files (without hs_code) and legacy 17-column files are still accepted; a blank hs_code does not clear one already stored.
+product_import_key,sku,barcode,barcode_quantity_multiplier,variant_name,size_value,size_unit,base_unit_abbreviation,purchase_unit_abbreviation,units_per_purchase_unit,cost_price,selling_price,selling_price_per_purchase_unit,gst_percent,hs_code,reorder_level,minimum_stock_level,maximum_stock_level,track_inventory,status
 shirt-001,SHIRT-BLK-M,1234567890123,1,Black / Medium,M,,PCS,BOX,12,100,150,,17,5,5,100,true,active
 coke-330,COKE-330ML,8901030861234,6,Coke 330ml,,,PCS,PCS,1,50,80,,0,10,10,200,true,active
 

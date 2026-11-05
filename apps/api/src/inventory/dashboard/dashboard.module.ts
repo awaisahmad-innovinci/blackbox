@@ -12,12 +12,14 @@ import {
   Warehouse,
 } from "../../db/entities";
 import { RbacModule } from "../../rbac/rbac.module";
+import { CashFlowModule } from "../../cash-flow/cash-flow.module";
 import { DashboardController } from "./dashboard.controller";
 import { DashboardService } from "./dashboard.service";
 
 @Module({
   imports: [
     RbacModule,
+    CashFlowModule,
     TypeOrmModule.forFeature([
       Product,
       ProductSku,

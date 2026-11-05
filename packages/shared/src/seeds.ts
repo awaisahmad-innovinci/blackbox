@@ -10,8 +10,16 @@ import type { DefaultRole } from "./roles";
  */
 /** Owner gets all Phase 1 permissions except POS sale creation (cashier-only). */
 const OWNER_PERMISSIONS: Permission[] = PERMISSIONS.filter(
-  (p) => p !== "sales.write",
+  (p) => p !== "sales.write" && p !== "sales.non_fbr",
 );
+
+const CASHIER_PERMISSIONS: readonly Permission[] = [
+  "desktop.access",
+  "sync.use",
+  "sales.write",
+  "sales.refund",
+  "till.read",
+];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<
   DefaultRole,
@@ -38,11 +46,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "purchasing.access",
     "vendors.access",
   ],
-  CASHIER: [
-    "desktop.access",
-    "sync.use",
-    "sales.write",
-    "sales.refund",
-    "till.read",
-  ],
+  CASHIER: CASHIER_PERMISSIONS,
+  CASHIER_NON_FBR: [...CASHIER_PERMISSIONS, "sales.non_fbr"],
 };

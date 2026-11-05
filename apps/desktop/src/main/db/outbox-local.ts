@@ -55,17 +55,42 @@ export function enqueueOutbox(input: {
   return changeId;
 }
 
+export function listPendingOutboxForEntity(
+  entityType: string,
+  entityId: string,
+): OutboxRow[] {
+  return listPendingOutboxRows(
+    `status in ('pending', 'pushing')
+       and entity_type = @entityType
+       and entity_id = @entityId`,
+    { entityType, entityId },
+  );
+}
+
 export function listPendingOutbox(limit = 100): OutboxRow[] {
+  return listPendingOutboxRows(
+    `status in ('pending', 'pushing')`,
+    {},
+    "order by created_at, change_id limit @limit",
+    { limit },
+  );
+}
+
+function listPendingOutboxRows(
+  where: string,
+  whereParams: Record<string, string>,
+  tail = "order by created_at, change_id",
+  tailParams: Record<string, string | number> = {},
+): OutboxRow[] {
   const rows = getLocalDb()
     .prepare(
       `select change_id as changeId, stream, entity_type as entityType,
               entity_id as entityId, operation, payload, base_entity_version as baseEntityVersion
        from local_sync_outbox
-       where status in ('pending', 'pushing')
-       order by created_at, change_id
-       limit @limit`,
+       where ${where}
+       ${tail}`,
     )
-    .all({ limit }) as Array<OutboxRow & { payload: string }>;
+    .all({ ...whereParams, ...tailParams }) as Array<OutboxRow & { payload: string }>;
   return rows.map((row) => ({
     ...row,
     payload: JSON.parse(row.payload) as Record<string, unknown>,

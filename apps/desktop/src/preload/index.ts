@@ -6,10 +6,16 @@ import type {
   DashboardSummary,
   EntityStatus,
   ManagerDashboardSummary,
+  CashFlowReport,
   ManagerStockOverviewQuery,
   PaginatedManagerStockOverview,
   GoodsReceiptDetail,
   GoodsReceiptListQuery,
+  PaginatedVendorPayments,
+  VendorCreditLedger,
+  VendorCreditQuery,
+  VendorLedger,
+  VendorPaymentListQuery,
   InventoryInOutReport,
   InventoryMovementListItem,
   InventoryOutDetail,
@@ -209,6 +215,21 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listGoodsReceipts",
         query,
       ) as Promise<PaginatedGoodsReceipts>,
+    getVendorLedger: (vendorId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getVendorLedger",
+        vendorId,
+      ) as Promise<VendorLedger>,
+    listVendorPayments: (query?: VendorPaymentListQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listVendorPayments",
+        query,
+      ) as Promise<PaginatedVendorPayments>,
+    listVendorCredits: (query?: VendorCreditQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listVendorCredits",
+        query,
+      ) as Promise<VendorCreditLedger>,
     listPoNumbers: () =>
       ipcRenderer.invoke("localDb:listPoNumbers") as Promise<string[]>,
     listSkuCodes: () =>
@@ -387,11 +408,25 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getCashierDashboardSummary",
         userId,
       ) as Promise<CashierDashboardSummary>,
-    getManagerDashboardSummary: (userId: string) =>
+    getManagerDashboardSummary: (
+      userId: string,
+      seeAll?: boolean,
+      managerName?: string,
+    ) =>
       ipcRenderer.invoke(
         "localDb:getManagerDashboardSummary",
         userId,
+        seeAll ?? false,
+        managerName ?? "",
       ) as Promise<ManagerDashboardSummary>,
+    getCashFlow: (query: {
+      userId: string;
+      managerName: string;
+      seeAll: boolean;
+      from: string;
+      to: string;
+    }) =>
+      ipcRenderer.invoke("localDb:getCashFlow", query) as Promise<CashFlowReport>,
     listManagerStockOverview: (query?: ManagerStockOverviewQuery) =>
       ipcRenderer.invoke(
         "localDb:listManagerStockOverview",
@@ -537,6 +572,10 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<InventoryOutReturnDetail | null>,
     getSale: (id: string) =>
       ipcRenderer.invoke("localDb:getSale", id) as Promise<SaleDetail | null>,
+    listPendingFbrSales: () =>
+      ipcRenderer.invoke(
+        "localDb:listPendingFbrSales",
+      ) as Promise<SaleDetail[]>,
     listSaleReturns: (query?: SaleReturnListQuery) =>
       ipcRenderer.invoke(
         "localDb:listSaleReturns",
@@ -698,6 +737,8 @@ contextBridge.exposeInMainWorld("blackbox", {
   },
   sync: {
     listOutbox: (limit?: number) => ipcRenderer.invoke("sync:listOutbox", limit),
+    listOutboxForEntity: (entityType: string, entityId: string) =>
+      ipcRenderer.invoke("sync:listOutboxForEntity", entityType, entityId),
     markPushing: (ids: string[]) =>
       ipcRenderer.invoke("sync:markPushing", ids) as Promise<{ ok: true }>,
     markAcked: (changeId: string, seq?: string) =>

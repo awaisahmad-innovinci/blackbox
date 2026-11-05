@@ -41,6 +41,8 @@ import { SalePayment } from "./sale-payment.entity";
 import { TillSession } from "./till-session.entity";
 import { TillWithdrawal } from "./till-withdrawal.entity";
 import { ActivityLog } from "./activity-log.entity";
+import { VendorLedgerEntry } from "./vendor-ledger-entry.entity";
+import { CashExpense } from "./cash-expense.entity";
 import { VendorReturn } from "./vendor-return.entity";
 import { VendorReturnItem } from "./vendor-return-item.entity";
 import { PasswordResetCode } from "./password-reset-code.entity";
@@ -89,7 +91,9 @@ export const entities = [
   SaleReturnLine,
   TillSession,
   TillWithdrawal,
+  CashExpense,
   ActivityLog,
+  VendorLedgerEntry,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,
@@ -139,7 +143,9 @@ export {
   SaleReturnLine,
   TillSession,
   TillWithdrawal,
+  CashExpense,
   ActivityLog,
+  VendorLedgerEntry,
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,

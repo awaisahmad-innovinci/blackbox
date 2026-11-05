@@ -1,5 +1,5 @@
 import type { SaleDetail } from "@blackbox/shared";
-import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import type Database from "better-sqlite3";
 import { applyInventoryOutBalanceDeltaLocal, getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
 import { getLocalDb } from "./index";
@@ -51,6 +51,74 @@ function removeStaleSaleByNumber(
   db.prepare("delete from sales where id = ?").run(stale.id);
 }
 
+function mergeFbrFields(
+  db: Database.Database,
+  detail: SaleDetail,
+): Pick<
+  SaleDetail,
+  | "fbrInvoiceNumber"
+  | "fbrStatus"
+  | "fbrError"
+  | "fbrSubmittedAt"
+  | "fbrSellerNtn"
+> {
+  const existing = db
+    .prepare(
+      `select
+         fbr_invoice_number as fbrInvoiceNumber,
+         fbr_status as fbrStatus,
+         fbr_error as fbrError,
+         fbr_submitted_at as fbrSubmittedAt,
+         fbr_seller_ntn as fbrSellerNtn
+       from sales where id = ?`,
+    )
+    .get(detail.id) as
+    | {
+        fbrInvoiceNumber: string | null;
+        fbrStatus: string | null;
+        fbrError: string | null;
+        fbrSubmittedAt: string | null;
+        fbrSellerNtn: string | null;
+      }
+    | undefined;
+
+  const incomingStatus = detail.fbrStatus ?? null;
+  const existingTerminal =
+    existing?.fbrStatus === "failed" ||
+    existing?.fbrStatus === "submitted" ||
+    existing?.fbrStatus === "excluded";
+  const incomingWouldEraseTerminal =
+    incomingStatus == null ||
+    incomingStatus === "pending" ||
+    (incomingStatus === "excluded" &&
+      (existing?.fbrStatus === "failed" || existing?.fbrStatus === "submitted"));
+  const keepExisting =
+    existing != null &&
+    !detail.fbrInvoiceNumber &&
+    (Boolean(existing.fbrInvoiceNumber) ||
+      (existingTerminal && incomingWouldEraseTerminal));
+  if (keepExisting && existing) {
+    return {
+      fbrInvoiceNumber: existing.fbrInvoiceNumber,
+      fbrStatus: asFbrInvoiceStatus(existing.fbrStatus) ?? "submitted",
+      fbrError: existing.fbrInvoiceNumber ? null : existing.fbrError,
+      fbrSubmittedAt: existing.fbrSubmittedAt,
+      fbrSellerNtn: detail.fbrSellerNtn || existing.fbrSellerNtn,
+    };
+  }
+
+  return {
+    fbrInvoiceNumber: detail.fbrInvoiceNumber ?? null,
+    fbrStatus:
+      detail.fbrStatus ??
+      asFbrInvoiceStatus(existing?.fbrStatus) ??
+      (detail.status === "POSTED" ? "pending" : null),
+    fbrError: detail.fbrError ?? null,
+    fbrSubmittedAt: detail.fbrSubmittedAt ?? null,
+    fbrSellerNtn: detail.fbrSellerNtn ?? existing?.fbrSellerNtn ?? null,
+  };
+}
+
 export function upsertSaleLocal(
   detail: SaleDetail,
   options?: { syncStatus?: "synced" | "local" },
@@ -65,16 +133,19 @@ export function upsertSaleLocal(
       detail.id,
     );
 
+    const fbr = mergeFbrFields(db, detail);
     db.prepare(
       `insert into sales (
         id, tenant_id, sale_number, warehouse_id, status,
         subtotal, gst_rate, gst_amount, sales_tax_rate, sales_tax_amount, total,
         device_id, posted_by, posted_at, customer_name, posted_by_name, cash_tendered, notes,
+        fbr_invoice_number, fbr_status, fbr_error, fbr_submitted_at, fbr_seller_ntn,
         created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @saleNumber, @warehouseId, @status,
         @subtotal, @gstRate, @gstAmount, @salesTaxRate, @salesTaxAmount, @total,
         @deviceId, @postedBy, @postedAt, @customerName, @postedByName, @cashTendered, @notes,
+        @fbrInvoiceNumber, @fbrStatus, @fbrError, @fbrSubmittedAt, @fbrSellerNtn,
         @createdAt, @updatedAt, @syncStatus, @serverUpdatedAt
       )
       on conflict(id) do update set
@@ -94,6 +165,11 @@ export function upsertSaleLocal(
         posted_by_name = excluded.posted_by_name,
         cash_tendered = excluded.cash_tendered,
         notes = excluded.notes,
+        fbr_invoice_number = excluded.fbr_invoice_number,
+        fbr_status = excluded.fbr_status,
+        fbr_error = excluded.fbr_error,
+        fbr_submitted_at = excluded.fbr_submitted_at,
+        fbr_seller_ntn = excluded.fbr_seller_ntn,
         updated_at = excluded.updated_at,
         sync_status = excluded.sync_status,
         server_updated_at = excluded.server_updated_at`,
@@ -116,6 +192,11 @@ export function upsertSaleLocal(
       postedByName: detail.postedByName,
       cashTendered: detail.cashTendered,
       notes: detail.notes,
+      fbrInvoiceNumber: fbr.fbrInvoiceNumber,
+      fbrStatus: fbr.fbrStatus,
+      fbrError: fbr.fbrError,
+      fbrSubmittedAt: fbr.fbrSubmittedAt,
+      fbrSellerNtn: fbr.fbrSellerNtn,
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
       syncStatus,
@@ -128,10 +209,10 @@ export function upsertSaleLocal(
     const insertLine = db.prepare(
       `insert into sale_lines (
         id, tenant_id, sale_id, product_sku_id, quantity, unit_price, line_total,
-        gst_percent, discount_percent, foc_quantity, quantity_corrected, sell_unit, barcode, created_at, updated_at, sync_status, server_updated_at
+        gst_percent, discount_percent, foc_quantity, quantity_corrected, sell_unit, barcode, hs_code, created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @saleId, @productSkuId, @quantity, @unitPrice, @lineTotal,
-        @gstPercent, @discountPercent, @focQuantity, @quantityCorrected, @sellUnit, @barcode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+        @gstPercent, @discountPercent, @focQuantity, @quantityCorrected, @sellUnit, @barcode, @hsCode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )`,
     );
 
@@ -150,6 +231,7 @@ export function upsertSaleLocal(
         quantityCorrected: item.quantityCorrected ? 1 : 0,
         sellUnit: item.sellUnit,
         barcode: item.barcode,
+        hsCode: item.hsCode ?? null,
         createdAt: detail.updatedAt,
         updatedAt: detail.updatedAt,
         serverUpdatedAt: detail.updatedAt,

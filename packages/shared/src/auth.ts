@@ -29,6 +29,8 @@ export interface AuthUser {
   defaultGstRate?: number;
   /** Tenant default sales tax percentage applied to every sale. */
   defaultSalesTaxRate?: number;
+  /** When true, posted sales are sent to FBR and the bill includes the FBR line. */
+  fbrEnabled?: boolean;
 }
 
 export interface AuthTokens {

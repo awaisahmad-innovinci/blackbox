@@ -23,6 +23,7 @@ import {
   type SyncStatusResponse,
   type SyncStream,
   inventoryMovementAffectsWarehouseStock,
+  asFbrInvoiceStatus,
   type InventoryMovementType,
 } from "@blackbox/shared";
 import {
@@ -63,6 +64,8 @@ import {
   Unit,
   Vendor,
   VendorContact,
+  VendorLedgerEntry,
+  CashExpense,
   VendorGroup,
   VendorReturn,
   VendorReturnItem,
@@ -747,6 +750,10 @@ export class SyncService {
           unitsPerPurchaseUnit: String(p.unitsPerPurchaseUnit ?? row.unitsPerPurchaseUnit ?? 1),
           costPrice: String(p.costPrice ?? row.costPrice ?? 0),
           gstPercent: String(p.gstPercent ?? row.gstPercent ?? 0),
+          hsCode:
+            p.hsCode == null || String(p.hsCode).trim() === ""
+              ? (row.hsCode ?? null)
+              : String(p.hsCode).trim(),
           sellingPrice: String(p.sellingPrice ?? row.sellingPrice ?? 0),
           sellingPricePerPurchaseUnit:
             p.sellingPricePerPurchaseUnit == null
@@ -894,6 +901,14 @@ export class SyncService {
         await this.upsertGoodsReceipt(manager, tenantId, change.entityId, p);
         break;
       }
+      case "vendor_ledger_entry": {
+        await this.upsertVendorLedgerEntry(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "cash_expense": {
+        await this.upsertCashExpense(manager, tenantId, change.entityId, p);
+        break;
+      }
       case "inventory_out": {
         await this.upsertInventoryOut(manager, tenantId, change.entityId, p);
         break;
@@ -1039,6 +1054,83 @@ export class SyncService {
     }
   }
 
+  private async upsertCashExpense(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const recordedByUserId = String(p.recordedByUserId ?? "");
+    if (!recordedByUserId) throw new Error("manager not found");
+    const category = String(p.category ?? "");
+    if (
+      category !== "Rent" &&
+      category !== "Electricity" &&
+      category !== "Internet" &&
+      category !== "Other"
+    ) {
+      throw new Error("expense category is invalid");
+    }
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("expense amount must be greater than zero");
+    const existing = await manager.findOne(CashExpense, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ?? manager.create(CashExpense, { id: entityId, tenantId });
+    Object.assign(row, {
+      recordedByUserId,
+      recordedByName: String(p.recordedByName ?? row.recordedByName ?? ""),
+      category,
+      amount: String(amount),
+      note: String(p.note ?? row.note ?? ""),
+      occurredAt: p.occurredAt
+        ? new Date(String(p.occurredAt))
+        : (row.occurredAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
+  private async upsertVendorLedgerEntry(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const vendorId = String(p.vendorId ?? "");
+    if (!vendorId) throw new Error("vendor not found");
+    const entryType = String(p.entryType ?? "");
+    if (entryType !== "CHARGE" && entryType !== "PAYMENT") {
+      throw new Error("ledger entry type is invalid");
+    }
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("ledger amount must be greater than zero");
+    const existing = await manager.findOne(VendorLedgerEntry, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(VendorLedgerEntry, { id: entityId, tenantId });
+    Object.assign(row, {
+      vendorId,
+      entryType,
+      amount: String(amount),
+      goodsReceiptId:
+        (p.goodsReceiptId as string | null | undefined) ??
+        row.goodsReceiptId ??
+        null,
+      receiptNumber:
+        (p.receiptNumber as string | null | undefined) ??
+        row.receiptNumber ??
+        null,
+      note: String(p.note ?? row.note ?? ""),
+      occurredAt: p.occurredAt
+        ? new Date(String(p.occurredAt))
+        : (row.occurredAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
   private async upsertGoodsReceipt(
     manager: EntityManager,
     tenantId: string,
@@ -1072,6 +1164,9 @@ export class SyncService {
       otherCharges: "0",
       returnCredit: String(p.returnCredit ?? row.returnCredit ?? 0),
       total: String(p.total ?? row.total ?? 0),
+      amountPaid: String(
+        p.amountPaid ?? row.amountPaid ?? p.total ?? row.total ?? 0,
+      ),
       notes: "",
     });
     if (!row.purchaseOrderId) throw new Error("purchase order not found");
@@ -1592,6 +1687,16 @@ export class SyncService {
     }
   }
 
+  async upsertPostedSale(
+    tenantId: string,
+    entityId: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await this.upsertSale(manager, tenantId, entityId, payload);
+    });
+  }
+
   private async upsertSale(
     manager: EntityManager,
     tenantId: string,
@@ -1629,6 +1734,46 @@ export class SyncService {
           : row.cashTendered,
       notes: String(p.notes ?? row.notes ?? ""),
     });
+    const incomingFbrInvoice =
+      p.fbrInvoiceNumber != null && String(p.fbrInvoiceNumber).trim() !== ""
+        ? String(p.fbrInvoiceNumber).trim()
+        : null;
+    const incomingFbrStatus = String(p.fbrStatus ?? "");
+    const serverTerminal =
+      row.fbrStatus === "submitted" ||
+      row.fbrStatus === "failed" ||
+      row.fbrStatus === "excluded";
+    const incomingDowngradesServer =
+      !incomingFbrInvoice &&
+      serverTerminal &&
+      (incomingFbrStatus === "" ||
+        incomingFbrStatus === "pending" ||
+        (incomingFbrStatus === "excluded" &&
+          (row.fbrStatus === "submitted" || row.fbrStatus === "failed")));
+    const keepServerFbr =
+      (Boolean(row.fbrInvoiceNumber) && !incomingFbrInvoice) ||
+      incomingDowngradesServer;
+    if (!keepServerFbr) {
+      row.fbrInvoiceNumber = incomingFbrInvoice ?? row.fbrInvoiceNumber ?? null;
+      const incomingStatus = asFbrInvoiceStatus(p.fbrStatus);
+      if (incomingStatus) {
+        row.fbrStatus = incomingStatus;
+      } else if (!row.fbrStatus) {
+        row.fbrStatus = "pending";
+      }
+      if (p.fbrError !== undefined) {
+        const errorText = p.fbrError == null ? "" : String(p.fbrError).trim();
+        row.fbrError = errorText || null;
+      }
+      if (p.fbrSubmittedAt) {
+        row.fbrSubmittedAt = new Date(String(p.fbrSubmittedAt));
+      }
+      const incomingNtn =
+        p.fbrSellerNtn != null && String(p.fbrSellerNtn).trim() !== ""
+          ? String(p.fbrSellerNtn).trim()
+          : null;
+      if (incomingNtn) row.fbrSellerNtn = incomingNtn;
+    }
     if (!row.warehouseId) throw new Error("warehouse not found");
     await manager.save(row);
 
@@ -1642,6 +1787,17 @@ export class SyncService {
         const inventoryQty = qty + focQty;
         const productSkuId = String(item.productSkuId ?? "");
         const unitPrice = Number(item.unitPrice ?? 0);
+        let hsCode =
+          item.hsCode != null && String(item.hsCode).trim() !== ""
+            ? String(item.hsCode).trim()
+            : null;
+        if (!hsCode && productSkuId) {
+          const sku = await manager.findOne(ProductSku, {
+            where: { id: productSkuId, tenantId },
+            select: { id: true, hsCode: true },
+          });
+          hsCode = sku?.hsCode ?? null;
+        }
         await manager.save(
           manager.create(SaleLine, {
             id: String(item.id ?? randomUUID()),
@@ -1656,6 +1812,7 @@ export class SyncService {
             focQuantity: String(focQty),
             sellUnit: String(item.sellUnit ?? "pc"),
             barcode: (item.barcode as string | null | undefined) ?? null,
+            hsCode,
           }),
         );
 

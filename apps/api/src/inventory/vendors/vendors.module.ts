@@ -6,6 +6,7 @@ import {
   Vendor,
   VendorContact,
   VendorGroup,
+  VendorLedgerEntry,
   VendorSku,
   InventoryStock,
 } from "../../db/entities";
@@ -13,6 +14,7 @@ import { VendorGroupsController } from "./vendor-groups.controller";
 import { VendorGroupsService } from "./vendor-groups.service";
 import { VendorSkusController } from "./vendor-skus.controller";
 import { VendorSkusService } from "./vendor-skus.service";
+import { VendorLedgerService } from "./vendor-ledger.service";
 import { VendorsController } from "./vendors.controller";
 import { VendorsService } from "./vendors.service";
 
@@ -22,6 +24,7 @@ import { VendorsService } from "./vendors.service";
       Vendor,
       VendorContact,
       VendorGroup,
+      VendorLedgerEntry,
       VendorSku,
       ProductSku,
       Unit,
@@ -33,7 +36,12 @@ import { VendorsService } from "./vendors.service";
     VendorsController,
     VendorSkusController,
   ],
-  providers: [VendorGroupsService, VendorsService, VendorSkusService],
+  providers: [
+    VendorGroupsService,
+    VendorsService,
+    VendorSkusService,
+    VendorLedgerService,
+  ],
   exports: [VendorSkusService],
 })
 export class VendorsModule {}

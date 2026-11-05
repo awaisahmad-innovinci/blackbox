@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import type { SaleListItem, WarehouseListItem } from "@blackbox/shared";
+import type { FbrInvoiceStatus, SaleListItem, WarehouseListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -26,6 +26,24 @@ import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import { useSession } from "@renderer/lib/session/context";
 
+function SaleBillBadge({ status }: { status?: FbrInvoiceStatus | null }) {
+  if (status === "excluded") {
+    return (
+      <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs font-medium">
+        Simple
+      </span>
+    );
+  }
+  if (status === "pending" || status === "submitted" || status === "failed") {
+    return (
+      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">
+        FBR
+      </span>
+    );
+  }
+  return <span className="text-muted-foreground">—</span>;
+}
+
 export function SalesListPage() {
   const navigate = useNavigate();
   const { user } = useSession();
@@ -44,6 +62,8 @@ export function SalesListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const showBillMode = user?.fbrEnabled === true;
+  const columnCount = showBillMode ? 7 : 6;
 
   useEffect(() => {
     if (!canReadList) navigate(defaultRouteForUser(permissions), { replace: true });
@@ -199,6 +219,9 @@ export function SalesListPage() {
               <th className="px-4 py-3 font-medium">Sale #</th>
               <th className="px-4 py-3 font-medium">Warehouse</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              {showBillMode ? (
+                <th className="px-4 py-3 font-medium">Bill</th>
+              ) : null}
               <th className="px-4 py-3 font-medium">Items</th>
               <th className="px-4 py-3 font-medium">Total</th>
               <th className="px-4 py-3 font-medium">Posted</th>
@@ -207,13 +230,13 @@ export function SalesListPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-muted-foreground px-4 py-8 text-center">
+                <td colSpan={columnCount} className="text-muted-foreground px-4 py-8 text-center">
                   Loading…
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-muted-foreground px-4 py-8 text-center">
+                <td colSpan={columnCount} className="text-muted-foreground px-4 py-8 text-center">
                   No sales found
                 </td>
               </tr>
@@ -230,6 +253,11 @@ export function SalesListPage() {
                   </td>
                   <td className="px-4 py-3">{item.warehouseName}</td>
                   <td className="px-4 py-3">{item.status}</td>
+                  {showBillMode ? (
+                    <td className="px-4 py-3">
+                      <SaleBillBadge status={item.fbrStatus} />
+                    </td>
+                  ) : null}
                   <td className="px-4 py-3 tabular-nums">{item.itemCount}</td>
                   <td className="px-4 py-3 tabular-nums">
                     {item.total.toLocaleString()}

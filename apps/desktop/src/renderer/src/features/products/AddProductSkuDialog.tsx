@@ -8,6 +8,7 @@ import type {
   VendorDetail,
   VendorSku,
 } from "@blackbox/shared";
+import { hsCodeError } from "@blackbox/shared";
 import {
   normalizeStoredText,
   costWithGst,
@@ -64,6 +65,7 @@ const emptyForm = {
   unitsPerPurchaseUnit: "",
   costPrice: "",
   gstPercent: "0",
+  hsCode: "",
   marginPercent: "",
   sellingPrice: "",
   saleDiscountPercent: "0",
@@ -264,6 +266,7 @@ export function AddProductSkuDialog({
           ? requiredNonNegative(form.costPrice, "Cost price/pc")
           : null,
       gstPercent: optionalGstPercent(form.gstPercent),
+      hsCode: hsCodeError(form.hsCode, attempted || Boolean(form.hsCode.trim())),
       marginPercent: optionalNonNegativeMargin(form.marginPercent),
       sellingPrice:
         form.sellingPrice.trim() || attempted
@@ -286,6 +289,7 @@ export function AddProductSkuDialog({
     !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
     !requiredNonNegative(form.costPrice, "Cost price/pc") &&
     !optionalGstPercent(form.gstPercent) &&
+    !hsCodeError(form.hsCode, true) &&
     !optionalNonNegativeMargin(form.marginPercent) &&
     !requiredNonNegative(form.sellingPrice, "Selling price/pc") &&
     !sellingGreaterThanCostWithGst(form.costPrice, form.gstPercent, form.sellingPrice) &&
@@ -341,6 +345,7 @@ export function AddProductSkuDialog({
       unitsPerPurchaseUnit: nums.unitsPerPurchaseUnit,
       costPrice: nums.costPrice,
       gstPercent: nums.gstPercent,
+      hsCode: form.hsCode.trim(),
       sellingPrice: nums.sellingPrice,
       saleDiscountPercent: Math.min(
         100,
@@ -412,6 +417,7 @@ export function AddProductSkuDialog({
           unitsPerPurchaseUnit: body.unitsPerPurchaseUnit,
           costPrice: body.costPrice,
           gstPercent: body.gstPercent ?? 0,
+          hsCode: body.hsCode?.trim() || null,
           sellingPrice: body.sellingPrice,
           saleDiscountPercent: body.saleDiscountPercent ?? 0,
           sellingPricePerPurchaseUnit: body.sellingPricePerPurchaseUnit ?? null,
@@ -694,6 +700,18 @@ export function AddProductSkuDialog({
             />
             {fieldErrors.gstPercent ? (
               <p className="text-destructive text-xs">{fieldErrors.gstPercent}</p>
+            ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>HS code *</Label>
+            <Input
+              value={form.hsCode}
+              aria-invalid={Boolean(fieldErrors.hsCode)}
+              placeholder="0101.2100"
+              onChange={(e) => setField("hsCode", e.target.value)}
+            />
+            {fieldErrors.hsCode ? (
+              <p className="text-destructive text-xs">{fieldErrors.hsCode}</p>
             ) : null}
           </div>
           <div className="space-y-1.5">

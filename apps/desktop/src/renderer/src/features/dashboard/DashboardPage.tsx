@@ -45,7 +45,7 @@ type LocalDbStatus = Awaited<
 >;
 
 const MANAGER_CARDS: {
-  key: keyof ManagerDashboardSummary;
+  key: "tillCashCollectedAmount" | "customerReturnCount" | "drawerBalance";
   label: string;
   hint: string;
   format: "money" | "count";
@@ -61,6 +61,12 @@ const MANAGER_CARDS: {
     label: "Returns issued (today)",
     hint: "Pending and completed return vouchers today",
     format: "count",
+  },
+  {
+    key: "drawerBalance",
+    label: "Expected drawer",
+    hint: "Your collections minus your expenses, all time",
+    format: "money",
   },
 ];
 
@@ -95,6 +101,12 @@ const CASHIER_CARDS: {
     key: "totalSalesAmount",
     label: "Total sales (today)",
     hint: "Posted sales total for today",
+    format: "money",
+  },
+  {
+    key: "nonFbrSalesAmount",
+    label: "Non-FBR sales (today)",
+    hint: "Simple bills posted today, not sent to FBR",
     format: "money",
   },
   {
@@ -198,6 +210,7 @@ export function DashboardPage() {
           setCashierSummary({
             date: new Date().toISOString().slice(0, 10),
             totalSalesAmount: 0,
+            nonFbrSalesAmount: 0,
             cashReceivedAmount: 0,
             cardPaymentsAmount: 0,
             heldBillsCount: 0,
@@ -216,7 +229,11 @@ export function DashboardPage() {
             window.blackbox?.localDb?.getManagerDashboardSummary
           ) {
             setManagerSummary(
-              await window.blackbox.localDb.getManagerDashboardSummary(user.id),
+              await window.blackbox.localDb.getManagerDashboardSummary(
+                user.id,
+                user.permissions.includes("web.access"),
+                user.fullName || user.username,
+              ),
             );
           } else {
             try {
@@ -226,6 +243,8 @@ export function DashboardPage() {
                 date: new Date().toISOString().slice(0, 10),
                 tillCashCollectedAmount: 0,
                 customerReturnCount: 0,
+                drawerBalance: 0,
+                drawers: [],
               });
             }
           }
@@ -613,7 +632,7 @@ export function DashboardPage() {
         <div className="space-y-8">
           {showManagerDashboard ? (
             <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {MANAGER_CARDS.map((card) => (
                   <Card key={card.key} className="gap-3 py-5">
                     <CardHeader className="px-5 pb-0">
@@ -638,7 +657,36 @@ export function DashboardPage() {
                   </Card>
                 ))}
               </div>
+              {user?.permissions.includes("web.access") &&
+              managerSummary &&
+              managerSummary.drawers.length > 0 ? (
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-sm font-medium">
+                      Manager drawers
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    <ul className="divide-y text-sm">
+                      {managerSummary.drawers.map((drawer) => (
+                        <li
+                          key={drawer.managerUserId}
+                          className="flex items-center justify-between gap-4 py-2"
+                        >
+                          <span>{drawer.managerName}</span>
+                          <span className="tabular-nums">
+                            Rs {drawer.balance.toLocaleString()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ) : null}
               <div className="flex flex-wrap gap-2">
+                <Button variant="outline" asChild>
+                  <Link to="/cash-flow">Cash flow</Link>
+                </Button>
                 <Button variant="outline" asChild>
                   <Link to="/sales/stock-overview">View floor &amp; warehouse stock</Link>
                 </Button>

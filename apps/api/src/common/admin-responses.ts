@@ -19,6 +19,13 @@ export type TenantResponse = {
   requireManagerApprovalFoc: boolean;
   defaultGstRate: number;
   defaultSalesTaxRate: number;
+  fbrEnabled: boolean;
+  fbrEnvironment: string;
+  fbrTokenConfigured: boolean;
+  fbrSellerNtn: string | null;
+  fbrSellerProvince: string | null;
+  fbrSellerAddress: string | null;
+  fbrScenarioId: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -86,6 +93,13 @@ export function toTenantResponse(tenant: Tenant): TenantResponse {
     requireManagerApprovalFoc: tenant.requireManagerApprovalFoc,
     defaultGstRate: tenant.defaultGstRate,
     defaultSalesTaxRate: tenant.defaultSalesTaxRate,
+    fbrEnabled: tenant.fbrEnabled === true,
+    fbrEnvironment: tenant.fbrEnvironment || "sandbox",
+    fbrTokenConfigured: Boolean(tenant.fbrToken?.trim()),
+    fbrSellerNtn: tenant.fbrSellerNtn,
+    fbrSellerProvince: tenant.fbrSellerProvince,
+    fbrSellerAddress: tenant.fbrSellerAddress,
+    fbrScenarioId: tenant.fbrScenarioId || "SN026",
     createdAt: tenant.createdAt,
     updatedAt: tenant.updatedAt,
   };

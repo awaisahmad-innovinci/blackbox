@@ -18,6 +18,7 @@ import {
   TillWithdrawal,
   Warehouse,
 } from "../../db/entities";
+import { CashFlowService } from "../../cash-flow/cash-flow.service";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 
 function toNum(value: string | number | null | undefined): number {
@@ -48,6 +49,7 @@ export class DashboardService {
     private readonly tillWithdrawals: Repository<TillWithdrawal>,
     @InjectRepository(SaleReturn)
     private readonly saleReturns: Repository<SaleReturn>,
+    private readonly cashFlow: CashFlowService,
   ) {}
 
   async getSummary(): Promise<DashboardSummary> {
@@ -98,6 +100,7 @@ export class DashboardService {
   async getManagerSummary(
     userId: string,
     tenantId: string,
+    seeAll: boolean,
   ): Promise<ManagerDashboardSummary> {
     const today = new Date().toISOString().slice(0, 10);
 
@@ -119,11 +122,20 @@ export class DashboardService {
       .getCount();
 
     const tillCashCollectedAmount = roundMoney(toNum(tillRow?.amount));
+    const drawers = await this.cashFlow.drawerBalances(
+      tenantId,
+      userId,
+      "",
+      seeAll,
+    );
+    const own = drawers.find((row) => row.managerUserId === userId);
 
     return {
       date: today,
       tillCashCollectedAmount,
       customerReturnCount: returnCount,
+      drawerBalance: own?.balance ?? 0,
+      drawers,
     };
   }
 

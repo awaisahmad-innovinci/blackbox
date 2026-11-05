@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { SaleDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { PrintButton } from "@renderer/components/print-button";
@@ -7,6 +7,7 @@ import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { salesApi } from "@renderer/lib/api/sales";
+import { submitPostedSaleToFbr } from "@renderer/lib/sales/submit-fbr";
 import { loadSale, loadSaleReturnCreditForSale } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -18,6 +19,11 @@ import { useSession } from "@renderer/lib/session/context";
 export function SaleDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const printBill = Boolean(
+    (location.state as { printBill?: boolean } | null)?.printBill,
+  );
+  const printedBillFor = useRef<string | null>(null);
   const confirm = useConfirm();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
@@ -28,6 +34,7 @@ export function SaleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
+  const [submittingFbr, setSubmittingFbr] = useState(false);
   const [discarding, setDiscarding] = useState(false);
 
   useEffect(() => {
@@ -69,6 +76,14 @@ export function SaleDetailPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (loading || !detail || !printBill) return;
+    if (detail.status !== "POSTED") return;
+    if (printedBillFor.current === detail.id) return;
+    printedBillFor.current = detail.id;
+    window.print();
+  }, [loading, detail, printBill]);
+
   async function onDiscardDraft() {
     if (!detail || detail.status !== "DRAFT") return;
     const ok = await confirm({
@@ -91,6 +106,20 @@ export function SaleDetailPage() {
       setError(getApiErrorMessage(err, "Failed to discard held bill"));
     } finally {
       setDiscarding(false);
+    }
+  }
+
+  async function onSubmitFbr() {
+    if (!detail || detail.status !== "POSTED") return;
+    setSubmittingFbr(true);
+    setError(null);
+    try {
+      const updated = await submitPostedSaleToFbr(detail);
+      setDetail(updated);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "FBR invoice was not issued"));
+    } finally {
+      setSubmittingFbr(false);
     }
   }
 
@@ -147,6 +176,7 @@ export function SaleDetailPage() {
   }
 
   const isDraft = detail.status === "DRAFT";
+  const fbrEnabled = user?.fbrEnabled === true;
 
   return (
     <div className="space-y-6">
@@ -161,6 +191,19 @@ export function SaleDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            {fbrEnabled &&
+            !isDraft &&
+            detail.fbrStatus !== "submitted" &&
+            detail.fbrStatus !== "excluded" &&
+            !detail.fbrInvoiceNumber ? (
+              <Button
+                variant="outline"
+                disabled={submittingFbr}
+                onClick={() => void onSubmitFbr()}
+              >
+                {submittingFbr ? "Sending to FBR…" : "Retry FBR invoice"}
+              </Button>
+            ) : null}
             {!isDraft ? <PrintButton openDrawerOnPrint /> : null}
             {isDraft && canWrite ? (
               <>
@@ -199,6 +242,15 @@ export function SaleDetailPage() {
             {error}
           </p>
         ) : null}
+        {fbrEnabled &&
+        !isDraft &&
+        detail.fbrStatus === "failed" &&
+        detail.fbrError &&
+        !detail.fbrInvoiceNumber ? (
+          <p className="text-destructive text-sm" role="alert">
+            {detail.fbrError}
+          </p>
+        ) : null}
 
         {isDraft ? (
           <p className="text-muted-foreground text-sm">
@@ -218,6 +270,7 @@ export function SaleDetailPage() {
               detail.postedByName?.trim() || user?.fullName?.trim() || "—"
             }
             returnCredit={returnCredit ?? undefined}
+            fbrEnabled={fbrEnabled}
           />
         </PrintDocument>
       ) : null}

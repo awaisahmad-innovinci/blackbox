@@ -1,10 +1,11 @@
 import { Type } from "class-transformer";
 import {
-  ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -53,6 +54,10 @@ export class CreateSaleLineDto {
   @IsOptional()
   @IsString()
   barcode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  hsCode?: string | null;
 
   @IsOptional()
   @Type(() => Number)
@@ -125,6 +130,10 @@ export class CreateSaleDto {
   @IsUUID()
   pendingReturnId?: string;
 
+  @IsOptional()
+  @IsBoolean()
+  fbrExcluded?: boolean;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateSaleLineDto)
@@ -173,4 +182,10 @@ export class ListSalesQueryDto {
   @IsNumber()
   @Min(1)
   pageSize?: number;
+}
+
+export class SubmitSaleFbrDto {
+  @IsOptional()
+  @IsObject()
+  sale?: Record<string, unknown>;
 }

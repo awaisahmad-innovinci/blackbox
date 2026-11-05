@@ -135,6 +135,9 @@ export function AddSaleItemDialog({
             sellingPricePerPurchaseUnit: profile.sku.sellingPricePerPurchaseUnit,
             unitsPerPurchaseUnit: profile.sku.unitsPerPurchaseUnit,
             costPrice: profile.sku.costPrice,
+            gstPercent: profile.sku.gstPercent,
+            saleDiscountPercent: profile.sku.saleDiscountPercent,
+            hsCode: profile.sku.hsCode,
           } satisfies SkuSearchResult;
         }),
       );

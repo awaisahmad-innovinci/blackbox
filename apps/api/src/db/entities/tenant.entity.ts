@@ -71,6 +71,27 @@ export class Tenant {
   @Column({ name: "default_sales_tax_rate", type: "real", default: 0 })
   defaultSalesTaxRate!: number;
 
+  @Column({ name: "fbr_enabled", type: "boolean", default: false })
+  fbrEnabled!: boolean;
+
+  @Column({ name: "fbr_environment", type: "text", default: "sandbox" })
+  fbrEnvironment!: string;
+
+  @Column({ name: "fbr_token", type: "text", nullable: true })
+  fbrToken!: string | null;
+
+  @Column({ name: "fbr_seller_ntn", type: "text", nullable: true })
+  fbrSellerNtn!: string | null;
+
+  @Column({ name: "fbr_seller_province", type: "text", nullable: true })
+  fbrSellerProvince!: string | null;
+
+  @Column({ name: "fbr_seller_address", type: "text", nullable: true })
+  fbrSellerAddress!: string | null;
+
+  @Column({ name: "fbr_scenario_id", type: "text", default: "SN026" })
+  fbrScenarioId!: string;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 
