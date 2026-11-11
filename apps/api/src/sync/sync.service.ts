@@ -445,6 +445,30 @@ export class SyncService {
     return { deleted: result.affected ?? 0 };
   }
 
+  /** Opening warehouse qty is owner-only and cannot decrease stock. */
+  private assertOpeningBalanceAllowed(
+    user: TenantContext,
+    item: SyncChangeInputDto,
+  ): void {
+    if (item.operation !== "EVENT" || item.entityType !== "inventory_movement") {
+      return;
+    }
+    if (String(item.payload.movementType ?? "") !== "OPENING_BALANCE") return;
+    if (!user.permissions.includes("inventory.opening.write")) {
+      throw new ForbiddenException(
+        "Opening warehouse quantity requires inventory.opening.write",
+      );
+    }
+    const qty = Number(item.payload.quantity ?? 0);
+    const delta =
+      item.payload.delta != null ? Number(item.payload.delta) : qty;
+    if (!(qty > 0) || !(delta > 0)) {
+      throw new BadRequestException(
+        "Opening warehouse quantity must be greater than zero",
+      );
+    }
+  }
+
   private async applyPushItem(
     user: TenantContext,
     device: Device,
@@ -529,6 +553,8 @@ export class SyncService {
             };
           }
         }
+
+        this.assertOpeningBalanceAllowed(user, item);
 
         const saved = await this.insertChange(manager, {
           tenantId: user.tenantId,
@@ -1706,6 +1732,10 @@ export class SyncService {
     const existing = await manager.findOne(Sale, {
       where: { id: entityId, tenantId },
     });
+    const byId = await manager.findOne(Sale, { where: { id: entityId } });
+    // #region agent log
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"B",location:"sync.service.ts:upsertSale",message:"sale lookup before save",data:{entityId,tenantId,foundForTenant:Boolean(existing),foundById:Boolean(byId),existingTenantId:byId?.tenantId??null,sameTenant:byId?byId.tenantId===tenantId:null,incomingStatus:p.status??null,incomingSaleNumber:p.saleNumber??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const row = existing ?? manager.create(Sale, { id: entityId, tenantId });
     const prevStatus = row.status;
     Object.assign(row, {
@@ -1775,7 +1805,23 @@ export class SyncService {
       if (incomingNtn) row.fbrSellerNtn = incomingNtn;
     }
     if (!row.warehouseId) throw new Error("warehouse not found");
-    await manager.save(row);
+    try {
+      await manager.save(row);
+    } catch (error: unknown) {
+      const driverCode =
+        error &&
+        typeof error === "object" &&
+        "driverError" in error &&
+        (error as { driverError?: { code?: string } }).driverError?.code
+          ? String(
+              (error as { driverError?: { code?: string } }).driverError?.code,
+            )
+          : "";
+      // #region agent log
+      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"C",location:"sync.service.ts:upsertSale:save",message:"sale save failed",data:{entityId,tenantId,wasInsert:!existing,pgCode:driverCode},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      throw error;
+    }
 
     if (Array.isArray(p.items)) {
       await manager.delete(SaleLine, { saleId: entityId, tenantId });

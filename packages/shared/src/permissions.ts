@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   "warehouses.read",
   "warehouses.write",
   "inventory.access",
+  "inventory.opening.write",
   "purchasing.access",
   "vendors.access",
   "sales.read",
@@ -53,6 +54,7 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   "warehouses.write": "Create, update, and deactivate warehouses",
   "inventory.access":
     "Access inventory module (products, brands, stock movements, reports)",
+  "inventory.opening.write": "Record opening warehouse quantity",
   "purchasing.access":
     "Access purchasing module (purchase orders, goods receipts)",
   "vendors.access": "Access vendors module (vendors and vendor groups)",

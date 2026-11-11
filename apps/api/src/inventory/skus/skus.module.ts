@@ -7,6 +7,7 @@ import {
   Unit,
   VendorSku,
 } from "../../db/entities";
+import { RbacModule } from "../../rbac/rbac.module";
 import { VendorsModule } from "../vendors/vendors.module";
 import { SkuBarcodesService } from "./sku-barcodes.service";
 import { SkusController } from "./skus.controller";
@@ -22,6 +23,7 @@ import { SkusService } from "./skus.service";
       VendorSku,
     ]),
     VendorsModule,
+    RbacModule,
   ],
   controllers: [SkusController],
   providers: [SkusService, SkuBarcodesService],

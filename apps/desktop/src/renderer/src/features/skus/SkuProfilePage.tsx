@@ -50,10 +50,12 @@ import {
 } from "@renderer/lib/sku-pricing";
 import { loadSkuProfile, loadUnits } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { useSession } from "@renderer/lib/session/context";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { SupplierPriceCells } from "@renderer/features/inventory/supplier-price-cells";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { wrapDialogOpenChange } from "@renderer/lib/on-dialog-open-change";
+import { AddCapitalDialog } from "./AddCapitalDialog";
 import { AddSkuBarcodeDialog } from "./AddSkuBarcodeDialog";
 
 function toProductSkuRow(
@@ -97,12 +99,14 @@ export function SkuProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { user } = useSession();
   const [sku, setSku] = useState<SkuDetail | null>(null);
   const [suppliers, setSuppliers] = useState<SkuSupplier[]>([]);
   const [inventory, setInventory] = useState<WarehouseStockRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [addBarcodeOpen, setAddBarcodeOpen] = useState(false);
+  const [addCapitalOpen, setAddCapitalOpen] = useState(false);
   const [units, setUnits] = useState<UnitListItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -665,7 +669,19 @@ export function SkuProfilePage() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Inventory by warehouse</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Inventory by warehouse</h2>
+          {sku.trackInventory &&
+          user?.permissions.includes("inventory.opening.write") ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddCapitalOpen(true)}
+            >
+              Add capital
+            </Button>
+          ) : null}
+        </div>
         <div className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
@@ -1001,6 +1017,22 @@ export function SkuProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {id && sku.trackInventory ? (
+        <AddCapitalDialog
+          open={addCapitalOpen}
+          skuId={id}
+          sku={sku.sku}
+          variantName={sku.variantName}
+          baseUnitName={sku.baseUnitName}
+          onClose={() => setAddCapitalOpen(false)}
+          onAdded={() => {
+            void reload().catch((err: unknown) => {
+              setError(getApiErrorMessage(err, "Failed to load SKU"));
+            });
+          }}
+        />
+      ) : null}
 
       {id ? (
         <AddSkuBarcodeDialog

@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
   EntityStatus,
+  OpeningStockRequest,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
@@ -19,9 +20,16 @@ import {
   normalizeUnitsPerPurchaseUnit,
   vendorPurchasePriceFromSku,
 } from "@blackbox/shared";
-import { Repository } from "typeorm";
+import { DataSource, Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
-import { InventoryStock, ProductSku, Unit, VendorSku } from "../../db/entities";
+import {
+  InventoryMovement,
+  InventoryStock,
+  ProductSku,
+  Unit,
+  VendorSku,
+  Warehouse,
+} from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { getInventoryOutBalanceQty } from "../inventory-out/inventory-out-balance";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
@@ -38,6 +46,10 @@ function toNumOrNull(value: string | null | undefined): number | null {
   return Number(value);
 }
 
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
 @Injectable()
 export class SkusService {
   constructor(
@@ -51,6 +63,7 @@ export class SkusService {
     @InjectRepository(VendorSku)
     private readonly vendorSkus: Repository<VendorSku>,
     private readonly skuBarcodes: SkuBarcodesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async search(
@@ -333,6 +346,83 @@ export class SkusService {
       quantityReserved: toNum(st.quantityReserved),
       quantityAvailable: toNum(st.quantityAvailable),
     }));
+  }
+
+  async addOpeningStock(
+    id: string,
+    input: OpeningStockRequest,
+  ): Promise<WarehouseStockRow> {
+    const tenantId = this.fixedTenant.tenantId;
+    const quantity = round4(Number(input.quantity));
+    if (!(quantity > 0)) {
+      throw new BadRequestException("Quantity must be greater than zero");
+    }
+
+    const sku = await this.skus.findOne({
+      where: { id, tenantId },
+      relations: { product: true },
+    });
+    if (!sku) throw new NotFoundException("SKU not found");
+    if (!sku.trackInventory) {
+      throw new BadRequestException("This SKU does not track inventory");
+    }
+
+    const warehouse = await this.dataSource.getRepository(Warehouse).findOne({
+      where: { id: input.warehouseId, tenantId },
+    });
+    if (!warehouse || warehouse.status !== "active") {
+      throw new BadRequestException("Warehouse not found");
+    }
+
+    const reason = input.reason?.trim() || "Add capital";
+    const stock = await this.dataSource.transaction(async (manager) => {
+      await manager.save(
+        manager.create(InventoryMovement, {
+          tenantId,
+          productSkuId: sku.id,
+          warehouseId: warehouse.id,
+          movementType: "OPENING_BALANCE",
+          quantity: String(quantity),
+          referenceType: "opening_balance",
+          referenceId: null,
+          reason,
+        }),
+      );
+
+      let row = await manager.findOne(InventoryStock, {
+        where: {
+          tenantId,
+          productSkuId: sku.id,
+          warehouseId: warehouse.id,
+        },
+      });
+      if (!row) {
+        row = manager.create(InventoryStock, {
+          tenantId,
+          productSkuId: sku.id,
+          warehouseId: warehouse.id,
+          quantityOnHand: "0",
+          quantityReserved: "0",
+          quantityAvailable: "0",
+        });
+      }
+      const onHand = round4(toNum(row.quantityOnHand) + quantity);
+      const reserved = toNum(row.quantityReserved);
+      row.quantityOnHand = String(onHand);
+      row.quantityAvailable = String(round4(onHand - reserved));
+      return manager.save(row);
+    });
+
+    return {
+      warehouseId: warehouse.id,
+      warehouseName: warehouse.name,
+      productSkuId: sku.id,
+      sku: sku.sku,
+      variantName: sku.variantName,
+      quantityOnHand: toNum(stock.quantityOnHand),
+      quantityReserved: toNum(stock.quantityReserved),
+      quantityAvailable: toNum(stock.quantityAvailable),
+    };
   }
 
   private mapDetail(
