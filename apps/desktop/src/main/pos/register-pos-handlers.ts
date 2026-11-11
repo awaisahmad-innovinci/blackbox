@@ -61,9 +61,23 @@ export function registerPosHandlers(
 
   ipcMain.handle("pos:listSerialPorts", async () => listPosSerialPorts());
 
-  ipcMain.handle("pos:pushCardAmount", async (_event, amount: number) =>
-    pushCardTerminalAmount(amount),
-  );
+  ipcMain.handle("pos:pushCardAmount", async (_event, amount: number) => {
+    const settings = loadPosCardTerminalSettings();
+    const mainWindow = getMainWindow();
+    if (
+      settings.enabled &&
+      settings.connection.type === "hid-keys" &&
+      mainWindow?.isFocused() === true
+    ) {
+      return {
+        ok: false as const,
+        deferred: true as const,
+        message:
+          "Card terminal amount is waiting until the POS window is not focused.",
+      };
+    }
+    return pushCardTerminalAmount(amount);
+  });
 
   ipcMain.handle(
     "pos:testCardTerminal",

@@ -51,7 +51,7 @@ export const DEFAULT_POS_CARD_TERMINAL_SETTINGS: PosCardTerminalSettings = {
 
 export type PosCardTerminalPushResult =
   | { ok: true }
-  | { ok: false; message: string };
+  | { ok: false; message: string; deferred?: boolean };
 
 export interface PosSerialPortInfo {
   path: string;

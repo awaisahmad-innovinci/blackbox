@@ -949,12 +949,10 @@ export function SalePage() {
     paymentsTouchedRef.current = true;
     setPaymentMode(mode);
     if (mode === "split") {
-      const existingCash =
-        payments.find((row) => row.method === "CASH")?.amount ?? 0;
       const cardReference =
         payments.find((row) => row.method === "CARD")?.reference ?? "";
       setPayments(
-        buildSplitPayments(amountDue, existingCash, cardReference, {
+        buildSplitPayments(amountDue, 0, cardReference, {
           cashId: payments.find((row) => row.method === "CASH")?.id,
           cardId: payments.find((row) => row.method === "CARD")?.id,
         }),
@@ -983,17 +981,29 @@ export function SalePage() {
   }
 
   function updateSplitCashAmount(raw: string): void {
-    const cash = round4(parseNumericInputChange(raw));
-    const clamped = round4(Math.min(Math.max(0, cash), amountDue));
+    const cash = round4(Math.max(0, parseNumericInputChange(raw)));
     paymentsTouchedRef.current = true;
     const cardReference =
       payments.find((row) => row.method === "CARD")?.reference ?? "";
-    setPayments(
-      buildSplitPayments(amountDue, clamped, cardReference, {
-        cashId: payments.find((row) => row.method === "CASH")?.id,
-        cardId: payments.find((row) => row.method === "CARD")?.id,
-      }),
-    );
+    const card = round4(Math.max(0, amountDue - cash));
+    setPayments([
+      {
+        id:
+          payments.find((row) => row.method === "CASH")?.id ??
+          crypto.randomUUID(),
+        method: "CASH",
+        amount: cash,
+        reference: "",
+      },
+      {
+        id:
+          payments.find((row) => row.method === "CARD")?.id ??
+          crypto.randomUUID(),
+        method: "CARD",
+        amount: card,
+        reference: cardReference,
+      },
+    ]);
   }
 
   function updateSplitCardReference(reference: string): void {
@@ -2143,17 +2153,20 @@ export function SalePage() {
                       <div className="space-y-2">
                         <Label htmlFor="splitCashAmount">Cash amount</Label>
                         <Input
+                          key="split-cash"
                           ref={splitCashAmountRef}
                           id="splitCashAmount"
                           type="number"
                           min={0}
-                          max={amountDue}
                           step="any"
                           placeholder="Cash portion"
                           className="h-12 text-lg tabular-nums"
-                          value={numericInputDisplayValue(splitAmounts.cash)}
-                          onFocus={selectZeroNumericOnFocus}
-                          onKeyDown={replaceLeadingZeroOnKeyDown}
+                          value={
+                            splitAmounts.cash === 0 ? "" : splitAmounts.cash
+                          }
+                          onFocus={(event) => {
+                            event.currentTarget.select();
+                          }}
                           onChange={(event) =>
                             updateSplitCashAmount(event.target.value)
                           }

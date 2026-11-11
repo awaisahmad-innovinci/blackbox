@@ -476,6 +476,13 @@ export interface CreateSkuBarcodeRequest {
   quantityMultiplier?: number;
 }
 
+/** First warehouse quantity the owner already has, posted as OPENING_BALANCE. */
+export interface OpeningStockRequest {
+  warehouseId: string;
+  quantity: number;
+  reason?: string;
+}
+
 export type SellUnit = "pc" | "box";
 export type OrderUnit = SellUnit;
 

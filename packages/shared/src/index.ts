@@ -176,6 +176,7 @@ export type {
   SkuSearchResult,
   SkuBarcode,
   CreateSkuBarcodeRequest,
+  OpeningStockRequest,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSupplier,

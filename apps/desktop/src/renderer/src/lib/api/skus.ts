@@ -1,6 +1,7 @@
 import type {
   CreateProductSkuRequest,
   CreateSkuBarcodeRequest,
+  OpeningStockRequest,
   SkuBarcode,
   SkuBarcodeLookupResult,
   SkuDetail,
@@ -53,6 +54,15 @@ export const skusApi = {
   },
   listInventory(id: string): Promise<WarehouseStockRow[]> {
     return apiFetch<WarehouseStockRow[]>(`/skus/${id}/inventory`);
+  },
+  addOpeningStock(
+    id: string,
+    body: OpeningStockRequest,
+  ): Promise<WarehouseStockRow> {
+    return apiFetch<WarehouseStockRow>(`/skus/${id}/opening-stock`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   },
   listVendors(id: string): Promise<SkuSupplier[]> {
     return apiFetch<SkuSupplier[]>(`/skus/${id}/vendors`);
