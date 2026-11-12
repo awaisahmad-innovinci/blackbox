@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@blackbox/ui/button";
 import type {
@@ -192,7 +193,7 @@ export function VendorPaymentsPage() {
             <span className="tabular-nums font-medium">
               {creditsLoading
                 ? "…"
-                : (credits?.totalCredit ?? 0).toLocaleString()}
+                :formatMoney((credits?.totalCredit ?? 0))}
             </span>
           </p>
         </div>
@@ -234,12 +235,12 @@ export function VendorPaymentsPage() {
                       </ListTableLink>
                     </td>
                     <td className="px-4 py-3 tabular-nums">
-                      {row.charges.toLocaleString()}
+                      {formatMoney(row.charges)}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
-                      {row.payments.toLocaleString()}
+                      {formatMoney(row.payments)}
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{row.credit.toLocaleString()}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(row.credit)}</td>
                   </ListTableRow>
                 ))
               )}
@@ -293,7 +294,7 @@ export function VendorPaymentsPage() {
                     </ListTableLink>
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {row.amount.toLocaleString()}
+                    {formatMoney(row.amount)}
                   </td>
                   <td className="px-4 py-3">{row.receiptNumber || "—"}</td>
                   <td className="px-4 py-3">{row.note || "—"}</td>

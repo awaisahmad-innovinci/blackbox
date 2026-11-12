@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Injectable,
@@ -22,6 +23,8 @@ import {
 } from "../../db/entities";
 import { allocateOutNumber } from "../common/allocate-document-number";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { getRequestTenant } from "../../common/request-tenant";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
 import { applyInventoryOutBalanceDelta } from "./inventory-out-balance";
 import { CreateInventoryOutDto } from "./dto/inventory-out.dto";
 import { ListInventoryOutQueryDto } from "./dto/list-inventory-out-query.dto";
@@ -46,6 +49,7 @@ export class InventoryOutService {
     private readonly outLines: Repository<InventoryOutLine>,
     @InjectRepository(Warehouse)
     private readonly warehouses: Repository<Warehouse>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(query: ListInventoryOutQueryDto): Promise<PaginatedInventoryOuts> {
@@ -144,7 +148,7 @@ export class InventoryOutService {
       seen.add(item.productSkuId);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const posted = await this.dataSource.transaction(async (manager) => {
       const warehouse = await manager.getRepository(Warehouse).findOne({
         where: { id: dto.warehouseId, tenantId, status: "active" },
       });
@@ -292,6 +296,22 @@ export class InventoryOutService {
 
       return this.getByIdInManager(manager, header.id);
     });
+
+    const actorUserId = getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "inventory_out.posted",
+        actorUserId,
+        summary: `Posted inventory out ${posted.outNumber} for Rs ${formatMoney(posted.total)}`,
+        metadata: {
+          inventoryOutId: posted.id,
+          outNumber: posted.outNumber,
+          total: posted.total,
+        },
+      });
+    }
+    return posted;
   }
 
   async getById(id: string): Promise<InventoryOutDetail> {

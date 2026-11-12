@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { InventoryOutDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -127,9 +128,9 @@ export function InventoryOutDetailPage() {
                   </td>
                   <td className="px-4 py-3">{item.sku}</td>
                   <td className="px-4 py-3 tabular-nums">{item.quantity}</td>
-                  <td className="px-4 py-3 tabular-nums">{item.unitCost}</td>
+                  <td className="px-4 py-3 tabular-nums">{formatMoney(item.unitCost)}</td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.lineTotal.toLocaleString()}
+                    {formatMoney(item.lineTotal)}
                   </td>
                 </ListTableRow>
               ))}
@@ -140,12 +141,12 @@ export function InventoryOutDetailPage() {
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Subtotal</span>
             <span className="tabular-nums">
-              {detail.subtotal.toLocaleString()}
+              {formatMoney(detail.subtotal)}
             </span>
           </div>
           <div className="flex justify-between gap-6 font-medium">
             <span>Total</span>
-            <span className="tabular-nums">{detail.total.toLocaleString()}</span>
+            <span className="tabular-nums">{formatMoney(detail.total)}</span>
           </div>
         </section>
       </section>

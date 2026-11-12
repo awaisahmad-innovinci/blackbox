@@ -288,21 +288,44 @@ export function listProductInventoryLocal(
   const rows = db
     .prepare(
       `select
-         st.warehouse_id as warehouseId,
+         keys.warehouse_id as warehouseId,
          w.name as warehouseName,
-         st.product_sku_id as productSkuId,
+         keys.product_sku_id as productSkuId,
          s.sku,
          s.variant_name as variantName,
-         st.quantity_on_hand as quantityOnHand,
-         st.quantity_reserved as quantityReserved,
-         st.quantity_available as quantityAvailable
-       from inventory_stock st
-       inner join product_skus s on s.id = st.product_sku_id
-       inner join warehouses w on w.id = st.warehouse_id
-       where s.product_id = ? and st.tenant_id = ?
+         coalesce(st.quantity_on_hand, 0) as quantityOnHand,
+         coalesce(st.quantity_reserved, 0) as quantityReserved,
+         coalesce(st.quantity_available, 0) as quantityAvailable,
+         coalesce(out.quantity, 0) as floorQuantity
+       from (
+         select st.warehouse_id, st.product_sku_id
+         from inventory_stock st
+         inner join product_skus s on s.id = st.product_sku_id
+         where s.product_id = @productId and st.tenant_id = @tenantId
+         union
+         select out.warehouse_id, out.product_sku_id
+         from inventory_out_items out
+         inner join product_skus s on s.id = out.product_sku_id
+         where s.product_id = @productId
+           and out.tenant_id = @tenantId
+           and out.quantity != 0
+       ) keys
+       inner join product_skus s on s.id = keys.product_sku_id
+       inner join warehouses w on w.id = keys.warehouse_id
+       left join inventory_stock st
+         on st.tenant_id = @tenantId
+        and st.warehouse_id = keys.warehouse_id
+        and st.product_sku_id = keys.product_sku_id
+       left join inventory_out_items out
+         on out.tenant_id = @tenantId
+        and out.warehouse_id = keys.warehouse_id
+        and out.product_sku_id = keys.product_sku_id
        order by w.name collate nocase, s.sku collate nocase`,
     )
-    .all(productId, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
+    .all({
+      productId,
+      tenantId: DEMO_STORE_TENANT_ID,
+    }) as Array<Record<string, unknown>>;
   return rows.map((r) => ({
     warehouseId: String(r.warehouseId),
     warehouseName: String(r.warehouseName),
@@ -312,6 +335,7 @@ export function listProductInventoryLocal(
     quantityOnHand: num(r.quantityOnHand),
     quantityReserved: num(r.quantityReserved),
     quantityAvailable: num(r.quantityAvailable),
+    floorQuantity: num(r.floorQuantity),
   }));
 }
 

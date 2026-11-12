@@ -1,4 +1,5 @@
 import { Button } from "@blackbox/ui/button";
+import { formatMoney } from "@blackbox/shared";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 
@@ -45,7 +46,7 @@ export function VendorPaymentReceipt({
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Amount paid</span>
           <span className="tabular-nums font-medium">
-            {receipt.amount.toLocaleString()}
+            {formatMoney(receipt.amount)}
           </span>
         </div>
         {receipt.note ? (
@@ -58,7 +59,7 @@ export function VendorPaymentReceipt({
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Credit still owed</span>
             <span className="tabular-nums">
-              {receipt.creditRemaining.toLocaleString()}
+              {formatMoney(receipt.creditRemaining)}
             </span>
           </div>
         ) : null}

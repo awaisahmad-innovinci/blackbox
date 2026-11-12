@@ -57,7 +57,7 @@ export class UsersService {
     try {
       const user = await this.dataSource.transaction(async (manager) => {
         if (roleIds.length > 0) {
-          await this.assertRolesInTenant(manager.getRepository(Role), tenantId, roleIds);
+          await this.assertRolesExist(manager.getRepository(Role), roleIds);
         }
 
         const created = manager.create(User, {
@@ -186,11 +186,7 @@ export class UsersService {
         throw new NotFoundException("User not found");
       }
 
-      await this.assertRolesInTenant(
-        manager.getRepository(Role),
-        tenantId,
-        roleIds,
-      );
+      await this.assertRolesExist(manager.getRepository(Role), roleIds);
 
       await manager.delete(UserRole, { userId: found.id, tenantId });
 
@@ -251,22 +247,19 @@ export class UsersService {
     return map;
   }
 
-  private async assertRolesInTenant(
+  private async assertRolesExist(
     rolesRepo: Repository<Role>,
-    tenantId: string,
     roleIds: string[],
   ): Promise<void> {
     if (roleIds.length === 0) {
       return;
     }
     const found = await rolesRepo.find({
-      where: { tenantId, id: In(roleIds) },
+      where: { id: In(roleIds) },
       select: { id: true },
     });
     if (found.length !== roleIds.length) {
-      throw new BadRequestException(
-        "One or more roles are invalid for this tenant",
-      );
+      throw new BadRequestException("One or more roles are invalid");
     }
   }
 }

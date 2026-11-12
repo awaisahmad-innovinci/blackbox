@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useLocation, useNavigate } from "react-router-dom";
 import type {
   InventoryOutDetail,
@@ -18,6 +19,7 @@ import {
 } from "@renderer/components/keyboard-hints";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -236,6 +238,21 @@ export function InventoryOutReturnFormPage() {
               createdAt: now,
             },
           });
+        }
+        if (user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "inventory_out_return.posted",
+              actorUserId: user.id,
+              summary: `Posted inventory out return ${returnNumber} for Rs ${formatMoney(subtotal)}`,
+              metadata: {
+                inventoryOutReturnId: localId,
+                returnNumber,
+                total: subtotal,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
         }
         void syncNow();
         setSuccess(detail);

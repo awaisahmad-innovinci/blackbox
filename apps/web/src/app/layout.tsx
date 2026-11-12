@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Blackbox",
   description:
-    "Blackbox workspace administration — users, roles, devices, and settings.",
+    "Blackbox workspace administration — users, devices, and settings.",
 };
 
 export default function RootLayout({

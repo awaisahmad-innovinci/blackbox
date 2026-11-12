@@ -37,7 +37,7 @@ export function verifySupervisorTotpCode(
     return {
       ok: false,
       error:
-        "No supervisor Authy codes on this device. Go online and complete Authy setup for a Manager or Owner.",
+        "No supervisor authentication codes on this device. Go online and complete authentication code setup for a Manager or Owner.",
     };
   }
 
@@ -60,5 +60,5 @@ export function verifySupervisorTotpCode(
   }
 
   recordFailure();
-  return { ok: false, error: "Invalid Authy code" };
+  return { ok: false, error: "Invalid authentication code" };
 }

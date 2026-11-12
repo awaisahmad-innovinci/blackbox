@@ -54,6 +54,15 @@ export class OpenTillDto extends TillNoteCountsDto {
   supervisorUserId?: string;
 }
 
+export class OpenTillForCashierDto {
+  @IsUUID()
+  cashierUserId!: string;
+
+  @IsNumber()
+  @Min(0)
+  openingBalance!: number;
+}
+
 export class WithdrawTillDto extends TillNoteCountsDto {
   @IsOptional()
   @IsUUID()

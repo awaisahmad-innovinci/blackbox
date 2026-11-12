@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   CreatePurchaseOrderRequest,
@@ -36,6 +37,7 @@ import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -420,6 +422,21 @@ export function PurchaseOrderFormPage() {
           operation: "UPSERT",
           payload: saved as unknown as Record<string, unknown>,
         });
+        if (!isEdit && user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "purchase_order.created",
+              actorUserId: user.id,
+              summary: `Created purchase order ${assignedPoNumber} for Rs ${formatMoney(saved.total)}`,
+              metadata: {
+                purchaseOrderId: localId,
+                poNumber: assignedPoNumber,
+                total: saved.total,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
+        }
         void syncNow();
         setSaving(false);
         navigate(`/purchase-orders/${localId}`, {
@@ -552,7 +569,7 @@ export function PurchaseOrderFormPage() {
             <p className="text-muted-foreground text-sm">
               Vendor credit:{" "}
               <span className="text-foreground tabular-nums">
-                {vendorCredit.toLocaleString()}
+                {formatMoney(vendorCredit)}
               </span>
             </p>
           ) : null}
@@ -719,7 +736,7 @@ export function PurchaseOrderFormPage() {
                     />
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {line.lineTotal.toLocaleString()}
+                    {formatMoney(line.lineTotal)}
                   </td>
                   <td className="no-print px-3 py-2">
                     <Button
@@ -761,7 +778,7 @@ export function PurchaseOrderFormPage() {
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Total</span>
-          <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(subtotal)}</span>
         </div>
       </section>
       </PrintDocument>
@@ -844,7 +861,7 @@ export function PurchaseOrderFormPage() {
               Vendor:{" "}
               {vendors.find((v) => v.id === vendorId)?.name ?? "Vendor"}
             </p>
-            <p>Total: {subtotal.toLocaleString()}</p>
+            <p>Total: {formatMoney(subtotal)}</p>
             <p>Items: {lines.length}</p>
           </>
         }

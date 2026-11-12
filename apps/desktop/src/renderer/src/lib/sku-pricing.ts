@@ -1,5 +1,6 @@
 import {
   costWithGst,
+  marginPercentFromCostSellingGst,
   pieceCostFromPurchase,
   sellingPriceFromCostMargin,
   sellingPriceFromCostMarginGst,
@@ -104,4 +105,38 @@ export function sellingFromPurchaseMarginGst(
   const pieceCost = pieceCostFromPurchase(purchaseN, unitsPerPurchaseUnit);
   if (pieceCost <= 0) return null;
   return sellingFromMarginGst(String(pieceCost), gstPercent, margin);
+}
+
+export function marginFromSellingGst(
+  cost: string,
+  gstPercent: string,
+  selling: string,
+): string | null {
+  if (!selling.trim() || !cost.trim()) return null;
+  const costN = Number(cost);
+  const gstN = gstPercent.trim() ? Number(gstPercent) : 0;
+  const sellingN = Number(selling);
+  if (Number.isNaN(costN) || costN <= 0 || Number.isNaN(sellingN)) {
+    return null;
+  }
+  const margin = marginPercentFromCostSellingGst(
+    costN,
+    Number.isNaN(gstN) ? 0 : gstN,
+    sellingN,
+  );
+  return margin == null ? null : String(margin);
+}
+
+export function marginFromPurchaseSellingGst(
+  purchasePrice: string,
+  gstPercent: string,
+  unitsPerPurchaseUnit: number,
+  selling: string,
+): string | null {
+  if (!selling.trim() || !purchasePrice.trim()) return null;
+  const purchaseN = Number(purchasePrice);
+  if (Number.isNaN(purchaseN) || purchaseN < 0) return null;
+  const pieceCost = pieceCostFromPurchase(purchaseN, unitsPerPurchaseUnit);
+  if (pieceCost <= 0) return null;
+  return marginFromSellingGst(String(pieceCost), gstPercent, selling);
 }

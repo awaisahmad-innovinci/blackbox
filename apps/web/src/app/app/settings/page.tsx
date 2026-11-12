@@ -414,7 +414,7 @@ export default function SettingsPage() {
 
             <SectionCard
               title="Manager approval"
-              description="Require manager or owner Authy on the POS before these actions."
+              description="Require a manager or owner authentication code on the POS before these actions."
             >
               {hasPermission("tenant.settings.write") ? (
                 <form className="space-y-4" onSubmit={(e) => void onSave(e)}>
@@ -431,8 +431,8 @@ export default function SettingsPage() {
                         Remove item from bill
                       </Label>
                       <p className="text-muted-foreground text-xs">
-                        When enabled, cashiers must enter a valid manager Authy
-                        code to remove a line from an in-progress sale.
+                        When enabled, cashiers must enter a valid manager
+                        authentication code to remove a line from an in-progress sale.
                       </p>
                     </div>
                   </div>
@@ -449,7 +449,7 @@ export default function SettingsPage() {
                         Open till
                       </Label>
                       <p className="text-muted-foreground text-xs">
-                        When enabled, a valid manager Authy code is required
+                        When enabled, a valid manager authentication code is required
                         before a cashier opens a till.
                       </p>
                     </div>
@@ -470,7 +470,7 @@ export default function SettingsPage() {
                         Cash withdrawal
                       </Label>
                       <p className="text-muted-foreground text-xs">
-                        When enabled, a valid manager Authy code is required
+                        When enabled, a valid manager authentication code is required
                         before collecting or withdrawing cash from a till.
                       </p>
                     </div>
@@ -489,7 +489,7 @@ export default function SettingsPage() {
                       </Label>
                       <p className="text-muted-foreground text-xs">
                         When enabled, a cashier must enter a valid manager
-                        Authy code to post a sale that includes FOC quantity.
+                        authentication code to post a sale that includes FOC quantity.
                       </p>
                     </div>
                   </div>

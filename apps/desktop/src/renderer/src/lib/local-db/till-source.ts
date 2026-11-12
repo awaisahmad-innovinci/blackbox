@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import type {
   CollectTillCashByAmountRequest,
   OpenTillRequest,
@@ -59,6 +60,14 @@ export async function loadTills(query: {
   return tillsApi.list(query);
 }
 
+function rethrowDrawerError(err: unknown): void {
+  if (err instanceof Error && /drawer|manager must|reopen|active till/i.test(err.message)) {
+    throw new Error(
+      err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ""),
+    );
+  }
+}
+
 export async function openTill(input: {
   userId: string;
   userName: string;
@@ -66,25 +75,31 @@ export async function openTill(input: {
   body: OpenTillRequest;
   requireApproval: boolean;
   supervisorDisplayName?: string;
+  funderUserId?: string;
+  funderName?: string;
 }): Promise<TillSessionDetail> {
   try {
     if (window.blackbox?.localDb?.openTill) {
       const detail = await window.blackbox.localDb.openTill(input);
       if (detail.status === "OPEN") {
         const amount = input.body.openingBalance;
+        const funderName = input.funderName?.trim();
         const authenticatorName =
-          input.supervisorDisplayName?.trim() || input.userName;
-        const hasSupervisor = Boolean(input.body.supervisorUserId);
+          funderName || input.supervisorDisplayName?.trim() || input.userName;
+        const hasSupervisor = Boolean(input.body.supervisorUserId || funderName);
         await logActivityEvent(
           {
             eventType: "till.opened",
-            actorUserId: input.body.supervisorUserId ?? input.userId,
-            supervisorUserId: input.body.supervisorUserId ?? null,
+            actorUserId: input.funderUserId ?? input.body.supervisorUserId ?? input.userId,
+            supervisorUserId: input.body.supervisorUserId ?? input.funderUserId ?? null,
             subjectUserId: input.userId,
-            summary: `${authenticatorName} opened ${input.userName}'s till with opening balance Rs ${amount.toLocaleString()}`,
+            summary: funderName
+              ? `${funderName} opened ${input.userName}'s till with Rs ${formatMoney(amount)} from their drawer`
+              : `${authenticatorName} opened ${input.userName}'s till with opening balance Rs ${formatMoney(amount)}`,
             metadata: {
               tillSessionId: detail.id,
               openingBalance: amount,
+              fundedByUserId: input.funderUserId ?? null,
             },
           },
           {
@@ -96,8 +111,14 @@ export async function openTill(input: {
       }
       return detail;
     }
-  } catch {
-    /* fall through */
+  } catch (err) {
+    rethrowDrawerError(err);
+  }
+  if (input.funderUserId) {
+    return tillsApi.openForCashier({
+      cashierUserId: input.userId,
+      openingBalance: input.body.openingBalance,
+    });
   }
   return tillsApi.open(input.body);
 }
@@ -116,7 +137,7 @@ export async function approveTill(input: {
           actorUserId: input.managerId,
           supervisorUserId: input.managerId,
           subjectUserId: detail.userId,
-          summary: `${input.managerName} opened ${detail.userName}'s till with opening balance Rs ${detail.openingBalance.toLocaleString()}`,
+          summary: `${input.managerName} opened ${detail.userName}'s till with Rs ${formatMoney(detail.openingBalance)} from their drawer`,
           metadata: { tillSessionId: detail.id, openingBalance: detail.openingBalance },
         },
         {
@@ -127,8 +148,8 @@ export async function approveTill(input: {
       );
       return detail;
     }
-  } catch {
-    /* fall through */
+  } catch (err) {
+    rethrowDrawerError(err);
   }
   return tillsApi.approve(input.id);
 }
@@ -153,7 +174,7 @@ export async function collectCashTill(input: {
           actorUserId: supervisorId,
           supervisorUserId: supervisorId,
           subjectUserId: detail.userId,
-          summary: `${authenticatorName} received Rs ${amount.toLocaleString()} cash from ${detail.userName}'s till`,
+          summary: `${authenticatorName} received Rs ${formatMoney(amount)} cash from ${detail.userName}'s till`,
           metadata: {
             tillSessionId: detail.id,
             amount,
@@ -202,7 +223,7 @@ export async function collectCashByAmountFromTill(input: {
           actorUserId: supervisorId,
           supervisorUserId: input.supervisorUserId ?? null,
           subjectUserId: input.cashierUserId,
-          summary: `${authenticatorName} received Rs ${input.amount.toLocaleString()} cash from ${input.cashierName}'s till`,
+          summary: `${authenticatorName} received Rs ${formatMoney(input.amount)} cash from ${input.cashierName}'s till`,
           metadata: {
             tillSessionId: detail.id,
             amount: input.amount,
@@ -239,7 +260,7 @@ export async function withdrawTill(input: {
           actorUserId: input.managerId,
           supervisorUserId: input.body.supervisorUserId ?? input.managerId,
           subjectUserId: detail.userId,
-          summary: `Withdrew Rs ${amount.toLocaleString()} from ${detail.userName} till`,
+          summary: `Withdrew Rs ${formatMoney(amount)} from ${detail.userName} till`,
           metadata: { tillSessionId: detail.id, amount },
         },
         {
@@ -273,10 +294,10 @@ export async function reopenTill(input: {
       await logActivityEvent(
         {
           eventType: "till.reopened",
-          actorUserId: input.body.supervisorUserId ?? input.managerId,
+          actorUserId: input.managerId,
           supervisorUserId: input.body.supervisorUserId ?? input.managerId,
           subjectUserId: detail.userId,
-          summary: `${authenticatorName} opened ${cashierName}'s till with opening balance Rs ${input.body.openingBalance.toLocaleString()}`,
+          summary: `${input.managerName} reopened ${cashierName}'s till with Rs ${formatMoney(input.body.openingBalance)} from their drawer`,
           metadata: {
             tillSessionId: detail.id,
             openingBalance: input.body.openingBalance,
@@ -290,8 +311,8 @@ export async function reopenTill(input: {
       );
       return detail;
     }
-  } catch {
-    /* fall through */
+  } catch (err) {
+    rethrowDrawerError(err);
   }
   return tillsApi.reopen(input.id, input.body);
 }
@@ -309,7 +330,7 @@ export async function closeTill(input: {
           eventType: "till.closed",
           actorUserId: input.userId,
           subjectUserId: input.userId,
-          summary: `${input.userName} closed till on ${closedAtLabel} — current cash Rs ${detail.currentCashBalance.toLocaleString()}`,
+          summary: `${input.userName} closed till on ${closedAtLabel} — current cash Rs ${formatMoney(detail.currentCashBalance)}`,
           metadata: {
             tillSessionId: detail.id,
             currentCashBalance: detail.currentCashBalance,

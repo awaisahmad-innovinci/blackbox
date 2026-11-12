@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { VendorReturnDetail } from "@blackbox/shared";
 import {
@@ -127,10 +128,10 @@ export function VendorReturnDetailPage() {
                     {item.quantity.toLocaleString()} pcs
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.unitCost.toLocaleString()}
+                    {formatMoney(item.unitCost)}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.lineTotal.toLocaleString()}
+                    {formatMoney(item.lineTotal)}
                   </td>
                   <td className="px-4 py-3">
                     {item.settlement
@@ -152,7 +153,7 @@ export function VendorReturnDetailPage() {
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Total</span>
-          <span className="tabular-nums">{detail.total.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(detail.total)}</span>
         </div>
       </section>
     </PrintDocument>

@@ -8,7 +8,6 @@ import {
 } from "typeorm";
 import { Device } from "./device.entity";
 import { Location } from "./location.entity";
-import { Role } from "./role.entity";
 import { User } from "./user.entity";
 
 @Entity({ name: "tenants" })
@@ -100,9 +99,6 @@ export class Tenant {
 
   @OneToMany(() => User, (user) => user.tenant)
   users!: User[];
-
-  @OneToMany(() => Role, (role) => role.tenant)
-  roles!: Role[];
 
   @OneToMany(() => Device, (device) => device.tenant)
   devices!: Device[];

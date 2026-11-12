@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { TillSessionDetail } from "@blackbox/shared";
+import { formatMoney } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -99,7 +100,7 @@ export function CollectCashDialog({
           <DialogTitle>Withdraw cash</DialogTitle>
           <DialogDescription>
             {step === "authorize"
-              ? "Ask a manager or owner to enter their Authy code to authorize a cash withdrawal."
+              ? "Ask a manager or owner to enter their authentication code to authorize a cash withdrawal."
               : "Manager: enter the cash amount you received from this till."}
             {session.status === "CLOSED_LIMIT" ? (
               <>
@@ -116,7 +117,7 @@ export function CollectCashDialog({
             <p className="text-muted-foreground text-sm">
               Current till cash:{" "}
               <span className="font-medium tabular-nums text-foreground">
-                Rs {session.currentCashBalance.toLocaleString()}
+                Rs {formatMoney(session.currentCashBalance)}
               </span>
             </p>
             <Button
@@ -125,7 +126,7 @@ export function CollectCashDialog({
               disabled={busy}
               onClick={() => void onManagerAuthorize()}
             >
-              Manager Authy code
+              Manager authentication code
             </Button>
           </div>
         ) : (
@@ -151,7 +152,7 @@ export function CollectCashDialog({
                 }}
               />
               <p className="text-muted-foreground text-xs">
-                Max {session.currentCashBalance.toLocaleString()} in till
+                Max {formatMoney(session.currentCashBalance)} in till
               </p>
             </div>
           </div>

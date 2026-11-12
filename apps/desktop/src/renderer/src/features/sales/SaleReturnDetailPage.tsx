@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate, useParams } from "react-router-dom";
 import type { SaleReturnDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -58,8 +59,8 @@ export function SaleReturnDetailPage() {
     return (
       <div className="space-y-4">
         <p className="text-destructive text-sm">{error ?? "Return not found"}</p>
-        <Button variant="outline" onClick={() => navigate("/sales/returns")}>
-          Back to returns
+        <Button variant="outline" onClick={() => navigate("/sales")}>
+          Back to sales
         </Button>
       </div>
     );
@@ -86,7 +87,7 @@ export function SaleReturnDetailPage() {
           </div>
           <div className="flex gap-2">
             <PrintButton openDrawerOnPrint />
-            <Button variant="outline" onClick={() => navigate("/sales/returns")}>
+            <Button variant="outline" onClick={() => navigate("/sales")}>
               Back to list
             </Button>
           </div>
@@ -104,7 +105,7 @@ export function SaleReturnDetailPage() {
           <div>
             <dt className="text-muted-foreground">Refund</dt>
             <dd className="font-semibold tabular-nums">
-              {detail.refundTotal.toFixed(2)} ({detail.refundMethod})
+              {formatMoney(detail.refundTotal)} ({detail.refundMethod})
             </dd>
           </div>
           <div>
@@ -154,10 +155,10 @@ export function SaleReturnDetailPage() {
                   {line.quantity}
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">
-                  {line.unitPrice.toFixed(2)}
+                  {formatMoney(line.unitPrice)}
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">
-                  {line.lineTotal.toFixed(2)}
+                  {formatMoney(line.lineTotal)}
                 </td>
               </ListTableRow>
             ))}

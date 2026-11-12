@@ -1445,6 +1445,66 @@ where units_per_purchase_unit > 0;
         on cash_expenses (tenant_id, occurred_at);
     `,
   },
+  {
+    id: "044_manager_drawer_openings",
+    sql: `
+      create table if not exists manager_drawer_openings (
+        id text primary key,
+        tenant_id text not null,
+        manager_user_id text not null,
+        manager_name text not null default '',
+        amount real not null,
+        opened_by_user_id text not null,
+        opened_by_name text not null default '',
+        opened_at text not null,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists manager_drawer_openings_tenant_id_idx
+        on manager_drawer_openings (tenant_id);
+      create index if not exists manager_drawer_openings_manager_idx
+        on manager_drawer_openings (tenant_id, manager_user_id);
+    `,
+    after: (db) => {
+      const cols = (
+        db.prepare("pragma table_info(till_sessions)").all() as { name: string }[]
+      ).map((c) => c.name);
+      if (!cols.includes("funded_by_user_id")) {
+        db.exec(
+          `alter table till_sessions add column funded_by_user_id text`,
+        );
+      }
+      db.exec(
+        `create index if not exists till_sessions_funded_by_idx
+         on till_sessions (tenant_id, funded_by_user_id)`,
+      );
+    },
+  },
+  {
+    id: "045_manager_drawer_submissions",
+    sql: `
+      create table if not exists manager_drawer_submissions (
+        id text primary key,
+        tenant_id text not null,
+        manager_user_id text not null,
+        manager_name text not null default '',
+        amount real not null,
+        submitted_at text not null,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists manager_drawer_submissions_tenant_id_idx
+        on manager_drawer_submissions (tenant_id);
+      create index if not exists manager_drawer_submissions_manager_idx
+        on manager_drawer_submissions (tenant_id, manager_user_id);
+      create index if not exists manager_drawer_submissions_submitted_at_idx
+        on manager_drawer_submissions (tenant_id, submitted_at);
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

@@ -1,14 +1,9 @@
 import type { SaleLineRow } from "@blackbox/shared";
-import { splitInclusiveGst } from "@blackbox/shared";
+import { formatMoney, splitInclusiveGst } from "@blackbox/shared";
 import JsBarcode from "jsbarcode";
 import { Fragment, useEffect, useRef, type ReactNode } from "react";
 
-export function formatMoney(value: number): string {
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
+export { formatMoney };
 
 export function formatDiscountPercent(value: number): string {
   if (value <= 0) return "0";

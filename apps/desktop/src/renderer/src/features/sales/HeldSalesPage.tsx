@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type { SaleListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -125,7 +126,7 @@ export function HeldSalesPage() {
                   <td className="px-4 py-3">{row.warehouseName}</td>
                   <td className="px-4 py-3 tabular-nums">{row.itemCount}</td>
                   <td className="px-4 py-3 tabular-nums">
-                    {row.total.toLocaleString()}
+                    {formatMoney(row.total)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">

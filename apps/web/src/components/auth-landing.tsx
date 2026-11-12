@@ -13,7 +13,6 @@ import {
 } from "@blackbox/ui/card";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@blackbox/ui/tabs";
 import { useAuth } from "@/components/auth-provider";
 import { PasswordInput } from "@/components/password-input";
 import { FieldStatus, FormError } from "@/components/section-card";
@@ -23,29 +22,13 @@ import {
   resetPasswordRequest,
 } from "@/lib/auth-api";
 import { resolvePostAuthPath } from "@/lib/onboarding";
-import {
-  emailError,
-  liveEmailError,
-  livePasswordError,
-  livePersonNameError,
-  liveUsernameError,
-  personNameError,
-  usernameError,
-} from "@blackbox/shared";
+import { emailError, liveEmailError, livePasswordError } from "@blackbox/shared";
 
 export function AuthLanding() {
-  const { login, signup, status, hasPermission } = useAuth();
+  const { login, status, hasPermission } = useAuth();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState("login");
-  const [signupFields, setSignupFields] = useState({
-    fullName: "",
-    email: "",
-    username: "",
-    password: "",
-  });
-  const [signupAttempted, setSignupAttempted] = useState(false);
   const [forgotStep, setForgotStep] = useState<"request" | "reset" | null>(
     null,
   );
@@ -72,21 +55,6 @@ export function AuthLanding() {
     forgotAttempted && forgotPassword !== forgotConfirm
       ? "Passwords do not match"
       : null;
-
-  const signupNameErr = signupAttempted
-    ? personNameError(signupFields.fullName)
-    : livePersonNameError(signupFields.fullName);
-  const signupEmailErr = signupAttempted
-    ? emailError(signupFields.email)
-    : liveEmailError(signupFields.email);
-  const signupUsernameErr = signupAttempted
-    ? usernameError(signupFields.username)
-    : liveUsernameError(signupFields.username);
-  const signupPasswordErr = signupAttempted
-    ? signupFields.password.length < 8
-      ? "Password must be at least 8 characters"
-      : null
-    : livePasswordError(signupFields.password);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -180,46 +148,6 @@ export function AuthLanding() {
       setForgotPassword("");
       setForgotConfirm("");
       setForgotAttempted(false);
-      setTab("login");
-    } catch (err) {
-      setError(toUserFacingError(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onSignup(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setSignupAttempted(true);
-    const form = new FormData(e.currentTarget);
-    const fullName = signupFields.fullName;
-    const email = signupFields.email;
-    const username = signupFields.username;
-    const password = signupFields.password;
-
-    if (
-      personNameError(fullName) ||
-      emailError(email) ||
-      usernameError(username) ||
-      password.length < 8
-    ) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const authed = await signup({
-        businessName: String(form.get("businessName") ?? ""),
-        fullName: fullName.trim(),
-        email: email.trim(),
-        username: username.trim(),
-        password,
-      });
-      const path = await resolvePostAuthPath(
-        authed.permissions.includes("tenant.settings.read"),
-      );
-      router.push(path);
     } catch (err) {
       setError(toUserFacingError(err));
     } finally {
@@ -260,8 +188,9 @@ export function AuthLanding() {
             Blackbox
           </h1>
           <p className="text-muted-foreground text-lg leading-relaxed text-pretty">
-            Create your business on the web, invite your team, and run the floor
-            from desktop — online or offline once a device is trusted.
+            Sign in with the credentials for your workspace, invite your team,
+            and run the floor from desktop — online or offline once a device is
+            trusted.
           </p>
           <ul className="text-muted-foreground mx-auto flex max-w-md flex-col gap-3 text-sm lg:mx-0">
             <li className="flex items-start gap-2.5">
@@ -281,378 +210,199 @@ export function AuthLanding() {
 
         <Card className="border-border/80 w-full max-w-md shadow-sm">
           <CardHeader className="space-y-1.5">
-            <CardTitle className="font-display text-xl">
-              {tab === "login" ? "Welcome back" : "Create your workspace"}
-            </CardTitle>
-            <CardDescription>
-              {tab === "login"
-                ? "Sign in to your workspace"
-                : "Owners create the tenant here. Staff use the desktop app."}
-            </CardDescription>
+            <CardTitle className="font-display text-xl">Welcome back</CardTitle>
+            <CardDescription>Sign in to your workspace</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs
-              value={tab}
-              onValueChange={(value) => {
-                setTab(value);
-                setError(null);
-                setForgotStep(null);
-                setForgotMessage(null);
-                setForgotAttempted(false);
-              }}
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Sign in</TabsTrigger>
-                <TabsTrigger value="signup">Create workspace</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="login" className="mt-5">
-                {forgotStep === "request" ? (
-                  <form
-                    className="space-y-4"
-                    onSubmit={(e) => void onForgotRequest(e)}
-                  >
-                    <p className="text-muted-foreground text-sm">
-                      Enter the owner email for your workspace. We&apos;ll send
-                      a 6-digit verification code.
-                    </p>
-                    <div className="space-y-2">
-                      <Label htmlFor="forgot-email">Email</Label>
-                      <Input
-                        id="forgot-email"
-                        type="email"
-                        required
-                        autoComplete="email"
-                        placeholder="you@business.com"
-                        value={forgotEmail}
-                        aria-invalid={Boolean(forgotEmailErr)}
-                        onChange={(e) => setForgotEmail(e.target.value)}
-                      />
-                      <FieldStatus error={forgotEmailErr} />
-                    </div>
-                    {forgotMessage ? (
-                      <p className="text-muted-foreground text-sm">
-                        {forgotMessage}
-                      </p>
-                    ) : null}
-                    <FormError>{error}</FormError>
-                    <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Sending…
-                        </>
-                      ) : (
-                        "Send code"
-                      )}
-                    </Button>
+            {forgotStep === "request" ? (
+              <form
+                className="space-y-4"
+                onSubmit={(e) => void onForgotRequest(e)}
+              >
+                <p className="text-muted-foreground text-sm">
+                  Enter the owner email for your workspace. We&apos;ll send a
+                  6-digit verification code.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-email">Email</Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="you@business.com"
+                    value={forgotEmail}
+                    aria-invalid={Boolean(forgotEmailErr)}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                  />
+                  <FieldStatus error={forgotEmailErr} />
+                </div>
+                {forgotMessage ? (
+                  <p className="text-muted-foreground text-sm">{forgotMessage}</p>
+                ) : null}
+                <FormError>{error}</FormError>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    "Send code"
+                  )}
+                </Button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
+                  onClick={() => {
+                    setForgotStep(null);
+                    setForgotMessage(null);
+                    setError(null);
+                    setForgotAttempted(false);
+                  }}
+                >
+                  Back to sign in
+                </button>
+              </form>
+            ) : forgotStep === "reset" ? (
+              <form
+                className="space-y-4"
+                onSubmit={(e) => void onForgotReset(e)}
+              >
+                <p className="text-muted-foreground text-sm">
+                  {forgotMessage ??
+                    "Enter the code from your email and choose a new password."}
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-reset-email">Email</Label>
+                  <Input
+                    id="forgot-reset-email"
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    aria-invalid={Boolean(forgotEmailErr)}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                  />
+                  <FieldStatus error={forgotEmailErr} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-code">Verification code</Label>
+                  <Input
+                    id="forgot-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="123456"
+                    maxLength={6}
+                    value={forgotCode}
+                    aria-invalid={Boolean(forgotCodeErr)}
+                    onChange={(e) =>
+                      setForgotCode(e.target.value.replace(/\D/g, ""))
+                    }
+                  />
+                  <FieldStatus error={forgotCodeErr} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-new-password">New password</Label>
+                  <PasswordInput
+                    id="forgot-new-password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={forgotPassword}
+                    aria-invalid={Boolean(forgotPasswordErr)}
+                    onChange={(e) => setForgotPassword(e.target.value)}
+                  />
+                  <FieldStatus error={forgotPasswordErr} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-confirm-password">
+                    Confirm password
+                  </Label>
+                  <PasswordInput
+                    id="forgot-confirm-password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={forgotConfirm}
+                    aria-invalid={Boolean(forgotConfirmErr)}
+                    onChange={(e) => setForgotConfirm(e.target.value)}
+                  />
+                  <FieldStatus error={forgotConfirmErr} />
+                </div>
+                <FormError>{error}</FormError>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Updating…
+                    </>
+                  ) : (
+                    "Reset password"
+                  )}
+                </Button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
+                  onClick={() => {
+                    setForgotStep("request");
+                    setError(null);
+                    setForgotAttempted(false);
+                  }}
+                >
+                  Resend code
+                </button>
+              </form>
+            ) : (
+              <form className="space-y-4" onSubmit={(e) => void onLogin(e)}>
+                <div className="space-y-2">
+                  <Label htmlFor="login-identifier">Email or username</Label>
+                  <Input
+                    id="login-identifier"
+                    name="identifier"
+                    type="text"
+                    required
+                    autoComplete="username"
+                    placeholder="you@business.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="login-password">Password</Label>
                     <button
                       type="button"
-                      className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
+                      className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
                       onClick={() => {
-                        setForgotStep(null);
+                        setForgotStep("request");
                         setForgotMessage(null);
                         setError(null);
                         setForgotAttempted(false);
                       }}
                     >
-                      Back to sign in
+                      Forgot password?
                     </button>
-                  </form>
-                ) : forgotStep === "reset" ? (
-                  <form
-                    className="space-y-4"
-                    onSubmit={(e) => void onForgotReset(e)}
-                  >
-                    <p className="text-muted-foreground text-sm">
-                      {forgotMessage ??
-                        "Enter the code from your email and choose a new password."}
-                    </p>
-                    <div className="space-y-2">
-                      <Label htmlFor="forgot-reset-email">Email</Label>
-                      <Input
-                        id="forgot-reset-email"
-                        type="email"
-                        required
-                        value={forgotEmail}
-                        aria-invalid={Boolean(forgotEmailErr)}
-                        onChange={(e) => setForgotEmail(e.target.value)}
-                      />
-                      <FieldStatus error={forgotEmailErr} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="forgot-code">Verification code</Label>
-                      <Input
-                        id="forgot-code"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        placeholder="123456"
-                        maxLength={6}
-                        value={forgotCode}
-                        aria-invalid={Boolean(forgotCodeErr)}
-                        onChange={(e) =>
-                          setForgotCode(e.target.value.replace(/\D/g, ""))
-                        }
-                      />
-                      <FieldStatus error={forgotCodeErr} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="forgot-new-password">New password</Label>
-                      <PasswordInput
-                        id="forgot-new-password"
-                        required
-                        minLength={8}
-                        autoComplete="new-password"
-                        value={forgotPassword}
-                        aria-invalid={Boolean(forgotPasswordErr)}
-                        onChange={(e) => setForgotPassword(e.target.value)}
-                      />
-                      <FieldStatus error={forgotPasswordErr} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="forgot-confirm-password">
-                        Confirm password
-                      </Label>
-                      <PasswordInput
-                        id="forgot-confirm-password"
-                        required
-                        minLength={8}
-                        autoComplete="new-password"
-                        value={forgotConfirm}
-                        aria-invalid={Boolean(forgotConfirmErr)}
-                        onChange={(e) => setForgotConfirm(e.target.value)}
-                      />
-                      <FieldStatus error={forgotConfirmErr} />
-                    </div>
-                    <FormError>{error}</FormError>
-                    <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Updating…
-                        </>
-                      ) : (
-                        "Reset password"
-                      )}
-                    </Button>
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
-                      onClick={() => {
-                        setForgotStep("request");
-                        setError(null);
-                        setForgotAttempted(false);
-                      }}
-                    >
-                      Resend code
-                    </button>
-                  </form>
-                ) : (
-                  <form className="space-y-4" onSubmit={(e) => void onLogin(e)}>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-identifier">Email or username</Label>
-                      <Input
-                        id="login-identifier"
-                        name="identifier"
-                        type="text"
-                        required
-                        autoComplete="username"
-                        placeholder="you@business.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <Label htmlFor="login-password">Password</Label>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
-                          onClick={() => {
-                            setForgotStep("request");
-                            setForgotMessage(null);
-                            setError(null);
-                            setForgotAttempted(false);
-                          }}
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
-                      <PasswordInput
-                        id="login-password"
-                        name="password"
-                        required
-                        minLength={8}
-                        autoComplete="current-password"
-                        placeholder="Enter your password"
-                      />
-                    </div>
-                    <FormError>{error}</FormError>
-                    <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Signing in…
-                        </>
-                      ) : (
-                        "Sign in"
-                      )}
-                    </Button>
-                    <p className="text-muted-foreground text-center text-sm">
-                      Don&apos;t have an account?{" "}
-                      <button
-                        type="button"
-                        className="text-foreground font-medium underline-offset-4 hover:underline"
-                        onClick={() => {
-                          setTab("signup");
-                          setError(null);
-                        }}
-                      >
-                        Create workspace
-                      </button>
-                    </p>
-                  </form>
-                )}
-              </TabsContent>
-
-              <TabsContent value="signup" className="mt-5">
-                <form className="space-y-5" onSubmit={(e) => void onSignup(e)}>
-                  <div className="space-y-3">
-                    <p className="text-muted-foreground text-[11px] font-medium tracking-[0.14em] uppercase">
-                      Workspace
-                    </p>
-                    <div className="space-y-2">
-                      <Label htmlFor="businessName">Business name</Label>
-                      <Input
-                        id="businessName"
-                        name="businessName"
-                        required
-                        placeholder="Acme Retail"
-                        autoComplete="organization"
-                      />
-                    </div>
                   </div>
-
-                  <div className="space-y-3">
-                    <p className="text-muted-foreground text-[11px] font-medium tracking-[0.14em] uppercase">
-                      Account
-                    </p>
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName">Your name</Label>
-                      <Input
-                        id="fullName"
-                        name="fullName"
-                        required
-                        placeholder="Alex Morgan"
-                        autoComplete="name"
-                        value={signupFields.fullName}
-                        aria-invalid={Boolean(signupNameErr)}
-                        onChange={(e) =>
-                          setSignupFields((s) => ({
-                            ...s,
-                            fullName: e.target.value,
-                          }))
-                        }
-                      />
-                      <FieldStatus
-                        error={signupNameErr}
-                        hint="Letters only, with spaces between words."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input
-                        id="signup-email"
-                        name="email"
-                        type="email"
-                        required
-                        autoComplete="email"
-                        placeholder="you@business.com"
-                        value={signupFields.email}
-                        aria-invalid={Boolean(signupEmailErr)}
-                        onChange={(e) =>
-                          setSignupFields((s) => ({
-                            ...s,
-                            email: e.target.value,
-                          }))
-                        }
-                      />
-                      <FieldStatus error={signupEmailErr} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-username">Username</Label>
-                      <Input
-                        id="signup-username"
-                        name="username"
-                        type="text"
-                        required
-                        minLength={3}
-                        autoComplete="username"
-                        placeholder="alex"
-                        value={signupFields.username}
-                        aria-invalid={Boolean(signupUsernameErr)}
-                        onChange={(e) =>
-                          setSignupFields((s) => ({
-                            ...s,
-                            username: e.target.value,
-                          }))
-                        }
-                      />
-                      <FieldStatus
-                        error={signupUsernameErr}
-                        hint="Letters, numbers, and special characters. No spaces. Min 3 characters."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password</Label>
-                      <PasswordInput
-                        id="signup-password"
-                        name="password"
-                        required
-                        minLength={8}
-                        autoComplete="new-password"
-                        placeholder="At least 8 characters"
-                        value={signupFields.password}
-                        aria-invalid={Boolean(signupPasswordErr)}
-                        onChange={(e) =>
-                          setSignupFields((s) => ({
-                            ...s,
-                            password: e.target.value,
-                          }))
-                        }
-                      />
-                      <FieldStatus
-                        error={signupPasswordErr}
-                        hint="Use at least 8 characters."
-                      />
-                    </div>
-                  </div>
-
-                  <FormError>{error}</FormError>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Creating…
-                      </>
-                    ) : (
-                      "Create workspace"
-                    )}
-                  </Button>
-                  <p className="text-muted-foreground text-center text-sm">
-                    Already have an account?{" "}
-                    <button
-                      type="button"
-                      className="text-foreground font-medium underline-offset-4 hover:underline"
-                      onClick={() => {
-                        setTab("login");
-                        setError(null);
-                      }}
-                    >
-                      Sign in
-                    </button>
-                  </p>
-                </form>
-              </TabsContent>
-            </Tabs>
+                  <PasswordInput
+                    id="login-password"
+                    name="password"
+                    required
+                    minLength={8}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                  />
+                </div>
+                <FormError>{error}</FormError>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Signing in…
+                    </>
+                  ) : (
+                    "Sign in"
+                  )}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </main>

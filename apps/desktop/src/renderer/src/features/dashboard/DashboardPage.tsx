@@ -6,35 +6,24 @@ import type {
   ManagerDashboardSummary,
   MasterDataImportResult,
 } from "@blackbox/shared";
+import { formatMoney } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
 import { Skeleton } from "@blackbox/ui/skeleton";
 import { dashboardApi } from "@renderer/lib/api/dashboard";
 import { ApiError } from "@renderer/lib/api/client";
-import { getAccessToken } from "@renderer/lib/api/session";
-import { syncApi } from "@renderer/lib/api/sync";
 import {
-  bumpDataVersion,
-  getSyncStatus,
-  syncNow,
-  useSyncDataVersion,
-} from "@renderer/lib/sync/sync-status";
+  enqueueMasterDataLocalSync,
+  useCatalogSync,
+} from "@renderer/lib/sync/catalog-sync";
+import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 import {
   resolveDataSourceMode,
   type DataSourceMode,
 } from "@renderer/lib/local-db/data-source";
-import {
-  LAST_FULL_PULL_AT_KEY,
-  runFullPull,
-  runMasterDataImportPull,
-  SyncPullError,
-  type SyncProgress,
-} from "@renderer/lib/local-db/pull";
-import { seedEntityVersionHeadsFromCloud } from "@renderer/lib/sync/entity-version-seed";
 import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { ImportMasterDataDialog } from "./ImportMasterDataDialog";
-import { DeviceSessionCard } from "./DeviceSessionCard";
 import {
   KEYBOARD_HINT_APP_NAV,
   KeyboardHints,
@@ -64,8 +53,8 @@ const MANAGER_CARDS: {
   },
   {
     key: "drawerBalance",
-    label: "Expected drawer",
-    hint: "Your collections minus your expenses, all time",
+    label: "Drawer balance",
+    hint: "Opening float plus collections, minus till floats, expenses, and cash submitted to the owner",
     format: "money",
   },
 ];
@@ -98,15 +87,15 @@ const CASHIER_CARDS: {
   format: "money" | "count";
 }[] = [
   {
-    key: "totalSalesAmount",
-    label: "Total sales (today)",
-    hint: "Posted sales total for today",
+    key: "openingBalanceAmount",
+    label: "Opening balance (today)",
+    hint: "Till float you opened with today",
     format: "money",
   },
   {
-    key: "nonFbrSalesAmount",
-    label: "Non-FBR sales (today)",
-    hint: "Simple bills posted today, not sent to FBR",
+    key: "totalSalesAmount",
+    label: "Total sales (today)",
+    hint: "Posted sales total for today",
     format: "money",
   },
   {
@@ -134,20 +123,18 @@ const CASHIER_CARDS: {
     format: "money",
   },
   {
+    key: "cashWithdrawnAmount",
+    label: "Cash withdrawn (today)",
+    hint: "Cash collected from your till today",
+    format: "money",
+  },
+  {
     key: "cashInHandAmount",
     label: "Cash in hand (today)",
-    hint: "Cash received minus refunds paid today",
+    hint: "Opening float plus cash received minus refunds and withdrawals today",
     format: "money",
   },
 ];
-
-function formatSyncedAt(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
 
 export function DashboardPage() {
   const dataVersion = useSyncDataVersion();
@@ -156,7 +143,6 @@ export function DashboardPage() {
     cashierOnly,
     showManagerDashboard,
     showInventoryDashboard,
-    canReadTaxReports,
     canAccessStockOverview,
   } =
     useSalesAccess();
@@ -172,18 +158,8 @@ export function DashboardPage() {
     null,
   );
   const [localDbLoading, setLocalDbLoading] = useState(true);
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
+  const catalog = useCatalogSync();
   const [importOpen, setImportOpen] = useState(false);
-
-  const loadLastSynced = useCallback(async () => {
-    const value = await window.blackbox?.localDb?.getSyncMeta?.(
-      LAST_FULL_PULL_AT_KEY,
-    );
-    setLastSyncedAt(value ?? null);
-  }, []);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -215,6 +191,8 @@ export function DashboardPage() {
             cardPaymentsAmount: 0,
             heldBillsCount: 0,
             refundTotalAmount: 0,
+            openingBalanceAmount: 0,
+            cashWithdrawnAmount: 0,
             cashInHandAmount: 0,
           });
         }
@@ -245,6 +223,9 @@ export function DashboardPage() {
                 customerReturnCount: 0,
                 drawerBalance: 0,
                 drawers: [],
+                cashierTills: [],
+                cashSubmittedToday: 0,
+                cashSubmissionsToday: [],
               });
             }
           }
@@ -301,9 +282,6 @@ export function DashboardPage() {
       .then(async (status) => {
         if (cancelled) return;
         setLocalDbStatus(status);
-        if (status.connected) {
-          await loadLastSynced();
-        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -323,135 +301,18 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadLastSynced]);
+  }, []);
 
-  async function onSync() {
-    if (syncing || !localDbStatus?.connected) return;
-    setSyncing(true);
-    setSyncError(null);
-    setSyncProgress({
-      phase: "reference",
-      done: 0,
-      total: 1,
-      message: "Starting sync…",
-    });
-    try {
-      const token = getAccessToken();
-      if (token) {
-        try {
-          const status = await syncApi.status();
-          setSyncProgress({
-            phase: "reference",
-            done: 0,
-            total: 1,
-            message: "Incremental sync…",
-          });
-          if (!status.needsFullResync && lastSyncedAt) {
-            if (!(await syncNow())) {
-              throw new Error(
-                getSyncStatus().lastError ?? "Incremental sync failed",
-              );
-            }
-            const now = new Date().toISOString();
-            await window.blackbox?.localDb?.setSyncMeta(
-              LAST_FULL_PULL_AT_KEY,
-              now,
-            );
-            setLastSyncedAt(now);
-            setSyncProgress({
-              phase: "done",
-              done: 1,
-              total: 1,
-              message: "Incremental sync complete",
-            });
-            await loadSummary();
-            return;
-          }
-        } catch {
-          /* fall through to full pull */
-        }
-      }
-      const result = await runFullPull((progress) => {
-        setSyncProgress(progress);
-      });
-      if (token) {
-        try {
-          const status = await syncApi.status();
-          for (const stream of status.streams) {
-            await window.blackbox?.sync?.applyPull({
-              changes: [],
-              nextCursor: stream.serverSeq,
-              stream: stream.stream,
-            });
-          }
-          await syncApi.completeFullResync();
-          await seedEntityVersionHeadsFromCloud().catch(() => undefined);
-        } catch {
-          /* cursors optional until device is trusted */
-        }
-      }
-      setLastSyncedAt(result.lastSyncedAt);
-      setSyncProgress({
-        phase: "done",
-        done: 1,
-        total: 1,
-        message: "Sync complete",
-      });
-      bumpDataVersion();
-      await loadSummary();
-    } catch (err: unknown) {
-      if (err instanceof SyncPullError) {
-        setSyncError(`${err.phase}: ${err.message}`);
-      } else if (err instanceof Error) {
-        setSyncError(err.message);
-      } else {
-        setSyncError("Sync failed");
-      }
-    } finally {
-      setSyncing(false);
-    }
+  function onMasterDataImported(imported: MasterDataImportResult) {
+    enqueueMasterDataLocalSync(imported.files.map((file) => file.file));
   }
 
-  async function onMasterDataImported(imported: MasterDataImportResult) {
-    if (!localDbStatus?.connected) {
-      await loadSummary();
-      throw new Error("Local database is not connected.");
-    }
-    setSyncing(true);
-    setSyncError(null);
-    setSyncProgress({
-      phase: "reference",
-      done: 0,
-      total: 1,
-      message: "Starting post-import sync…",
-    });
-    try {
-      const result = await runMasterDataImportPull(
-        imported.files.map((file) => file.file),
-        setSyncProgress,
-      );
-      setLastSyncedAt(result.lastSyncedAt);
-      setSyncProgress({
-        phase: "done",
-        done: 1,
-        total: 1,
-        message: "Import Sync complete",
-      });
-      bumpDataVersion();
-      await loadSummary();
-    } catch (error: unknown) {
-      const message =
-        error instanceof SyncPullError
-          ? `${error.phase}: ${error.message}`
-          : error instanceof Error
-            ? error.message
-            : "Sync failed";
-      setSyncError(message);
-      throw new Error(message);
-    } finally {
-      setSyncing(false);
-    }
-  }
+  const cashierTills = managerSummary?.cashierTills ?? [];
+  const isOwner = user?.permissions.includes("web.access") ?? false;
+  const uncollectedTillTotal = cashierTills.reduce(
+    (sum, till) => sum + till.currentCashBalance,
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -491,7 +352,6 @@ export function DashboardPage() {
           <Button
             type="button"
             variant="outline"
-            disabled={syncing}
             onClick={() => setImportOpen(true)}
           >
             Upload Old Data
@@ -507,67 +367,7 @@ export function DashboardPage() {
         />
       ) : null}
 
-      <DeviceSessionCard />
-
-      {localDbLoading ? (
-        <Skeleton className="h-12 w-full rounded-lg" />
-      ) : localDbStatus?.connected ? (
-        <div
-          role="status"
-          className="border-border bg-muted/40 space-y-3 rounded-lg border px-4 py-3 text-sm"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">Local database connected</p>
-              {/* {localDbStatus.path ? (
-                <>
-                  <p className="text-muted-foreground mt-1 break-all font-mono text-xs">
-                    {localDbStatus.path}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        void navigator.clipboard.writeText(localDbStatus.path);
-                      }}
-                    >
-                      Copy DB path
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        void window.blackbox?.localDb?.revealDatabaseInFolder?.();
-                      }}
-                    >
-                      Show in folder
-                    </Button>
-                  </div>
-                </>
-              ) : null} */}
-              <p className="text-muted-foreground mt-1 text-xs">
-                {lastSyncedAt
-                  ? `Last synced: ${formatSyncedAt(lastSyncedAt)}`
-                  : "Not synced yet — pull cloud data into the local database."}
-              </p>
-              {syncing && syncProgress ? (
-                <p className="mt-2 text-xs font-medium">{syncProgress.message}</p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              disabled={syncing}
-              onClick={() => void onSync()}
-            >
-              {syncing ? "Syncing…" : "Sync"}
-            </Button>
-          </div>
-        </div>
-      ) : (
+      {!localDbLoading && localDbStatus && !localDbStatus.connected ? (
         <div
           role="alert"
           className="border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200 rounded-lg border px-4 py-3 text-sm"
@@ -584,14 +384,14 @@ export function DashboardPage() {
             </p>
           ) : null}
         </div>
-      )}
+      ) : null}
 
-      {syncError ? (
+      {catalog.error ? (
         <div
           role="alert"
           className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
         >
-          Sync failed — {syncError}
+          Sync failed — {catalog.error}
         </div>
       ) : null}
 
@@ -605,6 +405,7 @@ export function DashboardPage() {
       ) : null}
 
       {cashierOnly ? (
+        <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CASHIER_CARDS.map((card) => (
             <Card key={card.key} className="gap-3 py-5">
@@ -619,7 +420,7 @@ export function DashboardPage() {
                 ) : (
                   <p className="text-3xl font-semibold tracking-tight tabular-nums">
                     {card.format === "money"
-                      ? `Rs ${(cashierSummary?.[card.key] ?? 0).toLocaleString()}`
+                      ? `Rs ${formatMoney(Number(cashierSummary?.[card.key] ?? 0))}`
                       : (cashierSummary?.[card.key] ?? "—")}
                   </p>
                 )}
@@ -628,10 +429,15 @@ export function DashboardPage() {
             </Card>
           ))}
         </div>
+        <Button variant="outline" asChild>
+          <Link to="/sales/till">Open till</Link>
+        </Button>
+        </div>
       ) : (
         <div className="space-y-8">
           {showManagerDashboard ? (
             <div className="space-y-4">
+              {isOwner ? null : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {MANAGER_CARDS.map((card) => (
                   <Card key={card.key} className="gap-3 py-5">
@@ -646,62 +452,173 @@ export function DashboardPage() {
                       ) : (
                         <p className="text-3xl font-semibold tracking-tight tabular-nums">
                           {card.format === "money"
-                            ? `Rs ${(managerSummary?.[card.key] ?? 0).toLocaleString()}`
+                            ? `Rs ${formatMoney(Number(managerSummary?.[card.key] ?? 0))}`
                             : (managerSummary?.[card.key] ?? "—")}
                         </p>
                       )}
                       <p className="text-muted-foreground mt-1 text-xs">
-                        {card.hint}
+                        {card.key === "drawerBalance"
+                          ? (() => {
+                              const own = managerSummary?.drawers.find(
+                                (drawer) => drawer.managerUserId === user?.id,
+                              );
+                              if (!own) return card.hint;
+                              return `Opening ${formatMoney(own.openingFloat)} · Collected ${formatMoney(own.collected)} · Till floats ${formatMoney(own.tillFloats)} · Expenses ${formatMoney(own.expenses)} · Submitted ${formatMoney(own.submitted)}`;
+                            })()
+                          : card.hint}
                       </p>
                     </CardContent>
                   </Card>
                 ))}
               </div>
-              {user?.permissions.includes("web.access") &&
-              managerSummary &&
-              managerSummary.drawers.length > 0 ? (
-                <Card className="gap-3 py-5">
-                  <CardHeader className="px-5 pb-0">
-                    <CardTitle className="text-sm font-medium">
-                      Manager drawers
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-5">
+              )}
+              {isOwner ? null : (
+              <Card className="gap-3 py-5">
+                <CardHeader className="px-5 pb-0">
+                  <CardTitle className="text-sm font-medium">
+                    Cash still in tills
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-5">
+                  {loading ? (
+                    <Skeleton className="h-8 w-full" />
+                  ) : cashierTills.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      No uncollected till cash.
+                    </p>
+                  ) : (
                     <ul className="divide-y text-sm">
-                      {managerSummary.drawers.map((drawer) => (
+                      {cashierTills.map((till) => (
                         <li
-                          key={drawer.managerUserId}
+                          key={`${till.userId}-${till.tillName}-${till.status}`}
                           className="flex items-center justify-between gap-4 py-2"
                         >
-                          <span>{drawer.managerName}</span>
+                          <span>
+                            {till.userName}
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {till.tillName}
+                            </span>
+                          </span>
                           <span className="tabular-nums">
-                            Rs {drawer.balance.toLocaleString()}
+                            Rs {formatMoney(till.currentCashBalance)}
                           </span>
                         </li>
                       ))}
+                      <li className="flex items-center justify-between gap-4 py-2 font-medium">
+                        <span>Total not collected</span>
+                        <span className="tabular-nums">
+                          Rs {formatMoney(uncollectedTillTotal)}
+                        </span>
+                      </li>
                     </ul>
+                  )}
+                </CardContent>
+              </Card>
+              )}
+              {isOwner ? (
+                <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-sm font-medium">
+                      Cash collected
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-8 w-full" />
+                    ) : (
+                      <>
+                        <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                          Rs {formatMoney(managerSummary?.cashSubmittedToday ?? 0)}
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          Cash managers handed over today
+                        </p>
+                        {(managerSummary?.cashSubmissionsToday.length ?? 0) > 0 ? (
+                          <ul className="mt-3 divide-y text-sm">
+                            {managerSummary?.cashSubmissionsToday.map((row) => (
+                              <li
+                                key={row.managerUserId}
+                                className="flex items-center justify-between gap-4 py-2"
+                              >
+                                <span>{row.managerName}</span>
+                                <span className="tabular-nums">
+                                  Rs {formatMoney(row.amount)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-muted-foreground mt-3 text-sm">
+                            No cash submitted today.
+                          </p>
+                        )}
+                      </>
+                    )}
                   </CardContent>
                 </Card>
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-sm font-medium">
+                      Cash in manager drawers
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-8 w-full" />
+                    ) : (managerSummary?.drawers.length ?? 0) === 0 ? (
+                      <p className="text-muted-foreground text-sm">
+                        No cash in manager drawers.
+                      </p>
+                    ) : (
+                      <ul className="divide-y text-sm">
+                        {managerSummary?.drawers.map((drawer) => (
+                          <li
+                            key={drawer.managerUserId}
+                            className="flex items-start justify-between gap-4 py-2"
+                          >
+                            <span>
+                              {drawer.managerName}
+                              <span className="text-muted-foreground block text-xs">
+                                Opening {formatMoney(drawer.openingFloat)} · Collected{" "}
+                                {formatMoney(drawer.collected)} · Till floats{" "}
+                                {formatMoney(drawer.tillFloats)} · Expenses{" "}
+                                {formatMoney(drawer.expenses)} · Submitted{" "}
+                                {formatMoney(drawer.submitted)}
+                              </span>
+                            </span>
+                            <span className="tabular-nums">
+                              Rs {formatMoney(drawer.balance)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+                </div>
               ) : null}
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" asChild>
-                  <Link to="/cash-flow">Cash flow</Link>
-                </Button>
+                {isOwner ? (
+                  <Button variant="outline" asChild>
+                    <Link to="/cash-flow">Fund drawers</Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" asChild>
+                    <Link to="/cash-flow">Cash flow</Link>
+                  </Button>
+                )}
                 <Button variant="outline" asChild>
                   <Link to="/sales/stock-overview">View floor &amp; warehouse stock</Link>
                 </Button>
-                {canReadTaxReports ? (
-                  <Button variant="outline" asChild>
-                    <Link to="/reports/taxes">Tax report</Link>
-                  </Button>
-                ) : null}
               </div>
             </div>
           ) : null}
 
           {showInventoryDashboard ? (
             <div className="space-y-4">
-              {canAccessStockOverview ? (
+              {canAccessStockOverview && !showManagerDashboard ? (
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" asChild>
                     <Link to="/sales/stock-overview">

@@ -123,8 +123,9 @@ export function salesNavTarget(permissions: string[]): string {
   return isCashierOnlyNav(permissions) ? "/sales/new" : "/sales";
 }
 
+/** Every role opens the dashboard. The argument stays for existing callers. */
 export function defaultRouteForUser(permissions: string[]): string {
-  if (isCashierOnlyNav(permissions)) return "/sales/new";
+  void permissions;
   return "/";
 }
 
@@ -143,7 +144,9 @@ function isSalesPathAllowed(pathname: string, permissions: string[]): boolean {
   }
   if (pathname === "/sales/held") return canAccessSale(permissions);
   if (pathname === "/sales/till") return canAccessTill(permissions);
-  if (pathname === "/sales") return canAccessSalesList(permissions);
+  if (pathname === "/sales") {
+    return canAccessSalesList(permissions) || canAccessSaleReturn(permissions);
+  }
   return canAccessSalesList(permissions) || canAccessSale(permissions);
 }
 

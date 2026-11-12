@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate, useParams } from "react-router-dom";
 import type { InventoryOutReturnDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -74,7 +75,7 @@ export function InventoryOutReturnDetailPage() {
         </div>
         <div>
           <dt className="text-muted-foreground">Total</dt>
-          <dd>{detail.total.toFixed(2)}</dd>
+          <dd>{formatMoney(detail.total)}</dd>
         </div>
       </dl>
 
@@ -98,8 +99,8 @@ export function InventoryOutReturnDetailPage() {
                   </div>
                 </td>
                 <td className="px-4 py-2 text-right">{line.quantity}</td>
-                <td className="px-4 py-2 text-right">{line.unitCost.toFixed(2)}</td>
-                <td className="px-4 py-2 text-right">{line.lineTotal.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right">{formatMoney(line.unitCost)}</td>
+                <td className="px-4 py-2 text-right">{formatMoney(line.lineTotal)}</td>
               </ListTableRow>
             ))}
           </tbody>

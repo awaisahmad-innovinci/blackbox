@@ -11,6 +11,7 @@ import type {
 } from "@blackbox/shared";
 import {
   DEFAULT_SALE_CUSTOMER_NAME,
+  formatMoney,
   isTillNearLimit,
   lineTotalAfterDiscount,
   maxCashTender,
@@ -1097,10 +1098,6 @@ export function SalePage() {
       setError("FOC-only line has no billed quantity to adjust");
       return;
     }
-    if (line.quantityCorrected) {
-      setError("Quantity already corrected for this item");
-      return;
-    }
     setAdjustQtyLine(line);
     setAdjustQtyOpen(true);
     setError(null);
@@ -1124,10 +1121,6 @@ export function SalePage() {
     line: DraftSaleLine,
     newQuantity: number,
   ): Promise<boolean> {
-    if (line.quantityCorrected) {
-      setError("Quantity already corrected for this item");
-      return false;
-    }
     if (newQuantity >= line.quantity || newQuantity <= 0) {
       setError("New quantity must be less than current and greater than zero");
       return false;
@@ -1233,7 +1226,7 @@ export function SalePage() {
 
   const tillLimitWithdrawHint =
     requireTillWithdrawApproval
-      ? "Use Withdraw cash — a manager must authorize with Authy first."
+      ? "Use Withdraw cash — a manager must authorize with an authentication code first."
       : "Use Withdraw cash to remove enough cash; the till reopens for sales when below the limit.";
 
   async function onConfirm() {
@@ -1440,7 +1433,7 @@ export function SalePage() {
               {
                 eventType: "sale.return_refunded",
                 actorUserId: user.id,
-                summary: `${resolvedCashierName} refunded return ${completedReturn.returnNumber} — Rs ${completedReturn.refundTotal.toLocaleString()} cash`,
+                summary: `${resolvedCashierName} refunded return ${completedReturn.returnNumber} — Rs ${formatMoney(completedReturn.refundTotal)} cash`,
                 metadata: {
                   returnNumber: completedReturn.returnNumber,
                   returnId: completedReturn.id,
@@ -1496,6 +1489,21 @@ export function SalePage() {
           user?.fbrEnabled && !nonFbrSale && !registerOffline
             ? await submitPostedSaleToFbr(detail)
             : detail;
+        if (user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "sale.posted",
+              actorUserId: user.id,
+              summary: `Posted sale ${withFbr.saleNumber} for Rs ${formatMoney(withFbr.total)}`,
+              metadata: {
+                saleId: withFbr.id,
+                saleNumber: withFbr.saleNumber,
+                total: withFbr.total,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
+        }
         navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
         void syncNow();
         return;
@@ -1766,7 +1774,7 @@ export function SalePage() {
           className="border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 rounded-lg border px-4 py-3 text-sm"
         >
           Till is near the cash limit — Rs{" "}
-          {tillRemainingHeadroom(tillSession!).toLocaleString()} headroom left.
+          {formatMoney(tillRemainingHeadroom(tillSession!))} headroom left.
           You can still complete this sale even if cash exceeds the limit; the
           till will close afterward and a manager must collect cash before more
           sales.
@@ -1939,7 +1947,7 @@ export function SalePage() {
                       <td className="px-3 py-2 tabular-nums">
                         <div className="flex items-center gap-2">
                           <span>{line.quantity.toLocaleString()}</span>
-                          {!line.quantityCorrected && line.quantity > 0 ? (
+                          {line.quantity > 0 ? (
                             <Button
                               type="button"
                               variant="ghost"
@@ -1970,13 +1978,13 @@ export function SalePage() {
                         />
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {split.exGstUnit.toLocaleString()}
+                        {formatMoney(split.exGstUnit)}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {split.gstAmount.toLocaleString()}
+                        {formatMoney(split.gstAmount)}
                       </td>
                       <td className="px-3 py-2 tabular-nums font-medium">
-                        {split.inclusiveTotal.toLocaleString()}
+                        {formatMoney(split.inclusiveTotal)}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <Button
@@ -2016,18 +2024,18 @@ export function SalePage() {
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Subtotal</span>
-              <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+              <span className="tabular-nums">{formatMoney(subtotal)}</span>
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">GST</span>
               <span className="tabular-nums">
-                {billGstAmount.toLocaleString()}
+                {formatMoney(billGstAmount)}
               </span>
             </div>
             <div className="border-border flex justify-between gap-4 border-t pt-3">
               <span className="text-base font-semibold">Total</span>
               <span className="text-3xl font-bold tabular-nums tracking-tight">
-                {billTotal.toLocaleString()}
+                {formatMoney(billTotal)}
               </span>
             </div>
             {appliedReturn ? (
@@ -2037,21 +2045,21 @@ export function SalePage() {
                     Return credit ({appliedReturn.returnNumber})
                   </span>
                   <span className="font-medium tabular-nums text-green-700 dark:text-green-400">
-                    −{returnCredit.toLocaleString()}
+                    −{formatMoney(returnCredit)}
                   </span>
                 </div>
                 {cashBackFromCredit > 0 ? (
                   <div className="flex justify-between gap-4 text-sm">
                     <span className="text-muted-foreground">Cash back</span>
                     <span className="font-medium tabular-nums">
-                      {cashBackFromCredit.toLocaleString()}
+                      {formatMoney(cashBackFromCredit)}
                     </span>
                   </div>
                 ) : null}
                 <div className="border-border flex justify-between gap-4 border-t pt-3">
                   <span className="text-base font-semibold">Amount due</span>
                   <span className="text-2xl font-bold tabular-nums tracking-tight">
-                    {amountDue.toLocaleString()}
+                    {formatMoney(amountDue)}
                   </span>
                 </div>
               </>
@@ -2102,7 +2110,7 @@ export function SalePage() {
               <h2 className="text-sm font-medium">Payment</h2>
               {cardTerminalStatus.state === "sent" ? (
                 <p className="text-muted-foreground text-xs">
-                  Card terminal: {cardTerminalStatus.amount.toLocaleString()}{" "}
+                  Card terminal: {formatMoney(cardTerminalStatus.amount)}{" "}
                   sent
                 </p>
               ) : cardTerminalStatus.state === "error" ? (
@@ -2174,7 +2182,7 @@ export function SalePage() {
                         {splitCashOverDue ? (
                           <p className="text-destructive text-xs" role="alert">
                             Cash cannot exceed amount due (
-                            {amountDue.toLocaleString()})
+                            {formatMoney(amountDue)})
                           </p>
                         ) : splitAmounts.cash <= 0 ? (
                           <p className="text-muted-foreground text-xs">
@@ -2233,7 +2241,7 @@ export function SalePage() {
                         />
                         {cashOverMax ? (
                           <p className="text-destructive text-xs" role="alert">
-                            Max tender {cashMaxTender.toLocaleString()}
+                            Max tender {formatMoney(cashMaxTender)}
                           </p>
                         ) : null}
                       </div>
@@ -2259,28 +2267,28 @@ export function SalePage() {
                             <div className="flex justify-between gap-4 font-semibold">
                               <span>Cash back from credit</span>
                               <span className="text-xl tabular-nums">
-                                {cashBackFromCredit.toLocaleString()}
+                                {formatMoney(cashBackFromCredit)}
                               </span>
                             </div>
                           ) : tendered >= amountDue ? (
                             <div className="flex justify-between gap-4 font-semibold">
                               <span>Change</span>
                               <span className="text-xl text-green-700 tabular-nums dark:text-green-400">
-                                {cashChange.toLocaleString()}
+                                {formatMoney(cashChange)}
                               </span>
                             </div>
                           ) : (
                             <div className="flex justify-between gap-4 font-semibold">
                               <span>Short</span>
                               <span className="text-xl text-amber-700 tabular-nums dark:text-amber-300">
-                                {cashShortfall.toLocaleString()}
+                                {formatMoney(cashShortfall)}
                               </span>
                             </div>
                           )}
                         </div>
                       ) : cardRemaining !== 0 ? (
                         <p className="text-amber-700 text-sm dark:text-amber-300">
-                          Remaining: {cardRemaining.toLocaleString()}
+                          Remaining: {formatMoney(cardRemaining)}
                         </p>
                       ) : null}
                     </>

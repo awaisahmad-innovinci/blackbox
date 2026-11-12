@@ -209,6 +209,55 @@ importers:
         specifier: ^6.3.5
         version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)(tsx@4.23.12)
 
+  apps/platform:
+    dependencies:
+      '@blackbox/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@blackbox/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      lucide-react:
+        specifier: ^0.511.0
+        version: 0.511.0(react@19.2.8)
+      next:
+        specifier: ^15.3.3
+        version: 15.5.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.1.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.1.0
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@blackbox/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@blackbox/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@tailwindcss/postcss':
+        specifier: ^4.1.8
+        version: 4.3.3
+      '@types/node':
+        specifier: ^22.15.29
+        version: 22.20.1
+      '@types/react':
+        specifier: ^19.1.6
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.1.5
+        version: 19.2.4(@types/react@19.2.18)
+      eslint:
+        specifier: ^9.28.0
+        version: 9.39.5(jiti@2.7.0)
+      tailwindcss:
+        specifier: ^4.1.8
+        version: 4.3.3
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   apps/web:
     dependencies:
       '@blackbox/shared':

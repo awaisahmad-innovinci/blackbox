@@ -16,9 +16,11 @@ import {
 } from "../../db/entities";
 import { GoodsReceiptsController } from "./goods-receipts.controller";
 import { GoodsReceiptsService } from "./goods-receipts.service";
+import { ActivityLogModule } from "../../activity-log/activity-log.module";
 
 @Module({
   imports: [
+    ActivityLogModule,
     TypeOrmModule.forFeature([
       GoodsReceipt,
       GoodsReceiptItem,

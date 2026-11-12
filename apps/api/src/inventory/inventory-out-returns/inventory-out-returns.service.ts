@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Injectable,
@@ -22,6 +23,8 @@ import {
   Warehouse,
 } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { getRequestTenant } from "../../common/request-tenant";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
 import {
   applyInventoryOutBalanceDelta,
   getInventoryOutBalanceQty,
@@ -49,6 +52,7 @@ export class InventoryOutReturnsService {
     private readonly returns: Repository<InventoryOutReturn>,
     @InjectRepository(InventoryOutReturnItem)
     private readonly returnItems: Repository<InventoryOutReturnItem>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(
@@ -145,7 +149,7 @@ export class InventoryOutReturnsService {
       seen.add(item.productSkuId);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const posted = await this.dataSource.transaction(async (manager) => {
       const warehouse = await manager.getRepository(Warehouse).findOne({
         where: { id: dto.warehouseId, tenantId, status: "active" },
       });
@@ -295,6 +299,22 @@ export class InventoryOutReturnsService {
 
       return this.getByIdInManager(manager, header.id);
     });
+
+    const actorUserId = getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "inventory_out_return.posted",
+        actorUserId,
+        summary: `Posted inventory out return ${posted.returnNumber} for Rs ${formatMoney(posted.total)}`,
+        metadata: {
+          inventoryOutReturnId: posted.id,
+          returnNumber: posted.returnNumber,
+          total: posted.total,
+        },
+      });
+    }
+    return posted;
   }
 
   async returnableQuantity(

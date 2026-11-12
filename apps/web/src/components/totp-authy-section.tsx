@@ -74,7 +74,7 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
 
   async function onConfirm() {
     if (!isSelf || !/^\d{6}$/.test(code.trim())) {
-      setError("Enter the 6-digit code from Authy");
+      setError("Enter the 6-digit code from your authentication app");
       return;
     }
     setBusy(true);
@@ -85,7 +85,7 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
       setStatus(next);
       setQrDataUrl(null);
       setCode("");
-      setSuccess("Authy configured.");
+      setSuccess("Authentication code configured.");
     } catch (err) {
       setError(toUserFacingError(err));
     } finally {
@@ -104,7 +104,7 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
       setQrDataUrl(null);
       setCode("");
       setResetOpen(false);
-      setSuccess("Authy reset. Set up again when ready.");
+      setSuccess("Authentication code reset. Set up again when ready.");
     } catch (err) {
       setError(toUserFacingError(err));
     } finally {
@@ -114,8 +114,8 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
 
   return (
     <SectionCard
-      title="Authy (supervisor codes)"
-      description="Manager and Owner accounts can generate Authy codes used on POS to approve removing sale lines."
+      title="Authentication code (supervisor codes)"
+      description="Manager and Owner accounts can generate authentication codes used on POS to approve removing sale lines."
     >
       <FormSuccess>{success}</FormSuccess>
       <FormError>{error}</FormError>
@@ -123,13 +123,13 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
       {loading ? (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
-          Loading Authy status…
+          Loading authentication code status…
         </p>
       ) : isSelf && status ? (
         <div className="space-y-4">
           {status.enrolled ? (
             <p className="text-sm">
-              Authy is configured
+              Authentication code is configured
               {status.confirmedAt
                 ? ` (since ${new Date(status.confirmedAt).toLocaleString()})`
                 : ""}
@@ -140,7 +140,7 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
               {/* eslint-disable-next-line @next/next/no-img-element -- QR is an inline data URL from the API */}
               <img
                 src={qrDataUrl}
-                alt="Authy QR code"
+                alt="Authentication QR code"
                 className="border-border size-48 rounded-md border bg-white p-2"
               />
               <div className="space-y-2">
@@ -155,11 +155,11 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
                     setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
                   }
                 />
-                <FieldStatus hint="Enter the code shown in Authy after scanning." />
+                <FieldStatus hint="Enter the code shown in your authentication app after scanning." />
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button disabled={busy} onClick={() => void onConfirm()}>
-                  Confirm Authy
+                  Confirm authentication code
                 </Button>
                 <Button
                   variant="outline"
@@ -175,7 +175,7 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
             </div>
           ) : (
             <Button disabled={busy || !canSetup} onClick={() => void onStartSetup()}>
-              Set up Authy
+              Set up authentication code
             </Button>
           )}
 
@@ -192,7 +192,7 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
       ) : !isSelf && canManage ? (
         <div className="space-y-3">
           <p className="text-muted-foreground text-sm">
-            Reset this user&apos;s Authy enrollment so they can scan a new QR code
+            Reset this user&apos;s authentication code so they can scan a new QR code
             on web or desktop.
           </p>
           <Button
@@ -200,21 +200,21 @@ export function TotpAuthySection({ userId, canManage, isSelf }: Props) {
             disabled={busy}
             onClick={() => setResetOpen(true)}
           >
-            Reset Authy
+            Reset authentication code
           </Button>
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">
-          Only the account owner can complete Authy setup on web.
+          Only the account owner can complete authentication code setup on web.
         </p>
       )}
 
       <ConfirmDialog
         open={resetOpen}
         onOpenChange={setResetOpen}
-        title="Reset Authy?"
-        description="Existing Authy codes for this account will stop working. A new QR setup is required before POS line removal works offline."
-        confirmLabel="Reset Authy"
+        title="Reset authentication code?"
+        description="Existing authentication codes for this account will stop working. A new QR setup is required before POS line removal works offline."
+        confirmLabel="Reset authentication code"
         destructive
         loading={busy}
         onConfirm={onReset}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import type { SellUnit, SkuSearchResult } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -198,7 +199,7 @@ export function AddInventoryOutItemDialog({
                       <span className="text-muted-foreground block tabular-nums">
                         Available{" "}
                         {(r.quantityAvailable ?? 0).toLocaleString()} · Avg
-                        cost {(r.costPrice ?? 0).toLocaleString()}
+                        cost {formatMoney((r.costPrice ?? 0))}
                       </span>
                     </span>
                   </ListPickRow>

@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Injectable,
@@ -29,6 +30,8 @@ import {
   Warehouse,
 } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { getRequestTenant } from "../../common/request-tenant";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
 import {
   CreateVendorReturnDto,
   ListVendorReturnsQueryDto,
@@ -52,6 +55,7 @@ export class VendorReturnsService {
     private readonly returns: Repository<VendorReturn>,
     @InjectRepository(VendorReturnItem)
     private readonly returnItems: Repository<VendorReturnItem>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(
@@ -166,7 +170,7 @@ export class VendorReturnsService {
       seen.add(item.productSkuId);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const posted = await this.dataSource.transaction(async (manager) => {
       const vendor = await manager.getRepository(Vendor).findOne({
         where: { id: dto.vendorId, tenantId, status: "active" },
       });
@@ -342,6 +346,22 @@ export class VendorReturnsService {
 
       return this.getByIdInManager(manager, header.id);
     });
+
+    const actorUserId = getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "vendor_return.posted",
+        actorUserId,
+        summary: `Posted vendor return ${posted.returnNumber} for Rs ${formatMoney(posted.total)}`,
+        metadata: {
+          vendorReturnId: posted.id,
+          returnNumber: posted.returnNumber,
+          total: posted.total,
+        },
+      });
+    }
+    return posted;
   }
 
   async getById(id: string): Promise<VendorReturnDetail> {

@@ -5,19 +5,32 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import {
   businessPeriodBounds,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
+  formatMoney,
   isCashExpenseCategory,
+  managerDrawerBalance,
   roundMoney4,
   type CashCollectionRow,
   type CashExpenseCategory,
   type CashExpenseRow,
   type CashFlowReport,
   type CashierCashSaleRow,
+  type DrawerPerson,
+  type CashSubmissionToday,
   type ManagerDrawerBalance,
   type RecordCashExpenseRequest,
+  type RecordManagerDrawerOpeningRequest,
 } from "@blackbox/shared";
 import { DataSource, Repository } from "typeorm";
 import type { TenantContext } from "../common/tenant-context";
-import { CashExpense, User } from "../db/entities";
+import {
+  CashExpense,
+  ManagerDrawerOpening,
+  ManagerDrawerSubmission,
+  User,
+} from "../db/entities";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 
 function num(value: unknown): number {
   const n = Number(value ?? 0);
@@ -34,8 +47,13 @@ export class CashFlowService {
     private readonly dataSource: DataSource,
     @InjectRepository(CashExpense)
     private readonly expenses: Repository<CashExpense>,
+    @InjectRepository(ManagerDrawerOpening)
+    private readonly openings: Repository<ManagerDrawerOpening>,
+    @InjectRepository(ManagerDrawerSubmission)
+    private readonly submissions: Repository<ManagerDrawerSubmission>,
     @InjectRepository(User)
     private readonly users: Repository<User>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   seesEveryDrawer(permissions: readonly string[]): boolean {
@@ -82,6 +100,17 @@ export class CashFlowService {
       throw new BadRequestException("Enter an amount greater than zero");
     }
     const managerName = await this.managerName(user.tenantId, user.userId);
+    const drawers = await this.drawerBalances(
+      user.tenantId,
+      user.userId,
+      managerName,
+      false,
+    );
+    const available =
+      drawers.find((row) => row.managerUserId === user.userId)?.balance ?? 0;
+    if (expenseExceedsDrawer(body.amount, available)) {
+      throw new BadRequestException(expenseOverDrawerMessage(available));
+    }
     const now = new Date();
     const row = this.expenses.create({
       tenantId: user.tenantId,
@@ -93,15 +122,152 @@ export class CashFlowService {
       occurredAt: now,
     });
     const saved = await this.expenses.save(row);
+    const amount = roundMoney(num(saved.amount));
+    await this.activityLog.logFromContext({
+      tenantId: user.tenantId,
+      eventType: "cash_expense.recorded",
+      actorUserId: user.userId,
+      summary: `Recorded ${body.category} of Rs ${formatMoney(amount)}`,
+      metadata: {
+        expenseId: saved.id,
+        category: body.category,
+        amount,
+      },
+    });
     return {
       id: saved.id,
       at: saved.occurredAt.toISOString(),
       managerUserId: saved.recordedByUserId,
       managerName: saved.recordedByName || managerName,
       category: body.category,
-      amount: roundMoney(num(saved.amount)),
+      amount,
       note: saved.note,
     };
+  }
+
+  async recordOpening(
+    user: TenantContext,
+    body: RecordManagerDrawerOpeningRequest,
+  ): Promise<{ id: string }> {
+    if (!(body.amount > 0)) {
+      throw new BadRequestException("Enter an amount greater than zero");
+    }
+    const managers = await this.listPeople(user.tenantId, "till.manage");
+    const manager = managers.find((row) => row.id === body.managerUserId);
+    if (!manager) {
+      throw new BadRequestException("Choose a manager");
+    }
+    const openerName = await this.managerName(user.tenantId, user.userId);
+    const managerName = manager.fullName.trim() || manager.username;
+    const now = new Date();
+    const saved = await this.openings.save(
+      this.openings.create({
+        tenantId: user.tenantId,
+        managerUserId: manager.id,
+        managerName,
+        amount: String(body.amount),
+        openedByUserId: user.userId,
+        openedByName: openerName,
+        openedAt: now,
+      }),
+    );
+    const amount = roundMoney(body.amount);
+    await this.activityLog.logFromContext({
+      tenantId: user.tenantId,
+      eventType: "drawer.opened",
+      actorUserId: user.userId,
+      subjectUserId: manager.id,
+      summary: `${openerName} opened ${managerName}'s drawer with Rs ${formatMoney(amount)}`,
+      metadata: {
+        openingId: saved.id,
+        managerUserId: manager.id,
+        amount,
+      },
+    });
+    return { id: saved.id };
+  }
+
+  async recordSubmission(user: TenantContext): Promise<{ id: string; amount: number }> {
+    const managerName = await this.managerName(user.tenantId, user.userId);
+    const drawers = await this.drawerBalances(
+      user.tenantId,
+      user.userId,
+      managerName,
+      false,
+    );
+    const balance =
+      drawers.find((row) => row.managerUserId === user.userId)?.balance ?? 0;
+    if (!(balance > 0)) {
+      throw new BadRequestException("There is no cash to submit");
+    }
+    const amount = roundMoney(balance);
+    const now = new Date();
+    const saved = await this.submissions.save(
+      this.submissions.create({
+        tenantId: user.tenantId,
+        managerUserId: user.userId,
+        managerName,
+        amount: String(amount),
+        submittedAt: now,
+      }),
+    );
+    await this.activityLog.logFromContext({
+      tenantId: user.tenantId,
+      eventType: "drawer.submitted",
+      actorUserId: user.userId,
+      summary: `${managerName} submitted Rs ${formatMoney(amount)} cash to the owner`,
+      metadata: {
+        submissionId: saved.id,
+        amount,
+      },
+    });
+    return { id: saved.id, amount };
+  }
+
+  async submissionsToday(
+    tenantId: string,
+    today: string,
+  ): Promise<CashSubmissionToday[]> {
+    const rows = await this.dataSource.query<
+      { manager_user_id: string; manager_name: string; amount: string }[]
+    >(
+      `select s.manager_user_id,
+              max(s.manager_name) as manager_name,
+              coalesce(sum(s.amount), 0) as amount
+       from manager_drawer_submissions s
+       where s.tenant_id = $1
+         and date(s.submitted_at) = $2::date
+       group by s.manager_user_id
+       order by max(s.manager_name)`,
+      [tenantId, today],
+    );
+    return rows.map((row) => ({
+      managerUserId: row.manager_user_id,
+      managerName: row.manager_name?.trim() || "Manager",
+      amount: roundMoney(num(row.amount)),
+    }));
+  }
+
+  async listPeople(tenantId: string, permissionKey: string): Promise<DrawerPerson[]> {
+    const rows = await this.dataSource.query<
+      { id: string; full_name: string; username: string }[]
+    >(
+      `select distinct u.id, u.full_name, u.username
+       from users u
+       join user_roles ur on ur.user_id = u.id and ur.tenant_id = u.tenant_id
+       join role_permissions rp on rp.role_id = ur.role_id
+       join permissions p on p.id = rp.permission_id
+       where u.tenant_id = $1
+         and u.is_active = true
+         and p.key = $2
+       order by u.full_name`,
+      [tenantId, permissionKey],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      fullName: row.full_name,
+      username: row.username,
+    }));
   }
 
   async drawerBalances(
@@ -113,66 +279,245 @@ export class CashFlowService {
     const signedInName = managerName.trim()
       ? managerName.trim()
       : await this.managerName(tenantId, userId);
-    const collected = await this.dataSource.query<
-      { manager_user_id: string; manager_name: string; collected: string }[]
-    >(
-      `select w.withdrawn_by_user_id as manager_user_id,
-              max(coalesce(nullif(u.full_name, ''), nullif(u.username, ''), 'Manager')) as manager_name,
-              coalesce(sum(w.withdrawal_total), 0) as collected
-       from till_withdrawals w
-       left join users u on u.id = w.withdrawn_by_user_id and u.tenant_id = w.tenant_id
-       where w.tenant_id = $1
-         and ($2::boolean or w.withdrawn_by_user_id = $3)
-       group by w.withdrawn_by_user_id`,
-      [tenantId, seeAll, userId],
-    );
+    let collected: {
+      manager_user_id: string;
+      manager_name: string;
+      named_at: string | Date | null;
+      collected: string;
+    }[];
+    try {
+      collected = await this.dataSource.query(
+        `select w.withdrawn_by_user_id as manager_user_id,
+                max(coalesce(nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Manager')) as manager_name,
+                max(w.created_at) as named_at,
+                coalesce(sum(w.withdrawal_total), 0) as collected
+         from till_withdrawals w
+         left join users u
+           on u.id = w.withdrawn_by_user_id
+          and u.tenant_id = w.tenant_id
+         where w.tenant_id = $1
+           and ($2::boolean or w.withdrawn_by_user_id = $3)
+           and (
+             $2::boolean = false
+             or not exists (
+               select 1 from till_sessions ts
+               where ts.tenant_id = w.tenant_id
+                 and ts.user_id = w.withdrawn_by_user_id
+             )
+           )
+         group by w.withdrawn_by_user_id`,
+        [tenantId, seeAll, userId],
+      );
+      // #region agent log
+      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"5b973a"},body:JSON.stringify({sessionId:"5b973a",runId:"post-fix",hypothesisId:"A",location:"cash-flow.service.ts:drawerBalances",message:"collected query used users.full_name",data:{rowCount:collected.length,seeAll},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+    } catch (err) {
+      // #region agent log
+      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"5b973a"},body:JSON.stringify({sessionId:"5b973a",runId:"post-fix",hypothesisId:"A",location:"cash-flow.service.ts:drawerBalances",message:"collected query failed",data:{error:err instanceof Error?err.message:"unknown"},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      throw err;
+    }
     const spent = await this.dataSource.query<
-      { manager_user_id: string; manager_name: string; expenses: string }[]
+      {
+        manager_user_id: string;
+        manager_name: string;
+        named_at: string | Date | null;
+        expenses: string;
+      }[]
     >(
       `select e.recorded_by_user_id as manager_user_id,
-              max(coalesce(nullif(e.recorded_by_name, ''), nullif(u.full_name, ''), 'Manager')) as manager_name,
+              max(coalesce(nullif(trim(e.recorded_by_name), ''), nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Manager')) as manager_name,
+              max(e.created_at) as named_at,
               coalesce(sum(e.amount), 0) as expenses
        from cash_expenses e
-       left join users u on u.id = e.recorded_by_user_id and u.tenant_id = e.tenant_id
+       left join users u
+         on u.id = e.recorded_by_user_id
+        and u.tenant_id = e.tenant_id
        where e.tenant_id = $1
          and ($2::boolean or e.recorded_by_user_id = $3)
+         and (
+           $2::boolean = false
+           or not exists (
+             select 1 from till_sessions ts
+             where ts.tenant_id = e.tenant_id
+               and ts.user_id = e.recorded_by_user_id
+           )
+         )
        group by e.recorded_by_user_id`,
       [tenantId, seeAll, userId],
     );
+    const openings = await this.dataSource.query<
+      {
+        manager_user_id: string;
+        manager_name: string;
+        named_at: string | Date | null;
+        opening_float: string;
+      }[]
+    >(
+      `select o.manager_user_id as manager_user_id,
+              max(coalesce(nullif(trim(o.manager_name), ''), nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Manager')) as manager_name,
+              max(o.created_at) as named_at,
+              coalesce(sum(o.amount), 0) as opening_float
+       from manager_drawer_openings o
+       left join users u
+         on u.id = o.manager_user_id
+        and u.tenant_id = o.tenant_id
+       where o.tenant_id = $1
+         and ($2::boolean or o.manager_user_id = $3)
+         and (
+           $2::boolean = false
+           or not exists (
+             select 1 from till_sessions ts
+             where ts.tenant_id = o.tenant_id
+               and ts.user_id = o.manager_user_id
+           )
+         )
+       group by o.manager_user_id`,
+      [tenantId, seeAll, userId],
+    );
+    const tillFloats = await this.dataSource.query<
+      {
+        manager_user_id: string;
+        till_floats: string;
+      }[]
+    >(
+      `select t.funded_by_user_id as manager_user_id,
+              coalesce(sum(t.opening_balance), 0) as till_floats
+       from till_sessions t
+       where t.tenant_id = $1
+         and t.funded_by_user_id is not null
+         and ($2::boolean or t.funded_by_user_id = $3)
+         and (
+           $2::boolean = false
+           or not exists (
+             select 1 from till_sessions ts
+             where ts.tenant_id = t.tenant_id
+               and ts.user_id = t.funded_by_user_id
+           )
+         )
+       group by t.funded_by_user_id`,
+      [tenantId, seeAll, userId],
+    );
+    const submissions = await this.dataSource.query<
+      {
+        manager_user_id: string;
+        manager_name: string;
+        named_at: string | Date | null;
+        submitted: string;
+      }[]
+    >(
+      `select s.manager_user_id as manager_user_id,
+              max(coalesce(nullif(trim(s.manager_name), ''), nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Manager')) as manager_name,
+              max(s.submitted_at) as named_at,
+              coalesce(sum(s.amount), 0) as submitted
+       from manager_drawer_submissions s
+       left join users u
+         on u.id = s.manager_user_id
+        and u.tenant_id = s.tenant_id
+       where s.tenant_id = $1
+         and ($2::boolean or s.manager_user_id = $3)
+         and (
+           $2::boolean = false
+           or not exists (
+             select 1 from till_sessions ts
+             where ts.tenant_id = s.tenant_id
+               and ts.user_id = s.manager_user_id
+           )
+         )
+       group by s.manager_user_id`,
+      [tenantId, seeAll, userId],
+    );
+    // #region agent log
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"5b973a"},body:JSON.stringify({sessionId:"5b973a",runId:"post-fix",hypothesisId:"B",location:"cash-flow.service.ts:drawerBalances",message:"expense opening and submission queries finished",data:{expenses:spent.length,openings:openings.length,tillFloats:tillFloats.length,submissions:submissions.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const map = new Map<
       string,
-      { name: string; collected: number; expenses: number }
+      {
+        name: string;
+        namedAt: string;
+        openingFloat: number;
+        collected: number;
+        expenses: number;
+        tillFloats: number;
+        submitted: number;
+      }
     >();
-    const touch = (id: string, name: string) => {
+    const namedAtOf = (value: string | Date | null | undefined): string => {
+      if (value instanceof Date) return value.toISOString();
+      return value ? String(value) : "";
+    };
+    const touch = (id: string, name: string, namedAt: string) => {
+      const trimmed = name.trim();
       const current = map.get(id) ?? {
-        name: name.trim() || "Manager",
+        name: trimmed || "Manager",
+        namedAt,
+        openingFloat: 0,
         collected: 0,
         expenses: 0,
+        tillFloats: 0,
+        submitted: 0,
       };
-      if (name.trim() && current.name === "Manager") current.name = name.trim();
+      const laterName =
+        seeAll && trimmed && namedAt && namedAt >= current.namedAt;
+      if (trimmed && (current.name === "Manager" || laterName)) {
+        current.name = trimmed;
+        if (namedAt) current.namedAt = namedAt;
+      }
       map.set(id, current);
       return current;
     };
     for (const row of collected) {
-      touch(row.manager_user_id, row.manager_name).collected = num(row.collected);
+      touch(
+        row.manager_user_id,
+        row.manager_name,
+        namedAtOf(row.named_at),
+      ).collected = num(row.collected);
     }
     for (const row of spent) {
-      touch(row.manager_user_id, row.manager_name).expenses = num(row.expenses);
+      touch(
+        row.manager_user_id,
+        row.manager_name,
+        namedAtOf(row.named_at),
+      ).expenses = num(row.expenses);
+    }
+    for (const row of openings) {
+      touch(
+        row.manager_user_id,
+        row.manager_name,
+        namedAtOf(row.named_at),
+      ).openingFloat = num(row.opening_float);
+    }
+    for (const row of tillFloats) {
+      touch(row.manager_user_id, "", "").tillFloats = num(row.till_floats);
+    }
+    for (const row of submissions) {
+      touch(
+        row.manager_user_id,
+        row.manager_name,
+        namedAtOf(row.named_at),
+      ).submitted = num(row.submitted);
     }
     if (!seeAll && userId && !map.has(userId)) {
       map.set(userId, {
         name: signedInName,
+        namedAt: "",
+        openingFloat: 0,
         collected: 0,
         expenses: 0,
+        tillFloats: 0,
+        submitted: 0,
       });
     }
     return [...map.entries()]
       .map(([managerUserId, row]) => ({
         managerUserId,
         managerName: row.name,
+        openingFloat: roundMoney(row.openingFloat),
         collected: roundMoney(row.collected),
         expenses: roundMoney(row.expenses),
-        balance: roundMoney(row.collected - row.expenses),
+        tillFloats: roundMoney(row.tillFloats),
+        submitted: roundMoney(row.submitted),
+        balance: managerDrawerBalance(row),
       }))
       .sort((a, b) => a.managerName.localeCompare(b.managerName));
   }

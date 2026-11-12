@@ -1,7 +1,11 @@
 import {
   DEMO_STORE_TENANT_ID,
   businessPeriodBounds,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
   isCashExpenseCategory,
+  formatMoney,
+  managerDrawerBalance,
   roundMoney4,
   type CashCollectionRow,
   type CashExpenseCategory,
@@ -19,6 +23,62 @@ function roundMoney(value: number): number {
 function num(value: unknown): number {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+export function assertCashExpenseWithinDrawer(input: {
+  id: string;
+  recordedByUserId: string;
+  amount: number;
+}): void {
+  const db = getLocalDb();
+  const tenantId = DEMO_STORE_TENANT_ID;
+  const row = db
+    .prepare(
+      `select
+         coalesce((
+           select sum(amount) from manager_drawer_openings
+           where tenant_id = @tenantId and manager_user_id = @userId
+         ), 0) as opening_float,
+         coalesce((
+           select sum(withdrawal_total) from till_withdrawals
+           where tenant_id = @tenantId and withdrawn_by_user_id = @userId
+         ), 0) as collected,
+         coalesce((
+           select sum(amount) from cash_expenses
+           where tenant_id = @tenantId
+             and recorded_by_user_id = @userId
+             and id != @id
+         ), 0) as expenses,
+         coalesce((
+           select sum(opening_balance) from till_sessions
+           where tenant_id = @tenantId and funded_by_user_id = @userId
+         ), 0) as till_floats,
+         coalesce((
+           select sum(amount) from manager_drawer_submissions
+           where tenant_id = @tenantId and manager_user_id = @userId
+         ), 0) as submitted`,
+    )
+    .get({
+      tenantId,
+      userId: input.recordedByUserId,
+      id: input.id,
+    }) as {
+    opening_float: number;
+    collected: number;
+    expenses: number;
+    till_floats: number;
+    submitted: number;
+  };
+  const available = roundMoney(
+    num(row.opening_float) +
+      num(row.collected) -
+      num(row.expenses) -
+      num(row.till_floats) -
+      num(row.submitted),
+  );
+  if (expenseExceedsDrawer(input.amount, available)) {
+    throw new Error(expenseOverDrawerMessage(available));
+  }
 }
 
 export function upsertCashExpenseLocal(input: {
@@ -67,7 +127,26 @@ export function upsertCashExpenseLocal(input: {
   });
 }
 
-type DrawerAcc = { name: string; collected: number; expenses: number };
+type DrawerAcc = {
+  name: string;
+  namedAt: string;
+  openingFloat: number;
+  collected: number;
+  expenses: number;
+  tillFloats: number;
+  submitted: number;
+};
+
+const cashierExcludedWhenSeeAll = `
+  and (
+    @seeAll = 0
+    or not exists (
+      select 1 from till_sessions ts
+      where ts.tenant_id = @tenantId
+        and ts.user_id = manager_user_id
+    )
+  )
+`;
 
 export function listDrawerBalancesLocal(input: {
   userId: string;
@@ -79,11 +158,21 @@ export function listDrawerBalancesLocal(input: {
   const collected = db
     .prepare(
       `select withdrawn_by_user_id as manager_user_id,
-              max(withdrawn_by_name) as manager_name,
+              (
+                select w2.withdrawn_by_name
+                from till_withdrawals w2
+                where w2.tenant_id = @tenantId
+                  and w2.withdrawn_by_user_id = till_withdrawals.withdrawn_by_user_id
+                  and trim(coalesce(w2.withdrawn_by_name, '')) != ''
+                order by w2.created_at desc
+                limit 1
+              ) as manager_name,
+              max(created_at) as named_at,
               coalesce(sum(withdrawal_total), 0) as collected
        from till_withdrawals
        where tenant_id = @tenantId
          and (@seeAll = 1 or withdrawn_by_user_id = @userId)
+         ${cashierExcludedWhenSeeAll.replaceAll("manager_user_id", "withdrawn_by_user_id")}
        group by withdrawn_by_user_id`,
     )
     .all({
@@ -93,17 +182,28 @@ export function listDrawerBalancesLocal(input: {
     }) as {
     manager_user_id: string;
     manager_name: string;
+    named_at: string;
     collected: number;
   }[];
 
   const expenses = db
     .prepare(
       `select recorded_by_user_id as manager_user_id,
-              max(recorded_by_name) as manager_name,
+              (
+                select e2.recorded_by_name
+                from cash_expenses e2
+                where e2.tenant_id = @tenantId
+                  and e2.recorded_by_user_id = cash_expenses.recorded_by_user_id
+                  and trim(coalesce(e2.recorded_by_name, '')) != ''
+                order by e2.created_at desc
+                limit 1
+              ) as manager_name,
+              max(created_at) as named_at,
               coalesce(sum(amount), 0) as expenses
        from cash_expenses
        where tenant_id = @tenantId
          and (@seeAll = 1 or recorded_by_user_id = @userId)
+         ${cashierExcludedWhenSeeAll.replaceAll("manager_user_id", "recorded_by_user_id")}
        group by recorded_by_user_id`,
     )
     .all({
@@ -113,62 +213,385 @@ export function listDrawerBalancesLocal(input: {
     }) as {
     manager_user_id: string;
     manager_name: string;
+    named_at: string;
     expenses: number;
   }[];
 
-  return mergeDrawers(collected, expenses, input);
+  const openings = db
+    .prepare(
+      `select manager_user_id,
+              (
+                select o2.manager_name
+                from manager_drawer_openings o2
+                where o2.tenant_id = @tenantId
+                  and o2.manager_user_id = manager_drawer_openings.manager_user_id
+                  and trim(coalesce(o2.manager_name, '')) != ''
+                order by o2.opened_at desc
+                limit 1
+              ) as manager_name,
+              max(opened_at) as named_at,
+              coalesce(sum(amount), 0) as opening_float
+       from manager_drawer_openings
+       where tenant_id = @tenantId
+         and (@seeAll = 1 or manager_user_id = @userId)
+         ${cashierExcludedWhenSeeAll.replaceAll("manager_user_id", "manager_user_id")}
+       group by manager_user_id`,
+    )
+    .all({
+      tenantId,
+      userId: input.userId,
+      seeAll: input.seeAll ? 1 : 0,
+    }) as {
+    manager_user_id: string;
+    manager_name: string;
+    named_at: string;
+    opening_float: number;
+  }[];
+
+  const tillFloats = db
+    .prepare(
+      `select funded_by_user_id as manager_user_id,
+              '' as manager_name,
+              max(opened_at) as named_at,
+              coalesce(sum(opening_balance), 0) as till_floats
+       from till_sessions
+       where tenant_id = @tenantId
+         and funded_by_user_id is not null
+         and (@seeAll = 1 or funded_by_user_id = @userId)
+         ${cashierExcludedWhenSeeAll.replaceAll("manager_user_id", "funded_by_user_id")}
+       group by funded_by_user_id`,
+    )
+    .all({
+      tenantId,
+      userId: input.userId,
+      seeAll: input.seeAll ? 1 : 0,
+    }) as {
+    manager_user_id: string;
+    manager_name: string;
+    named_at: string;
+    till_floats: number;
+  }[];
+
+  const submissions = db
+    .prepare(
+      `select manager_user_id,
+              (
+                select s2.manager_name
+                from manager_drawer_submissions s2
+                where s2.tenant_id = @tenantId
+                  and s2.manager_user_id = manager_drawer_submissions.manager_user_id
+                  and trim(coalesce(s2.manager_name, '')) != ''
+                order by s2.submitted_at desc
+                limit 1
+              ) as manager_name,
+              max(submitted_at) as named_at,
+              coalesce(sum(amount), 0) as submitted
+       from manager_drawer_submissions
+       where tenant_id = @tenantId
+         and (@seeAll = 1 or manager_user_id = @userId)
+         ${cashierExcludedWhenSeeAll.replaceAll("manager_user_id", "manager_user_id")}
+       group by manager_user_id`,
+    )
+    .all({
+      tenantId,
+      userId: input.userId,
+      seeAll: input.seeAll ? 1 : 0,
+    }) as {
+    manager_user_id: string;
+    manager_name: string;
+    named_at: string;
+    submitted: number;
+  }[];
+
+  return mergeDrawers(collected, expenses, openings, tillFloats, submissions, input);
 }
 
 function mergeDrawers(
   collected: {
     manager_user_id: string;
     manager_name: string;
+    named_at?: string;
     collected: number;
   }[],
   expenses: {
     manager_user_id: string;
     manager_name: string;
+    named_at?: string;
     expenses: number;
+  }[],
+  openings: {
+    manager_user_id: string;
+    manager_name: string;
+    named_at?: string;
+    opening_float: number;
+  }[],
+  tillFloats: {
+    manager_user_id: string;
+    manager_name: string;
+    named_at?: string;
+    till_floats: number;
+  }[],
+  submissions: {
+    manager_user_id: string;
+    manager_name: string;
+    named_at?: string;
+    submitted: number;
   }[],
   input: { userId: string; managerName: string; seeAll: boolean },
 ): ManagerDrawerBalance[] {
   const map = new Map<string, DrawerAcc>();
-  const touch = (id: string, name: string): DrawerAcc => {
+  const touch = (id: string, name: string, namedAt = ""): DrawerAcc => {
+    const trimmed = name.trim();
     const current = map.get(id) ?? {
-      name: name.trim() || "Manager",
+      name: trimmed || "Manager",
+      namedAt,
+      openingFloat: 0,
       collected: 0,
       expenses: 0,
+      tillFloats: 0,
+      submitted: 0,
     };
-    if (name.trim() && current.name === "Manager") current.name = name.trim();
+    const laterName =
+      input.seeAll && trimmed && namedAt && namedAt >= current.namedAt;
+    if (trimmed && (current.name === "Manager" || laterName)) {
+      current.name = trimmed;
+      if (namedAt) current.namedAt = namedAt;
+    }
     map.set(id, current);
     return current;
   };
   for (const row of collected) {
-    touch(row.manager_user_id, row.manager_name ?? "").collected = num(
-      row.collected,
-    );
+    touch(row.manager_user_id, row.manager_name ?? "", row.named_at ?? "").collected =
+      num(row.collected);
   }
   for (const row of expenses) {
-    touch(row.manager_user_id, row.manager_name ?? "").expenses = num(
-      row.expenses,
-    );
+    touch(row.manager_user_id, row.manager_name ?? "", row.named_at ?? "").expenses =
+      num(row.expenses);
+  }
+  for (const row of openings) {
+    touch(
+      row.manager_user_id,
+      row.manager_name ?? "",
+      row.named_at ?? "",
+    ).openingFloat = num(row.opening_float);
+  }
+  for (const row of tillFloats) {
+    touch(row.manager_user_id, row.manager_name ?? "", row.named_at ?? "").tillFloats =
+      num(row.till_floats);
+  }
+  for (const row of submissions) {
+    touch(row.manager_user_id, row.manager_name ?? "", row.named_at ?? "").submitted =
+      num(row.submitted);
   }
   if (!input.seeAll && input.userId && !map.has(input.userId)) {
     map.set(input.userId, {
       name: input.managerName.trim() || "Manager",
+      namedAt: "",
+      openingFloat: 0,
       collected: 0,
       expenses: 0,
+      tillFloats: 0,
+      submitted: 0,
     });
   }
   return [...map.entries()]
     .map(([managerUserId, row]) => ({
       managerUserId,
       managerName: row.name,
+      openingFloat: roundMoney(row.openingFloat),
       collected: roundMoney(row.collected),
       expenses: roundMoney(row.expenses),
-      balance: roundMoney(row.collected - row.expenses),
+      tillFloats: roundMoney(row.tillFloats),
+      submitted: roundMoney(row.submitted),
+      balance: managerDrawerBalance(row),
     }))
     .sort((a, b) => a.managerName.localeCompare(b.managerName));
+}
+
+export function getManagerDrawerBalanceLocal(
+  userId: string,
+  managerName = "",
+): number {
+  return (
+    listDrawerBalancesLocal({ userId, managerName, seeAll: false }).find(
+      (row) => row.managerUserId === userId,
+    )?.balance ?? 0
+  );
+}
+
+export function upsertManagerDrawerOpeningLocal(input: {
+  id: string;
+  managerUserId: string;
+  managerName: string;
+  amount: number;
+  openedByUserId: string;
+  openedByName: string;
+  openedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}): void {
+  const db = getLocalDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+    insert into manager_drawer_openings (
+      id, tenant_id, manager_user_id, manager_name, amount,
+      opened_by_user_id, opened_by_name, opened_at, created_at, updated_at, sync_status
+    ) values (
+      @id, @tenantId, @managerUserId, @managerName, @amount,
+      @openedByUserId, @openedByName, @openedAt, @createdAt, @updatedAt, 'synced'
+    )
+    on conflict(id) do update set
+      manager_user_id = excluded.manager_user_id,
+      manager_name = excluded.manager_name,
+      amount = excluded.amount,
+      opened_by_user_id = excluded.opened_by_user_id,
+      opened_by_name = excluded.opened_by_name,
+      opened_at = excluded.opened_at,
+      updated_at = excluded.updated_at,
+      sync_status = 'synced'
+  `,
+  ).run({
+    id: input.id,
+    tenantId: DEMO_STORE_TENANT_ID,
+    managerUserId: input.managerUserId,
+    managerName: input.managerName,
+    amount: input.amount,
+    openedByUserId: input.openedByUserId,
+    openedByName: input.openedByName,
+    openedAt: input.openedAt || now,
+    createdAt: input.createdAt || now,
+    updatedAt: input.updatedAt || now,
+  });
+}
+
+export function assertDrawerSubmissionLocal(input: {
+  id: string;
+  managerUserId: string;
+  amount: number;
+}): void {
+  const db = getLocalDb();
+  const tenantId = DEMO_STORE_TENANT_ID;
+  const row = db
+    .prepare(
+      `select
+         coalesce((
+           select sum(amount) from manager_drawer_openings
+           where tenant_id = @tenantId and manager_user_id = @userId
+         ), 0) as opening_float,
+         coalesce((
+           select sum(withdrawal_total) from till_withdrawals
+           where tenant_id = @tenantId and withdrawn_by_user_id = @userId
+         ), 0) as collected,
+         coalesce((
+           select sum(amount) from cash_expenses
+           where tenant_id = @tenantId and recorded_by_user_id = @userId
+         ), 0) as expenses,
+         coalesce((
+           select sum(opening_balance) from till_sessions
+           where tenant_id = @tenantId and funded_by_user_id = @userId
+         ), 0) as till_floats,
+         coalesce((
+           select sum(amount) from manager_drawer_submissions
+           where tenant_id = @tenantId
+             and manager_user_id = @userId
+             and id != @id
+         ), 0) as submitted`,
+    )
+    .get({
+      tenantId,
+      userId: input.managerUserId,
+      id: input.id,
+    }) as {
+    opening_float: number;
+    collected: number;
+    expenses: number;
+    till_floats: number;
+    submitted: number;
+  };
+  const available = roundMoney(
+    num(row.opening_float) +
+      num(row.collected) -
+      num(row.expenses) -
+      num(row.till_floats) -
+      num(row.submitted),
+  );
+  if (!(input.amount > 0) || roundMoney(input.amount) !== available) {
+    throw new Error(
+      available > 0
+        ? `Submit the full drawer balance of Rs ${formatMoney(available)}`
+        : "There is no cash to submit",
+    );
+  }
+}
+
+export function upsertManagerDrawerSubmissionLocal(input: {
+  id: string;
+  managerUserId: string;
+  managerName: string;
+  amount: number;
+  submittedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}): void {
+  const db = getLocalDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+    insert into manager_drawer_submissions (
+      id, tenant_id, manager_user_id, manager_name, amount,
+      submitted_at, created_at, updated_at, sync_status
+    ) values (
+      @id, @tenantId, @managerUserId, @managerName, @amount,
+      @submittedAt, @createdAt, @updatedAt, 'synced'
+    )
+    on conflict(id) do update set
+      manager_user_id = excluded.manager_user_id,
+      manager_name = excluded.manager_name,
+      amount = excluded.amount,
+      submitted_at = excluded.submitted_at,
+      updated_at = excluded.updated_at,
+      sync_status = 'synced'
+  `,
+  ).run({
+    id: input.id,
+    tenantId: DEMO_STORE_TENANT_ID,
+    managerUserId: input.managerUserId,
+    managerName: input.managerName,
+    amount: input.amount,
+    submittedAt: input.submittedAt || now,
+    createdAt: input.createdAt || now,
+    updatedAt: input.updatedAt || now,
+  });
+}
+
+export function listDrawerSubmissionsTodayLocal(): {
+  managerUserId: string;
+  managerName: string;
+  amount: number;
+}[] {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select manager_user_id as managerUserId,
+              max(manager_name) as managerName,
+              coalesce(sum(amount), 0) as amount
+       from manager_drawer_submissions
+       where tenant_id = @tenantId
+         and date(submitted_at) = date('now', 'localtime')
+       group by manager_user_id
+       order by managerName`,
+    )
+    .all({ tenantId: DEMO_STORE_TENANT_ID }) as {
+    managerUserId: string;
+    managerName: string;
+    amount: number;
+  }[];
+  return rows.map((row) => ({
+    managerUserId: row.managerUserId,
+    managerName: row.managerName?.trim() || "Manager",
+    amount: roundMoney(Number(row.amount)),
+  }));
 }
 
 export function getCashFlowLocal(input: {

@@ -6,6 +6,7 @@ import {
   DEFAULT_TAX_REPORT_PERIOD,
   TAX_REPORT_KINDS,
   buildTaxReportCsv,
+  formatMoney,
   resolveTaxReportRange,
   taxReportCsvFilename,
 } from "@blackbox/shared";
@@ -30,13 +31,6 @@ const TAX_KIND_LABELS: Record<TaxReportKind, string> = {
   sales_tax: "Sales tax (customer)",
   credits: "Vendor credits",
 };
-
-function formatMoney(n: number): string {
-  return n.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
-  });
-}
 
 export default function TaxReportsPage() {
   const [period, setPeriod] = useState<TaxReportPeriodInput>(

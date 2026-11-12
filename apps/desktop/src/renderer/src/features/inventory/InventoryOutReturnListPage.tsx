@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type {
   InventoryOutReturnListItem,
@@ -171,7 +172,7 @@ export function InventoryOutReturnListPage() {
                   </td>
                   <td className="px-4 py-2">{row.warehouseName}</td>
                   <td className="px-4 py-2">{row.returnDate}</td>
-                  <td className="px-4 py-2 text-right">{row.total.toFixed(2)}</td>
+                  <td className="px-4 py-2 text-right">{formatMoney(row.total)}</td>
                   <td className="px-4 py-2 text-right">{row.itemCount}</td>
                 </ListTableRow>
               ))

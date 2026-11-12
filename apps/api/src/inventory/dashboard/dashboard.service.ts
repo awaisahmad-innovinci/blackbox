@@ -1,11 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
+  CashierTillBalance,
   DashboardSummary,
   ManagerDashboardSummary,
   ManagerStockOverviewQuery,
+  OwnerBusinessOverview,
   PaginatedManagerStockOverview,
 } from "@blackbox/shared";
+import { formatTillName } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import {
   GoodsReceipt,
@@ -14,7 +17,10 @@ import {
   Product,
   ProductSku,
   PurchaseOrder,
+  Sale,
+  SalePayment,
   SaleReturn,
+  TillSession,
   TillWithdrawal,
   Warehouse,
 } from "../../db/entities";
@@ -47,6 +53,12 @@ export class DashboardService {
     private readonly goodsReceipts: Repository<GoodsReceipt>,
     @InjectRepository(TillWithdrawal)
     private readonly tillWithdrawals: Repository<TillWithdrawal>,
+    @InjectRepository(TillSession)
+    private readonly tillSessions: Repository<TillSession>,
+    @InjectRepository(Sale)
+    private readonly sales: Repository<Sale>,
+    @InjectRepository(SalePayment)
+    private readonly salePayments: Repository<SalePayment>,
     @InjectRepository(SaleReturn)
     private readonly saleReturns: Repository<SaleReturn>,
     private readonly cashFlow: CashFlowService,
@@ -129,6 +141,14 @@ export class DashboardService {
       seeAll,
     );
     const own = drawers.find((row) => row.managerUserId === userId);
+    const cashSubmissionsToday = await this.cashFlow.submissionsToday(
+      tenantId,
+      today,
+    );
+    const cashSubmittedToday = roundMoney(
+      cashSubmissionsToday.reduce((sum, row) => sum + row.amount, 0),
+    );
+    const cashierTills = await this.listCashierTills(tenantId);
 
     return {
       date: today,
@@ -136,7 +156,144 @@ export class DashboardService {
       customerReturnCount: returnCount,
       drawerBalance: own?.balance ?? 0,
       drawers,
+      cashSubmittedToday,
+      cashSubmissionsToday,
+      cashierTills,
     };
+  }
+
+  async getOwnerOverview(
+    tenantId: string,
+    userId: string,
+  ): Promise<OwnerBusinessOverview> {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const [
+      salesRow,
+      paymentRows,
+      refundRow,
+      cashierTills,
+      drawers,
+      cashSubmissionsToday,
+      productCount,
+      lowStockCount,
+      pendingPurchaseOrderCount,
+    ] = await Promise.all([
+      this.sales
+        .createQueryBuilder("s")
+        .select("COUNT(*)", "count")
+        .addSelect("COALESCE(SUM(s.total), 0)", "total")
+        .where("s.tenant_id = :tenantId", { tenantId })
+        .andWhere("s.status = :status", { status: "POSTED" })
+        .andWhere("DATE(s.posted_at) = :today", { today })
+        .getRawOne<{ count: string; total: string }>(),
+      this.salePayments
+        .createQueryBuilder("p")
+        .innerJoin("p.sale", "s")
+        .select("p.method", "method")
+        .addSelect("COALESCE(SUM(p.amount), 0)", "amount")
+        .where("p.tenant_id = :tenantId", { tenantId })
+        .andWhere("s.status = :status", { status: "POSTED" })
+        .andWhere("DATE(s.posted_at) = :today", { today })
+        .groupBy("p.method")
+        .getRawMany<{ method: string; amount: string }>(),
+      this.saleReturns
+        .createQueryBuilder("r")
+        .select("COUNT(*)", "count")
+        .addSelect("COALESCE(SUM(r.refund_total), 0)", "total")
+        .where("r.tenant_id = :tenantId", { tenantId })
+        .andWhere("r.status = :status", { status: "COMPLETED" })
+        .andWhere("r.return_date = :today", { today })
+        .getRawOne<{ count: string; total: string }>(),
+      this.listCashierTills(tenantId),
+      this.cashFlow.drawerBalances(tenantId, userId, "", true),
+      this.cashFlow.submissionsToday(tenantId, today),
+      this.products.count({ where: { tenantId } }),
+      this.stock
+        .createQueryBuilder("s")
+        .innerJoin("s.productSku", "sku")
+        .where("s.tenant_id = :tenantId", { tenantId })
+        .andWhere("s.quantity_available <= sku.reorder_level")
+        .getCount(),
+      this.purchaseOrders
+        .createQueryBuilder("po")
+        .where("po.tenant_id = :tenantId", { tenantId })
+        .andWhere("po.status IN (:...statuses)", {
+          statuses: ["DRAFT", "SUBMITTED", "PARTIALLY_RECEIVED"],
+        })
+        .getCount(),
+    ]);
+
+    const payments = new Map(
+      paymentRows.map((row) => [row.method, roundMoney(toNum(row.amount))]),
+    );
+    const tillCashTotal = roundMoney(
+      cashierTills.reduce((sum, till) => sum + till.currentCashBalance, 0),
+    );
+
+    return {
+      date: today,
+      salesCount: toNum(salesRow?.count),
+      salesTotal: roundMoney(toNum(salesRow?.total)),
+      cashPayments: payments.get("CASH") ?? 0,
+      cardPayments: payments.get("CARD") ?? 0,
+      creditPayments: payments.get("CREDIT") ?? 0,
+      refundCount: toNum(refundRow?.count),
+      refundTotal: roundMoney(toNum(refundRow?.total)),
+      cashierTills,
+      tillCashTotal,
+      drawers,
+      cashSubmittedToday: roundMoney(
+        cashSubmissionsToday.reduce((sum, row) => sum + row.amount, 0),
+      ),
+      cashSubmissionsToday,
+      productCount,
+      lowStockCount,
+      pendingPurchaseOrderCount,
+    };
+  }
+
+  private async listCashierTills(
+    tenantId: string,
+  ): Promise<CashierTillBalance[]> {
+    const tillRows = await this.tillSessions
+      .createQueryBuilder("t")
+      .leftJoin("t.user", "u")
+      .select("t.user_id", "user_id")
+      .addSelect(
+        "coalesce(nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Cashier')",
+        "user_name",
+      )
+      .addSelect("t.till_name", "till_name")
+      .addSelect("u.username", "username")
+      .addSelect("t.status", "status")
+      .addSelect("t.current_cash_balance", "current_cash_balance")
+      .where("t.tenant_id = :tenantId", { tenantId })
+      .andWhere("t.status IN (:...statuses)", {
+        statuses: ["OPEN", "CLOSED_LIMIT", "PENDING_APPROVAL"],
+      })
+      .getRawMany<{
+        user_id: string;
+        user_name: string;
+        till_name: string;
+        username: string | null;
+        status: CashierTillBalance["status"];
+        current_cash_balance: string;
+      }>();
+
+    return tillRows
+      .map((row) => ({
+        userId: row.user_id,
+        userName: row.user_name?.trim() || "Cashier",
+        tillName: row.till_name?.trim() || formatTillName(row.username ?? ""),
+        status: row.status,
+        currentCashBalance: roundMoney(toNum(row.current_cash_balance)),
+      }))
+      .sort(
+        (a, b) =>
+          a.userName.localeCompare(b.userName) ||
+          a.tillName.localeCompare(b.tillName),
+      );
   }
 
   async listManagerStockOverview(

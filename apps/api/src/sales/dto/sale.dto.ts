@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
@@ -15,8 +15,11 @@ import {
 } from "class-validator";
 import {
   SALE_PAYMENT_METHODS,
+  SALE_REGISTER_KINDS,
+  SALE_REGISTER_STATUSES,
   SALE_STATUSES,
   type SalePaymentMethod,
+  type SaleRegisterKind,
   type SaleStatus,
 } from "@blackbox/shared";
 
@@ -169,6 +172,53 @@ export class ListSalesQueryDto {
 
   @IsOptional()
   @Type(() => Boolean)
+  hasFoc?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  pageSize?: number;
+}
+
+export class ListSaleRegisterQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string;
+
+  @IsOptional()
+  @IsIn([...SALE_REGISTER_KINDS])
+  kind?: SaleRegisterKind;
+
+  @IsOptional()
+  @IsIn([...SALE_REGISTER_STATUSES])
+  status?: (typeof SALE_REGISTER_STATUSES)[number];
+
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === true || value === "true") return true;
+    if (value === false || value === "false") return false;
+    return undefined;
+  })
+  @IsBoolean()
   hasFoc?: boolean;
 
   @IsOptional()

@@ -18,6 +18,7 @@ import { SaleReturnsModule } from "./sales/sale-returns/sale-returns.module";
 import { TillsModule } from "./tills/tills.module";
 import { CashFlowModule } from "./cash-flow/cash-flow.module";
 import { ActivityLogModule } from "./activity-log/activity-log.module";
+import { PlatformModule } from "./platform/platform.module";
 import { TenantsModule } from "./tenants/tenants.module";
 import { TaxReportsModule } from "./tax-reports/tax-reports.module";
 import { UsersModule } from "./users/users.module";
@@ -31,6 +32,7 @@ import { UsersModule } from "./users/users.module";
     DbModule,
     RbacModule,
     AuthModule,
+    PlatformModule,
     TenantsModule,
     UsersModule,
     RolesModule,

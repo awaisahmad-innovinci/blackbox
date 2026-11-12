@@ -25,26 +25,23 @@ export class RolesService {
     @InjectRepository(Role) private readonly roles: Repository<Role>,
     @InjectRepository(RolePermission)
     private readonly rolePermissions: Repository<RolePermission>,
-    @InjectRepository(Permission)
-    private readonly permissions: Repository<Permission>,
   ) {}
 
-  async list(tenantId: string): Promise<RoleResponse[]> {
+  async list(): Promise<RoleResponse[]> {
     const roles = await this.roles.find({
-      where: { tenantId },
       order: { createdAt: "ASC" },
     });
     const permMap = await this.permissionIdsByRoleIds(roles.map((r) => r.id));
     return roles.map((r) => toRoleResponse(r, permMap.get(r.id) ?? []));
   }
 
-  async getById(tenantId: string, roleId: string): Promise<RoleResponse> {
-    const role = await this.findTenantRole(tenantId, roleId);
+  async getById(roleId: string): Promise<RoleResponse> {
+    const role = await this.findRole(roleId);
     const permissionIds = await this.permissionIdsForRole(role.id);
     return toRoleResponse(role, permissionIds);
   }
 
-  async create(tenantId: string, dto: CreateRoleDto): Promise<RoleResponse> {
+  async create(dto: CreateRoleDto): Promise<RoleResponse> {
     const permissionIds = dto.permissionIds ?? [];
 
     try {
@@ -57,7 +54,6 @@ export class RolesService {
         }
 
         const created = manager.create(Role, {
-          tenantId,
           key: dto.key.trim(),
           name: dto.name.trim(),
           isSystem: false,
@@ -81,18 +77,14 @@ export class RolesService {
       return toRoleResponse(role, permissionIds);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Role key already exists in this tenant");
+        throw new ConflictException("Role key already exists");
       }
       throw error;
     }
   }
 
-  async update(
-    tenantId: string,
-    roleId: string,
-    dto: UpdateRoleDto,
-  ): Promise<RoleResponse> {
-    const role = await this.findTenantRole(tenantId, roleId);
+  async update(roleId: string, dto: UpdateRoleDto): Promise<RoleResponse> {
+    const role = await this.findRole(roleId);
 
     if (dto.key !== undefined) {
       if (role.isSystem) {
@@ -108,7 +100,7 @@ export class RolesService {
       await this.roles.save(role);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Role key already exists in this tenant");
+        throw new ConflictException("Role key already exists");
       }
       throw error;
     }
@@ -118,7 +110,6 @@ export class RolesService {
   }
 
   async replacePermissions(
-    tenantId: string,
     roleId: string,
     dto: ReplaceRolePermissionsDto,
   ): Promise<RoleResponse> {
@@ -126,7 +117,7 @@ export class RolesService {
 
     const role = await this.dataSource.transaction(async (manager) => {
       const found = await manager.findOne(Role, {
-        where: { id: roleId, tenantId },
+        where: { id: roleId },
       });
       if (!found) {
         throw new NotFoundException("Role not found");
@@ -156,8 +147,8 @@ export class RolesService {
     return toRoleResponse(role, permissionIds);
   }
 
-  private async findTenantRole(tenantId: string, roleId: string): Promise<Role> {
-    const role = await this.roles.findOne({ where: { id: roleId, tenantId } });
+  private async findRole(roleId: string): Promise<Role> {
+    const role = await this.roles.findOne({ where: { id: roleId } });
     if (!role) {
       throw new NotFoundException("Role not found");
     }

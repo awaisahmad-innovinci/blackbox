@@ -100,9 +100,9 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
         <Dialog open onOpenChange={(next) => !next && finish({ approved: false })}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle>Supervisor Authy code</DialogTitle>
+              <DialogTitle>Supervisor authentication code</DialogTitle>
               <DialogDescription>
-                Enter a valid Manager or Owner Authy code to continue.
+                Enter a valid Manager or Owner authentication code to continue.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">

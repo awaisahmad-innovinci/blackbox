@@ -1,5 +1,6 @@
 import type {
   CollectTillCashByAmountRequest,
+  DrawerPerson,
   OpenTillRequest,
   ReopenTillRequest,
   TillListItem,
@@ -22,6 +23,18 @@ export const tillsApi = {
   },
   open(body: OpenTillRequest): Promise<TillSessionDetail> {
     return apiFetch<TillSessionDetail>("/tills/open", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  listCashiers(): Promise<DrawerPerson[]> {
+    return apiFetch<DrawerPerson[]>("/tills/cashiers");
+  },
+  openForCashier(body: {
+    cashierUserId: string;
+    openingBalance: number;
+  }): Promise<TillSessionDetail> {
+    return apiFetch<TillSessionDetail>("/tills/open-for-cashier", {
       method: "POST",
       body: JSON.stringify(body),
     });

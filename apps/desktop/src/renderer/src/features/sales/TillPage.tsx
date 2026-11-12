@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { TillListItem, TillSessionDetail } from "@blackbox/shared";
+import type { DrawerPerson, TillListItem, TillSessionDetail } from "@blackbox/shared";
 import {
   computeTillDenominationTotal,
   emptyTillNotes,
+  formatMoney,
   isTillNearLimit,
   TILL_MAX_CASH_BALANCE_TO_CLOSE,
   validateTillCanCloseBalance,
@@ -21,6 +22,7 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { tillsApi } from "@renderer/lib/api/tills";
 import {
   createEmptyTillFormState,
   TillDenominationForm,
@@ -42,10 +44,7 @@ import {
   reopenTill,
   withdrawTill,
 } from "@renderer/lib/local-db/till-source";
-import {
-  requireManagerTillOpenApproval,
-  requireManagerTillWithdrawApproval,
-} from "@renderer/lib/manager-approval";
+import { requireManagerTillWithdrawApproval } from "@renderer/lib/manager-approval";
 import { useSession } from "@renderer/lib/session/context";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
@@ -63,18 +62,20 @@ export function TillPage() {
   const permissions = user?.permissions ?? [];
   const { canReadTill, canManageTill, canWrite, canRefund } = useSalesAccess();
   const { promptSupervisorTotp } = useSupervisorTotp();
-  const requireTillOpenApproval = requireManagerTillOpenApproval(user);
   const requireTillWithdrawApproval = requireManagerTillWithdrawApproval(user);
 
   const [session, setSession] = useState<TillSessionDetail | null>(null);
   const [latestClosedSession, setLatestClosedSession] =
     useState<TillSessionDetail | null>(null);
-  const [awaitingManagerReopen, setAwaitingManagerReopen] = useState(false);
   const [managerItems, setManagerItems] = useState<TillListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [openingBalance, setOpeningBalance] = useState("");
+  const [fundOpen, setFundOpen] = useState(false);
+  const [cashiers, setCashiers] = useState<DrawerPerson[]>([]);
+  const [cashierId, setCashierId] = useState("");
+  const [fundAmount, setFundAmount] = useState("");
+  const [fundError, setFundError] = useState<string | null>(null);
   const [managerDialog, setManagerDialog] = useState<
     | { kind: "collect"; tillId: string }
     | { kind: "withdraw"; tillId: string }
@@ -103,16 +104,9 @@ export function TillPage() {
       setSession(current);
       if (!current && !canManageTill) {
         const latest = await loadLatestTillSession(user.id);
-        if (latest?.status === "CLOSED") {
-          setLatestClosedSession(latest);
-          setAwaitingManagerReopen(true);
-        } else {
-          setLatestClosedSession(null);
-          setAwaitingManagerReopen(false);
-        }
+        setLatestClosedSession(latest?.status === "CLOSED" ? latest : null);
       } else {
         setLatestClosedSession(null);
-        setAwaitingManagerReopen(false);
       }
       if (canManageTill) {
         const rows = await loadTills({
@@ -152,33 +146,52 @@ export function TillPage() {
     };
   }, [user?.id, canManageTill]);
 
-  async function onOpenTillDirect(): Promise<void> {
+  async function onOpenFundDialog(): Promise<void> {
+    setFundOpen(true);
+    setFundError(null);
+    try {
+      const rows = await tillsApi.listCashiers();
+      setCashiers(rows);
+      setCashierId((current) => current || rows[0]?.id || "");
+    } catch (err: unknown) {
+      setCashiers([]);
+      setFundError(getApiErrorMessage(err, "Could not load cashiers. Connect and try again."));
+    }
+  }
+
+  async function onFundCashier(): Promise<void> {
     if (!user) return;
-    const balance = Number(openingBalance);
+    const cashier = cashiers.find((row) => row.id === cashierId);
+    const balance = Number(fundAmount);
     const validationError = validateTillOpeningBalanceAmount(balance);
-    if (validationError) {
-      setError(validationError);
+    if (!cashier) {
+      setFundError("Choose a cashier");
       return;
     }
-
+    if (validationError) {
+      setFundError(validationError);
+      return;
+    }
     setBusy(true);
-    setError(null);
+    setFundError(null);
     try {
-      const detail = await openTill({
-        userId: user.id,
-        userName: user.fullName?.trim() || user.username,
-        tillUsername: user.username,
+      await openTill({
+        userId: cashier.id,
+        userName: cashier.fullName.trim() || cashier.username,
+        tillUsername: cashier.username,
         body: {
           ...emptyTillNotes(),
           openingBalance: balance,
         },
         requireApproval: false,
+        funderUserId: user.id,
+        funderName: user.fullName?.trim() || user.username,
       });
-      setSession(detail);
-      setOpeningBalance("");
-      setAwaitingManagerReopen(false);
+      setFundOpen(false);
+      setFundAmount("");
+      await refresh();
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, "Failed to open till"));
+      setFundError(getApiErrorMessage(err, "Failed to open till"));
     } finally {
       setBusy(false);
     }
@@ -293,9 +306,6 @@ export function TillPage() {
     }
   }
 
-  const canOpenNewTill =
-    !session && !loading && !canManageTill && !awaitingManagerReopen;
-
   const progressPct =
     session && session.maxCashLimit > 0
       ? Math.min(100, (session.currentCashBalance / session.maxCashLimit) * 100)
@@ -383,7 +393,7 @@ export function TillPage() {
             {session.status === "CLOSED_LIMIT" ? (
               <p className="text-destructive text-sm">
                 {requireTillWithdrawApproval
-                  ? "Cash limit reached. Tap Withdraw cash — a manager must authorize with Authy first; the till reopens when cash is below the limit."
+                  ? "Cash limit reached. Tap Withdraw cash — a manager must authorize with an authentication code first; the till reopens when cash is below the limit."
                   : "Cash limit reached. Tap Withdraw cash to remove enough cash; the till reopens for sales when below the limit."}
               </p>
             ) : isTillNearLimit(session) ? (
@@ -422,19 +432,19 @@ export function TillPage() {
             <div>
               <p className="text-muted-foreground text-xs">Opening balance</p>
               <p className="text-lg font-semibold tabular-nums">
-                {session.openingBalance.toLocaleString()}
+                {formatMoney(session.openingBalance)}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Current cash</p>
               <p className="text-lg font-semibold tabular-nums">
-                {session.currentCashBalance.toLocaleString()}
+                {formatMoney(session.currentCashBalance)}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Max limit</p>
               <p className="text-lg font-semibold tabular-nums">
-                {session.maxCashLimit.toLocaleString()}
+                {formatMoney(session.maxCashLimit)}
               </p>
             </div>
           </div>
@@ -447,25 +457,23 @@ export function TillPage() {
               />
             </div>
             <p className="text-muted-foreground text-xs">
-              {session.currentCashBalance.toLocaleString()} /{" "}
-              {session.maxCashLimit.toLocaleString()} cash in till
+              {formatMoney(session.currentCashBalance)} /{" "}
+              {formatMoney(session.maxCashLimit)} cash in till
             </p>
           </div>
         </div>
       ) : null}
 
-      {!loading && !session && latestClosedSession && !canManageTill ? (
+      {!loading && !session && !canManageTill && latestClosedSession ? (
         <div className="border-border space-y-4 rounded-lg border p-4">
           <h2 className="text-lg font-medium">Till closed</h2>
           <p className="text-muted-foreground text-sm">
-            {requireTillOpenApproval
-              ? "Your till was closed. Open it again with manager authorization before you can post sales."
-              : "Your till was closed. Enter an opening balance to open it again before you can post sales."}
+            Ask a manager to approve with their authentication code. The opening balance comes from that manager&apos;s drawer.
           </p>
           <div>
             <p className="text-muted-foreground text-xs">Last session cash</p>
             <p className="text-lg font-semibold tabular-nums">
-              Rs {latestClosedSession.currentCashBalance.toLocaleString()}
+              Rs {formatMoney(latestClosedSession.currentCashBalance)}
             </p>
           </div>
           <Button disabled={busy} onClick={() => setReopenDialogOpen(true)}>
@@ -474,47 +482,26 @@ export function TillPage() {
         </div>
       ) : null}
 
-      {canOpenNewTill ? (
+      {!loading && !session && !canManageTill && !latestClosedSession ? (
         <div className="border-border space-y-4 rounded-lg border p-4">
           <h2 className="text-lg font-medium">Open till</h2>
-          {requireTillOpenApproval ? (
-            <>
-              <p className="text-muted-foreground text-sm">
-                Ask a manager to authorize and enter the opening cash balance.
-              </p>
-              <Button disabled={busy} onClick={() => setOpenDialogOpen(true)}>
-                Open till
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-muted-foreground text-sm">
-                Enter the opening cash balance for your till.
-              </p>
-              <div className="max-w-xs space-y-2">
-                <Label htmlFor="cashierOpeningBalance">Opening balance (Rs)</Label>
-                <Input
-                  id="cashierOpeningBalance"
-                  type="number"
-                  min={0}
-                  step="any"
-                  inputMode="decimal"
-                  disabled={busy}
-                  value={openingBalance}
-                  onChange={(event) => setOpeningBalance(event.target.value)}
-                />
-              </div>
-              <Button disabled={busy} onClick={() => void onOpenTillDirect()}>
-                {busy ? "Opening…" : "Open till"}
-              </Button>
-            </>
-          )}
+          <p className="text-muted-foreground text-sm">
+            Ask a manager to approve with their authentication code. The opening balance comes from that manager&apos;s drawer.
+          </p>
+          <Button disabled={busy} onClick={() => setOpenDialogOpen(true)}>
+            Open till
+          </Button>
         </div>
       ) : null}
 
       {canManageTill ? (
         <div className="border-border space-y-4 rounded-lg border p-4">
-          <h2 className="text-lg font-medium">Manage cashier tills</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-medium">Manage cashier tills</h2>
+            <Button disabled={busy} onClick={() => void onOpenFundDialog()}>
+              Open cashier till
+            </Button>
+          </div>
           {managerItems.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No tills need manager action.
@@ -536,7 +523,7 @@ export function TillPage() {
                       <td className="px-4 py-3">{row.tillName}</td>
                       <td className="px-4 py-3">{statusLabel(row.status)}</td>
                       <td className="px-4 py-3 tabular-nums">
-                        {row.currentCashBalance.toLocaleString()}
+                        {formatMoney(row.currentCashBalance)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
@@ -664,7 +651,7 @@ export function TillPage() {
             <>
               <p className="text-sm font-medium tabular-nums">
                 Current cash in till: Rs{" "}
-                {session.currentCashBalance.toLocaleString()}
+                {formatMoney(session.currentCashBalance)}
               </p>
               {closeBalanceError ? (
                 <p className="text-destructive text-sm" role="alert">
@@ -696,34 +683,87 @@ export function TillPage() {
         </DialogContent>
       </Dialog>
 
-      {user ? (
+      <Dialog
+        open={fundOpen}
+        onOpenChange={(open) => {
+          if (!open) setFundOpen(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open cashier till</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm">
+              The opening balance is taken from your drawer.
+            </p>
+            <label className="grid gap-1 text-sm">
+              Cashier
+              <select
+                className="border-input bg-background h-9 rounded-md border px-2"
+                value={cashierId}
+                onChange={(event) => setCashierId(event.target.value)}
+              >
+                {cashiers.length === 0 ? (
+                  <option value="">No cashiers loaded</option>
+                ) : null}
+                {cashiers.map((cashier) => (
+                  <option key={cashier.id} value={cashier.id}>
+                    {cashier.fullName.trim() || cashier.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="space-y-2">
+              <Label htmlFor="fundOpeningBalance">Opening balance (Rs)</Label>
+              <Input
+                id="fundOpeningBalance"
+                inputMode="decimal"
+                value={fundAmount}
+                onChange={(event) => setFundAmount(event.target.value)}
+              />
+            </div>
+            {fundError ? (
+              <p className="text-destructive text-sm">{fundError}</p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={busy} onClick={() => setFundOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={busy} onClick={() => void onFundCashier()}>
+              {busy ? "Opening…" : "Open till"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {user && !canManageTill ? (
         <OpenTillDialog
           open={openDialogOpen}
           onOpenChange={setOpenDialogOpen}
           cashierUserId={user.id}
           cashierName={user.fullName?.trim() || user.username}
           cashierUsername={user.username}
-          requireApproval={requireTillOpenApproval}
+          requireApproval
           onSuccess={(detail) => {
             setSession(detail);
             setLatestClosedSession(null);
-            setAwaitingManagerReopen(false);
           }}
         />
       ) : null}
 
-      {latestClosedSession && user ? (
+      {latestClosedSession && user && !canManageTill ? (
         <ReopenTillDialog
           open={reopenDialogOpen}
           onOpenChange={setReopenDialogOpen}
           closedSessionId={latestClosedSession.id}
           cashierUserId={user.id}
           cashierName={user.fullName?.trim() || user.username}
-          requireApproval={requireTillOpenApproval}
+          requireApproval
           onSuccess={(detail) => {
             setSession(detail);
             setLatestClosedSession(null);
-            setAwaitingManagerReopen(false);
           }}
         />
       ) : null}

@@ -1,5 +1,6 @@
 import { flushPendingFbrSales } from "@renderer/lib/sales/flush-pending-fbr";
 import { refreshSessionUserFromApi } from "@renderer/lib/session/session-user-refresh";
+import { maybeStartCatalogSync } from "./catalog-sync";
 import { refreshPendingCount, syncNow } from "./sync-status";
 
 const BASE_INTERVAL_MS = 60_000;
@@ -48,6 +49,7 @@ export function startAutoSync(): void {
       schedule(current.intervalMs);
       return;
     }
+    maybeStartCatalogSync();
     const ok = await syncNow();
     if (ok) await flushPendingFbrSales();
     current.intervalMs = ok

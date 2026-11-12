@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type {
   PurchaseOrderListItem,
@@ -316,7 +317,7 @@ export function PurchaseOrdersListPage() {
                     {po.status.replaceAll("_", " ")}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {po.total.toLocaleString()}
+                    {formatMoney(po.total)}
                   </td>
                 </ListTableRow>
               ))

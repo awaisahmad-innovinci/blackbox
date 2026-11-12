@@ -8,6 +8,7 @@ import {
 import type {
   DashboardSummary,
   ManagerDashboardSummary,
+  OwnerBusinessOverview,
   PaginatedManagerStockOverview,
 } from "@blackbox/shared";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
@@ -38,6 +39,15 @@ export class DashboardController {
   @Get("summary")
   getSummary(): Promise<DashboardSummary> {
     return this.dashboardService.getSummary();
+  }
+
+  @Get("owner-overview")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("web.access")
+  getOwnerOverview(
+    @CurrentUser() user: TenantContext,
+  ): Promise<OwnerBusinessOverview> {
+    return this.dashboardService.getOwnerOverview(user.tenantId, user.userId);
   }
 
   @Get("manager-summary")

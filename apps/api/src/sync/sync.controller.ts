@@ -13,12 +13,16 @@ import type { TenantContext } from "../common/tenant-context";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
 import { SyncConflictAckDto, SyncPushDto } from "./dto/sync.dto";
+import { SyncCatalogService } from "./sync-catalog.service";
 import { SyncService } from "./sync.service";
 
 @Controller("sync")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SyncController {
-  constructor(private readonly sync: SyncService) {}
+  constructor(
+    private readonly sync: SyncService,
+    private readonly catalogService: SyncCatalogService,
+  ) {}
 
   @Post("push")
   @RequirePermissions("sync.use")
@@ -44,6 +48,18 @@ export class SyncController {
   @RequirePermissions("sync.use")
   status(@CurrentUser() user: TenantContext): Promise<SyncStatusResponse> {
     return this.sync.status(user);
+  }
+
+  @Get("catalog")
+  @RequirePermissions("sync.use")
+  catalog(
+    @CurrentUser() user: TenantContext,
+    @Query("section") section: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("kind") kind?: string,
+  ) {
+    return this.catalogService.snapshot(user, section, page, pageSize, kind);
   }
 
   @Get("entity-version-heads")

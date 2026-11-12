@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import type { SkuSearchResult } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -230,7 +231,7 @@ export function AddSaleItemDialog({
                         <span className="text-muted-foreground block tabular-nums">
                           POS balance {balance.toLocaleString()}
                           {(r.sellingPrice ?? 0) > 0
-                            ? ` · Price ${(r.sellingPrice ?? 0).toLocaleString()}`
+                            ? ` · Price ${formatMoney((r.sellingPrice ?? 0))}`
                             : ""}
                         </span>
                       ) : null}

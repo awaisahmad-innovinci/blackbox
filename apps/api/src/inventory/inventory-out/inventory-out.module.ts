@@ -10,9 +10,11 @@ import {
 } from "../../db/entities";
 import { InventoryOutController } from "./inventory-out.controller";
 import { InventoryOutService } from "./inventory-out.service";
+import { ActivityLogModule } from "../../activity-log/activity-log.module";
 
 @Module({
   imports: [
+    ActivityLogModule,
     TypeOrmModule.forFeature([
       InventoryOut,
       InventoryOutLine,

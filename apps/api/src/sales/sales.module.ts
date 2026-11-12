@@ -1,4 +1,5 @@
 import { Module, forwardRef } from "@nestjs/common";
+import { ActivityLogModule } from "../activity-log/activity-log.module";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { FbrModule } from "../fbr/fbr.module";
 import { Sale, SaleLine, SalePayment, Tenant } from "../db/entities";
@@ -11,6 +12,7 @@ import { SalesService } from "./sales.service";
 
 @Module({
   imports: [
+    ActivityLogModule,
     InventoryCommonModule,
     RbacModule,
     forwardRef(() => FbrModule),

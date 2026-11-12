@@ -11,6 +11,15 @@ export const ACTIVITY_LOG_EVENT_TYPES = [
   "till.withdrawn_full",
   "till.reopened",
   "till.closed",
+  "sale.posted",
+  "purchase_order.created",
+  "goods_receipt.posted",
+  "inventory_out.posted",
+  "inventory_out_return.posted",
+  "vendor_return.posted",
+  "cash_expense.recorded",
+  "drawer.opened",
+  "drawer.submitted",
 ] as const;
 
 export type ActivityLogEventType = (typeof ACTIVITY_LOG_EVENT_TYPES)[number];
@@ -67,4 +76,13 @@ export const ACTIVITY_LOG_EVENT_LABELS: Record<ActivityLogEventType, string> = {
   "till.withdrawn_full": "Till fully withdrawn",
   "till.reopened": "Till reopened",
   "till.closed": "Till closed",
+  "sale.posted": "Sale posted",
+  "purchase_order.created": "Purchase order created",
+  "goods_receipt.posted": "Purchase order received",
+  "inventory_out.posted": "Inventory out posted",
+  "inventory_out_return.posted": "Inventory out return posted",
+  "vendor_return.posted": "Vendor return posted",
+  "cash_expense.recorded": "Expense recorded",
+  "drawer.opened": "Manager drawer opened",
+  "drawer.submitted": "Cash submitted to owner",
 };

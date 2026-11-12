@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   ForbiddenException,
@@ -18,6 +19,8 @@ import {
   formatTillName,
   TILL_CLOSE_REASON_CASHIER_CLOSED,
   tillMaxLimit,
+  tillOpeningExceedsDrawer,
+  tillOpeningExceedsDrawerMessage,
   validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
@@ -26,7 +29,8 @@ import { randomUUID } from "node:crypto";
 import { EntityManager, Repository } from "typeorm";
 import { getRequestTenant } from "../common/request-tenant";
 import { ActivityLogService } from "../activity-log/activity-log.service";
-import { Tenant, TillSession, TillWithdrawal, User } from "../db/entities";
+import { CashFlowService } from "../cash-flow/cash-flow.service";
+import { TillSession, TillWithdrawal, User } from "../db/entities";
 import type { ListTillsQueryDto, CollectTillCashByAmountDto, OpenTillDto, ReopenTillDto, WithdrawTillDto } from "./dto/till.dto";
 
 const ACTIVE_STATUSES = ["PENDING_APPROVAL", "OPEN", "CLOSED_LIMIT"] as const;
@@ -74,9 +78,9 @@ export class TillsService {
     private readonly sessions: Repository<TillSession>,
     @InjectRepository(TillWithdrawal)
     private readonly withdrawals: Repository<TillWithdrawal>,
-    @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly activityLog: ActivityLogService,
+    private readonly cashFlow: CashFlowService,
   ) {}
 
   async getCurrent(): Promise<TillSessionDetail | null> {
@@ -109,111 +113,141 @@ export class TillsService {
     return rows.map((row) => this.toListItem(row));
   }
 
+  listCashiers(tenantId: string) {
+    return this.cashFlow.listPeople(tenantId, "sales.write");
+  }
+
   async open(dto: OpenTillDto): Promise<TillSessionDetail> {
     const ctx = getRequestTenant();
     if (!ctx?.userId) {
       throw new ForbiddenException("Authentication required");
     }
-
+    if (!dto.supervisorUserId) {
+      throw new BadRequestException(
+        "A manager must approve this till with their authentication code.",
+      );
+    }
+    await this.assertCanFundDrawer(ctx.tenantId, dto.supervisorUserId);
     const validationError = validateTillOpeningBalanceAmount(dto.openingBalance);
     if (validationError) {
       throw new BadRequestException(validationError);
     }
+    return this.openFundedTill({
+      tenantId: ctx.tenantId,
+      cashierUserId: ctx.userId,
+      funderUserId: dto.supervisorUserId,
+      openingBalance: round4(dto.openingBalance),
+    });
+  }
 
-    const existing = await this.findActiveSession(ctx.tenantId, ctx.userId);
-    if (existing) {
-      throw new BadRequestException("You already have an active till session");
+  async openForCashier(
+    cashierUserId: string,
+    openingBalanceInput: number,
+  ): Promise<TillSessionDetail> {
+    const ctx = getRequestTenant();
+    if (!ctx?.userId) {
+      throw new ForbiddenException("Authentication required");
     }
-
+    const validationError = validateTillOpeningBalanceAmount(openingBalanceInput);
+    if (validationError) {
+      throw new BadRequestException(validationError);
+    }
+    const sellers = await this.cashFlow.listPeople(ctx.tenantId, "sales.write");
+    const cashier = sellers.find((row) => row.id === cashierUserId);
+    if (!cashier) {
+      throw new BadRequestException("Choose a cashier");
+    }
+    const existing = await this.findActiveSession(ctx.tenantId, cashierUserId);
+    if (existing) {
+      throw new BadRequestException("Cashier already has an active till session");
+    }
     const latest = await this.sessions.findOne({
-      where: { tenantId: ctx.tenantId, userId: ctx.userId },
+      where: { tenantId: ctx.tenantId, userId: cashierUserId },
       order: { createdAt: "DESC" },
     });
     if (latest?.status === "CLOSED") {
-      throw new BadRequestException("Contact a manager to reopen your till");
+      throw new BadRequestException("Reopen the closed till instead");
     }
-
-    const tenant = await this.tenants.findOne({ where: { id: ctx.tenantId } });
-    if (!tenant) {
-      throw new NotFoundException("Tenant not found");
-    }
-
-    const cashierUser = await this.users.findOne({
-      where: { id: ctx.userId, tenantId: ctx.tenantId },
+    const openingBalance = round4(openingBalanceInput);
+    return this.openFundedTill({
+      tenantId: ctx.tenantId,
+      cashierUserId,
+      funderUserId: ctx.userId,
+      openingBalance,
+      cashier,
     });
-    if (!cashierUser) {
-      throw new NotFoundException("User not found");
-    }
-    const tillName = formatTillName(cashierUser.username);
+  }
 
-    const openingBalance = round4(dto.openingBalance);
-    const openingTotal = openingBalance;
-    const maxLimit = round4(tillMaxLimit(openingBalance));
+  private async openFundedTill(input: {
+    tenantId: string;
+    cashierUserId: string;
+    funderUserId: string;
+    openingBalance: number;
+    cashier?: { fullName: string; username: string };
+  }): Promise<TillSessionDetail> {
+    const sellers = input.cashier
+      ? null
+      : await this.cashFlow.listPeople(input.tenantId, "sales.write");
+    const cashier =
+      input.cashier ?? sellers?.find((row) => row.id === input.cashierUserId);
+    if (!cashier) {
+      throw new BadRequestException("Choose a cashier");
+    }
+    const existing = await this.findActiveSession(input.tenantId, input.cashierUserId);
+    if (existing) {
+      throw new BadRequestException("Cashier already has an active till session");
+    }
+    const latest = await this.sessions.findOne({
+      where: { tenantId: input.tenantId, userId: input.cashierUserId },
+      order: { createdAt: "DESC" },
+    });
+    if (latest?.status === "CLOSED") {
+      throw new BadRequestException("Reopen the closed till instead");
+    }
+    const managerName = await this.fundFromManagerDrawer(
+      input.tenantId,
+      input.funderUserId,
+      input.openingBalance,
+    );
     const now = new Date();
-
-    const requireApproval = tenant.requireManagerApprovalTillOpen;
-    const approvedNow =
-      !requireApproval || dto.supervisorApproved === true;
-    if (requireApproval && !dto.supervisorApproved) {
-      const row = this.sessions.create({
-        id: randomUUID(),
-        tenantId: ctx.tenantId,
-        userId: ctx.userId,
-        tillName,
-        status: "PENDING_APPROVAL",
-        ...notesFromDto(dto),
-        openingTotal: String(openingTotal),
-        openingBalance: String(openingBalance),
-        currentCashBalance: String(openingBalance),
-        maxCashLimit: String(maxLimit),
-        openedAt: now,
-      });
-      await this.sessions.save(row);
-      return this.toDetail(await this.loadSession(row.id, ctx.tenantId));
-    }
-
     const row = this.sessions.create({
       id: randomUUID(),
-      tenantId: ctx.tenantId,
-      userId: ctx.userId,
-      tillName,
+      tenantId: input.tenantId,
+      userId: input.cashierUserId,
+      tillName: formatTillName(cashier.username),
       status: "OPEN",
-      ...notesFromDto(dto),
-      openingTotal: String(openingTotal),
-      openingBalance: String(openingBalance),
-      currentCashBalance: String(openingBalance),
-      maxCashLimit: String(maxLimit),
+      note10: 0,
+      note20: 0,
+      note50: 0,
+      note100: 0,
+      note500: 0,
+      note1000: 0,
+      note5000: 0,
+      openingTotal: String(input.openingBalance),
+      openingBalance: String(input.openingBalance),
+      currentCashBalance: String(input.openingBalance),
+      maxCashLimit: String(round4(tillMaxLimit(input.openingBalance))),
       openedAt: now,
-      approvedAt: approvedNow ? now : null,
-      approvedByUserId: approvedNow ? ctx.userId : null,
+      approvedAt: now,
+      approvedByUserId: input.funderUserId,
+      fundedByUserId: input.funderUserId,
     });
     await this.sessions.save(row);
-    const detail = await this.loadSession(row.id, ctx.tenantId);
-    const cashierName =
-      detail.user?.fullName?.trim() || detail.user?.username || "cashier";
-    let authenticatorName = cashierName;
-    if (requireApproval && dto.supervisorUserId) {
-      const supervisorUser = await this.users.findOne({
-        where: { id: dto.supervisorUserId, tenantId: ctx.tenantId },
-      });
-      authenticatorName =
-        supervisorUser?.fullName?.trim() ||
-        supervisorUser?.username ||
-        "Manager";
-    }
+    const cashierName = cashier.fullName.trim() || cashier.username;
     await this.activityLog.logFromContext({
-      tenantId: ctx.tenantId,
+      tenantId: input.tenantId,
       eventType: "till.opened",
-      actorUserId: requireApproval && dto.supervisorUserId ? dto.supervisorUserId : ctx.userId,
-      supervisorUserId: requireApproval ? dto.supervisorUserId ?? null : null,
-      subjectUserId: ctx.userId,
-      summary: `${authenticatorName} opened ${cashierName}'s till with opening balance Rs ${openingBalance.toLocaleString()}`,
+      actorUserId: input.funderUserId,
+      supervisorUserId: input.funderUserId,
+      subjectUserId: input.cashierUserId,
+      summary: `${managerName} opened ${cashierName}'s till with Rs ${formatMoney(input.openingBalance)} from their drawer`,
       metadata: {
         tillSessionId: row.id,
-        openingBalance,
+        openingBalance: input.openingBalance,
+        fundedByUserId: input.funderUserId,
       },
     });
-    return this.toDetail(detail);
+    return this.toDetail(await this.loadSession(row.id, input.tenantId));
   }
 
   async approve(id: string): Promise<TillSessionDetail> {
@@ -227,17 +261,20 @@ export class TillsService {
       throw new BadRequestException("Till session is not pending approval");
     }
 
+    const approvedOpeningBalance = round4(toNum(row.openingBalance));
+    const managerName = row.fundedByUserId
+      ? await this.displayName(ctx.tenantId, ctx.userId)
+      : await this.fundFromManagerDrawer(
+          ctx.tenantId,
+          ctx.userId,
+          approvedOpeningBalance,
+        );
     row.status = "OPEN";
     row.approvedAt = new Date();
     row.approvedByUserId = ctx.userId;
+    if (!row.fundedByUserId) row.fundedByUserId = ctx.userId;
     await this.sessions.save(row);
     const detail = await this.loadSession(id, ctx.tenantId);
-    const approvedOpeningBalance = round4(toNum(row.openingBalance));
-    const managerUser = await this.users.findOne({
-      where: { id: ctx.userId, tenantId: ctx.tenantId },
-    });
-    const managerName =
-      managerUser?.fullName?.trim() || managerUser?.username || "Manager";
     const cashierName =
       detail.user?.fullName?.trim() || detail.user?.username || "cashier";
     await this.activityLog.logFromContext({
@@ -246,7 +283,7 @@ export class TillsService {
       actorUserId: ctx.userId,
       supervisorUserId: ctx.userId,
       subjectUserId: row.userId,
-      summary: `${managerName} opened ${cashierName}'s till with opening balance Rs ${approvedOpeningBalance.toLocaleString()}`,
+      summary: `${managerName} opened ${cashierName}'s till with Rs ${formatMoney(approvedOpeningBalance)} from their drawer`,
       metadata: {
         tillSessionId: row.id,
         openingBalance: approvedOpeningBalance,
@@ -286,7 +323,7 @@ export class TillsService {
       actorUserId: ctx.userId,
       supervisorUserId: dto.supervisorUserId ?? ctx.userId,
       subjectUserId: row.userId,
-      summary: `Collected Rs ${round4(withdrawalTotal).toLocaleString()} from ${detail.user?.fullName?.trim() || "cashier"} till`,
+      summary: `Collected Rs ${formatMoney(round4(withdrawalTotal))} from ${detail.user?.fullName?.trim() || "cashier"} till`,
     });
   }
 
@@ -349,7 +386,7 @@ export class TillsService {
       actorUserId: withdrawnByUserId,
       supervisorUserId: dto.supervisorUserId ?? withdrawnByUserId,
       subjectUserId: row.userId,
-      summary: `${supervisorName} received Rs ${amount.toLocaleString()} cash from ${cashierName}'s till`,
+      summary: `${supervisorName} received Rs ${formatMoney(amount)} cash from ${cashierName}'s till`,
     });
   }
 
@@ -447,7 +484,7 @@ export class TillsService {
       actorUserId: ctx.userId,
       supervisorUserId: dto.supervisorUserId ?? ctx.userId,
       subjectUserId: row.userId,
-      summary: `Withdrew Rs ${round4(withdrawalTotal).toLocaleString()} from ${detail.user?.fullName?.trim() || "cashier"} till`,
+      summary: `Withdrew Rs ${formatMoney(round4(withdrawalTotal))} from ${detail.user?.fullName?.trim() || "cashier"} till`,
       metadata: {
         tillSessionId: row.id,
         amount: round4(withdrawalTotal),
@@ -487,17 +524,19 @@ export class TillsService {
     }
 
     const openingBalance = round4(dto.openingBalance);
+    const funderUserId = dto.supervisorUserId ?? ctx.userId;
+    if (dto.supervisorUserId) {
+      await this.assertCanFundDrawer(ctx.tenantId, dto.supervisorUserId);
+    }
+    const funderName = await this.fundFromManagerDrawer(
+      ctx.tenantId,
+      funderUserId,
+      openingBalance,
+    );
     const openingTotal = amountOnly ? openingBalance : round4(notesTotal);
     const maxLimit = round4(tillMaxLimit(openingBalance));
     const now = new Date();
     const supervisorId = dto.supervisorUserId ?? ctx.userId;
-    const supervisorUser = await this.users.findOne({
-      where: { id: supervisorId, tenantId: ctx.tenantId },
-    });
-    const supervisorName =
-      supervisorUser?.fullName?.trim() ||
-      supervisorUser?.username ||
-      "Manager";
     const cashierName =
       previous.user?.fullName?.trim() || previous.user?.username || "cashier";
 
@@ -528,16 +567,17 @@ export class TillsService {
       approvedAt: now,
       approvedByUserId: supervisorId,
       reopenedByUserId: supervisorId,
+      fundedByUserId: funderUserId,
     });
     await this.sessions.save(row);
     const detail = await this.loadSession(row.id, ctx.tenantId);
     await this.activityLog.logFromContext({
       tenantId: ctx.tenantId,
       eventType: "till.reopened",
-      actorUserId: supervisorId,
+      actorUserId: ctx.userId,
       supervisorUserId: supervisorId,
       subjectUserId: previous.userId,
-      summary: `${supervisorName} opened ${cashierName}'s till with opening balance Rs ${openingBalance.toLocaleString()}`,
+      summary: `${funderName} reopened ${cashierName}'s till with Rs ${formatMoney(openingBalance)} from their drawer`,
       metadata: {
         tillSessionId: row.id,
         openingBalance,
@@ -742,6 +782,43 @@ export class TillsService {
     });
   }
 
+  private async assertCanFundDrawer(
+    tenantId: string,
+    managerUserId: string,
+  ): Promise<void> {
+    const managers = await this.cashFlow.listPeople(tenantId, "till.manage");
+    if (!managers.some((row) => row.id === managerUserId)) {
+      throw new BadRequestException(
+        "A manager must approve this till with their authentication code.",
+      );
+    }
+  }
+
+  private async displayName(tenantId: string, userId: string): Promise<string> {
+    const user = await this.users.findOne({ where: { id: userId, tenantId } });
+    return user?.fullName?.trim() || user?.username || "Manager";
+  }
+
+  private async fundFromManagerDrawer(
+    tenantId: string,
+    managerUserId: string,
+    openingBalance: number,
+  ): Promise<string> {
+    const managerName = await this.displayName(tenantId, managerUserId);
+    const drawers = await this.cashFlow.drawerBalances(
+      tenantId,
+      managerUserId,
+      managerName,
+      false,
+    );
+    const available =
+      drawers.find((row) => row.managerUserId === managerUserId)?.balance ?? 0;
+    if (tillOpeningExceedsDrawer(openingBalance, available)) {
+      throw new BadRequestException(tillOpeningExceedsDrawerMessage(available));
+    }
+    return managerName;
+  }
+
   private async loadSession(id: string, tenantId: string): Promise<TillSession> {
     const row = await this.sessions.findOne({
       where: { id, tenantId },
@@ -773,6 +850,7 @@ export class TillsService {
       reopenedByUserId: row.reopenedByUserId,
       reopenedByName: row.reopenedByUser?.fullName?.trim() || null,
       closeReason: row.closeReason,
+      fundedByUserId: row.fundedByUserId,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

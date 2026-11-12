@@ -1,6 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { Link, useNavigate } from "react-router-dom";
-import type { FbrInvoiceStatus, SaleListItem, WarehouseListItem } from "@blackbox/shared";
+import {
+  SALE_REGISTER_STATUSES,
+  type FbrInvoiceStatus,
+  type SaleRegisterItem,
+  type SaleRegisterKind,
+  type WarehouseListItem,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -15,7 +22,12 @@ import {
   filterSelectProps,
   ListFilterNav,
 } from "@renderer/components/list-filter-nav";
-import { loadSales, loadWarehouses, resolveSaleByNumber } from "@renderer/lib/local-db/entity-source";
+import {
+  loadSaleRegister,
+  loadWarehouses,
+  resolveSaleByNumber,
+  resolveSaleReturnByNumber,
+} from "@renderer/lib/local-db/entity-source";
 import { barcodeScanInputProps, useBarcodeScanTarget } from "@renderer/lib/barcode-scan";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -44,18 +56,33 @@ function SaleBillBadge({ status }: { status?: FbrInvoiceStatus | null }) {
   return <span className="text-muted-foreground">—</span>;
 }
 
+function documentPath(item: SaleRegisterItem): string {
+  return item.kind === "return"
+    ? `/sales/returns/${item.id}`
+    : `/sales/${item.id}`;
+}
+
+function when(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
 export function SalesListPage() {
   const navigate = useNavigate();
   const { user } = useSession();
-  const permissions = user?.permissions ?? [];
   const { canReadList, canWrite, canReturn, canAccessStockOverview } =
     useSalesAccess();
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [kind, setKind] = useState<"" | SaleRegisterKind>("");
+  const [status, setStatus] = useState("");
+  const [hasFoc, setHasFoc] = useState<"" | "yes" | "no">("");
   const [search, setSearch] = useState("");
-  const [items, setItems] = useState<SaleListItem[]>([]);
+  const [items, setItems] = useState<SaleRegisterItem[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
   const [total, setTotal] = useState(0);
@@ -63,11 +90,32 @@ export function SalesListPage() {
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const showBillMode = user?.fbrEnabled === true;
-  const columnCount = showBillMode ? 7 : 6;
+  const columnCount = showBillMode ? 8 : 7;
+  const kindFilter: SaleRegisterKind | undefined =
+    canReadList && canReturn
+      ? kind || undefined
+      : canReturn
+        ? "return"
+        : "sale";
+  const statusOptions = useMemo(
+    () =>
+      SALE_REGISTER_STATUSES.filter((value) => {
+        const saleStatus =
+          value === "DRAFT" || value === "POSTED" || value === "VOID";
+        if (!canReadList && saleStatus) return false;
+        if (!canReturn && !saleStatus) return false;
+        if (kindFilter === "sale" && !saleStatus) return false;
+        if (kindFilter === "return" && saleStatus) return false;
+        return true;
+      }),
+    [canReadList, canReturn, kindFilter],
+  );
 
   useEffect(() => {
-    if (!canReadList) navigate(defaultRouteForUser(permissions), { replace: true });
-  }, [canReadList, navigate, permissions]);
+    if (!canReadList && !canReturn) {
+      navigate(defaultRouteForUser(user?.permissions ?? []), { replace: true });
+    }
+  }, [canReadList, canReturn, navigate, user?.permissions]);
 
   useBarcodeScanTarget({
     kind: "search",
@@ -76,12 +124,21 @@ export function SalesListPage() {
     onScan: setSearch,
     onComplete: (code) => {
       void (async () => {
-        const match = await resolveSaleByNumber(code);
-        if (match) {
-          navigate(`/sales/${match.id}`);
-          return;
+        if (canReadList) {
+          const sale = await resolveSaleByNumber(code);
+          if (sale) {
+            navigate(`/sales/${sale.id}`);
+            return;
+          }
         }
-        setError(`Sale not found: ${code.trim()}`);
+        if (canReturn) {
+          const saleReturn = await resolveSaleReturnByNumber(code);
+          if (saleReturn) {
+            navigate(`/sales/returns/${saleReturn.id}`);
+            return;
+          }
+        }
+        setError(`Not found: ${code.trim()}`);
       })();
     },
   });
@@ -96,17 +153,33 @@ export function SalesListPage() {
       .catch(() => undefined);
   }, []);
 
-  useResetPageOnFilterChange(setPage, [warehouseId, search, dateFrom, dateTo]);
+  useResetPageOnFilterChange(setPage, [
+    warehouseId,
+    search,
+    dateFrom,
+    dateTo,
+    kind,
+    status,
+    hasFoc,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
       setLoading(true);
-      void loadSales({
+      const statusQuery = statusOptions.includes(
+        status as (typeof SALE_REGISTER_STATUSES)[number],
+      )
+        ? status
+        : undefined;
+      void loadSaleRegister({
         warehouseId: warehouseId || undefined,
         search: search.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
+        kind: kindFilter,
+        status: statusQuery,
+        hasFoc: hasFoc === "" ? undefined : hasFoc === "yes",
         page,
         pageSize,
       })
@@ -130,7 +203,18 @@ export function SalesListPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [warehouseId, search, dateFrom, dateTo, page, pageSize]);
+  }, [
+    warehouseId,
+    search,
+    dateFrom,
+    dateTo,
+    kindFilter,
+    status,
+    statusOptions,
+    hasFoc,
+    page,
+    pageSize,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -138,9 +222,7 @@ export function SalesListPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Sales</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {canWrite
-              ? "Posted POS bills and receipts"
-              : "Posted bills and customer returns"}
+            Posted bills and customer returns
           </p>
         </div>
         {canWrite || canReturn ? (
@@ -148,9 +230,9 @@ export function SalesListPage() {
             {canReturn ? (
               <Button
                 variant="outline"
-                onClick={() => navigate("/sales/returns")}
+                onClick={() => navigate("/sales/returns/new")}
               >
-                Customer returns
+                New return
               </Button>
             ) : null}
             {canWrite ? (
@@ -172,11 +254,51 @@ export function SalesListPage() {
       <ListFilterNav>
         <Input
           ref={searchRef}
-          placeholder="Search sale number…"
+          placeholder="Search sale or return number…"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           {...barcodeScanInputProps}
         />
+        {canReadList && canReturn ? (
+          <select
+            className={FILTER_SELECT_CLASS}
+            value={kind}
+            onChange={(event) => {
+              const next = event.target.value as "" | SaleRegisterKind;
+              setKind(next);
+              if (
+                next === "sale" &&
+                (status === "PENDING" || status === "COMPLETED")
+              ) {
+                setStatus("");
+              }
+              if (
+                next === "return" &&
+                (status === "DRAFT" || status === "POSTED" || status === "VOID")
+              ) {
+                setStatus("");
+              }
+            }}
+            {...filterSelectProps}
+          >
+            <option value="">All types</option>
+            <option value="sale">Sale</option>
+            <option value="return">Return</option>
+          </select>
+        ) : null}
+        <select
+          className={FILTER_SELECT_CLASS}
+          value={statusOptions.includes(status as (typeof SALE_REGISTER_STATUSES)[number]) ? status : ""}
+          onChange={(event) => setStatus(event.target.value)}
+          {...filterSelectProps}
+        >
+          <option value="">All statuses</option>
+          {statusOptions.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
         <select
           className={FILTER_SELECT_CLASS}
           value={warehouseId}
@@ -196,6 +318,7 @@ export function SalesListPage() {
           {...filterDateProps()}
           value={dateFrom}
           onChange={(event) => setDateFrom(event.target.value)}
+          aria-label="From date"
         />
         <Input
           type="date"
@@ -203,7 +326,18 @@ export function SalesListPage() {
           {...filterDateProps()}
           value={dateTo}
           onChange={(event) => setDateTo(event.target.value)}
+          aria-label="To date"
         />
+        <select
+          className={FILTER_SELECT_CLASS}
+          value={hasFoc}
+          onChange={(event) => setHasFoc(event.target.value as "" | "yes" | "no")}
+          {...filterSelectProps}
+        >
+          <option value="">FOC bills: all</option>
+          <option value="yes">FOC bills only</option>
+          <option value="no">No FOC on bill</option>
+        </select>
       </ListFilterNav>
 
       {error ? (
@@ -216,7 +350,8 @@ export function SalesListPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-muted/40 text-muted-foreground">
             <tr>
-              <th className="px-4 py-3 font-medium">Sale #</th>
+              <th className="px-4 py-3 font-medium">Number</th>
+              <th className="px-4 py-3 font-medium">Type</th>
               <th className="px-4 py-3 font-medium">Warehouse</th>
               <th className="px-4 py-3 font-medium">Status</th>
               {showBillMode ? (
@@ -224,7 +359,7 @@ export function SalesListPage() {
               ) : null}
               <th className="px-4 py-3 font-medium">Items</th>
               <th className="px-4 py-3 font-medium">Total</th>
-              <th className="px-4 py-3 font-medium">Posted</th>
+              <th className="px-4 py-3 font-medium">When</th>
             </tr>
           </thead>
           <tbody>
@@ -237,36 +372,44 @@ export function SalesListPage() {
             ) : items.length === 0 ? (
               <tr>
                 <td colSpan={columnCount} className="text-muted-foreground px-4 py-8 text-center">
-                  No sales found
+                  No sales or returns found
                 </td>
               </tr>
             ) : (
               items.map((item) => (
                 <ListTableRow
-                  key={item.id}
-                  onActivate={() => navigate(`/sales/${item.id}`)}
+                  key={`${item.kind}-${item.id}`}
+                  onActivate={() => navigate(documentPath(item))}
                 >
                   <td className="px-4 py-3">
-                    <ListTableLink to={`/sales/${item.id}`}>
-                      {item.saleNumber}
+                    <ListTableLink to={documentPath(item)}>
+                      {item.number}
                     </ListTableLink>
+                    {item.kind === "return" && item.relatedSaleNumber ? (
+                      <div className="text-muted-foreground text-xs">
+                        Sale {item.relatedSaleNumber}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.kind === "return" ? "Return" : "Sale"}
                   </td>
                   <td className="px-4 py-3">{item.warehouseName}</td>
                   <td className="px-4 py-3">{item.status}</td>
                   {showBillMode ? (
                     <td className="px-4 py-3">
-                      <SaleBillBadge status={item.fbrStatus} />
+                      {item.kind === "sale" ? (
+                        <SaleBillBadge status={item.fbrStatus} />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                   ) : null}
                   <td className="px-4 py-3 tabular-nums">{item.itemCount}</td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.total.toLocaleString()}
+                    {formatMoney(item.amount)}
                   </td>
-                  <td className="px-4 py-3">
-                    {item.postedAt
-                      ? new Date(item.postedAt).toLocaleString()
-                      : "—"}
-                  </td>
+                  <td className="px-4 py-3">{when(item.at)}</td>
                 </ListTableRow>
               ))
             )}

@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:web": "pnpm --filter @blackbox/web dev",
+    "dev:platform": "pnpm --filter @blackbox/platform dev",
     "dev:desktop": "pnpm --filter @blackbox/desktop dev",
     "dev:api": "pnpm --filter @blackbox/api dev",
     "build": "turbo run build",

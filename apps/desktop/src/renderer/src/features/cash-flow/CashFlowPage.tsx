@@ -2,13 +2,18 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import {
   CASH_EXPENSE_CATEGORIES,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
+  formatMoney,
   type CashExpenseCategory,
   type CashFlowReport,
+  type DrawerPerson,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
 import { Input } from "@blackbox/ui/input";
 import { cashFlowApi } from "@renderer/lib/api/cash-flow";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { ApiError } from "@renderer/lib/api/client";
 import { isDeviceBound, commitLocalChange } from "@renderer/lib/local-db/local-write";
 import { useSession } from "@renderer/lib/session/context";
@@ -45,10 +50,7 @@ function periodFor(preset: Preset, day: string): { from: string; to: string } {
 }
 
 function money(value: number): string {
-  return `Rs ${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return `Rs ${formatMoney(value)}`;
 }
 
 function when(value: string): string {
@@ -71,6 +73,13 @@ export function CashFlowPage() {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [managers, setManagers] = useState<DrawerPerson[]>([]);
+  const [floatManagerId, setFloatManagerId] = useState("");
+  const [floatAmount, setFloatAmount] = useState("");
+  const [floatSaving, setFloatSaving] = useState(false);
+  const [floatError, setFloatError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { from, to } = periodFor(preset, day);
 
@@ -105,6 +114,16 @@ export function CashFlowPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!seeAll) return;
+    void cashFlowApi.listManagers().then((rows) => {
+      setManagers(rows);
+      setFloatManagerId((current) => current || rows[0]?.id || "");
+    }).catch(() => {
+      setManagers([]);
+    });
+  }, [seeAll]);
+
   if (!showManagerDashboard) {
     return <Navigate to="/" replace />;
   }
@@ -115,6 +134,13 @@ export function CashFlowPage() {
     const parsed = Number(amount);
     if (!(parsed > 0)) {
       setFormError("Enter an amount greater than zero");
+      return;
+    }
+    const drawerBalance =
+      report?.drawers.find((row) => row.managerUserId === user.id)?.balance ??
+      0;
+    if (expenseExceedsDrawer(parsed, drawerBalance)) {
+      setFormError(expenseOverDrawerMessage(drawerBalance));
       return;
     }
     setSaving(true);
@@ -139,6 +165,15 @@ export function CashFlowPage() {
             updatedAt: now,
           },
         });
+        await logActivityEvent(
+          {
+            eventType: "cash_expense.recorded",
+            actorUserId: user.id,
+            summary: `Recorded ${category} of Rs ${formatMoney(parsed)}`,
+            metadata: { expenseId: id, category, amount: parsed },
+          },
+          { actorName: user.fullName?.trim() || user.username },
+        );
       } else {
         await cashFlowApi.record({
           category,
@@ -162,6 +197,135 @@ export function CashFlowPage() {
     }
   }
 
+  async function onFundDrawer(event: FormEvent) {
+    event.preventDefault();
+    if (!user || !seeAll) return;
+    const manager = managers.find((row) => row.id === floatManagerId);
+    const parsed = Number(floatAmount);
+    if (!manager) {
+      setFloatError("Choose a manager");
+      return;
+    }
+    if (!(parsed > 0)) {
+      setFloatError("Enter an amount greater than zero");
+      return;
+    }
+    setFloatSaving(true);
+    setFloatError(null);
+    const managerName = manager.fullName.trim() || manager.username;
+    const openerName = user.fullName?.trim() || user.username;
+    try {
+      const bound = await isDeviceBound();
+      if (bound) {
+        const now = new Date().toISOString();
+        const id = crypto.randomUUID();
+        await commitLocalChange({
+          entityType: "manager_drawer_opening",
+          entityId: id,
+          operation: "UPSERT",
+          payload: {
+            managerUserId: manager.id,
+            managerName,
+            amount: parsed,
+            openedByUserId: user.id,
+            openedByName: openerName,
+            openedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        await logActivityEvent(
+          {
+            eventType: "drawer.opened",
+            actorUserId: user.id,
+            subjectUserId: manager.id,
+            summary: `${openerName} opened ${managerName}'s drawer with Rs ${formatMoney(parsed)}`,
+            metadata: { openingId: id, managerUserId: manager.id, amount: parsed },
+          },
+          {
+            actorName: openerName,
+            subjectName: managerName,
+          },
+        );
+      } else {
+        await cashFlowApi.recordOpening({
+          managerUserId: manager.id,
+          amount: parsed,
+        });
+      }
+      setFloatAmount("");
+      await load();
+    } catch (err: unknown) {
+      setFloatError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Could not fund the drawer",
+      );
+    } finally {
+      setFloatSaving(false);
+    }
+  }
+
+  async function onSubmitCash() {
+    if (!user || !canManageTill) return;
+    const balance =
+      report?.drawers.find((row) => row.managerUserId === user.id)?.balance ?? 0;
+    if (!(balance > 0)) {
+      setSubmitError("There is no cash to submit");
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError(null);
+    const managerName = user.fullName?.trim() || user.username;
+    try {
+      const bound = await isDeviceBound();
+      if (bound) {
+        const now = new Date().toISOString();
+        const id = crypto.randomUUID();
+        await commitLocalChange({
+          entityType: "manager_drawer_submission",
+          entityId: id,
+          operation: "UPSERT",
+          payload: {
+            managerUserId: user.id,
+            managerName,
+            amount: balance,
+            submittedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        await logActivityEvent(
+          {
+            eventType: "drawer.submitted",
+            actorUserId: user.id,
+            summary: `${managerName} submitted Rs ${formatMoney(balance)} cash to the owner`,
+            metadata: { submissionId: id, amount: balance },
+          },
+          { actorName: managerName },
+        );
+      } else {
+        await cashFlowApi.submit();
+      }
+      await load();
+    } catch (err: unknown) {
+      setSubmitError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Could not submit the cash",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const ownBalance =
+    report?.drawers.find((row) => row.managerUserId === user?.id)?.balance ?? 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -169,8 +333,8 @@ export function CashFlowPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Cash flow</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {seeAll
-              ? "Every manager has a separate drawer. Collections increase it. Expenses decrease it."
-              : "Your drawer is the cash you collected minus the expenses you recorded."}
+              ? "Every manager has a separate drawer. Opening float and collections increase it. Till floats, expenses, and cash submitted to the owner decrease it."
+              : "Your drawer is the opening float plus cash you collected, minus till floats, expenses, and cash you submitted to the owner."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -229,7 +393,9 @@ export function CashFlowPage() {
                   {money(drawer.balance)}
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  Collected {money(drawer.collected)} · Expenses {money(drawer.expenses)}
+                  Opening float {money(drawer.openingFloat)} · Collected{" "}
+                  {money(drawer.collected)} · Till floats {money(drawer.tillFloats)} ·
+                  Expenses {money(drawer.expenses)} · Submitted {money(drawer.submitted)}
                 </p>
               </CardContent>
             </Card>
@@ -238,7 +404,70 @@ export function CashFlowPage() {
             <p className="text-muted-foreground text-sm">No drawer activity yet.</p>
           ) : null}
         </div>
+        {canManageTill && ownBalance > 0 ? (
+          <div className="space-y-2">
+            <Button
+              type="button"
+              disabled={submitting}
+              onClick={() => void onSubmitCash()}
+            >
+              {submitting ? "Submitting…" : "Submit cash to owner"}
+            </Button>
+            <p className="text-muted-foreground text-xs">
+              Hands your whole drawer, {money(ownBalance)}, to the owner and sets the balance to zero.
+            </p>
+            {submitError ? (
+              <p className="text-destructive text-sm">{submitError}</p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
+
+      {seeAll ? (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium">Fund a manager drawer</h2>
+          <p className="text-muted-foreground text-xs">
+            Morning floats add together. The manager uses this cash to open cashier tills and pay expenses.
+          </p>
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(event) => void onFundDrawer(event)}
+          >
+            <label className="grid gap-1 text-sm">
+              Manager
+              <select
+                className="border-input bg-background h-9 rounded-md border px-2"
+                value={floatManagerId}
+                onChange={(event) => setFloatManagerId(event.target.value)}
+              >
+                {managers.length === 0 ? (
+                  <option value="">No managers</option>
+                ) : null}
+                {managers.map((manager) => (
+                  <option key={manager.id} value={manager.id}>
+                    {manager.fullName.trim() || manager.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              Opening float
+              <Input
+                inputMode="decimal"
+                className="w-36"
+                value={floatAmount}
+                onChange={(event) => setFloatAmount(event.target.value)}
+              />
+            </label>
+            <Button type="submit" disabled={floatSaving}>
+              {floatSaving ? "Saving…" : "Fund drawer"}
+            </Button>
+            {floatError ? (
+              <p className="text-destructive w-full text-sm">{floatError}</p>
+            ) : null}
+          </form>
+        </section>
+      ) : null}
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Cashier cash sales</h2>
@@ -324,7 +553,12 @@ export function CashFlowPage() {
               <p className="text-destructive w-full text-sm">{formError}</p>
             ) : (
               <p className="text-muted-foreground w-full text-xs">
-                This expense is deducted from your drawer.
+                This expense is deducted from your drawer. Maximum{" "}
+                {money(
+                  report?.drawers.find((row) => row.managerUserId === user?.id)
+                    ?.balance ?? 0,
+                )}
+                .
               </p>
             )}
           </form>

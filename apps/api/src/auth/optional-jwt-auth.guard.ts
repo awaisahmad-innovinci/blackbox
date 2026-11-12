@@ -7,7 +7,13 @@ export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
   override canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
       headers: { authorization?: string };
+      path?: string;
+      url?: string;
     }>();
+    const path = request.path ?? request.url?.split("?")[0] ?? "";
+    if (path === "/platform" || path.startsWith("/platform/")) {
+      return true;
+    }
     if (!request.headers.authorization?.startsWith("Bearer ")) {
       return true;
     }

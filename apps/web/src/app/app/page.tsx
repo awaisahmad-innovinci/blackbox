@@ -4,14 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Users,
-  Shield,
   MonitorSmartphone,
   Settings,
-  KeyRound,
   ArrowRight,
   Warehouse,
+  Loader2,
 } from "lucide-react";
-import type { Permission } from "@blackbox/shared";
+import {
+  formatMoney,
+  type OwnerBusinessOverview,
+  type Permission,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Badge } from "@blackbox/ui/badge";
 import { useAuth } from "@/components/auth-provider";
@@ -19,15 +22,14 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import {
   getCurrentTenant,
+  getOwnerOverview,
   listDevices,
-  listRoles,
   listUsers,
   type TenantDto,
 } from "@/lib/admin-api";
 
 type Counts = {
   users: number | null;
-  roles: number | null;
   devices: number | null;
 };
 
@@ -44,20 +46,6 @@ const QUICK: {
     description: "Invite people and assign roles",
     permission: "users.read",
     icon: Users,
-  },
-  {
-    href: "/app/roles",
-    label: "Roles",
-    description: "Group permission keys",
-    permission: "roles.read",
-    icon: Shield,
-  },
-  {
-    href: "/app/permissions",
-    label: "Permissions",
-    description: "Browse the catalog",
-    permission: "permissions.read",
-    icon: KeyRound,
   },
   {
     href: "/app/devices",
@@ -82,19 +70,25 @@ const QUICK: {
   },
 ];
 
+function money(value: number): string {
+  return `Rs ${formatMoney(value)}`;
+}
+
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
   const [tenant, setTenant] = useState<TenantDto | null>(null);
   const [counts, setCounts] = useState<Counts>({
     users: null,
-    roles: null,
     devices: null,
   });
+  const [overview, setOverview] = useState<OwnerBusinessOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const next: Counts = { users: null, roles: null, devices: null };
+      const next: Counts = { users: null, devices: null };
       if (hasPermission("tenant.settings.read")) {
         try {
           const t = await getCurrentTenant();
@@ -109,14 +103,6 @@ export default function DashboardPage() {
           next.users = users.length;
         } catch {
           next.users = null;
-        }
-      }
-      if (hasPermission("roles.read")) {
-        try {
-          const roles = await listRoles();
-          next.roles = roles.length;
-        } catch {
-          next.roles = null;
         }
       }
       if (hasPermission("devices.read")) {
@@ -134,14 +120,55 @@ export default function DashboardPage() {
     };
   }, [hasPermission]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setOverviewLoading(true);
+      setOverviewError(null);
+      try {
+        const next = await getOwnerOverview();
+        if (!cancelled) setOverview(next);
+      } catch (err) {
+        if (!cancelled) {
+          setOverview(null);
+          setOverviewError(
+            err instanceof Error
+              ? err.message
+              : "Could not load today's overview.",
+          );
+        }
+      } finally {
+        if (!cancelled) setOverviewLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const actions = QUICK.filter((item) => hasPermission(item.permission));
 
   return (
     <div className="bb-page">
       <PageHeader
         title="Dashboard"
-        description="Tenant administration for your Blackbox workspace. Point-of-sale and inventory live in the desktop app."
+        description="Today's sales, cash, and stock for this workspace."
       />
+
+      {overviewError ? (
+        <p className="text-destructive text-sm" role="alert">
+          {overviewError}
+        </p>
+      ) : null}
+
+      {overviewLoading ? (
+        <p className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Loading today&apos;s overview…
+        </p>
+      ) : overview ? (
+        <OwnerOverview overview={overview} />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <SectionCard title="Workspace" className="md:col-span-2 xl:col-span-2">
@@ -190,7 +217,6 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           { label: "Users", value: counts.users, show: hasPermission("users.read") },
-          { label: "Roles", value: counts.roles, show: hasPermission("roles.read") },
           {
             label: "Devices",
             value: counts.devices,
@@ -240,6 +266,161 @@ export default function DashboardPage() {
             );
           })}
         </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
+  const today = new Date(`${overview.date}T12:00:00`).toLocaleDateString();
+  const moneyCards = [
+    {
+      label: "Sales",
+      value: money(overview.salesTotal),
+      hint: `${overview.salesCount} posted ${overview.salesCount === 1 ? "bill" : "bills"}`,
+    },
+    {
+      label: "Cash payments",
+      value: money(overview.cashPayments),
+      hint: "Cash taken on posted sales",
+    },
+    {
+      label: "Card payments",
+      value: money(overview.cardPayments),
+      hint: "Card taken on posted sales",
+    },
+    {
+      label: "Credit payments",
+      value: money(overview.creditPayments),
+      hint: "Credit taken on posted sales",
+    },
+    {
+      label: "Refunds",
+      value: money(overview.refundTotal),
+      hint: `${overview.refundCount} completed ${overview.refundCount === 1 ? "return" : "returns"}`,
+    },
+  ];
+  const inventoryCards = [
+    { label: "Products", value: overview.productCount },
+    { label: "Low stock", value: overview.lowStockCount },
+    { label: "Pending purchase orders", value: overview.pendingPurchaseOrderCount },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <p className="text-muted-foreground text-sm">
+        {today}. Sales appear here after the desktop syncs them.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {moneyCards.map((card) => (
+          <div key={card.label} className="bb-surface px-5 py-4">
+            <p className="text-muted-foreground text-xs tracking-wide uppercase">
+              {card.label}
+            </p>
+            <p className="font-display mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+              {card.value}
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs">{card.hint}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {inventoryCards.map((card) => (
+          <div key={card.label} className="bb-surface px-5 py-4">
+            <p className="text-muted-foreground text-xs tracking-wide uppercase">
+              {card.label}
+            </p>
+            <p className="font-display mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+              {card.value}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SectionCard title="Cash still in tills">
+          {overview.cashierTills.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No uncollected till cash.
+            </p>
+          ) : (
+            <ul className="divide-y text-sm">
+              {overview.cashierTills.map((till) => (
+                <li
+                  key={`${till.userId}-${till.tillName}-${till.status}`}
+                  className="flex items-center justify-between gap-4 py-2"
+                >
+                  <span>
+                    {till.userName}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {till.tillName}
+                    </span>
+                  </span>
+                  <span className="tabular-nums">
+                    {money(till.currentCashBalance)}
+                  </span>
+                </li>
+              ))}
+              <li className="flex items-center justify-between gap-4 py-2 font-medium">
+                <span>Total not collected</span>
+                <span className="tabular-nums">{money(overview.tillCashTotal)}</span>
+              </li>
+            </ul>
+          )}
+        </SectionCard>
+        <SectionCard
+          title="Cash collected"
+          description="Cash managers handed over today"
+        >
+          <p className="font-display text-3xl font-semibold tracking-tight tabular-nums">
+            {money(overview.cashSubmittedToday)}
+          </p>
+          {overview.cashSubmissionsToday.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No cash submitted today.
+            </p>
+          ) : (
+            <ul className="divide-y text-sm">
+              {overview.cashSubmissionsToday.map((row) => (
+                <li
+                  key={row.managerUserId}
+                  className="flex items-center justify-between gap-4 py-2"
+                >
+                  <span>{row.managerName}</span>
+                  <span className="tabular-nums">{money(row.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
+      <SectionCard title="Cash in manager drawers">
+        {overview.drawers.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No cash in manager drawers.
+          </p>
+        ) : (
+          <ul className="divide-y text-sm">
+            {overview.drawers.map((drawer) => (
+              <li
+                key={drawer.managerUserId}
+                className="flex items-start justify-between gap-4 py-2"
+              >
+                <span>
+                  {drawer.managerName}
+                  <span className="text-muted-foreground block text-xs">
+                    Opening {formatMoney(drawer.openingFloat)} · Collected{" "}
+                    {formatMoney(drawer.collected)} · Till floats{" "}
+                    {formatMoney(drawer.tillFloats)} · Expenses{" "}
+                    {formatMoney(drawer.expenses)} · Submitted{" "}
+                    {formatMoney(drawer.submitted)}
+                  </span>
+                </span>
+                <span className="tabular-nums">{money(drawer.balance)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </SectionCard>
     </div>
   );

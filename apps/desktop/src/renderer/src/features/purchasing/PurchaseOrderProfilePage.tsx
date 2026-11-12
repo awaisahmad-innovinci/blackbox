@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
 import {
@@ -283,14 +284,14 @@ export function PurchaseOrderProfilePage() {
                       {formatPoOrderQuantity(item)}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
-                      {displayPurchaseUnitCost(
+                      {formatMoney(displayPurchaseUnitCost(
                         item.unitCost,
                         item.orderUnit ?? "box",
                         item.unitsPerPurchaseUnit,
-                      ).toLocaleString()}
+                      ))}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
-                      {item.lineTotal.toLocaleString()}
+                      {formatMoney(item.lineTotal)}
                     </td>
                   </ListTableRow>
                 ))
@@ -308,7 +309,7 @@ export function PurchaseOrderProfilePage() {
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Total</span>
-          <span className="tabular-nums">{po.total.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(po.total)}</span>
         </div>
       </section>
       </PrintDocument>
@@ -321,7 +322,7 @@ export function PurchaseOrderProfilePage() {
           po ? (
             <>
               <p>Vendor: {po.vendorName}</p>
-              <p>Total: {po.total.toLocaleString()}</p>
+              <p>Total: {formatMoney(po.total)}</p>
               <p>Items: {po.items.length}</p>
             </>
           ) : null

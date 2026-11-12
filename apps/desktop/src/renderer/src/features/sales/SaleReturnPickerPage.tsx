@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type { SaleListItem, WarehouseListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -131,8 +132,8 @@ export function SaleReturnPickerPage() {
             Search posted sales by bill number, date, or FOC filter.
           </p>
         </div>
-        <Button variant="ghost" onClick={() => navigate("/sales/returns")}>
-          Back to returns
+        <Button variant="ghost" onClick={() => navigate("/sales")}>
+          Back to sales
         </Button>
       </div>
 
@@ -229,7 +230,7 @@ export function SaleReturnPickerPage() {
                   </td>
                   <td className="px-4 py-2">{item.warehouseName}</td>
                   <td className="px-4 py-2 text-right tabular-nums">
-                    {item.total.toFixed(2)}
+                    {formatMoney(item.total)}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
                     {item.itemCount}

@@ -1,4 +1,7 @@
-export const HS_CODE_PATTERN = /^\d{4}\.\d{4}$/;
+export const HS_CODE_PATTERN = /^\d{3,4}\.\d{1,4}$/;
+
+export const HS_CODE_MESSAGE =
+  "HS code must look like 804.102, 910.91, 1704.909, or 0101.1212";
 
 export const FBR_ENVIRONMENTS = ["sandbox", "production"] as const;
 export type FbrEnvironment = (typeof FBR_ENVIRONMENTS)[number];
@@ -49,15 +52,27 @@ export const FBR_SANDBOX_BUYER_NAME = "FERTILIZER MANUFAC IRS NEW";
 export function normalizeHsCode(
   value: string | null | undefined,
 ): string | null {
-  const trimmed = value?.trim() ?? "";
-  return trimmed ? trimmed : null;
+  const trimmed = value?.replace(/\u00a0/g, " ").trim() ?? "";
+  if (!trimmed) return null;
+  const compact = trimmed.replace(/[\s\u00a0]+/g, "").replace(/,/g, ".");
+  const digitsAndDots = compact.replace(/[^\d.]/g, "");
+  if (!digitsAndDots) return null;
+  const firstDot = digitsAndDots.indexOf(".");
+  const normalized =
+    firstDot === -1
+      ? digitsAndDots
+      : `${digitsAndDots.slice(0, firstDot)}.${digitsAndDots
+          .slice(firstDot + 1)
+          .replace(/\./g, "")}`;
+  return normalized || null;
 }
 
 export function hsCodeError(value: string, required: boolean): string | null {
-  const trimmed = value.trim();
+  const trimmed = value.replace(/\u00a0/g, " ").trim();
   if (!trimmed) return required ? "HS code is required" : null;
-  if (!HS_CODE_PATTERN.test(trimmed)) {
-    return "HS code must look like 0101.2100";
+  const normalized = normalizeHsCode(value);
+  if (!normalized || !HS_CODE_PATTERN.test(normalized)) {
+    return HS_CODE_MESSAGE;
   }
   return null;
 }

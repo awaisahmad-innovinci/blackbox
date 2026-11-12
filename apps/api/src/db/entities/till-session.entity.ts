@@ -108,6 +108,9 @@ export class TillSession {
   @Column({ name: "close_reason", type: "text", nullable: true })
   closeReason!: string | null;
 
+  @Column({ name: "funded_by_user_id", type: "uuid", nullable: true })
+  fundedByUserId!: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

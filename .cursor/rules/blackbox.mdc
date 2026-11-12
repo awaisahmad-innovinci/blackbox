@@ -16,6 +16,7 @@ blackbox/
 ├── apps/
 │   ├── api/          # @blackbox/api — NestJS + TypeORM
 │   ├── web/          # @blackbox/web — Next.js App Router (admin)
+│   ├── platform/     # @blackbox/platform — operator tenant management
 │   └── desktop/      # @blackbox/desktop — Electron + Vite + React
 ├── packages/
 │   ├── shared/       # @blackbox/shared — permissions, DTOs, validation helpers
@@ -128,6 +129,7 @@ apps/desktop/src/renderer/  # Vite + React + react-router-dom
 ```bash
 pnpm dev:api        # API :4000
 pnpm dev:web        # web :3000
+pnpm dev:platform   # platform :3001
 pnpm dev:desktop
 pnpm typecheck && pnpm lint
 ```

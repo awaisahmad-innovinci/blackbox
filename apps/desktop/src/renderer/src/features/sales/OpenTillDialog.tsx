@@ -70,6 +70,10 @@ export function OpenTillDialog({
       setError(validationError);
       return;
     }
+    if (requireApproval && !supervisorUserId) {
+      setError("A manager must approve this till with their authentication code.");
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -81,11 +85,13 @@ export function OpenTillDialog({
         body: {
           ...emptyTillNotes(),
           openingBalance: balance,
-          supervisorApproved: requireApproval ? true : undefined,
+          supervisorApproved: true,
           supervisorUserId,
         },
         requireApproval,
-        supervisorDisplayName: supervisorDisplayName ?? cashierName,
+        supervisorDisplayName,
+        funderUserId: supervisorUserId,
+        funderName: supervisorDisplayName,
       });
       onSuccess(detail);
       onOpenChange(false);
@@ -103,7 +109,7 @@ export function OpenTillDialog({
           <DialogTitle>Open till</DialogTitle>
           <DialogDescription>
             {step === "authorize"
-              ? "Ask a manager or owner to enter their Authy code to authorize opening this till."
+              ? "Ask a manager or owner to enter their authentication code to authorize opening this till."
               : "Manager: enter the opening cash balance for this till."}
           </DialogDescription>
         </DialogHeader>
@@ -115,7 +121,7 @@ export function OpenTillDialog({
             disabled={busy}
             onClick={() => void onManagerAuthorize()}
           >
-            Manager Authy code
+            Manager authentication code
           </Button>
         ) : (
           <div className="space-y-2">

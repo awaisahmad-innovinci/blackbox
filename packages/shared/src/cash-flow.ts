@@ -1,3 +1,5 @@
+import { formatMoney, roundMoney4 } from "./inventory";
+
 /** Store calendar is Pakistan (UTC+5, no daylight saving). */
 const BUSINESS_OFFSET = "+05:00";
 
@@ -6,6 +8,7 @@ export const CASH_EXPENSE_CATEGORIES = [
   "Electricity",
   "Internet",
   "Other",
+  "Bank deposit",
 ] as const;
 
 export type CashExpenseCategory = (typeof CASH_EXPENSE_CATEGORIES)[number];
@@ -14,6 +17,16 @@ export function isCashExpenseCategory(
   value: string,
 ): value is CashExpenseCategory {
   return (CASH_EXPENSE_CATEGORIES as readonly string[]).includes(value);
+}
+
+/** True when a new or updated expense would take the drawer below zero. */
+export function expenseExceedsDrawer(amount: number, available: number): boolean {
+  return roundMoney4(amount) > roundMoney4(available);
+}
+
+export function expenseOverDrawerMessage(available: number): string {
+  const shown = roundMoney4(Math.max(0, available));
+  return `Expense cannot be more than the drawer balance of Rs ${formatMoney(shown)}`;
 }
 
 export interface CashierCashSaleRow {
@@ -48,9 +61,51 @@ export interface CashExpenseRow {
 export interface ManagerDrawerBalance {
   managerUserId: string;
   managerName: string;
+  openingFloat: number;
   collected: number;
   expenses: number;
+  tillFloats: number;
+  submitted: number;
   balance: number;
+}
+
+export type DrawerPerson = {
+  id: string;
+  fullName: string;
+  username: string;
+};
+
+export interface RecordManagerDrawerOpeningRequest {
+  managerUserId: string;
+  amount: number;
+}
+
+export function managerDrawerBalance(parts: {
+  openingFloat: number;
+  collected: number;
+  expenses: number;
+  tillFloats: number;
+  submitted: number;
+}): number {
+  return roundMoney4(
+    parts.openingFloat +
+      parts.collected -
+      parts.expenses -
+      parts.tillFloats -
+      parts.submitted,
+  );
+}
+
+export function tillOpeningExceedsDrawer(
+  opening: number,
+  available: number,
+): boolean {
+  return roundMoney4(opening) > roundMoney4(available);
+}
+
+export function tillOpeningExceedsDrawerMessage(available: number): string {
+  const shown = formatMoney(Math.max(0, roundMoney4(available)));
+  return `Amount exceeds the manager drawer balance of Rs ${shown}`;
 }
 
 export interface CashFlowReport {

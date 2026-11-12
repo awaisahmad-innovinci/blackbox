@@ -231,6 +231,10 @@ export interface CashierDashboardSummary {
   cardPaymentsAmount: number;
   heldBillsCount: number;
   refundTotalAmount: number;
+  /** Till opening float for this cashier today. */
+  openingBalanceAmount: number;
+  /** Cash collected from this cashier's till today. */
+  cashWithdrawnAmount: number;
   cashInHandAmount: number;
 }
 
@@ -904,6 +908,15 @@ export function roundMoney4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
+/** Display money with exactly two decimal places. Does not change stored precision. */
+export function formatMoney(value: number): string {
+  const amount = Number.isFinite(value) ? value : 0;
+  return amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function pieceCostFromPurchase(
   purchasePrice: number,
   unitsPerPurchaseUnit: number,
@@ -944,6 +957,18 @@ export function sellingPriceFromCostMarginGst(
 ): number {
   const base = costWithGst(cost, gstPercent);
   return roundMoney4(base * (1 + marginPercent / 100));
+}
+
+/** Inverse of sellingPriceFromCostMarginGst: margin % implied by sale over cost + GST. */
+export function marginPercentFromCostSellingGst(
+  cost: number,
+  gstPercent: number,
+  sellingPrice: number,
+): number | null {
+  if (!Number.isFinite(sellingPrice)) return null;
+  const base = costWithGst(cost, gstPercent);
+  if (!(base > 0)) return null;
+  return roundMoney4((sellingPrice / base - 1) * 100);
 }
 
 /** Split a GST-inclusive amount into ex-GST and GST portions. */
@@ -1136,6 +1161,8 @@ export interface WarehouseStockRow {
   quantityOnHand: number;
   quantityReserved: number;
   quantityAvailable: number;
+  /** POS floor balance for this SKU and warehouse. Omitted when not loaded. */
+  floorQuantity?: number;
 }
 
 export interface StockMovementRow {

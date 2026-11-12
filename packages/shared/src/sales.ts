@@ -1,4 +1,5 @@
 import type { ManagerDrawerBalance } from "./cash-flow";
+import type { TillStatus } from "./till";
 import type { FbrInvoiceStatus } from "./fbr";
 import { splitInclusiveGst } from "./inventory";
 
@@ -35,7 +36,7 @@ export interface SaleLineRow {
   focQuantity: number;
   /** Harmonized System code snapshotted from the SKU when the sale is posted. */
   hsCode?: string | null;
-  /** Draft bill only: one manager-approved qty correction already used on this line. */
+  /** Draft bill only: this line's billed quantity has been corrected at least once. */
   quantityCorrected?: boolean;
 }
 
@@ -96,6 +97,52 @@ export interface SaleListQuery {
 
 export interface PaginatedSales {
   items: SaleListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const SALE_REGISTER_KINDS = ["sale", "return"] as const;
+export type SaleRegisterKind = (typeof SALE_REGISTER_KINDS)[number];
+
+export const SALE_REGISTER_STATUSES = [
+  "DRAFT",
+  "POSTED",
+  "VOID",
+  "PENDING",
+  "COMPLETED",
+] as const;
+
+/** One row on the combined sales and returns list. */
+export interface SaleRegisterItem {
+  id: string;
+  kind: SaleRegisterKind;
+  number: string;
+  relatedSaleNumber: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  status: string;
+  itemCount: number;
+  amount: number;
+  at: string | null;
+  fbrStatus?: FbrInvoiceStatus | null;
+}
+
+export interface SaleRegisterQuery {
+  search?: string;
+  warehouseId?: string;
+  kind?: SaleRegisterKind;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  /** When true, only bills with any line focQuantity > 0. When false, exclude those. */
+  hasFoc?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedSaleRegister {
+  items: SaleRegisterItem[];
   total: number;
   page: number;
   pageSize: number;
@@ -325,14 +372,55 @@ export interface SaleReturnLookupSummary {
   lineCount: number;
 }
 
+/** Cash still sitting in a cashier till (not collected into a manager drawer). */
+export interface CashierTillBalance {
+  userId: string;
+  userName: string;
+  tillName: string;
+  status: TillStatus;
+  currentCashBalance: number;
+}
+
+export interface CashSubmissionToday {
+  managerUserId: string;
+  managerName: string;
+  amount: number;
+}
+
 /** Manager dashboard — today's till collections (no refund cash metrics). */
 export interface ManagerDashboardSummary {
   /** Local calendar date (YYYY-MM-DD). */
   date: string;
   tillCashCollectedAmount: number;
   customerReturnCount: number;
-  /** Signed-in manager's all-time drawer (collections minus expenses). */
+  /** Signed-in manager's drawer after floats, collections, till floats, expenses, and handovers. */
   drawerBalance: number;
   /** Owner sees every manager. A manager sees only their own row. */
   drawers: ManagerDrawerBalance[];
+  /** Open tills with cash that has not been collected yet. */
+  cashierTills: CashierTillBalance[];
+  /** Cash managers handed to the owner today. */
+  cashSubmittedToday: number;
+  cashSubmissionsToday: CashSubmissionToday[];
+}
+
+/** Owner web dashboard — today's cloud sales, cash, and inventory counts. */
+export interface OwnerBusinessOverview {
+  /** UTC calendar date (YYYY-MM-DD), same day as the manager summary. */
+  date: string;
+  salesCount: number;
+  salesTotal: number;
+  cashPayments: number;
+  cardPayments: number;
+  creditPayments: number;
+  refundCount: number;
+  refundTotal: number;
+  cashierTills: CashierTillBalance[];
+  tillCashTotal: number;
+  drawers: ManagerDrawerBalance[];
+  cashSubmittedToday: number;
+  cashSubmissionsToday: CashSubmissionToday[];
+  productCount: number;
+  lowStockCount: number;
+  pendingPurchaseOrderCount: number;
 }

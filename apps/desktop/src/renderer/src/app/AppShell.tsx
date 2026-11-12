@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@blackbox/ui/dropdown-menu";
 import { useSession } from "@renderer/lib/session/context";
+import { useCatalogSync } from "@renderer/lib/sync/catalog-sync";
+import { LAST_FULL_PULL_AT_KEY } from "@renderer/lib/local-db/pull";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { NavDropdownMenuItem } from "@renderer/components/nav-dropdown-menu-item";
@@ -45,6 +47,14 @@ const DEVICE_LABEL: Record<string, string> = {
   revoked: "Device revoked",
 };
 
+function formatFullSyncAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
 function navItemClass(active: boolean): string {
   return cn(
     "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -59,6 +69,8 @@ export function AppShell() {
   const location = useLocation();
   const { user, offline, deviceState } = useSession();
   const sync = useSyncStatus();
+  const catalog = useCatalogSync();
+  const [lastFullSync, setLastFullSync] = useState<string | null>(null);
   const { requestLogout, logoutDialogs } = useTillGuardedLogout();
   const permissions = user?.permissions ?? [];
   const sections = useMemo(
@@ -86,6 +98,18 @@ export function AppShell() {
   useEffect(() => {
     releaseStuckModalState({ retry: true });
   }, [location.pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.blackbox?.localDb
+      ?.getSyncMeta?.(LAST_FULL_PULL_AT_KEY)
+      .then((value) => {
+        if (!cancelled) setLastFullSync(value ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [catalog.finishedAt]);
 
   useEffect(() => {
     if (!user || offline || !supervisorCapable) return;
@@ -150,7 +174,7 @@ export function AppShell() {
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <header className="border-border/80 bg-card/40 sticky top-0 z-10 border-b backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-none items-center gap-6 px-8 lg:px-10">
+        <div className="mx-auto flex min-h-14 w-full max-w-none items-center gap-6 px-8 py-2 lg:px-10">
           <Link to="/" className="text-lg font-semibold tracking-tight">
             Blackbox
           </Link>
@@ -261,6 +285,7 @@ export function AppShell() {
                     ? `${sync.pending} queued`
                     : "Synced"}
             </button>
+            <div className="flex flex-col items-end">
             <DropdownMenu>
               <DropdownMenuTrigger className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
                 {user?.fullName ?? user?.username ?? "Account"}
@@ -279,10 +304,10 @@ export function AppShell() {
                     <DropdownMenuItem
                       onSelect={() => setTotpEnrollOpen(true)}
                     >
-                      Set up Authy
+                      Set up authentication code
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setTotpResetOpen(true)}>
-                      Reset Authy
+                      Reset authentication code
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
@@ -295,6 +320,16 @@ export function AppShell() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {catalog.active && catalog.message ? (
+              <p className="text-muted-foreground px-3 text-xs">
+                {catalog.message}
+              </p>
+            ) : lastFullSync ? (
+              <p className="text-muted-foreground px-3 text-xs">
+                Last full sync {formatFullSyncAt(lastFullSync)}
+              </p>
+            ) : null}
+            </div>
           </div>
         </div>
       </header>
@@ -363,9 +398,9 @@ export function AppShell() {
       <ConfirmDialog
         open={totpResetOpen}
         onOpenChange={setTotpResetOpen}
-        title="Reset Authy?"
-        description="Existing Authy codes will stop working on this device until you scan a new QR code."
-        confirmLabel="Reset Authy"
+        title="Reset authentication code?"
+        description="Existing authentication codes will stop working on this device until you scan a new QR code."
+        confirmLabel="Reset authentication code"
         loading={totpBusy}
         onConfirm={async () => {
           setTotpBusy(true);
