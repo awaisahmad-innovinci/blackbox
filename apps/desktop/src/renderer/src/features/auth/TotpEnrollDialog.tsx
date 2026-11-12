@@ -56,7 +56,7 @@ export function TotpEnrollDialog({
         if (!cancelled) setQrDataUrl(start.qrDataUrl);
       } catch (err) {
         if (!cancelled) {
-          setError(getApiErrorMessage(err, "Could not start Authy setup"));
+          setError(getApiErrorMessage(err, "Could not start authentication code setup"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -70,7 +70,7 @@ export function TotpEnrollDialog({
 
   async function onConfirm() {
     if (!/^\d{6}$/.test(code.trim())) {
-      setError("Enter the 6-digit code from Authy");
+      setError("Enter the 6-digit code from your authentication app");
       return;
     }
     setConfirming(true);
@@ -97,11 +97,11 @@ export function TotpEnrollDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Set up Authy</DialogTitle>
+          <DialogTitle>Set up authentication code</DialogTitle>
           <DialogDescription>
-            Scan this QR code once in Authy (or another authenticator app), then
-            enter the 6-digit code to finish. You will not see this again unless
-            you reset Authy.
+            Scan this QR code once in an authenticator app, then enter the
+            6-digit code to finish. You will not see this again unless you reset
+            the authentication code.
           </DialogDescription>
         </DialogHeader>
 
@@ -114,7 +114,7 @@ export function TotpEnrollDialog({
           <div className="flex flex-col items-center gap-4">
             <img
               src={qrDataUrl}
-              alt="Authy QR code"
+              alt="Authentication QR code"
               className="border-border size-48 rounded-md border bg-white p-2"
             />
             <div className="w-full space-y-2">
@@ -158,7 +158,7 @@ export function TotpEnrollDialog({
                 Confirming…
               </>
             ) : (
-              "Confirm Authy"
+              "Confirm authentication code"
             )}
           </Button>
         </DialogFooter>

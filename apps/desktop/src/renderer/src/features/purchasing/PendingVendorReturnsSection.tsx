@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import type { PendingVendorReturnLine } from "@blackbox/shared";
 import { VENDOR_RETURN_REASON_LABELS } from "@blackbox/shared";
 import { loadPendingVendorReturns } from "@renderer/lib/local-db/entity-source";
@@ -78,10 +79,10 @@ export function PendingVendorReturnsSection({
                   {line.quantity.toLocaleString()} pcs
                 </td>
                 <td className="px-3 py-2 tabular-nums">
-                  {line.unitCost.toLocaleString()}
+                  {formatMoney(line.unitCost)}
                 </td>
                 <td className="px-3 py-2 tabular-nums">
-                  {line.lineTotal.toLocaleString()}
+                  {formatMoney(line.lineTotal)}
                 </td>
               </tr>
             ))}
@@ -95,7 +96,7 @@ export function PendingVendorReturnsSection({
                 Pending returns total
               </td>
               <td className="px-3 py-2 tabular-nums font-medium">
-                {total.toLocaleString()}
+                {formatMoney(total)}
               </td>
             </tr>
           </tfoot>

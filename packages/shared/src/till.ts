@@ -56,6 +56,8 @@ export type TillSessionDetail = TillNoteCounts & {
   reopenedByUserId: string | null;
   reopenedByName: string | null;
   closeReason: string | null;
+  /** Manager whose drawer paid this opening balance. Null on tills opened before drawer funding. */
+  fundedByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -75,7 +77,7 @@ export type TillListItem = {
 
 export type OpenTillRequest = TillNoteCounts & {
   openingBalance: number;
-  /** Set when supervisor Authy verified client-side and tenant requires approval */
+  /** Set when a supervisor authentication code was verified client-side and tenant requires approval */
   supervisorApproved?: boolean;
   supervisorUserId?: string;
 };

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { Link } from "react-router-dom";
 import type { SaleReturnLookupSummary, TillSessionDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -99,7 +100,7 @@ export function SaleReturnRefundPage() {
           {
             eventType: "sale.return_refunded",
             actorUserId: user.id,
-            summary: `${cashierName} refunded return ${detail.returnNumber} — Rs ${detail.refundTotal.toLocaleString()} cash`,
+            summary: `${cashierName} refunded return ${detail.returnNumber} — Rs ${formatMoney(detail.refundTotal)} cash`,
             metadata: {
               returnNumber: detail.returnNumber,
               returnId: detail.id,
@@ -139,7 +140,7 @@ export function SaleReturnRefundPage() {
         {
           eventType: "sale.return_refunded",
           actorUserId: user.id,
-          summary: `${cashierName} refunded return ${detail.returnNumber} — Rs ${detail.refundTotal.toLocaleString()} cash`,
+          summary: `${cashierName} refunded return ${detail.returnNumber} — Rs ${formatMoney(detail.refundTotal)} cash`,
           metadata: {
             returnNumber: detail.returnNumber,
             returnId: detail.id,
@@ -229,7 +230,7 @@ export function SaleReturnRefundPage() {
 
       {tillSession?.status === "OPEN" ? (
         <p className="text-muted-foreground text-sm">
-          Till balance: Rs {tillSession.currentCashBalance.toLocaleString()}
+          Till balance: Rs {formatMoney(tillSession.currentCashBalance)}
         </p>
       ) : null}
 
@@ -245,7 +246,7 @@ export function SaleReturnRefundPage() {
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Refund due</span>
             <span className="text-xl font-bold tabular-nums">
-              {lookup.refundTotal.toLocaleString()}
+              {formatMoney(lookup.refundTotal)}
             </span>
           </div>
           <Button

@@ -1,3 +1,4 @@
+import type { OwnerBusinessOverview } from "@blackbox/shared";
 import { apiFetch, apiJson } from "./api-client";
 
 export type TenantDto = {
@@ -41,19 +42,12 @@ export type UserDto = {
 
 export type RoleDto = {
   id: string;
-  tenantId: string;
   key: string;
   name: string;
   isSystem: boolean;
   permissionIds: string[];
   createdAt: string;
   updatedAt: string;
-};
-
-export type PermissionDto = {
-  id: string;
-  key: string;
-  description: string;
 };
 
 export type DeviceDto = {
@@ -71,6 +65,10 @@ export type DeviceDto = {
 
 export function getCurrentTenant() {
   return apiFetch<TenantDto>("/tenants/current");
+}
+
+export function getOwnerOverview() {
+  return apiFetch<OwnerBusinessOverview>("/dashboard/owner-overview");
 }
 
 export function updateCurrentTenant(body: {
@@ -155,41 +153,12 @@ export function activateUser(id: string) {
   return apiJson<UserDto>(`/users/${id}/activate`, "POST");
 }
 
-export function replaceUserRoles(id: string, roleIds: string[]) {
-  return apiJson<UserDto>(`/users/${id}/roles`, "PUT", { roleIds });
-}
-
 export function listRoles() {
   return apiFetch<RoleDto[]>("/roles");
 }
 
-export function getRole(id: string) {
-  return apiFetch<RoleDto>(`/roles/${id}`);
-}
-
-export function createRole(body: {
-  key: string;
-  name: string;
-  permissionIds?: string[];
-}) {
-  return apiJson<RoleDto>("/roles", "POST", body);
-}
-
-export function updateRole(
-  id: string,
-  body: { key?: string; name?: string },
-) {
-  return apiJson<RoleDto>(`/roles/${id}`, "PATCH", body);
-}
-
-export function replaceRolePermissions(id: string, permissionIds: string[]) {
-  return apiJson<RoleDto>(`/roles/${id}/permissions`, "PUT", {
-    permissionIds,
-  });
-}
-
-export function listPermissions() {
-  return apiFetch<PermissionDto[]>("/permissions");
+export function replaceUserRoles(id: string, roleIds: string[]) {
+  return apiJson<UserDto>(`/users/${id}/roles`, "PUT", { roleIds });
 }
 
 export function listDevices() {

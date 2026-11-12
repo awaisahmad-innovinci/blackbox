@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { TillSessionDetail } from "@blackbox/shared";
 import {
   emptyTillNotes,
+  formatMoney,
   tillMaxLimit,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -116,7 +117,7 @@ export function ReopenTillDialog({
           <DialogTitle>Open till</DialogTitle>
           <DialogDescription>
             {step === "authorize"
-              ? "Ask a manager or owner to enter their Authy code to reopen this till."
+              ? "Ask a manager or owner to enter their authentication code to reopen this till."
               : requireApproval
                 ? "Manager: enter the opening cash balance for this till."
                 : "Enter the opening cash balance for this till."}
@@ -130,7 +131,7 @@ export function ReopenTillDialog({
             disabled={busy}
             onClick={() => void onManagerAuthorize()}
           >
-            Manager Authy code
+            Manager authentication code
           </Button>
         ) : (
           <div className="space-y-2">
@@ -154,7 +155,7 @@ export function ReopenTillDialog({
             />
             {maxLimitHint != null ? (
               <p className="text-muted-foreground text-xs">
-                Max cash limit will be Rs {maxLimitHint.toLocaleString()}
+                Max cash limit will be Rs {formatMoney(maxLimitHint)}
               </p>
             ) : null}
           </div>

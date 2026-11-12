@@ -1,8 +1,10 @@
 import type {
   CreateSaleRequest,
+  PaginatedSaleRegister,
   PaginatedSales,
   SaleDetail,
   SaleListQuery,
+  SaleRegisterQuery,
 } from "@blackbox/shared";
 import { apiFetch } from "./client";
 
@@ -19,6 +21,20 @@ export const salesApi = {
     if (query.pageSize != null) params.set("pageSize", String(query.pageSize));
     const q = params.toString() ? `?${params.toString()}` : "";
     return apiFetch<PaginatedSales>(`/sales${q}`);
+  },
+  register(query: SaleRegisterQuery = {}): Promise<PaginatedSaleRegister> {
+    const params = new URLSearchParams();
+    if (query.search?.trim()) params.set("search", query.search.trim());
+    if (query.warehouseId) params.set("warehouseId", query.warehouseId);
+    if (query.kind) params.set("kind", query.kind);
+    if (query.status) params.set("status", query.status);
+    if (query.dateFrom) params.set("dateFrom", query.dateFrom);
+    if (query.dateTo) params.set("dateTo", query.dateTo);
+    if (query.hasFoc != null) params.set("hasFoc", String(query.hasFoc));
+    if (query.page != null) params.set("page", String(query.page));
+    if (query.pageSize != null) params.set("pageSize", String(query.pageSize));
+    const q = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<PaginatedSaleRegister>(`/sales/register${q}`);
   },
   get(id: string): Promise<SaleDetail> {
     return apiFetch<SaleDetail>(`/sales/${id}`);

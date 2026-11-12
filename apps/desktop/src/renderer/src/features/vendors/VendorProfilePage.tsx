@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   ProductDetail,
@@ -341,7 +342,7 @@ export function VendorProfilePage() {
             <p className="text-muted-foreground text-sm">
               Vendor credit:{" "}
               <span className="text-foreground tabular-nums">
-                {(ledger?.credit ?? 0).toLocaleString()}
+                {formatMoney((ledger?.credit ?? 0))}
               </span>
             </p>
           </div>
@@ -409,7 +410,7 @@ export function VendorProfilePage() {
                       {entry.entryType === "CHARGE" ? "Charge" : "Payment"}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
-                      {entry.amount.toLocaleString()}
+                      {formatMoney(entry.amount)}
                     </td>
                     <td className="px-4 py-3">{entry.receiptNumber || "—"}</td>
                     <td className="px-4 py-3">{entry.note || "—"}</td>
@@ -465,7 +466,7 @@ export function VendorProfilePage() {
                     </td>
                     <td className="px-4 py-3">{row.variantName || "—"}</td>
                     <td className="px-4 py-3">{row.sku}</td>
-                    <td className="px-4 py-3 tabular-nums">{row.purchasePrice}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(row.purchasePrice)}</td>
                     <td className="px-4 py-3 tabular-nums">
                       {row.minimumOrderQuantity}
                     </td>

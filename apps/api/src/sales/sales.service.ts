@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Inject,
@@ -7,10 +8,12 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
+  PaginatedSaleRegister,
   PaginatedSales,
   SaleDetail,
   SaleListItem,
   SalePaymentMethod,
+  SaleRegisterItem,
   SaleStatus,
 } from "@blackbox/shared";
 import {
@@ -39,8 +42,13 @@ import {
   applyInventoryOutBalanceDelta,
   getInventoryOutBalanceQty,
 } from "../inventory/inventory-out/inventory-out-balance";
-import { CreateSaleDto, ListSalesQueryDto } from "./dto/sale.dto";
+import {
+  CreateSaleDto,
+  ListSaleRegisterQueryDto,
+  ListSalesQueryDto,
+} from "./dto/sale.dto";
 import { TillsService } from "../tills/tills.service";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 import { SaleReturnsService } from "./sale-returns/sale-returns.service";
 import { SaleReturn } from "../db/entities";
 
@@ -66,6 +74,7 @@ export class SalesService {
     @InjectRepository(SalePayment)
     private readonly salePayments: Repository<SalePayment>,
     @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(query: ListSalesQueryDto): Promise<PaginatedSales> {
@@ -164,6 +173,167 @@ export class SalesService {
     }));
 
     return { items, total, page, pageSize };
+  }
+
+  async listRegister(
+    query: ListSaleRegisterQueryDto,
+    access: { includeSales: boolean; includeReturns: boolean },
+  ): Promise<PaginatedSaleRegister> {
+    const tenantId = this.fixedTenant.tenantId;
+    const page = query.page ?? 1;
+    const pageSize = Math.min(query.pageSize ?? 25, 100);
+    const includeSales = access.includeSales && query.kind !== "return";
+    const includeReturns = access.includeReturns && query.kind !== "sale";
+    if (!includeSales && !includeReturns) {
+      return { items: [], total: 0, page, pageSize };
+    }
+
+    const params: unknown[] = [tenantId];
+    const add = (value: unknown) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+    let saleWhere = "s.tenant_id = $1";
+    let returnWhere = "r.tenant_id = $1";
+    if (query.warehouseId) {
+      const p = add(query.warehouseId);
+      saleWhere += ` and s.warehouse_id = ${p}`;
+      returnWhere += ` and r.warehouse_id = ${p}`;
+    }
+    if (query.status) {
+      const p = add(query.status);
+      saleWhere += ` and s.status = ${p}`;
+      returnWhere += ` and r.status = ${p}`;
+    }
+    if (query.dateFrom) {
+      const saleFrom = add(`${query.dateFrom}T00:00:00.000Z`);
+      const returnFrom = add(query.dateFrom);
+      saleWhere += ` and coalesce(s.posted_at, s.created_at) >= ${saleFrom}`;
+      returnWhere += ` and r.return_date >= ${returnFrom}`;
+    }
+    if (query.dateTo) {
+      const saleTo = add(`${query.dateTo}T23:59:59.999Z`);
+      const returnTo = add(query.dateTo);
+      saleWhere += ` and coalesce(s.posted_at, s.created_at) <= ${saleTo}`;
+      returnWhere += ` and r.return_date <= ${returnTo}`;
+    }
+    if (query.search?.trim()) {
+      const term = add(`%${query.search.trim().toLowerCase()}%`);
+      saleWhere += ` and lower(s.sale_number) like ${term}`;
+      returnWhere += ` and (lower(r.return_number) like ${term} or lower(coalesce(sale.sale_number, '')) like ${term})`;
+    }
+    if (query.hasFoc === true || query.hasFoc === false) {
+      const saleFoc = `${query.hasFoc ? "" : "not "}exists (
+        select 1 from sale_lines sl
+        where sl.sale_id = s.id and sl.tenant_id = s.tenant_id
+          and coalesce(sl.foc_quantity, 0) > 0
+      )`;
+      const returnFoc = `${query.hasFoc ? "" : "not "}exists (
+        select 1 from sale_lines sl
+        where sl.sale_id = r.sale_id and sl.tenant_id = r.tenant_id
+          and coalesce(sl.foc_quantity, 0) > 0
+      )`;
+      saleWhere += ` and ${saleFoc}`;
+      returnWhere += ` and ${returnFoc}`;
+    }
+
+    const branches: string[] = [];
+    if (includeSales) {
+      branches.push(`
+        select
+          s.id as id,
+          'sale'::text as kind,
+          s.sale_number as number,
+          null::text as related_sale_number,
+          s.warehouse_id as warehouse_id,
+          coalesce(w.name, '—') as warehouse_name,
+          s.status as status,
+          (
+            select count(*)::int from sale_lines l
+            where l.sale_id = s.id and l.tenant_id = s.tenant_id
+          ) as item_count,
+          s.total as amount,
+          coalesce(s.posted_at, s.created_at) as at,
+          s.fbr_status as fbr_status
+        from sales s
+        left join warehouses w on w.id = s.warehouse_id
+        where ${saleWhere}
+      `);
+    }
+    if (includeReturns) {
+      branches.push(`
+        select
+          r.id,
+          'return'::text,
+          r.return_number,
+          nullif(sale.sale_number, ''),
+          r.warehouse_id,
+          coalesce(w.name, '—'),
+          r.status,
+          (
+            select count(*)::int from sale_return_lines l
+            where l.sale_return_id = r.id and l.tenant_id = r.tenant_id
+          ),
+          r.refund_total,
+          coalesce(r.created_at, r.return_date::timestamptz),
+          null::text
+        from sale_returns r
+        left join sales sale on sale.id = r.sale_id
+        left join warehouses w on w.id = r.warehouse_id
+        where ${returnWhere}
+      `);
+    }
+    const union = branches.join(" union all ");
+    const totalRows = await this.dataSource.query<{ cnt: string }[]>(
+      `select count(*)::int as cnt from (${union}) register_rows`,
+      params,
+    );
+    const limit = add(pageSize);
+    const offset = add((page - 1) * pageSize);
+    const rows = await this.dataSource.query<
+      {
+        id: string;
+        kind: "sale" | "return";
+        number: string;
+        related_sale_number: string | null;
+        warehouse_id: string;
+        warehouse_name: string;
+        status: string;
+        item_count: number;
+        amount: string;
+        at: Date | string | null;
+        fbr_status: string | null;
+      }[]
+    >(
+      `select * from (${union}) register_rows
+       order by at desc nulls last
+       limit ${limit} offset ${offset}`,
+      params,
+    );
+    const items: SaleRegisterItem[] = rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      number: row.number,
+      relatedSaleNumber: row.related_sale_number,
+      warehouseId: row.warehouse_id,
+      warehouseName: row.warehouse_name,
+      status: row.status,
+      itemCount: Number(row.item_count),
+      amount: toNum(row.amount),
+      at:
+        row.at instanceof Date
+          ? row.at.toISOString()
+          : row.at
+            ? String(row.at)
+            : null,
+      fbrStatus: asFbrInvoiceStatus(row.fbr_status),
+    }));
+    return {
+      items,
+      total: Number(totalRows[0]?.cnt ?? 0),
+      page,
+      pageSize,
+    };
   }
 
   async getById(id: string): Promise<SaleDetail> {
@@ -338,7 +508,7 @@ export class SalesService {
         ? round4(dto.cashTendered)
         : null;
 
-    return this.dataSource.transaction(async (manager) => {
+    const posted = await this.dataSource.transaction(async (manager) => {
       const warehouse = await manager.getRepository(Warehouse).findOne({
         where: { id: dto.warehouseId, tenantId, status: "active" },
       });
@@ -561,6 +731,22 @@ export class SalesService {
 
       return detail;
     });
+
+    const actorUserId = posted.postedBy ?? getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId: this.fixedTenant.tenantId,
+        eventType: "sale.posted",
+        actorUserId,
+        summary: `Posted sale ${posted.saleNumber} for Rs ${formatMoney(posted.total)}`,
+        metadata: {
+          saleId: posted.id,
+          saleNumber: posted.saleNumber,
+          total: posted.total,
+        },
+      });
+    }
+    return posted;
   }
 
   async void(id: string): Promise<SaleDetail> {

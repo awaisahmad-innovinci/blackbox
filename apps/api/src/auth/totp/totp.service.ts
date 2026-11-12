@@ -47,12 +47,11 @@ export class TotpService {
     });
     if (userRoleRows.length === 0) {
       throw new ForbiddenException(
-        "Only Manager or Owner accounts can set up Authy",
+        "Only Manager or Owner accounts can set up an authentication code",
       );
     }
     const roles = await this.roles.find({
       where: {
-        tenantId,
         id: In(userRoleRows.map((row) => row.roleId)),
       },
     });
@@ -63,7 +62,7 @@ export class TotpService {
     );
     if (!ok) {
       throw new ForbiddenException(
-        "Only Manager or Owner accounts can set up Authy",
+        "Only Manager or Owner accounts can set up an authentication code",
       );
     }
   }
@@ -89,7 +88,7 @@ export class TotpService {
     });
     if (existing) {
       throw new ConflictException(
-        "Authy is already configured. Reset before setting up again.",
+        "Authentication code is already configured. Reset before setting up again.",
       );
     }
 
@@ -142,10 +141,10 @@ export class TotpService {
       where: { userId, tenantId },
     });
     if (!row) {
-      throw new BadRequestException("Start Authy setup before confirming");
+      throw new BadRequestException("Start authentication code setup before confirming");
     }
     if (row.confirmedAt) {
-      throw new ConflictException("Authy is already configured");
+      throw new ConflictException("Authentication code is already configured");
     }
 
     const secretBase32 = decryptTotpSecret(row.secretCiphertext, this.encryptionKey());
@@ -175,7 +174,7 @@ export class TotpService {
   ): Promise<{ ok: true }> {
     if (targetUserId !== actorUserId) {
       if (!canManageUsers) {
-        throw new ForbiddenException("Cannot reset another user's Authy");
+        throw new ForbiddenException("Cannot reset another user's authentication code");
       }
     } else {
       await this.assertSupervisorRole(actorUserId, tenantId);
@@ -189,7 +188,7 @@ export class TotpService {
     tenantId: string,
   ): Promise<Array<{ userId: string; secret: string; fullName: string }>> {
     const supervisorRoles = await this.roles.find({
-      where: { tenantId, key: In([...SUPERVISOR_ROLE_KEYS]) },
+      where: { key: In([...SUPERVISOR_ROLE_KEYS]) },
     });
     if (supervisorRoles.length === 0) return [];
 

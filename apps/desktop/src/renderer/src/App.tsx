@@ -46,7 +46,6 @@ import { SalePage } from "./features/sales/SalePage";
 import { SaleDetailPage } from "./features/sales/SaleDetailPage";
 import { SalesListPage } from "./features/sales/SalesListPage";
 import { ManagerStockOverviewPage } from "./features/sales/ManagerStockOverviewPage";
-import { SaleReturnsListPage } from "./features/sales/SaleReturnsListPage";
 import { SaleReturnPickerPage } from "./features/sales/SaleReturnPickerPage";
 import { SaleReturnFormPage } from "./features/sales/SaleReturnFormPage";
 import { SaleReturnDetailPage } from "./features/sales/SaleReturnDetailPage";
@@ -172,7 +171,7 @@ function AuthenticatedApp() {
           <Route path="warehouses/:id/edit" element={<WarehouseFormPage />} />
           <Route path="sales" element={<SalesListPage />} />
           <Route path="sales/stock-overview" element={<ManagerStockOverviewPage />} />
-          <Route path="sales/returns" element={<SaleReturnsListPage />} />
+          <Route path="sales/returns" element={<Navigate to="/sales" replace />} />
           <Route path="sales/returns/new" element={<SaleReturnPickerPage />} />
           <Route
             path="sales/returns/new/:saleId"

@@ -116,10 +116,65 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
   tx();
 }
 
+type ReceiptNumberConflict = {
+  id: string;
+  pendingOutbox: number;
+};
+
+function findReceiptNumberConflict(
+  receiptNumber: string,
+  incomingId: string,
+): ReceiptNumberConflict | undefined {
+  const db = getLocalDb();
+  return db
+    .prepare(
+      `select id,
+         (select count(*) from local_sync_outbox o
+          where o.entity_id = goods_receipts.id and o.status != 'acked') as pendingOutbox
+       from goods_receipts
+       where tenant_id = @tenantId and receipt_number = @receiptNumber and id != @id`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      receiptNumber,
+      id: incomingId,
+    }) as ReceiptNumberConflict | undefined;
+}
+
+function replaceStaleReceipt(staleId: string, incomingId: string): void {
+  const db = getLocalDb();
+  db.prepare("delete from goods_receipt_items where goods_receipt_id = ?").run(
+    staleId,
+  );
+  db.prepare(
+    "update vendor_ledger_entries set goods_receipt_id = ? where goods_receipt_id = ?",
+  ).run(incomingId, staleId);
+  db.prepare(
+    "update vendor_return_items set goods_receipt_id = ? where goods_receipt_id = ?",
+  ).run(incomingId, staleId);
+  db.prepare("delete from goods_receipts where id = ?").run(staleId);
+}
+
 export function upsertGoodsReceiptsLocal(rows: GoodsReceiptDetail[]): void {
   const db = getLocalDb();
-  const tx = db.transaction(() => {
-    for (const row of rows) upsertGoodsReceiptLocal(row);
-  });
-  tx();
+  for (const row of rows) {
+    try {
+      const tx = db.transaction(() => {
+        const conflict = findReceiptNumberConflict(row.receiptNumber, row.id);
+        if (conflict && conflict.pendingOutbox > 0) {
+          console.warn(
+            `Skipping goods receipt ${row.receiptNumber}: local receipt ${conflict.id} is still waiting to sync`,
+          );
+          return;
+        }
+        if (conflict) replaceStaleReceipt(conflict.id, row.id);
+        upsertGoodsReceiptLocal(row);
+      });
+      tx();
+    } catch (err) {
+      console.warn(
+        `Skipping goods receipt ${row.receiptNumber}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 }

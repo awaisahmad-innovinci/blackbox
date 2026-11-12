@@ -84,6 +84,13 @@ export type {
   AuthTokens,
   AuthResponse,
   SignupTenantRequest,
+  PlatformLoginRequest,
+  PlatformLoginResponse,
+  PlatformTenantOwner,
+  PlatformTenantSummary,
+  UpdatePlatformTenantRequest,
+  ResetPlatformOwnerPasswordRequest,
+  ResetPlatformOwnerPasswordResponse,
   LoginRequest,
   RefreshRequest,
   LogoutRequest,
@@ -111,6 +118,9 @@ export {
   SYNC_OPERATIONS,
   SYNC_PUSH_BATCH_SIZE,
   SYNC_PULL_BATCH_SIZE,
+  SYNC_CATALOG_PAGE_SIZE,
+  SYNC_CATALOG_SECTIONS,
+  SYNC_CATALOG_DOCUMENT_KINDS,
   SYNC_MAX_BODY_BYTES,
   SYNC_MAX_PAYLOAD_BYTES,
   streamForEntity,
@@ -134,6 +144,12 @@ export type {
   SyncConflictAckRequest,
   SyncEntityVersionHead,
   SyncEntityVersionHeadsResponse,
+  SyncCatalogSection,
+  SyncCatalogDocumentKind,
+  SyncCatalogPage,
+  SyncCatalogReference,
+  SyncCatalogProductRow,
+  SyncCatalogVendorRow,
 } from "./sync";
 export type {
   BusinessType,
@@ -342,6 +358,7 @@ export {
   nextVendorReturnNumber,
   nextSkuCodeForProduct,
 } from "./document-numbers";
+export { SALE_REGISTER_KINDS, SALE_REGISTER_STATUSES } from "./sales";
 export type { DocumentCounterType } from "./document-numbers";
 export type {
   SaleStatus,
@@ -352,6 +369,10 @@ export type {
   SaleListItem,
   SaleListQuery,
   PaginatedSales,
+  SaleRegisterKind,
+  SaleRegisterItem,
+  SaleRegisterQuery,
+  PaginatedSaleRegister,
   CreateSaleLineRequest,
   CreateSalePaymentRequest,
   CreateSaleRequest,
@@ -367,6 +388,9 @@ export type {
   SaleReturnCompletionMode,
   SaleReturnLookupSummary,
   ManagerDashboardSummary,
+  OwnerBusinessOverview,
+  CashSubmissionToday,
+  CashierTillBalance,
 } from "./sales";
 export type {
   CashExpenseCategory,
@@ -374,13 +398,20 @@ export type {
   CashCollectionRow,
   CashExpenseRow,
   ManagerDrawerBalance,
+  DrawerPerson,
   CashFlowReport,
   RecordCashExpenseRequest,
+  RecordManagerDrawerOpeningRequest,
   BusinessPeriodBounds,
 } from "./cash-flow";
 export {
   CASH_EXPENSE_CATEGORIES,
   isCashExpenseCategory,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
+  managerDrawerBalance,
+  tillOpeningExceedsDrawer,
+  tillOpeningExceedsDrawerMessage,
   businessPeriodBounds,
 } from "./cash-flow";
 export {
@@ -438,6 +469,7 @@ export {
 export type { FbrEnvironment, FbrInvoiceStatus } from "./fbr";
 export {
   HS_CODE_PATTERN,
+  HS_CODE_MESSAGE,
   FBR_ENVIRONMENTS,
   FBR_INVOICE_STATUSES,
   FBR_PROVINCES,
@@ -460,11 +492,13 @@ export {
   formatMasterDataHeaderMismatchMessage,
   nextSkuCode,
   roundMoney4,
+  formatMoney,
   pieceCostFromPurchase,
   vendorPurchasePriceFromSku,
   sellingPriceFromCostMargin,
   costWithGst,
   sellingPriceFromCostMarginGst,
+  marginPercentFromCostSellingGst,
   splitInclusiveGst,
   weightedAvgUnitCost,
   clampDiscountPercent,

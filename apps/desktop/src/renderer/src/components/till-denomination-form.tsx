@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   computeTillDenominationTotal,
   emptyTillNotes,
@@ -35,7 +36,7 @@ export function TillDenominationForm({
           return (
             <div key={denomination} className="space-y-1.5">
               <Label htmlFor={`till-note-${denomination}`}>
-                Rs {denomination.toLocaleString()}
+                Rs {formatMoney(denomination)}
               </Label>
               <Input
                 id={`till-note-${denomination}`}
@@ -55,7 +56,7 @@ export function TillDenominationForm({
         <div className="space-y-1.5">
           <Label>Denomination total</Label>
           <div className="border-input bg-muted/30 flex h-9 items-center rounded-md border px-3 text-sm font-medium tabular-nums">
-            {total.toLocaleString()}
+            {formatMoney(total)}
           </div>
         </div>
         <div className="space-y-1.5">

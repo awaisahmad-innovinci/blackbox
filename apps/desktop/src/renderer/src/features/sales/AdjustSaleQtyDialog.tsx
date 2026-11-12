@@ -58,11 +58,6 @@ export function AdjustSaleQtyDialog({
   async function onConfirm() {
     if (!line || busy) return;
 
-    if (line.quantityCorrected) {
-      setError("Quantity already corrected for this item");
-      return;
-    }
-
     const newQuantity = round4(parseNumericInputChange(newQtyRaw));
     if (!Number.isFinite(newQuantity) || newQuantity <= 0) {
       setError("Enter a quantity greater than zero");

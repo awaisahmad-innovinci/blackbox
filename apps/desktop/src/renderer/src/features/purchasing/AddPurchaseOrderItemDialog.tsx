@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import type { OrderUnit, VendorSku } from "@blackbox/shared";
 import {
   lineTotalForPurchase,
@@ -337,7 +338,7 @@ export function AddPurchaseOrderItemDialog({
                           {r.barcode ? ` · ${r.barcode}` : ""}
                         </span>
                         <span className="text-muted-foreground block tabular-nums">
-                          Cost {r.purchasePrice.toLocaleString()} ·{" "}
+                          Cost {formatMoney(r.purchasePrice)} ·{" "}
                           {r.purchaseUnitName || "—"} · MOQ{" "}
                           {r.minimumOrderQuantity} · Available{" "}
                           {(r.quantityAvailable ?? 0).toLocaleString()}

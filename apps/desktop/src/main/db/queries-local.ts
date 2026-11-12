@@ -34,8 +34,11 @@ import type {
   PaginatedInventoryOutReturns,
   InventoryOutReturnStatus,
   PaginatedSales,
+  PaginatedSaleRegister,
   PaginatedSaleReturns,
   SaleListQuery,
+  SaleRegisterKind,
+  SaleRegisterQuery,
   SaleReturnListItem,
   SaleReturnListQuery,
   SaleStatus,
@@ -43,7 +46,10 @@ import type {
 } from "@blackbox/shared";
 import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
-import { listDrawerBalancesLocal } from "./cash-flow-local";
+import {
+  listDrawerBalancesLocal,
+  listDrawerSubmissionsTodayLocal,
+} from "./cash-flow-local";
 import { getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
 
 function pageParams(page?: number, pageSize?: number) {
@@ -663,16 +669,45 @@ export function getCashierDashboardSummaryLocal(
     )
     .get({ tenantId, userId }) as { amount: number };
 
+  const withdrawnRow = db
+    .prepare(
+      `select coalesce(sum(w.withdrawal_total), 0) as amount
+       from till_withdrawals w
+       inner join till_sessions t
+         on t.id = w.till_session_id and t.tenant_id = w.tenant_id
+       where w.tenant_id = @tenantId
+         and t.user_id = @userId
+         and date(w.created_at, 'localtime') = date('now', 'localtime')`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
+  const openingRow = db
+    .prepare(
+      `select coalesce(sum(t.opening_balance), 0) as amount
+       from till_sessions t
+       where t.tenant_id = @tenantId
+         and t.user_id = @userId
+         and date(t.opened_at, 'localtime') = date('now', 'localtime')`,
+    )
+    .get({ tenantId, userId }) as { amount: number };
+
+  const openingFloat = Number(openingRow.amount);
+  const cashReceived = Number(cashRow.amount);
+  const refunds = Number(refundRow.amount);
+  const withdrawn = Number(withdrawnRow.amount);
+
   return {
     date: todayRow.d,
     totalSalesAmount: roundMoney(Number(totalSalesRow.amount)),
     nonFbrSalesAmount: roundMoney(Number(nonFbrSalesRow.amount)),
-    cashReceivedAmount: roundMoney(Number(cashRow.amount)),
+    cashReceivedAmount: roundMoney(cashReceived),
     cardPaymentsAmount: roundMoney(Number(cardRow.amount)),
     heldBillsCount: Number(heldRow.cnt),
-    refundTotalAmount: roundMoney(Number(refundRow.amount)),
+    refundTotalAmount: roundMoney(refunds),
+    openingBalanceAmount: roundMoney(openingFloat),
+    cashWithdrawnAmount: roundMoney(withdrawn),
     cashInHandAmount: roundMoney(
-      Number(cashRow.amount) - Number(refundRow.amount),
+      openingFloat + cashReceived - refunds - withdrawn,
     ),
   };
 }
@@ -716,6 +751,29 @@ export function getManagerDashboardSummaryLocal(
     seeAll,
   });
   const own = drawers.find((row) => row.managerUserId === userId);
+  const cashSubmissionsToday = listDrawerSubmissionsTodayLocal();
+  const cashSubmittedToday = roundMoney(
+    cashSubmissionsToday.reduce((sum, row) => sum + row.amount, 0),
+  );
+  const cashierTillRows = db
+    .prepare(
+      `select user_id as userId,
+              user_name as userName,
+              till_name as tillName,
+              status,
+              current_cash_balance as currentCashBalance
+       from till_sessions
+       where tenant_id = @tenantId
+         and status in ('OPEN', 'CLOSED_LIMIT', 'PENDING_APPROVAL')
+       order by user_name asc, till_name asc`,
+    )
+    .all({ tenantId }) as {
+    userId: string;
+    userName: string;
+    tillName: string;
+    status: ManagerDashboardSummary["cashierTills"][number]["status"];
+    currentCashBalance: number;
+  }[];
 
   return {
     date: today,
@@ -723,6 +781,15 @@ export function getManagerDashboardSummaryLocal(
     customerReturnCount: Number(returnCountRow.cnt),
     drawerBalance: own?.balance ?? 0,
     drawers,
+    cashSubmittedToday,
+    cashSubmissionsToday,
+    cashierTills: cashierTillRows.map((row) => ({
+      userId: row.userId,
+      userName: row.userName?.trim() || "Cashier",
+      tillName: row.tillName?.trim() || "till",
+      status: row.status,
+      currentCashBalance: roundMoney(Number(row.currentCashBalance)),
+    })),
   };
 }
 
@@ -1579,6 +1646,159 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
       itemCount: Number(r.itemCount),
       postedAt: r.postedAt,
       fbrStatus: asFbrInvoiceStatus(r.fbrStatus),
+    })),
+    total,
+    page,
+    pageSize,
+  };
+}
+
+function focClause(hasFoc: "" | "yes" | "no", saleIdSql: string): string {
+  if (hasFoc === "yes") {
+    return `and exists (
+      select 1 from sale_lines sl
+      where sl.sale_id = ${saleIdSql} and sl.tenant_id = s.tenant_id
+        and coalesce(sl.foc_quantity, 0) > 0
+    )`;
+  }
+  if (hasFoc === "no") {
+    return `and not exists (
+      select 1 from sale_lines sl
+      where sl.sale_id = ${saleIdSql} and sl.tenant_id = s.tenant_id
+        and coalesce(sl.foc_quantity, 0) > 0
+    )`;
+  }
+  return "";
+}
+
+export function listSaleRegisterLocal(
+  query: SaleRegisterQuery = {},
+): PaginatedSaleRegister {
+  const db = getLocalDb();
+  const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
+  const search = query.search?.trim().toLowerCase() ?? "";
+  const warehouseId = query.warehouseId ?? "";
+  const kind = query.kind ?? "";
+  const status = query.status ?? "";
+  const dateFrom = query.dateFrom ?? "";
+  const dateTo = query.dateTo ?? "";
+  const hasFoc: "" | "yes" | "no" =
+    query.hasFoc === true ? "yes" : query.hasFoc === false ? "no" : "";
+  const params = {
+    tenantId: DEMO_STORE_TENANT_ID,
+    warehouseId,
+    kind,
+    status,
+    dateFrom,
+    dateTo,
+    search,
+    limit: pageSize,
+    offset,
+  };
+  const saleWhere = `
+    s.tenant_id = @tenantId
+    and (@kind = '' or @kind = 'sale')
+    and (@warehouseId = '' or s.warehouse_id = @warehouseId)
+    and (@status = '' or s.status = @status)
+    and (@dateFrom = '' or coalesce(s.posted_at, s.created_at) >= @dateFrom)
+    and (@dateTo = '' or coalesce(s.posted_at, s.created_at) <= @dateTo || 'T23:59:59.999Z')
+    and (@search = '' or lower(s.sale_number) like '%' || @search || '%')
+    ${focClause(hasFoc, "s.id")}
+  `;
+  const returnWhere = `
+    r.tenant_id = @tenantId
+    and (@kind = '' or @kind = 'return')
+    and (@warehouseId = '' or r.warehouse_id = @warehouseId)
+    and (@status = '' or r.status = @status)
+    and (@dateFrom = '' or r.return_date >= @dateFrom)
+    and (@dateTo = '' or r.return_date <= @dateTo)
+    and (
+      @search = ''
+      or lower(r.return_number) like '%' || @search || '%'
+      or lower(coalesce(sale.sale_number, '')) like '%' || @search || '%'
+    )
+    ${focClause(hasFoc, "r.sale_id").replaceAll("s.tenant_id", "r.tenant_id")}
+  `;
+  const union = `
+    select
+      s.id as id,
+      'sale' as kind,
+      s.sale_number as number,
+      null as relatedSaleNumber,
+      s.warehouse_id as warehouseId,
+      coalesce(w.name, '—') as warehouseName,
+      s.status as status,
+      (
+        select count(*) from sale_lines l
+        where l.sale_id = s.id and l.tenant_id = s.tenant_id
+      ) as itemCount,
+      s.total as amount,
+      coalesce(s.posted_at, s.created_at) as at,
+      s.fbr_status as fbrStatus
+    from sales s
+    left join warehouses w on w.id = s.warehouse_id
+    where ${saleWhere}
+    union all
+    select
+      r.id,
+      'return',
+      r.return_number,
+      nullif(sale.sale_number, ''),
+      r.warehouse_id,
+      coalesce(w.name, '—'),
+      r.status,
+      (
+        select count(*) from sale_return_lines l
+        where l.sale_return_id = r.id and l.tenant_id = r.tenant_id
+      ),
+      r.refund_total,
+      coalesce(r.created_at, r.return_date),
+      null
+    from sale_returns r
+    left join sales sale on sale.id = r.sale_id
+    left join warehouses w on w.id = r.warehouse_id
+    where ${returnWhere}
+  `;
+
+  const total = (
+    db
+      .prepare(`select count(*) as cnt from (${union}) register_rows`)
+      .get(params) as { cnt: number }
+  ).cnt;
+
+  const rows = db
+    .prepare(
+      `select * from (${union}) register_rows
+       order by at desc
+       limit @limit offset @offset`,
+    )
+    .all(params) as Array<{
+    id: string;
+    kind: string;
+    number: string;
+    relatedSaleNumber: string | null;
+    warehouseId: string;
+    warehouseName: string;
+    status: string;
+    itemCount: number;
+    amount: number;
+    at: string | null;
+    fbrStatus: string | null;
+  }>;
+
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      kind: row.kind as SaleRegisterKind,
+      number: row.number,
+      relatedSaleNumber: row.relatedSaleNumber,
+      warehouseId: row.warehouseId,
+      warehouseName: row.warehouseName,
+      status: row.status,
+      itemCount: Number(row.itemCount),
+      amount: Number(row.amount),
+      at: row.at,
+      fbrStatus: asFbrInvoiceStatus(row.fbrStatus),
     })),
     total,
     page,

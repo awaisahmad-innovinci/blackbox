@@ -23,7 +23,7 @@ Rules:
 - Empty optional values are allowed. Do not add extra files or folders to the upload.
 - **Barcode qty per scan:** On `07_product_skus.csv`, optional `barcode_quantity_multiplier` (default 1) sets how many base units one scan adds when using the SKU’s `barcode`. Use `10_product_sku_barcodes.csv` for extra barcodes on the same SKU (upload **after** `07_product_skus.csv`). `quantity_multiplier` must be greater than zero (e.g. 6 = six pieces per scan).
 - **GST on SKU:** Optional `gst_percent` on `07_product_skus.csv` (0–100). Used for GST on inclusive sale line totals; leave empty for 0.
-- **HS code:** Optional `hs_code` on `07_product_skus.csv` (`0101.2100`). Required before FBR can invoice a sale of that SKU. Leave empty to keep an existing code on update.
+- **HS code:** Optional `hs_code` on `07_product_skus.csv` (`804.102`, `910.91`, `1704.909`, `2104.1`, or `0101.1212`). Required before FBR can invoice a sale of that SKU. Leave empty to keep an existing code on update.
 
 Uploading the same rows again updates the existing records instead of creating duplicates. The upload is atomic: if any row is invalid, nothing from that file is imported.
 

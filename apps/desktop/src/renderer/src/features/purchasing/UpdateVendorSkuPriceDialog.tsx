@@ -14,6 +14,7 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import {
+  marginFromPurchaseSellingGst,
   optionalNonNegativeMargin,
   pieceCostFromPurchase,
   sellingFromPurchaseMarginGst,
@@ -62,11 +63,18 @@ export function UpdateVendorSkuPriceDialog({
   useEffect(() => {
     if (open) {
       setPrice(String(currentPrice));
-      setMarginPercent("");
       setSellingPrice(String(currentSellingPrice));
+      setMarginPercent(
+        marginFromPurchaseSellingGst(
+          String(currentPrice),
+          gstPercentText,
+          unitsPer,
+          String(currentSellingPrice),
+        ) ?? "",
+      );
       setError(null);
     }
-  }, [open, currentPrice, currentSellingPrice]);
+  }, [open, currentPrice, currentSellingPrice, gstPercentText, unitsPer]);
 
   function applySaleFromMargin(nextPrice: string, nextMargin: string) {
     const calculated = sellingFromPurchaseMarginGst(
@@ -86,6 +94,17 @@ export function UpdateVendorSkuPriceDialog({
   function onMarginPercentChange(value: string) {
     setMarginPercent(value);
     applySaleFromMargin(price, value);
+  }
+
+  function onSellingPriceChange(value: string) {
+    setSellingPrice(value);
+    const calculated = marginFromPurchaseSellingGst(
+      price,
+      gstPercentText,
+      unitsPer,
+      value,
+    );
+    if (calculated != null) setMarginPercent(calculated);
   }
 
   function onSave() {
@@ -186,7 +205,7 @@ export function UpdateVendorSkuPriceDialog({
             <Input
               value={sellingPrice}
               aria-invalid={Boolean(saleError)}
-              onChange={(e) => setSellingPrice(e.target.value)}
+              onChange={(e) => onSellingPriceChange(e.target.value)}
             />
             {saleError ? (
               <p className="text-destructive text-xs">{saleError}</p>

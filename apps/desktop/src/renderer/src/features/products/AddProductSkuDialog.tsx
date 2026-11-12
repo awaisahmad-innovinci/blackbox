@@ -47,6 +47,7 @@ import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-w
 import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import {
+  marginFromSellingGst,
   optionalNonNegativeMargin,
   optionalGstPercent,
   sellingFromMarginGst,
@@ -240,6 +241,19 @@ export function AddProductSkuDialog({
       const next = { ...prev, marginPercent: value };
       const calculated = sellingFromMarginGst(prev.costPrice, prev.gstPercent, value);
       if (calculated != null) next.sellingPrice = calculated;
+      return next;
+    });
+  }
+
+  function onSellingPriceChange(value: string) {
+    setForm((prev) => {
+      const next = { ...prev, sellingPrice: value };
+      const calculated = marginFromSellingGst(
+        prev.costPrice,
+        prev.gstPercent,
+        value,
+      );
+      if (calculated != null) next.marginPercent = calculated;
       return next;
     });
   }
@@ -707,7 +721,7 @@ export function AddProductSkuDialog({
             <Input
               value={form.hsCode}
               aria-invalid={Boolean(fieldErrors.hsCode)}
-              placeholder="0101.2100"
+              placeholder="1704.909"
               onChange={(e) => setField("hsCode", e.target.value)}
             />
             {fieldErrors.hsCode ? (
@@ -731,7 +745,7 @@ export function AddProductSkuDialog({
             <Input
               value={form.sellingPrice}
               aria-invalid={Boolean(fieldErrors.sellingPrice)}
-              onChange={(e) => setField("sellingPrice", e.target.value)}
+              onChange={(e) => onSellingPriceChange(e.target.value)}
             />
             {fieldErrors.sellingPrice ? (
               <p className="text-destructive text-xs">

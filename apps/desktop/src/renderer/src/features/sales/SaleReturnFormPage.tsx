@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   ReturnableSaleLine,
@@ -311,7 +312,7 @@ export function SaleReturnFormPage() {
           {
             eventType: "sale.return_issued",
             actorUserId: user.id,
-            summary: `${processorName} issued return ${returnNumber} — refund Rs ${tax.total.toLocaleString()}`,
+            summary: `${processorName} issued return ${returnNumber} — refund Rs ${formatMoney(tax.total)}`,
             metadata: {
               returnNumber,
               returnId: localId,
@@ -358,7 +359,7 @@ export function SaleReturnFormPage() {
         {
           eventType: "sale.return_issued",
           actorUserId: user.id,
-          summary: `${processorName} issued return ${detail.returnNumber} — refund Rs ${detail.refundTotal.toLocaleString()}`,
+          summary: `${processorName} issued return ${detail.returnNumber} — refund Rs ${formatMoney(detail.refundTotal)}`,
           metadata: {
             returnNumber: detail.returnNumber,
             returnId: detail.id,
@@ -487,19 +488,19 @@ export function SaleReturnFormPage() {
             </div>
             <div>
               <dt className="text-muted-foreground text-xs">Bill total</dt>
-              <dd className="font-semibold tabular-nums">{sale.total.toFixed(2)}</dd>
+              <dd className="font-semibold tabular-nums">{formatMoney(sale.total)}</dd>
             </div>
           </dl>
           <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
-            <span>Subtotal {sale.subtotal.toFixed(2)}</span>
+            <span>Subtotal {formatMoney(sale.subtotal)}</span>
             {sale.gstAmount > 0 ? (
               <span>
-                GST ({sale.gstRate}%) {sale.gstAmount.toFixed(2)}
+                GST ({sale.gstRate}%) {formatMoney(sale.gstAmount)}
               </span>
             ) : null}
             {sale.salesTaxAmount > 0 ? (
               <span>
-                Sales tax ({sale.salesTaxRate}%) {sale.salesTaxAmount.toFixed(2)}
+                Sales tax ({sale.salesTaxRate}%) {formatMoney(sale.salesTaxAmount)}
               </span>
             ) : null}
           </div>
@@ -555,10 +556,10 @@ export function SaleReturnFormPage() {
                       {item.focQuantity > 0 ? item.focQuantity : 0}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">
-                      {item.unitPrice.toFixed(2)}
+                      {formatMoney(item.unitPrice)}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">
-                      {item.lineTotal.toFixed(2)}
+                      {formatMoney(item.lineTotal)}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {returnedQty}
@@ -588,7 +589,7 @@ export function SaleReturnFormPage() {
                       )}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">
-                      {isSelected ? lineRefund.toFixed(2) : "—"}
+                      {isSelected ? formatMoney(lineRefund) : "—"}
                     </td>
                   </>
                 );
@@ -637,26 +638,26 @@ export function SaleReturnFormPage() {
           <div className="flex justify-between gap-2">
             <span>Refund subtotal</span>
             <span className="tabular-nums">
-              {buildReturnLineItems(activeLines).subtotal.toFixed(2)}
+              {formatMoney(buildReturnLineItems(activeLines).subtotal)}
             </span>
           </div>
           {refundPreview.gstAmount > 0 ? (
             <div className="flex justify-between gap-2">
               <span>GST ({sale.gstRate}%)</span>
-              <span className="tabular-nums">{refundPreview.gstAmount.toFixed(2)}</span>
+              <span className="tabular-nums">{formatMoney(refundPreview.gstAmount)}</span>
             </div>
           ) : null}
           {refundPreview.salesTaxAmount > 0 ? (
             <div className="flex justify-between gap-2">
               <span>Sales tax ({sale.salesTaxRate}%)</span>
               <span className="tabular-nums">
-                {refundPreview.salesTaxAmount.toFixed(2)}
+                {formatMoney(refundPreview.salesTaxAmount)}
               </span>
             </div>
           ) : null}
           <div className="mt-1 flex justify-between gap-2 font-semibold">
             <span>Refund total</span>
-            <span className="tabular-nums">{refundPreview.total.toFixed(2)}</span>
+            <span className="tabular-nums">{formatMoney(refundPreview.total)}</span>
           </div>
           <p className="text-muted-foreground mt-1 text-xs">
             Record only — not deducted from till

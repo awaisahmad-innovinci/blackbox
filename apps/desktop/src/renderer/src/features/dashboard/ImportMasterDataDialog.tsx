@@ -28,7 +28,7 @@ const EXPECTED_FILES = new Set<string>(MASTER_DATA_IMPORT_FILES);
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImported: (result: MasterDataImportResult) => Promise<void>;
+  onImported: (result: MasterDataImportResult) => void;
 };
 
 function classify(list: File[]): {
@@ -143,19 +143,11 @@ export function ImportMasterDataDialog({
     try {
       const imported = await inventoryImportsApi.uploadMasterData(selection);
       setResult(imported);
-      setMessage("Cloud import complete. Syncing imported data locally…");
-      try {
-        await onImported(imported);
-        setMessage("File successfully uploaded.");
-        setSucceeded(true);
-      } catch (syncError: unknown) {
-        setSucceeded(false);
-        setMessage(
-          `Cloud import succeeded, but local Sync failed. Use the Dashboard Sync button to retry. ${
-            syncError instanceof Error ? syncError.message : ""
-          }`.trim(),
-        );
-      }
+      onImported(imported);
+      setMessage(
+        "Saved online. The local database will update in the background.",
+      );
+      setSucceeded(true);
     } catch (error: unknown) {
       if (error instanceof MasterDataImportApiError) {
         setErrors(error.errors);
@@ -182,8 +174,9 @@ export function ImportMasterDataDialog({
           <DialogTitle>Upload old master data</DialogTitle>
           <DialogDescription>
             Select one master-data CSV at a time. Existing records are updated
-            instead of duplicated. The import writes to the cloud database
-            first, then refreshes the matching data in local SQLite.
+            instead of duplicated. The file is saved to the online database.
+            The local database updates in the background, and another file can
+            be uploaded while that sync is still running.
           </DialogDescription>
         </DialogHeader>
 
@@ -300,7 +293,7 @@ export function ImportMasterDataDialog({
             disabled={!canUpload || busy}
             onClick={() => void upload()}
           >
-            {busy ? "Importing…" : "Upload and import"}
+            {busy ? "Uploading…" : "Upload"}
           </Button>
         </DialogFooter>
       </DialogContent>

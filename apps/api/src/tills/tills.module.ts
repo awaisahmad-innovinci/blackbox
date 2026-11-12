@@ -1,7 +1,8 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ActivityLogModule } from "../activity-log/activity-log.module";
-import { Tenant, TillSession, TillWithdrawal, User } from "../db/entities";
+import { CashFlowModule } from "../cash-flow/cash-flow.module";
+import { TillSession, TillWithdrawal, User } from "../db/entities";
 import { RbacModule } from "../rbac/rbac.module";
 import { TillsController } from "./tills.controller";
 import { TillsService } from "./tills.service";
@@ -10,7 +11,8 @@ import { TillsService } from "./tills.service";
   imports: [
     RbacModule,
     ActivityLogModule,
-    TypeOrmModule.forFeature([TillSession, TillWithdrawal, Tenant, User]),
+    CashFlowModule,
+    TypeOrmModule.forFeature([TillSession, TillWithdrawal, User]),
   ],
   controllers: [TillsController],
   providers: [TillsService],

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type {
   GoodsReceiptListItem,
@@ -312,7 +313,7 @@ export function GoodsReceiptsListPage() {
                     {gr.status.replaceAll("_", " ")}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {gr.total.toLocaleString()}
+                    {formatMoney(gr.total)}
                   </td>
                   <td className="px-4 py-3 tabular-nums">{gr.itemCount}</td>
                 </ListTableRow>

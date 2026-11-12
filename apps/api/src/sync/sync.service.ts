@@ -11,6 +11,10 @@ import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   landedUnitByQuantity,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
+  formatMoney,
+  isCashExpenseCategory,
   roundMoney4,
   streamForEntity,
   weightedAvgUnitCost,
@@ -66,6 +70,8 @@ import {
   VendorContact,
   VendorLedgerEntry,
   CashExpense,
+  ManagerDrawerOpening,
+  ManagerDrawerSubmission,
   VendorGroup,
   VendorReturn,
   VendorReturnItem,
@@ -935,6 +941,24 @@ export class SyncService {
         await this.upsertCashExpense(manager, tenantId, change.entityId, p);
         break;
       }
+      case "manager_drawer_opening": {
+        await this.upsertManagerDrawerOpening(
+          manager,
+          tenantId,
+          change.entityId,
+          p,
+        );
+        break;
+      }
+      case "manager_drawer_submission": {
+        await this.upsertManagerDrawerSubmission(
+          manager,
+          tenantId,
+          change.entityId,
+          p,
+        );
+        break;
+      }
       case "inventory_out": {
         await this.upsertInventoryOut(manager, tenantId, change.entityId, p);
         break;
@@ -1089,16 +1113,54 @@ export class SyncService {
     const recordedByUserId = String(p.recordedByUserId ?? "");
     if (!recordedByUserId) throw new Error("manager not found");
     const category = String(p.category ?? "");
-    if (
-      category !== "Rent" &&
-      category !== "Electricity" &&
-      category !== "Internet" &&
-      category !== "Other"
-    ) {
+    if (!isCashExpenseCategory(category)) {
       throw new Error("expense category is invalid");
     }
     const amount = Number(p.amount ?? 0);
     if (!(amount > 0)) throw new Error("expense amount must be greater than zero");
+    const totals = await manager.query<
+      {
+        opening_float: string;
+        collected: string;
+        expenses: string;
+        till_floats: string;
+        submitted: string;
+      }[]
+    >(
+      `select
+         coalesce((
+           select sum(amount) from manager_drawer_openings
+           where tenant_id = $1 and manager_user_id = $2
+         ), 0) as opening_float,
+         coalesce((
+           select sum(withdrawal_total) from till_withdrawals
+           where tenant_id = $1 and withdrawn_by_user_id = $2
+         ), 0) as collected,
+         coalesce((
+           select sum(amount) from cash_expenses
+           where tenant_id = $1 and recorded_by_user_id = $2 and id <> $3
+         ), 0) as expenses,
+         coalesce((
+           select sum(opening_balance) from till_sessions
+           where tenant_id = $1 and funded_by_user_id = $2
+         ), 0) as till_floats,
+         coalesce((
+           select sum(amount) from manager_drawer_submissions
+           where tenant_id = $1 and manager_user_id = $2
+         ), 0) as submitted`,
+      [tenantId, recordedByUserId, entityId],
+    );
+    const totalsRow = totals[0];
+    const available = roundMoney4(
+      Number(totalsRow?.opening_float ?? 0) +
+        Number(totalsRow?.collected ?? 0) -
+        Number(totalsRow?.expenses ?? 0) -
+        Number(totalsRow?.till_floats ?? 0) -
+        Number(totalsRow?.submitted ?? 0),
+    );
+    if (expenseExceedsDrawer(amount, available)) {
+      throw new Error(expenseOverDrawerMessage(available));
+    }
     const existing = await manager.findOne(CashExpense, {
       where: { id: entityId, tenantId },
     });
@@ -1113,6 +1175,112 @@ export class SyncService {
       occurredAt: p.occurredAt
         ? new Date(String(p.occurredAt))
         : (row.occurredAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
+  private async upsertManagerDrawerOpening(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const managerUserId = String(p.managerUserId ?? "");
+    const openedByUserId = String(p.openedByUserId ?? "");
+    if (!managerUserId || !openedByUserId) {
+      throw new Error("manager not found");
+    }
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("opening amount must be greater than zero");
+    const existing = await manager.findOne(ManagerDrawerOpening, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(ManagerDrawerOpening, { id: entityId, tenantId });
+    Object.assign(row, {
+      managerUserId,
+      managerName: String(p.managerName ?? row.managerName ?? ""),
+      amount: String(amount),
+      openedByUserId,
+      openedByName: String(p.openedByName ?? row.openedByName ?? ""),
+      openedAt: p.openedAt
+        ? new Date(String(p.openedAt))
+        : (row.openedAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
+  private async upsertManagerDrawerSubmission(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const managerUserId = String(p.managerUserId ?? "");
+    if (!managerUserId) throw new Error("manager not found");
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("There is no cash to submit");
+    const totals = await manager.query<
+      {
+        opening_float: string;
+        collected: string;
+        expenses: string;
+        till_floats: string;
+        submitted: string;
+      }[]
+    >(
+      `select
+         coalesce((
+           select sum(amount) from manager_drawer_openings
+           where tenant_id = $1 and manager_user_id = $2
+         ), 0) as opening_float,
+         coalesce((
+           select sum(withdrawal_total) from till_withdrawals
+           where tenant_id = $1 and withdrawn_by_user_id = $2
+         ), 0) as collected,
+         coalesce((
+           select sum(amount) from cash_expenses
+           where tenant_id = $1 and recorded_by_user_id = $2
+         ), 0) as expenses,
+         coalesce((
+           select sum(opening_balance) from till_sessions
+           where tenant_id = $1 and funded_by_user_id = $2
+         ), 0) as till_floats,
+         coalesce((
+           select sum(amount) from manager_drawer_submissions
+           where tenant_id = $1 and manager_user_id = $2 and id <> $3
+         ), 0) as submitted`,
+      [tenantId, managerUserId, entityId],
+    );
+    const totalsRow = totals[0];
+    const available = roundMoney4(
+      Number(totalsRow?.opening_float ?? 0) +
+        Number(totalsRow?.collected ?? 0) -
+        Number(totalsRow?.expenses ?? 0) -
+        Number(totalsRow?.till_floats ?? 0) -
+        Number(totalsRow?.submitted ?? 0),
+    );
+    if (!(available > 0) || expenseExceedsDrawer(amount, available)) {
+      throw new Error(
+        available > 0
+          ? `Submit no more than the drawer balance of Rs ${formatMoney(available)}`
+          : "There is no cash to submit",
+      );
+    }
+    const existing = await manager.findOne(ManagerDrawerSubmission, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(ManagerDrawerSubmission, { id: entityId, tenantId });
+    Object.assign(row, {
+      managerUserId,
+      managerName: String(p.managerName ?? row.managerName ?? ""),
+      amount: String(amount),
+      submittedAt: p.submittedAt
+        ? new Date(String(p.submittedAt))
+        : (row.submittedAt ?? new Date()),
     });
     await manager.save(row);
   }
@@ -1948,6 +2116,10 @@ export class SyncService {
       (row as { status: string }).status = "inactive";
     }
     await manager.save(row);
+  }
+
+  async assertCanSync(user: TenantContext): Promise<void> {
+    await this.requireTrustedDevice(user);
   }
 
   private async requireTrustedDevice(user: TenantContext): Promise<Device> {

@@ -1,4 +1,9 @@
 import type {
+  SyncCatalogDocumentKind,
+  SyncCatalogPage,
+  SyncCatalogProductRow,
+  SyncCatalogReference,
+  SyncCatalogVendorRow,
   SyncChangeInput,
   SyncEntityVersionHeadsResponse,
   SyncPushResponse,
@@ -6,8 +11,9 @@ import type {
   SyncStatusResponse,
   SyncStream,
   SyncEntityType,
+  WarehouseStockRow,
 } from "@blackbox/shared";
-import { SYNC_STREAMS } from "@blackbox/shared";
+import { SYNC_CATALOG_PAGE_SIZE, SYNC_STREAMS } from "@blackbox/shared";
 import { apiFetch } from "./client";
 import { flushPendingActivityLogs } from "./activity-logs";
 
@@ -30,6 +36,52 @@ export const syncApi = {
     return apiFetch<{ ok: true }>("/sync/full-resync-complete", {
       method: "POST",
     });
+  },
+  catalogReference() {
+    return apiFetch<SyncCatalogReference>("/sync/catalog?section=reference");
+  },
+  catalogProducts(page: number, pageSize = SYNC_CATALOG_PAGE_SIZE) {
+    const q = new URLSearchParams({
+      section: "products",
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return apiFetch<SyncCatalogPage<SyncCatalogProductRow>>(
+      `/sync/catalog?${q.toString()}`,
+    );
+  },
+  catalogVendors(page: number, pageSize = SYNC_CATALOG_PAGE_SIZE) {
+    const q = new URLSearchParams({
+      section: "vendors",
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return apiFetch<SyncCatalogPage<SyncCatalogVendorRow>>(
+      `/sync/catalog?${q.toString()}`,
+    );
+  },
+  catalogStock(page: number, pageSize = SYNC_CATALOG_PAGE_SIZE) {
+    const q = new URLSearchParams({
+      section: "stock",
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return apiFetch<SyncCatalogPage<WarehouseStockRow>>(
+      `/sync/catalog?${q.toString()}`,
+    );
+  },
+  catalogDocuments<T>(
+    kind: SyncCatalogDocumentKind,
+    page: number,
+    pageSize = SYNC_CATALOG_PAGE_SIZE,
+  ) {
+    const q = new URLSearchParams({
+      section: "documents",
+      kind,
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return apiFetch<SyncCatalogPage<T>>(`/sync/catalog?${q.toString()}`);
   },
   entityVersionHeads(
     stream: SyncStream,

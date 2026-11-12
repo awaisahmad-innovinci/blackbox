@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type { SaleReturnListItem, WarehouseListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -204,10 +205,7 @@ export function SaleReturnsListPage() {
         <div>
           <span className="text-muted-foreground">Total refund</span>{" "}
           <span className="font-semibold tabular-nums">
-            {refundTotalSum.toLocaleString(undefined, {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 2,
-            })}
+            {formatMoney(refundTotalSum)}
           </span>
         </div>
       </div>
@@ -244,7 +242,7 @@ export function SaleReturnsListPage() {
                   <td className="px-4 py-2">{item.returnDate}</td>
                   <td className="px-4 py-2">{item.warehouseName}</td>
                   <td className="px-4 py-2 text-right tabular-nums">
-                    {item.refundTotal.toFixed(2)}
+                    {formatMoney(item.refundTotal)}
                   </td>
                   <td className="px-4 py-2">
                     {item.issuedByName ?? "—"}

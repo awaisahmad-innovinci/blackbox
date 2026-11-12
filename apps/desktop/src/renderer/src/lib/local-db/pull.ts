@@ -1,30 +1,25 @@
 import type {
   GoodsReceiptDetail,
-  InventoryMovementListItem,
   InventoryOutDetail,
   VendorReturnDetail,
-  ProductDetail,
-  ProductSkuDetail,
   PurchaseOrderDetail,
+  SkuBarcode,
+  SyncCatalogDocumentKind,
+  SyncCatalogPage,
   VendorDetail,
   VendorSku,
-  WarehouseStockRow,
 } from "@blackbox/shared";
+import { SYNC_CATALOG_PAGE_SIZE } from "@blackbox/shared";
 import { brandsApi } from "@renderer/lib/api/brands";
 import { categoriesApi } from "@renderer/lib/api/categories";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryMovementsApi } from "@renderer/lib/api/inventory-movements";
-import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
-import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
-import { productsApi } from "@renderer/lib/api/products";
-import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
-import { skusApi } from "@renderer/lib/api/skus";
+import { getAccessToken } from "@renderer/lib/api/session";
+import { syncApi } from "@renderer/lib/api/sync";
 import { unitsApi } from "@renderer/lib/api/units";
 import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
-import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
-import { vendorsApi } from "@renderer/lib/api/vendors";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
+import { bumpDataVersion } from "@renderer/lib/sync/sync-status";
 import { seedEntityVersionHeadsFromCloud } from "@renderer/lib/sync/entity-version-seed";
 
 export const LAST_FULL_PULL_AT_KEY = "last_full_pull_at";
@@ -76,26 +71,6 @@ function requireLocalDb() {
   return localDb;
 }
 
-async function paginateAll<T>(
-  fetchPage: (
-    page: number,
-    pageSize: number,
-  ) => Promise<{
-    items: T[];
-    total: number;
-  }>,
-  pageSize = 100,
-): Promise<T[]> {
-  const first = await fetchPage(1, pageSize);
-  const items = [...first.items];
-  const totalPages = Math.max(1, Math.ceil(first.total / pageSize));
-  for (let page = 2; page <= totalPages; page += 1) {
-    const next = await fetchPage(page, pageSize);
-    items.push(...next.items);
-  }
-  return items;
-}
-
 type LocalDbBridge = ReturnType<typeof requireLocalDb>;
 type ProgressReporter = (
   phase: SyncPhase,
@@ -104,84 +79,130 @@ type ProgressReporter = (
   message: string,
 ) => void;
 
+export const CATALOG_PULL_ACTIVE_KEY = "catalog_pull_active";
+
+const CATALOG_PAGE_KEYS = {
+  reference: "catalog_reference_done",
+  products: "catalog_products_next_page",
+  vendors: "catalog_vendors_next_page",
+  stock: "catalog_stock_next_page",
+  purchaseOrders: "catalog_purchase_orders_next_page",
+  goodsReceipts: "catalog_goods_receipts_next_page",
+  inventoryOuts: "catalog_inventory_outs_next_page",
+  vendorReturns: "catalog_vendor_returns_next_page",
+  movements: "catalog_movements_next_page",
+} as const;
+
+type PagePullOptions = {
+  resume?: boolean;
+  persist?: boolean;
+};
+
+async function readSavedPage(
+  key: string,
+  options?: PagePullOptions,
+): Promise<number | "done"> {
+  if (!options?.persist || !options.resume) return 1;
+  const raw = await window.blackbox?.localDb?.getSyncMeta(key);
+  if (raw === "done") return "done";
+  const page = Number(raw);
+  return Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
+}
+
+async function writeSavedPage(
+  key: string,
+  value: string,
+  options?: PagePullOptions,
+): Promise<void> {
+  if (!options?.persist) return;
+  await window.blackbox?.localDb?.setSyncMeta(key, value);
+}
+
+async function forEachCatalogPage<T>(
+  key: string,
+  options: PagePullOptions | undefined,
+  fetchPage: (page: number) => Promise<SyncCatalogPage<T>>,
+  apply: (page: SyncCatalogPage<T>) => Promise<void>,
+  reportPage: (done: number, total: number) => void,
+): Promise<void> {
+  const start = await readSavedPage(key, options);
+  if (start === "done") return;
+  let page = start;
+  while (true) {
+    await writeSavedPage(key, String(page), options);
+    const result = await fetchPage(page);
+    if (result.items.length > 0) await apply(result);
+    const done = Math.min(page * result.pageSize, result.total);
+    reportPage(done, result.total);
+    if (result.items.length === 0 || page * result.pageSize >= result.total) {
+      await writeSavedPage(key, "done", options);
+      return;
+    }
+    page += 1;
+  }
+}
+
+async function saveBarcodes(barcodes: SkuBarcode[]): Promise<void> {
+  const save = window.blackbox?.localDb?.upsertSkuBarcode;
+  if (!save) return;
+  for (const barcode of barcodes) {
+    await save(barcode);
+  }
+}
+
 async function pullProductsSection(
   localDb: LocalDbBridge,
   report: ProgressReporter,
+  options?: PagePullOptions,
 ): Promise<void> {
-  const productList = await paginateAll((page, pageSize) =>
-    productsApi.list({ page, pageSize }),
+  await forEachCatalogPage(
+    CATALOG_PAGE_KEYS.products,
+    options,
+    (page) => syncApi.catalogProducts(page),
+    async (result) => {
+      await localDb.upsertProducts(result.items.map((row) => row.product));
+      const skus = result.items.flatMap((row) => row.skus);
+      if (skus.length > 0) await localDb.upsertProductSkus(skus);
+      await saveBarcodes(result.items.flatMap((row) => row.barcodes));
+      bumpDataVersion();
+    },
+    (done, total) => {
+      report(
+        "products",
+        Math.max(done, total === 0 ? 1 : done),
+        Math.max(total, 1),
+        total === 0
+          ? "No products to sync"
+          : `Updating catalog… ${done}/${total}`,
+      );
+    },
   );
-  report("products", 0, Math.max(productList.length, 1), "Syncing products…");
-  const details: ProductDetail[] = [];
-  const skus: ProductSkuDetail[] = [];
-
-  for (let i = 0; i < productList.length; i += 1) {
-    const id = productList[i]!.id;
-    const [detail, productSkus] = await Promise.all([
-      productsApi.get(id),
-      productsApi.listSkus(id),
-    ]);
-    details.push(detail);
-    skus.push(...productSkus);
-    report(
-      "products",
-      i + 1,
-      productList.length,
-      `Syncing products… ${i + 1}/${productList.length}`,
-    );
-
-    if (details.length >= 25) {
-      await localDb.upsertProducts(details.splice(0, details.length));
-    }
-    if (skus.length >= 50) {
-      await localDb.upsertProductSkus(skus.splice(0, skus.length));
-    }
-  }
-  if (details.length > 0) await localDb.upsertProducts(details);
-  if (skus.length > 0) await localDb.upsertProductSkus(skus);
-  if (productList.length === 0) {
-    report("products", 1, 1, "No products to sync");
-  }
 }
 
 async function pullVendorsSection(
   localDb: LocalDbBridge,
   report: ProgressReporter,
+  options?: PagePullOptions,
 ): Promise<void> {
-  const vendorList = await paginateAll((page, pageSize) =>
-    vendorsApi.list({ status: "all", page, pageSize }),
+  await forEachCatalogPage(
+    CATALOG_PAGE_KEYS.vendors,
+    options,
+    (page) => syncApi.catalogVendors(page),
+    async (result) => {
+      const details: VendorDetail[] = result.items.map((row) => row.vendor);
+      const links: VendorSku[] = result.items.flatMap((row) => row.links);
+      if (details.length > 0) await localDb.upsertVendors(details);
+      if (links.length > 0) await localDb.upsertVendorSkus(links);
+    },
+    (done, total) => {
+      report(
+        "vendors",
+        Math.max(done, total === 0 ? 1 : done),
+        Math.max(total, 1),
+        total === 0 ? "No vendors to sync" : `Updating vendors… ${done}/${total}`,
+      );
+    },
   );
-  report("vendors", 0, Math.max(vendorList.length, 1), "Syncing vendors…");
-  const details: VendorDetail[] = [];
-  const links: VendorSku[] = [];
-
-  for (let i = 0; i < vendorList.length; i += 1) {
-    const id = vendorList[i]!.id;
-    const [detail, vendorLinks] = await Promise.all([
-      vendorsApi.get(id),
-      vendorSkusApi.listByVendor(id),
-    ]);
-    details.push(detail);
-    links.push(...vendorLinks);
-    report(
-      "vendors",
-      i + 1,
-      vendorList.length,
-      `Syncing vendors… ${i + 1}/${vendorList.length}`,
-    );
-
-    if (details.length >= 25) {
-      await localDb.upsertVendors(details.splice(0, details.length));
-    }
-    if (links.length >= 50) {
-      await localDb.upsertVendorSkus(links.splice(0, links.length));
-    }
-  }
-  if (details.length > 0) await localDb.upsertVendors(details);
-  if (links.length > 0) await localDb.upsertVendorSkus(links);
-  if (vendorList.length === 0) {
-    report("vendors", 1, 1, "No vendors to sync");
-  }
 }
 
 export async function runMasterDataImportPull(
@@ -263,6 +284,7 @@ export async function runMasterDataImportPull(
 
 export async function runFullPull(
   onProgress?: (progress: SyncProgress) => void,
+  options?: { resume?: boolean },
 ): Promise<{ lastSyncedAt: string }> {
   const localDb = requireLocalDb();
   const report = (
@@ -273,27 +295,28 @@ export async function runFullPull(
   ) => {
     onProgress?.({ phase, done, total, message });
   };
+  const pageOptions: PagePullOptions = {
+    resume: options?.resume === true,
+    persist: true,
+  };
 
   try {
-    report("reference", 0, 5, "Syncing reference data…");
-    const [units, brands, categories, vendorGroups, warehouses] =
-      await Promise.all([
-        unitsApi.list(),
-        brandsApi.list({ status: "all" }),
-        categoriesApi.list({ status: "all" }),
-        vendorGroupsApi.list({ status: "all" }),
-        warehousesApi.list({ status: "all" }),
-      ]);
-    await localDb.upsertUnits(units);
-    report("reference", 1, 5, "Units saved");
-    await localDb.upsertBrands(brands);
-    report("reference", 2, 5, "Brands saved");
-    await localDb.upsertCategories(categories);
-    report("reference", 3, 5, "Categories saved");
-    await localDb.upsertVendorGroups(vendorGroups);
-    report("reference", 4, 5, "Vendor groups saved");
-    await localDb.upsertWarehouses(warehouses);
-    report("reference", 5, 5, "Warehouses saved");
+    const referenceSaved = await readSavedPage(
+      CATALOG_PAGE_KEYS.reference,
+      pageOptions,
+    );
+    if (referenceSaved !== "done") {
+      report("reference", 0, 1, "Syncing reference data…");
+      await writeSavedPage(CATALOG_PAGE_KEYS.reference, "1", pageOptions);
+      const reference = await syncApi.catalogReference();
+      await localDb.upsertUnits(reference.units);
+      await localDb.upsertBrands(reference.brands);
+      await localDb.upsertCategories(reference.categories);
+      await localDb.upsertVendorGroups(reference.vendorGroups);
+      await localDb.upsertWarehouses(reference.warehouses);
+      await writeSavedPage(CATALOG_PAGE_KEYS.reference, "done", pageOptions);
+      report("reference", 1, 1, "Reference data saved");
+    }
   } catch (err: unknown) {
     if (err instanceof SyncPullError) throw err;
     throw new SyncPullError(
@@ -302,44 +325,8 @@ export async function runFullPull(
     );
   }
 
-  const skuIds = new Set<string>();
-
   try {
-    const productList = await paginateAll((page, pageSize) =>
-      productsApi.list({ page, pageSize }),
-    );
-    report("products", 0, Math.max(productList.length, 1), "Syncing products…");
-    const details: ProductDetail[] = [];
-    const skus: ProductSkuDetail[] = [];
-
-    for (let i = 0; i < productList.length; i += 1) {
-      const id = productList[i]!.id;
-      const [detail, productSkus] = await Promise.all([
-        productsApi.get(id),
-        productsApi.listSkus(id),
-      ]);
-      details.push(detail);
-      skus.push(...productSkus);
-      for (const sku of productSkus) skuIds.add(sku.id);
-      report(
-        "products",
-        i + 1,
-        productList.length,
-        `Syncing products… ${i + 1}/${productList.length}`,
-      );
-
-      if (details.length >= 25) {
-        await localDb.upsertProducts(details.splice(0, details.length));
-      }
-      if (skus.length >= 50) {
-        await localDb.upsertProductSkus(skus.splice(0, skus.length));
-      }
-    }
-    if (details.length > 0) await localDb.upsertProducts(details);
-    if (skus.length > 0) await localDb.upsertProductSkus(skus);
-    if (productList.length === 0) {
-      report("products", 1, 1, "No products to sync");
-    }
+    await pullProductsSection(localDb, report, pageOptions);
   } catch (err: unknown) {
     if (err instanceof SyncPullError) throw err;
     throw new SyncPullError(
@@ -349,41 +336,7 @@ export async function runFullPull(
   }
 
   try {
-    const vendorList = await paginateAll((page, pageSize) =>
-      vendorsApi.list({ status: "all", page, pageSize }),
-    );
-    report("vendors", 0, Math.max(vendorList.length, 1), "Syncing vendors…");
-    const details: VendorDetail[] = [];
-    const links: VendorSku[] = [];
-
-    for (let i = 0; i < vendorList.length; i += 1) {
-      const id = vendorList[i]!.id;
-      const [detail, vendorLinks] = await Promise.all([
-        vendorsApi.get(id),
-        vendorSkusApi.listByVendor(id),
-      ]);
-      details.push(detail);
-      links.push(...vendorLinks);
-      for (const link of vendorLinks) skuIds.add(link.productSkuId);
-      report(
-        "vendors",
-        i + 1,
-        vendorList.length,
-        `Syncing vendors… ${i + 1}/${vendorList.length}`,
-      );
-
-      if (details.length >= 25) {
-        await localDb.upsertVendors(details.splice(0, details.length));
-      }
-      if (links.length >= 50) {
-        await localDb.upsertVendorSkus(links.splice(0, links.length));
-      }
-    }
-    if (details.length > 0) await localDb.upsertVendors(details);
-    if (links.length > 0) await localDb.upsertVendorSkus(links);
-    if (vendorList.length === 0) {
-      report("vendors", 1, 1, "No vendors to sync");
-    }
+    await pullVendorsSection(localDb, report, pageOptions);
   } catch (err: unknown) {
     if (err instanceof SyncPullError) throw err;
     throw new SyncPullError(
@@ -393,65 +346,22 @@ export async function runFullPull(
   }
 
   try {
-    const poList = await paginateAll((page, pageSize) =>
-      purchaseOrdersApi.list({ page, pageSize }),
+    await forEachCatalogPage(
+      CATALOG_PAGE_KEYS.stock,
+      pageOptions,
+      (page) => syncApi.catalogStock(page),
+      async (result) => {
+        if (result.items.length > 0) await localDb.upsertStockRows(result.items);
+      },
+      (done, total) => {
+        report(
+          "stock",
+          Math.max(done, total === 0 ? 1 : done),
+          Math.max(total, 1),
+          total === 0 ? "No stock rows to sync" : `Updating stock… ${done}/${total}`,
+        );
+      },
     );
-    report(
-      "purchaseOrders",
-      0,
-      Math.max(poList.length, 1),
-      "Syncing purchase orders…",
-    );
-    const details: PurchaseOrderDetail[] = [];
-
-    for (let i = 0; i < poList.length; i += 1) {
-      const detail = await purchaseOrdersApi.get(poList[i]!.id);
-      details.push(detail);
-      for (const item of detail.items) skuIds.add(item.productSkuId);
-      report(
-        "purchaseOrders",
-        i + 1,
-        poList.length,
-        `Syncing purchase orders… ${i + 1}/${poList.length}`,
-      );
-      if (details.length >= 20) {
-        await localDb.upsertPurchaseOrders(details.splice(0, details.length));
-      }
-    }
-    if (details.length > 0) await localDb.upsertPurchaseOrders(details);
-    if (poList.length === 0) {
-      report("purchaseOrders", 1, 1, "No purchase orders to sync");
-    }
-  } catch (err: unknown) {
-    if (err instanceof SyncPullError) throw err;
-    throw new SyncPullError(
-      "purchaseOrders",
-      getApiErrorMessage(err, "Failed to sync purchase orders"),
-    );
-  }
-
-  try {
-    const ids = Array.from(skuIds);
-    report("stock", 0, Math.max(ids.length, 1), "Syncing stock…");
-    const buffer: WarehouseStockRow[] = [];
-
-    for (let i = 0; i < ids.length; i += 1) {
-      const rows = await skusApi.listInventory(ids[i]!);
-      buffer.push(...rows);
-      report(
-        "stock",
-        i + 1,
-        ids.length,
-        `Syncing stock… ${i + 1}/${ids.length}`,
-      );
-      if (buffer.length >= 100) {
-        await localDb.upsertStockRows(buffer.splice(0, buffer.length));
-      }
-    }
-    if (buffer.length > 0) await localDb.upsertStockRows(buffer);
-    if (ids.length === 0) {
-      report("stock", 1, 1, "No stock rows to sync");
-    }
   } catch (err: unknown) {
     if (err instanceof SyncPullError) throw err;
     throw new SyncPullError(
@@ -460,146 +370,66 @@ export async function runFullPull(
     );
   }
 
-  try {
-    const grList = await paginateAll((page, pageSize) =>
-      goodsReceiptsApi.list({ page, pageSize }),
-    );
-    report(
-      "goodsReceipts",
-      0,
-      Math.max(grList.length, 1),
-      "Syncing goods receipts…",
-    );
-    const details: GoodsReceiptDetail[] = [];
-
-    for (let i = 0; i < grList.length; i += 1) {
-      const detail = await goodsReceiptsApi.get(grList[i]!.id);
-      details.push(detail);
-      report(
-        "goodsReceipts",
-        i + 1,
-        grList.length,
-        `Syncing goods receipts… ${i + 1}/${grList.length}`,
-      );
-      if (details.length >= 20) {
-        await localDb.upsertGoodsReceipts(details.splice(0, details.length));
-      }
-    }
-    if (details.length > 0) await localDb.upsertGoodsReceipts(details);
-    if (grList.length === 0) {
-      report("goodsReceipts", 1, 1, "No goods receipts to sync");
-    }
-  } catch (err: unknown) {
-    if (err instanceof SyncPullError) throw err;
-    throw new SyncPullError(
-      "goodsReceipts",
-      getApiErrorMessage(err, "Failed to sync goods receipts"),
-    );
-  }
+  await pullDocumentSection(
+    report,
+    pageOptions,
+    "purchaseOrders",
+    "purchaseOrders",
+    "purchase orders",
+    (rows) => localDb.upsertPurchaseOrders(rows),
+  );
+  await pullDocumentSection(
+    report,
+    pageOptions,
+    "goodsReceipts",
+    "goodsReceipts",
+    "goods receipts",
+    (rows) => localDb.upsertGoodsReceipts(rows),
+  );
+  await pullDocumentSection(
+    report,
+    pageOptions,
+    "inventoryOut",
+    "inventoryOuts",
+    "inventory outs",
+    (rows) => localDb.upsertInventoryOuts(rows),
+  );
+  await pullDocumentSection(
+    report,
+    pageOptions,
+    "vendorReturns",
+    "vendorReturns",
+    "vendor returns",
+    async (rows) => {
+      await localDb.upsertVendorReturns?.(rows);
+    },
+  );
 
   try {
-    const outList = await paginateAll((page, pageSize) =>
-      inventoryOutApi.list({ page, pageSize }),
-    );
-    report(
-      "inventoryOut",
-      0,
-      Math.max(outList.length, 1),
-      "Syncing inventory out…",
-    );
-    const details: InventoryOutDetail[] = [];
-
-    for (let i = 0; i < outList.length; i += 1) {
-      const detail = await inventoryOutApi.get(outList[i]!.id);
-      details.push(detail);
-      report(
-        "inventoryOut",
-        i + 1,
-        outList.length,
-        `Syncing inventory out… ${i + 1}/${outList.length}`,
-      );
-      if (details.length >= 20) {
-        await localDb.upsertInventoryOuts(details.splice(0, details.length));
-      }
-    }
-    if (details.length > 0) await localDb.upsertInventoryOuts(details);
-    if (outList.length === 0) {
-      report("inventoryOut", 1, 1, "No inventory outs to sync");
-    }
-  } catch (err: unknown) {
-    if (err instanceof SyncPullError) throw err;
-    throw new SyncPullError(
-      "inventoryOut",
-      getApiErrorMessage(err, "Failed to sync inventory out"),
-    );
-  }
-
-  try {
-    const returnList = await paginateAll((page, pageSize) =>
-      vendorReturnsApi.list({ page, pageSize }),
-    );
-    report(
-      "vendorReturns",
-      0,
-      Math.max(returnList.length, 1),
-      "Syncing vendor returns…",
-    );
-    const details: VendorReturnDetail[] = [];
-    for (let i = 0; i < returnList.length; i += 1) {
-      const detail = await vendorReturnsApi.get(returnList[i]!.id);
-      details.push(detail);
-      report(
-        "vendorReturns",
-        i + 1,
-        returnList.length,
-        `Syncing vendor returns… ${i + 1}/${returnList.length}`,
-      );
-      if (details.length >= 20) {
-        await localDb.upsertVendorReturns?.(details.splice(0, details.length));
-      }
-    }
-    if (details.length > 0) await localDb.upsertVendorReturns?.(details);
-    if (returnList.length === 0) {
-      report("vendorReturns", 1, 1, "No vendor returns to sync");
-    }
-  } catch (err: unknown) {
-    if (err instanceof SyncPullError) throw err;
-    throw new SyncPullError(
-      "vendorReturns",
-      getApiErrorMessage(err, "Failed to sync vendor returns"),
-    );
-  }
-
-  try {
-    const movementList = await paginateAll((page, pageSize) =>
-      inventoryMovementsApi.list({ page, pageSize }),
-    );
-    report(
-      "movements",
-      0,
-      Math.max(movementList.length, 1),
-      "Syncing movements…",
-    );
-    const buffer: InventoryMovementListItem[] = [];
-
-    for (let i = 0; i < movementList.length; i += 1) {
-      buffer.push(movementList[i]!);
-      report(
-        "movements",
-        i + 1,
-        movementList.length,
-        `Syncing movements… ${i + 1}/${movementList.length}`,
-      );
-      if (buffer.length >= 100) {
-        await localDb.upsertInventoryMovements(
-          buffer.splice(0, buffer.length),
+    await forEachCatalogPage(
+      CATALOG_PAGE_KEYS.movements,
+      { persist: false },
+      (page) =>
+        inventoryMovementsApi.list({
+          page,
+          pageSize: SYNC_CATALOG_PAGE_SIZE,
+        }),
+      async (result) => {
+        if (result.items.length > 0) {
+          await localDb.upsertInventoryMovements(result.items);
+        }
+      },
+      (done, total) => {
+        report(
+          "movements",
+          Math.max(done, total === 0 ? 1 : done),
+          Math.max(total, 1),
+          total === 0
+            ? "No movements to sync"
+            : `Updating movements… ${done}/${total}`,
         );
-      }
-    }
-    if (buffer.length > 0) await localDb.upsertInventoryMovements(buffer);
-    if (movementList.length === 0) {
-      report("movements", 1, 1, "No movements to sync");
-    }
+      },
+    );
   } catch (err: unknown) {
     if (err instanceof SyncPullError) throw err;
     throw new SyncPullError(
@@ -618,9 +448,77 @@ export async function runFullPull(
     );
   }
 
+  try {
+    await finalizeCatalogCursors();
+  } catch (err: unknown) {
+    throw new SyncPullError(
+      "done",
+      getApiErrorMessage(err, "Failed to finish catalog sync"),
+    );
+  }
+
   const lastSyncedAt = new Date().toISOString();
   await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);
-  await seedEntityVersionHeadsFromCloud().catch(() => undefined);
   report("done", 1, 1, "Sync complete");
   return { lastSyncedAt };
 }
+
+async function pullDocumentSection<T extends SyncCatalogDocumentKind>(
+  report: ProgressReporter,
+  options: PagePullOptions,
+  phase: SyncPhase,
+  kind: T,
+  label: string,
+  save: (rows: DocumentRow[T][]) => Promise<unknown>,
+): Promise<void> {
+  try {
+    await forEachCatalogPage(
+      CATALOG_PAGE_KEYS[kind],
+      options,
+      (page) => syncApi.catalogDocuments<DocumentRow[T]>(kind, page),
+      async (result) => {
+        if (result.items.length > 0) await save(result.items);
+      },
+      (done, total) => {
+        report(
+          phase,
+          Math.max(done, total === 0 ? 1 : done),
+          Math.max(total, 1),
+          total === 0
+            ? `No ${label} to sync`
+            : `Updating ${label}… ${done}/${total}`,
+        );
+      },
+    );
+  } catch (err: unknown) {
+    if (err instanceof SyncPullError) throw err;
+    throw new SyncPullError(
+      phase,
+      getApiErrorMessage(err, `Failed to sync ${label}`),
+    );
+  }
+}
+
+type DocumentRow = {
+  purchaseOrders: PurchaseOrderDetail;
+  goodsReceipts: GoodsReceiptDetail;
+  inventoryOuts: InventoryOutDetail;
+  vendorReturns: VendorReturnDetail;
+};
+
+async function finalizeCatalogCursors(): Promise<void> {
+  if (!getAccessToken()) {
+    throw new Error("Sign in to finish catalog sync");
+  }
+  const status = await syncApi.status();
+  for (const stream of status.streams) {
+    await window.blackbox?.sync?.applyPull({
+      changes: [],
+      nextCursor: stream.serverSeq,
+      stream: stream.stream,
+    });
+  }
+  await syncApi.completeFullResync();
+  await seedEntityVersionHeadsFromCloud();
+}
+

@@ -29,6 +29,7 @@ import type {
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
   PaginatedSales,
+  PaginatedSaleRegister,
   PaginatedSaleReturns,
   PaginatedVendors,
   ProductDetail,
@@ -39,6 +40,7 @@ import type {
   PurchaseOrderListQuery,
   SaleDetail,
   SaleListQuery,
+  SaleRegisterQuery,
   SaleReturnDetail,
   SaleReturnListQuery,
   ReturnableSaleLine,
@@ -214,6 +216,9 @@ declare global {
           query?: InventoryOutReturnListQuery,
         ) => Promise<PaginatedInventoryOutReturns>;
         listSales: (query?: SaleListQuery) => Promise<PaginatedSales>;
+        listSaleRegister: (
+          query?: SaleRegisterQuery,
+        ) => Promise<PaginatedSaleRegister>;
         listSaleReturns: (
           query?: SaleReturnListQuery,
         ) => Promise<PaginatedSaleReturns>;
@@ -255,6 +260,8 @@ declare global {
           tillUsername: string;
           body: OpenTillRequest;
           requireApproval: boolean;
+          funderUserId?: string;
+          funderName?: string;
         }) => Promise<TillSessionDetail>;
         approveTill: (input: {
           id: string;

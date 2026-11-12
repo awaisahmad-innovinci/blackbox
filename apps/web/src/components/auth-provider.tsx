@@ -9,14 +9,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { AuthUser, Permission, SignupTenantRequest } from "@blackbox/shared";
+import type { AuthUser, Permission } from "@blackbox/shared";
 import { setOnSessionCleared, refreshAccessToken } from "@/lib/api-client";
-import {
-  loginRequest,
-  logoutRequest,
-  meRequest,
-  signupTenantRequest,
-} from "@/lib/auth-api";
+import { loginRequest, logoutRequest, meRequest } from "@/lib/auth-api";
 import { getRefreshToken } from "@/lib/auth-storage";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
@@ -25,7 +20,6 @@ type AuthContextValue = {
   user: AuthUser | null;
   status: AuthStatus;
   login: (identifier: string, password: string) => Promise<AuthUser>;
-  signup: (payload: SignupTenantRequest) => Promise<AuthUser>;
   logout: () => Promise<void>;
   hasPermission: (...keys: Permission[]) => boolean;
 };
@@ -93,13 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user;
   }, []);
 
-  const signup = useCallback(async (payload: SignupTenantRequest) => {
-    const res = await signupTenantRequest(payload);
-    setUser(res.user);
-    setStatus("authenticated");
-    return res.user;
-  }, []);
-
   const logout = useCallback(async () => {
     await logoutRequest();
     becomeAnonymous();
@@ -120,11 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       status,
       login,
-      signup,
       logout,
       hasPermission,
     }),
-    [user, status, login, signup, logout, hasPermission],
+    [user, status, login, logout, hasPermission],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

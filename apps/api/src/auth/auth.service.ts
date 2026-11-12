@@ -21,6 +21,7 @@ import {
   type AuthUser,
   type JwtPayload,
   type Permission,
+  type PlatformTenantSummary,
 } from "@blackbox/shared";
 import { DataSource, IsNull, Not, QueryFailedError, Repository } from "typeorm";
 import { DeviceUser } from "../db/entities/device-user.entity";
@@ -78,7 +79,9 @@ export class AuthService {
     );
   }
 
-  async signupTenant(dto: SignupTenantDto): Promise<AuthResponse> {
+  async createTenantWorkspace(
+    dto: SignupTenantDto,
+  ): Promise<PlatformTenantSummary> {
     const email = dto.email.trim().toLowerCase();
     const username = dto.username.trim();
 
@@ -107,9 +110,9 @@ export class AuthService {
       }
     }
 
-    let user: User;
+    let createdTenant: { tenant: Tenant; user: User };
     try {
-      user = await this.dataSource.transaction(async (manager) => {
+      createdTenant = await this.dataSource.transaction(async (manager) => {
         const tenant = manager.create(Tenant, {
           name: dto.businessName.trim(),
         });
@@ -171,7 +174,7 @@ export class AuthService {
           }),
         );
 
-        return created;
+        return { tenant, user: created };
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -180,7 +183,18 @@ export class AuthService {
       throw error;
     }
 
-    return this.issueAuthResponse(user);
+    const { tenant, user } = createdTenant;
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      isActive: tenant.isActive !== false,
+      createdAt: (tenant.createdAt ?? new Date()).toISOString(),
+      owner: {
+        fullName: user.fullName,
+        email: user.email,
+        username: user.username,
+      },
+    };
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {

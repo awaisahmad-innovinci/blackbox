@@ -171,6 +171,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       writeCachedUser(result.user);
       setUser(result.user);
       setOffline(false);
+      window.location.hash = "#/";
       setStatus("signed-in");
       await refreshDeviceState();
       void refreshSupervisorTotpCache();

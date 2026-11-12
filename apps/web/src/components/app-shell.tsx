@@ -7,8 +7,6 @@ import type { Permission } from "@blackbox/shared";
 import {
   LayoutDashboard,
   Users,
-  Shield,
-  KeyRound,
   MonitorSmartphone,
   Settings,
   LogOut,
@@ -41,13 +39,6 @@ const NAV: {
 }[] = [
   { href: "/app", label: "Dashboard", permission: null, icon: LayoutDashboard },
   { href: "/app/users", label: "Users", permission: "users.read", icon: Users },
-  { href: "/app/roles", label: "Roles", permission: "roles.read", icon: Shield },
-  {
-    href: "/app/permissions",
-    label: "Permissions",
-    permission: "permissions.read",
-    icon: KeyRound,
-  },
   {
     href: "/app/devices",
     label: "Devices",

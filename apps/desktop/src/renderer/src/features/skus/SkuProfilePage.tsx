@@ -8,7 +8,7 @@ import type {
   SkuSupplier,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { hsCodeError } from "@blackbox/shared";
+import { formatMoney, hsCodeError } from "@blackbox/shared";
 import { BackButton } from "@renderer/app/BackButton";
 import {
   FORM_DIALOG_FIELD_FULL,
@@ -45,6 +45,7 @@ import {
   normalizeUnitsPerPurchaseUnit,
 } from "@blackbox/shared";
 import {
+  marginFromSellingGst,
   optionalGstPercent,
   sellingFromMarginGst,
 } from "@renderer/lib/sku-pricing";
@@ -175,8 +176,14 @@ export function SkuProfilePage() {
     setCostPrice(String(sku.costPrice));
     setGstPercent(String(sku.gstPercent ?? 0));
     setHsCode(sku.hsCode ?? "");
-    setMarginPercent("");
     setSellingPrice(String(sku.sellingPrice));
+    setMarginPercent(
+      marginFromSellingGst(
+        String(sku.costPrice),
+        String(sku.gstPercent ?? 0),
+        String(sku.sellingPrice),
+      ) ?? "",
+    );
     setSaleDiscountPercent(String(sku.saleDiscountPercent ?? 0));
     setReorderLevel(String(sku.reorderLevel));
     setMinimumStockLevel(String(sku.minimumStockLevel));
@@ -271,6 +278,12 @@ export function SkuProfilePage() {
     setMarginPercent(value);
     const calculated = sellingFromMarginGst(costPrice, gstPercent, value);
     if (calculated != null) setSellingPrice(calculated);
+  }
+
+  function onSellingPriceChange(value: string) {
+    setSellingPrice(value);
+    const calculated = marginFromSellingGst(costPrice, gstPercent, value);
+    if (calculated != null) setMarginPercent(calculated);
   }
 
   async function onSaveEdit() {
@@ -585,7 +598,7 @@ export function SkuProfilePage() {
           <div>
             <dt className="text-muted-foreground">Cost / Selling</dt>
             <dd className="font-medium tabular-nums">
-              {sku.costPrice} / {sku.sellingPrice} per pc
+              {formatMoney(sku.costPrice)} / {formatMoney(sku.sellingPrice)} per pc
             </dd>
           </div>
           <div>
@@ -909,7 +922,7 @@ export function SkuProfilePage() {
               <Input
                 value={hsCode}
                 aria-invalid={Boolean(hsError)}
-                placeholder="0101.2100"
+                placeholder="1704.909"
                 onChange={(e) => setHsCode(e.target.value)}
               />
               {hsError ? (
@@ -933,7 +946,7 @@ export function SkuProfilePage() {
               <Input
                 value={sellingPrice}
                 aria-invalid={Boolean(sellingError)}
-                onChange={(e) => setSellingPrice(e.target.value)}
+                onChange={(e) => onSellingPriceChange(e.target.value)}
               />
               {sellingError ? (
                 <p className="text-destructive text-xs">{sellingError}</p>

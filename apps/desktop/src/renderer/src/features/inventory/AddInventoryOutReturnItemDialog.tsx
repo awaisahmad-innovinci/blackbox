@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import type { SkuSearchResult } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -229,7 +230,7 @@ export function AddInventoryOutReturnItemDialog({
                       {!balancePending && !unavailable ? (
                         <span className="text-muted-foreground block tabular-nums">
                           Out balance {balance.toLocaleString()} · Avg cost{" "}
-                          {(r.costPrice ?? 0).toLocaleString()}
+                          {formatMoney((r.costPrice ?? 0))}
                         </span>
                       ) : null}
                     </span>

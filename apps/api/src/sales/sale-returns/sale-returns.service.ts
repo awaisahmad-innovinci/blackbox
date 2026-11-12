@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   ConflictException,
@@ -475,7 +476,7 @@ export class SaleReturnsService {
         tenantId,
         eventType: "sale.return_issued",
         actorUserId: user.userId,
-        summary: `${issuerName ?? "Manager"} issued return ${returnNumber} — refund Rs ${tax.total.toLocaleString()}`,
+        summary: `${issuerName ?? "Manager"} issued return ${returnNumber} — refund Rs ${formatMoney(tax.total)}`,
         metadata: {
           returnNumber,
           returnId: headerId,
@@ -602,7 +603,7 @@ export class SaleReturnsService {
         tenantId,
         eventType: "sale.return_refunded",
         actorUserId: user.userId,
-        summary: `${cashierName ?? "Cashier"} refunded return ${header.returnNumber} — Rs ${refundTotal.toLocaleString()} cash`,
+        summary: `${cashierName ?? "Cashier"} refunded return ${header.returnNumber} — Rs ${formatMoney(refundTotal)} cash`,
         metadata: {
           returnNumber: header.returnNumber,
           returnId: header.id,
@@ -665,7 +666,7 @@ export class SaleReturnsService {
       tenantId,
       eventType: "sale.return_refunded",
       actorUserId: user.userId,
-      summary: `${cashierName ?? "Cashier"} refunded return ${header.returnNumber} — Rs ${toNum(header.refundTotal).toLocaleString()} cash`,
+      summary: `${cashierName ?? "Cashier"} refunded return ${header.returnNumber} — Rs ${formatMoney(toNum(header.refundTotal))} cash`,
       metadata: {
         returnNumber: header.returnNumber,
         returnId: header.id,

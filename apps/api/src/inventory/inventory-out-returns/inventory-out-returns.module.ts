@@ -11,9 +11,11 @@ import {
 } from "../../db/entities";
 import { InventoryOutReturnsController } from "./inventory-out-returns.controller";
 import { InventoryOutReturnsService } from "./inventory-out-returns.service";
+import { ActivityLogModule } from "../../activity-log/activity-log.module";
 
 @Module({
   imports: [
+    ActivityLogModule,
     TypeOrmModule.forFeature([
       InventoryOutReturn,
       InventoryOutReturnItem,

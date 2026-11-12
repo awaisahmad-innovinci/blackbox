@@ -9,11 +9,13 @@ import type {
   PaginatedInventoryOuts,
   PaginatedInventoryOutReturns,
   PaginatedSales,
+  PaginatedSaleRegister,
   PaginatedSaleReturns,
   PaginatedVendors,
   ReturnableSaleLine,
   SaleDetail,
   SaleListQuery,
+  SaleRegisterQuery,
   SaleReturnDetail,
   SaleReturnListQuery,
   ProductDetail,
@@ -275,6 +277,18 @@ export async function loadSales(
     /* fall through */
   }
   return salesApi.list(query);
+}
+
+export async function loadSaleRegister(
+  query: SaleRegisterQuery = {},
+): Promise<PaginatedSaleRegister> {
+  try {
+    const local = await window.blackbox?.localDb?.listSaleRegister?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return salesApi.register(query);
 }
 
 export async function loadSale(id: string): Promise<SaleDetail> {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { GoodsReceiptDetail } from "@blackbox/shared";
 import { formatStoredDateTime } from "@blackbox/shared";
@@ -152,16 +153,16 @@ export function GoodsReceiptProfilePage() {
                     {(item.bonusQuantity ?? 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.poUnitCost.toLocaleString()}
+                    {formatMoney(item.poUnitCost)}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.receivingUnitCost.toLocaleString()}
+                    {formatMoney(item.receivingUnitCost)}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
                     {item.discountPercent.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {item.lineTotal.toLocaleString()}
+                    {formatMoney(item.lineTotal)}
                   </td>
                 </ListTableRow>
               ))}
@@ -174,7 +175,7 @@ export function GoodsReceiptProfilePage() {
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Subtotal</span>
           <span className="tabular-nums">
-            {receipt.subtotal.toLocaleString()}
+            {formatMoney(receipt.subtotal)}
           </span>
         </div>
         <div className="flex justify-between gap-6">
@@ -186,51 +187,51 @@ export function GoodsReceiptProfilePage() {
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Sale tax</span>
           <span className="tabular-nums">
-            {receipt.saleTax.toLocaleString()}
+            {formatMoney(receipt.saleTax)}
           </span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Adv tax</span>
           <span className="tabular-nums">
-            {receipt.advTax.toLocaleString()}
+            {formatMoney(receipt.advTax)}
           </span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">GST</span>
-          <span className="tabular-nums">{receipt.gst.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(receipt.gst)}</span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Incentive</span>
           <span className="tabular-nums text-green-700 dark:text-green-400">
-            −{receipt.incentive.toLocaleString()}
+            −{formatMoney(receipt.incentive)}
           </span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Shelf rent</span>
           <span className="tabular-nums text-green-700 dark:text-green-400">
-            −{receipt.shelfRent.toLocaleString()}
+            −{formatMoney(receipt.shelfRent)}
           </span>
         </div>
         {receipt.returnCredit > 0 ? (
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Return credit</span>
             <span className="tabular-nums">
-              −{receipt.returnCredit.toLocaleString()}
+              −{formatMoney(receipt.returnCredit)}
             </span>
           </div>
         ) : null}
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Grand total</span>
-          <span className="tabular-nums">{receipt.total.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(receipt.total)}</span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Paid</span>
-          <span className="tabular-nums">{receipt.amountPaid.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(receipt.amountPaid)}</span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Vendor credit</span>
           <span className="tabular-nums">
-            {Math.max(0, receipt.total - receipt.amountPaid).toLocaleString()}
+            {formatMoney(Math.max(0, receipt.total - receipt.amountPaid))}
           </span>
         </div>
       </section>

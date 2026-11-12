@@ -7,5 +7,6 @@ import { PermissionsCatalogService } from "./permissions-catalog.service";
   imports: [RbacModule],
   controllers: [PermissionsCatalogController],
   providers: [PermissionsCatalogService],
+  exports: [PermissionsCatalogService],
 })
 export class PermissionsCatalogModule {}

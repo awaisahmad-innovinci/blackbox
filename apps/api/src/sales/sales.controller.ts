@@ -10,14 +10,23 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import type { PaginatedSales, SaleDetail } from "@blackbox/shared";
+import type {
+  PaginatedSaleRegister,
+  PaginatedSales,
+  SaleDetail,
+} from "@blackbox/shared";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import type { TenantContext } from "../common/tenant-context";
 import { CurrentUser } from "../common/current-user.decorator";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
 import { FbrService } from "../fbr/fbr.service";
-import { CreateSaleDto, ListSalesQueryDto, SubmitSaleFbrDto } from "./dto/sale.dto";
+import {
+  CreateSaleDto,
+  ListSaleRegisterQueryDto,
+  ListSalesQueryDto,
+  SubmitSaleFbrDto,
+} from "./dto/sale.dto";
 import { SalesService } from "./sales.service";
 
 @Controller("sales")
@@ -32,6 +41,19 @@ export class SalesController {
   @RequirePermissions("sales.read")
   list(@Query() query: ListSalesQueryDto): Promise<PaginatedSales> {
     return this.sales.list(query);
+  }
+
+  @Get("register")
+  register(
+    @Query() query: ListSaleRegisterQueryDto,
+    @CurrentUser() user: TenantContext,
+  ): Promise<PaginatedSaleRegister> {
+    const includeSales = user.permissions.includes("sales.read");
+    const includeReturns = user.permissions.includes("sales.return");
+    if (!includeSales && !includeReturns) {
+      throw new ForbiddenException("Insufficient permissions");
+    }
+    return this.sales.listRegister(query, { includeSales, includeReturns });
   }
 
   @Get(":id")

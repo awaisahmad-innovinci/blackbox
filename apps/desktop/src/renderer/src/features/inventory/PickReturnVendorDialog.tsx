@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   Dialog,
   DialogContent,
@@ -75,7 +76,7 @@ export function PickReturnVendorDialog({
                   ) : null}
                   <span className="text-muted-foreground block">
                     {candidate.vendorCode} · Cost{" "}
-                    {candidate.row.purchasePrice.toLocaleString()} · Returnable{" "}
+                    {formatMoney(candidate.row.purchasePrice)} · Returnable{" "}
                     {returnable.toLocaleString()} pcs
                   </span>
                 </span>

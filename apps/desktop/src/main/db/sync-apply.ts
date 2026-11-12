@@ -54,7 +54,13 @@ import {
 import { upsertPurchaseOrderLocal } from "./purchase-orders-local";
 import { upsertGoodsReceiptLocal } from "./goods-receipts-local";
 import { upsertVendorLedgerEntryLocal } from "./vendor-ledger-local";
-import { upsertCashExpenseLocal } from "./cash-flow-local";
+import {
+  assertCashExpenseWithinDrawer,
+  assertDrawerSubmissionLocal,
+  upsertCashExpenseLocal,
+  upsertManagerDrawerOpeningLocal,
+  upsertManagerDrawerSubmissionLocal,
+} from "./cash-flow-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
 import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
 import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
@@ -367,6 +373,13 @@ export function applyChange(change: SyncChangeDto): void {
   }
   if (change.entityType === "cash_expense") {
     const nowIso = now;
+    if (change.changeId === "local") {
+      assertCashExpenseWithinDrawer({
+        id: change.entityId,
+        recordedByUserId: str(p.recordedByUserId),
+        amount: Number(p.amount ?? 0),
+      });
+    }
     upsertCashExpenseLocal({
       id: change.entityId,
       recordedByUserId: str(p.recordedByUserId),
@@ -375,6 +388,44 @@ export function applyChange(change: SyncChangeDto): void {
       amount: Number(p.amount ?? 0),
       note: str(p.note),
       occurredAt: str(p.occurredAt, nowIso),
+      createdAt: str(p.createdAt, nowIso),
+      updatedAt: str(p.updatedAt, nowIso),
+    });
+    return;
+  }
+  if (change.entityType === "manager_drawer_opening") {
+    const nowIso = now;
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("opening amount must be greater than zero");
+    upsertManagerDrawerOpeningLocal({
+      id: change.entityId,
+      managerUserId: str(p.managerUserId),
+      managerName: str(p.managerName),
+      amount,
+      openedByUserId: str(p.openedByUserId),
+      openedByName: str(p.openedByName),
+      openedAt: str(p.openedAt, nowIso),
+      createdAt: str(p.createdAt, nowIso),
+      updatedAt: str(p.updatedAt, nowIso),
+    });
+    return;
+  }
+  if (change.entityType === "manager_drawer_submission") {
+    const nowIso = now;
+    const amount = Number(p.amount ?? 0);
+    if (change.changeId === "local") {
+      assertDrawerSubmissionLocal({
+        id: change.entityId,
+        managerUserId: str(p.managerUserId),
+        amount,
+      });
+    }
+    upsertManagerDrawerSubmissionLocal({
+      id: change.entityId,
+      managerUserId: str(p.managerUserId),
+      managerName: str(p.managerName),
+      amount,
+      submittedAt: str(p.submittedAt, nowIso),
       createdAt: str(p.createdAt, nowIso),
       updatedAt: str(p.updatedAt, nowIso),
     });
@@ -655,6 +706,7 @@ export function applyChange(change: SyncChangeDto): void {
       reopenedByUserId: (p.reopenedByUserId as string | null | undefined) ?? null,
       reopenedByName: (p.reopenedByName as string | null | undefined) ?? null,
       closeReason: (p.closeReason as string | null | undefined) ?? null,
+      fundedByUserId: (p.fundedByUserId as string | null | undefined) ?? null,
       createdAt: str(p.createdAt, now),
       updatedAt: str(p.updatedAt, now),
     });

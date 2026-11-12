@@ -2,7 +2,9 @@ import { Injectable, UnprocessableEntityException } from "@nestjs/common";
 import {
   ENTITY_STATUSES,
   formatMasterDataHeaderMismatchMessage,
+  HS_CODE_MESSAGE,
   HS_CODE_PATTERN,
+  normalizeHsCode,
   LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
@@ -533,11 +535,11 @@ export class MasterDataImportService {
         min: 0,
         max: 100,
       });
-      const hsCode = row.values.hs_code.trim();
-      if (hsCode && !HS_CODE_PATTERN.test(hsCode)) {
-        errors.push(
-          this.rowError(row, "hs_code", "HS code must look like 0101.2100"),
-        );
+      const rawHsCode = row.values.hs_code.trim();
+      const hsCode = normalizeHsCode(row.values.hs_code);
+      if (hsCode) row.values.hs_code = hsCode;
+      if (rawHsCode && (!hsCode || !HS_CODE_PATTERN.test(hsCode))) {
+        errors.push(this.rowError(row, "hs_code", HS_CODE_MESSAGE));
       }
       this.number(row, "units_per_purchase_unit", errors, {
         min: Number.EPSILON,

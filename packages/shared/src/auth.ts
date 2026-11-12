@@ -17,13 +17,13 @@ export interface AuthUser {
   fullName: string;
   /** Effective permission keys resolved from User → Role → Permission. */
   permissions: Permission[];
-  /** When true, POS requires manager Authy before removing a sale line. */
+  /** When true, POS requires a manager authentication code before removing a sale line. */
   requireManagerApprovalRemoveSaleLine?: boolean;
-  /** When true, POS requires manager Authy before opening a cashier till. */
+  /** When true, POS requires a manager authentication code before opening a cashier till. */
   requireManagerApprovalTillOpen?: boolean;
-  /** When true, POS requires manager Authy before collecting or withdrawing till cash. */
+  /** When true, POS requires a manager authentication code before collecting or withdrawing till cash. */
   requireManagerApprovalTillWithdraw?: boolean;
-  /** When true, POS requires manager Authy before posting a sale that includes FOC. */
+  /** When true, POS requires a manager authentication code before posting a sale that includes FOC. */
   requireManagerApprovalFoc?: boolean;
   /** Tenant default GST percentage applied to every sale (e.g. 17 = 17%). */
   defaultGstRate?: number;
@@ -51,6 +51,46 @@ export interface SignupTenantRequest {
   email: string;
   username: string;
   password: string;
+}
+
+export interface PlatformLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface PlatformLoginResponse {
+  accessToken: string;
+  expiresIn: number;
+}
+
+export interface PlatformTenantOwner {
+  fullName: string;
+  email: string;
+  username: string;
+}
+
+export interface PlatformTenantSummary {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  owner: PlatformTenantOwner | null;
+}
+
+export interface UpdatePlatformTenantRequest {
+  isActive: boolean;
+}
+
+export interface ResetPlatformOwnerPasswordRequest {
+  password: string;
+}
+
+export interface ResetPlatformOwnerPasswordResponse {
+  password: string;
+  businessName: string;
+  fullName: string;
+  email: string;
+  username: string;
 }
 
 /**

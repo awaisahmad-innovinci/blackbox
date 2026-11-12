@@ -8,14 +8,17 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import type { TillListItem, TillSessionDetail } from "@blackbox/shared";
+import type { DrawerPerson, TillListItem, TillSessionDetail } from "@blackbox/shared";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CurrentUser } from "../common/current-user.decorator";
+import type { TenantContext } from "../common/tenant-context";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
 import {
   CollectTillCashByAmountDto,
   ListTillsQueryDto,
   OpenTillDto,
+  OpenTillForCashierDto,
   ReopenTillDto,
   WithdrawTillDto,
 } from "./dto/till.dto";
@@ -38,10 +41,24 @@ export class TillsController {
     return this.tills.list(query);
   }
 
+  @Get("cashiers")
+  @RequirePermissions("till.manage")
+  cashiers(@CurrentUser() user: TenantContext): Promise<DrawerPerson[]> {
+    return this.tills.listCashiers(user.tenantId);
+  }
+
   @Post("open")
   @RequirePermissions("till.read", "sales.write")
   open(@Body() dto: OpenTillDto): Promise<TillSessionDetail> {
     return this.tills.open(dto);
+  }
+
+  @Post("open-for-cashier")
+  @RequirePermissions("till.manage")
+  openForCashier(
+    @Body() dto: OpenTillForCashierDto,
+  ): Promise<TillSessionDetail> {
+    return this.tills.openForCashier(dto.cashierUserId, dto.openingBalance);
   }
 
   @Post("current/collect-cash-by-amount")

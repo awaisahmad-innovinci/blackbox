@@ -6,11 +6,8 @@ import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { salesApi } from "@renderer/lib/api/sales";
 import { submitPostedSaleToFbr } from "@renderer/lib/sales/submit-fbr";
 import { loadSale, loadSaleReturnCreditForSale } from "@renderer/lib/local-db/entity-source";
-import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
-import { syncNow } from "@renderer/lib/sync/sync-status";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import { SaleThermalReceipt, type SaleReturnCreditReceipt } from "./sale-thermal-receipt";
@@ -27,13 +24,12 @@ export function SaleDetailPage() {
   const confirm = useConfirm();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
-  const { canReadList, canVoid, canWrite } = useSalesAccess();
+  const { canReadList, canWrite } = useSalesAccess();
   const [detail, setDetail] = useState<SaleDetail | null>(null);
   const [returnCredit, setReturnCredit] =
     useState<SaleReturnCreditReceipt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [voiding, setVoiding] = useState(false);
   const [submittingFbr, setSubmittingFbr] = useState(false);
   const [discarding, setDiscarding] = useState(false);
 
@@ -123,43 +119,6 @@ export function SaleDetailPage() {
     }
   }
 
-  async function onVoid() {
-    if (!detail || detail.status !== "POSTED") return;
-    setVoiding(true);
-    setError(null);
-    try {
-      if (await isDeviceBound()) {
-        const now = new Date().toISOString();
-        const voided: SaleDetail = {
-          ...detail,
-          status: "VOID",
-          updatedAt: now,
-        };
-        await commitLocalChange({
-          entityType: "sale",
-          entityId: detail.id,
-          operation: "UPSERT",
-          payload: voided as unknown as Record<string, unknown>,
-        });
-        void syncNow();
-        setDetail(voided);
-        return;
-      }
-
-      const voided = await salesApi.void(detail.id);
-      try {
-        await window.blackbox?.localDb?.upsertSale?.(voided);
-      } catch {
-        /* optional cache */
-      }
-      setDetail(voided);
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, "Failed to void sale"));
-    } finally {
-      setVoiding(false);
-    }
-  }
-
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading sale…</p>;
   }
@@ -218,15 +177,6 @@ export function SaleDetailPage() {
                   {discarding ? "Discarding…" : "Discard"}
                 </Button>
               </>
-            ) : null}
-            {canVoid && detail.status === "POSTED" ? (
-              <Button
-                variant="destructive"
-                disabled={voiding}
-                onClick={() => void onVoid()}
-              >
-                {voiding ? "Voiding…" : "Void sale"}
-              </Button>
             ) : null}
             <Button
               variant="outline"

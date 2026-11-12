@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Injectable,
@@ -22,6 +23,8 @@ import {
   Warehouse,
 } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { getRequestTenant } from "../../common/request-tenant";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
 import {
   CreatePurchaseOrderDto,
   ListPurchaseOrdersQueryDto,
@@ -55,6 +58,7 @@ export class PurchaseOrdersService {
     private readonly vendorSkus: Repository<VendorSku>,
     @InjectRepository(ProductSku)
     private readonly skus: Repository<ProductSku>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(query: ListPurchaseOrdersQueryDto): Promise<PaginatedPurchaseOrders> {
@@ -178,7 +182,7 @@ export class PurchaseOrdersService {
     const tenantId = this.fixedTenant.tenantId;
     const enforceMoq = Boolean(dto.submit);
 
-    return this.dataSource.transaction(async (manager) => {
+    const created = await this.dataSource.transaction(async (manager) => {
       await this.assertVendorWarehouse(
         manager,
         tenantId,
@@ -236,6 +240,22 @@ export class PurchaseOrdersService {
 
       return this.getByIdInManager(manager, saved.id);
     });
+
+    const actorUserId = getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "purchase_order.created",
+        actorUserId,
+        summary: `Created purchase order ${created.poNumber} for Rs ${formatMoney(created.total)}`,
+        metadata: {
+          purchaseOrderId: created.id,
+          poNumber: created.poNumber,
+          total: created.total,
+        },
+      });
+    }
+    return created;
   }
 
   async update(

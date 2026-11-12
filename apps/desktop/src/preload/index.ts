@@ -28,6 +28,7 @@ import type {
   PaginatedPurchaseOrders,
   PaginatedGoodsReceipts,
   PaginatedSales,
+  PaginatedSaleRegister,
   PaginatedSaleReturns,
   PaginatedVendors,
   ProductDetail,
@@ -38,6 +39,7 @@ import type {
   PurchaseOrderListQuery,
   SaleDetail,
   SaleListQuery,
+  SaleRegisterQuery,
   SaleReturnDetail,
   SaleReturnListQuery,
   ReturnableSaleLine,
@@ -262,6 +264,11 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<PaginatedInventoryOutReturns>,
     listSales: (query?: SaleListQuery) =>
       ipcRenderer.invoke("localDb:listSales", query) as Promise<PaginatedSales>,
+    listSaleRegister: (query?: SaleRegisterQuery) =>
+      ipcRenderer.invoke(
+        "localDb:listSaleRegister",
+        query,
+      ) as Promise<PaginatedSaleRegister>,
     getCurrentTill: (userId: string) =>
       ipcRenderer.invoke("localDb:getCurrentTill", userId) as Promise<TillSessionDetail | null>,
     getLatestTillSession: (userId: string) =>
@@ -277,6 +284,8 @@ contextBridge.exposeInMainWorld("blackbox", {
       tillUsername: string;
       body: OpenTillRequest;
       requireApproval: boolean;
+      funderUserId?: string;
+      funderName?: string;
     }) => ipcRenderer.invoke("localDb:openTill", input) as Promise<TillSessionDetail>,
     approveTill: (input: {
       id: string;

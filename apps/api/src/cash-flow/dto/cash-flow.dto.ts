@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   Min,
@@ -29,4 +30,13 @@ export class RecordCashExpenseDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+}
+
+export class RecordManagerDrawerOpeningDto {
+  @IsUUID()
+  managerUserId!: string;
+
+  @IsNumber()
+  @Min(0.0001)
+  amount!: number;
 }

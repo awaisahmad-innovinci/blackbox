@@ -20,6 +20,7 @@ import type {
   PurchaseOrderListQuery,
   SaleDetail,
   SaleListQuery,
+  SaleRegisterQuery,
   SaleReturnDetail,
   SaleReturnListQuery,
   OpenTillRequest,
@@ -207,6 +208,7 @@ import {
   listInventoryOutsLocal,
   listInventoryOutReturnsLocal,
   listSalesLocal,
+  listSaleRegisterLocal,
   listSaleReturnsLocal,
   listVendorGroupsLocal,
   getVendorGroupLocal,
@@ -576,6 +578,10 @@ function registerIpc(): void {
     (_event, query: SaleListQuery = {}) => listSalesLocal(query),
   );
   ipcMain.handle(
+    "localDb:listSaleRegister",
+    (_event, query: SaleRegisterQuery = {}) => listSaleRegisterLocal(query),
+  );
+  ipcMain.handle(
     "localDb:getCurrentTill",
     (_event, userId: string) => getCurrentTillLocal(userId),
   );
@@ -598,6 +604,8 @@ function registerIpc(): void {
         tillUsername: string;
         body: OpenTillRequest;
         requireApproval: boolean;
+        funderUserId?: string;
+        funderName?: string;
       },
     ) => openTillLocal(input),
   );

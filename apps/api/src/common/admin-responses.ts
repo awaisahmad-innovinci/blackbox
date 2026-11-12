@@ -45,7 +45,6 @@ export type UserResponse = {
 
 export type RoleResponse = {
   id: string;
-  tenantId: string;
   key: string;
   name: string;
   isSystem: boolean;
@@ -126,7 +125,6 @@ export function toRoleResponse(
 ): RoleResponse {
   return {
     id: role.id,
-    tenantId: role.tenantId,
     key: role.key,
     name: role.name,
     isSystem: role.isSystem,

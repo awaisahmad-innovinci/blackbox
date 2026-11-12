@@ -14,7 +14,6 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { LogoutDto, RefreshDto } from "./dto/refresh.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
-import { SignupTenantDto } from "./dto/signup-tenant.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { PasswordResetService } from "./password-reset.service";
 
@@ -24,11 +23,6 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly passwordReset: PasswordResetService,
   ) {}
-
-  @Post("signup-tenant")
-  signupTenant(@Body() dto: SignupTenantDto): Promise<AuthResponse> {
-    return this.authService.signupTenant(dto);
-  }
 
   @Post("login")
   @HttpCode(200)

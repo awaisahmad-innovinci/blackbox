@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   GoodsReceiptDetail,
@@ -41,6 +42,7 @@ import {
 } from "@renderer/components/form-enter-nav";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -776,6 +778,22 @@ export function ReceivePurchaseOrderPage() {
           returnSettlements,
           now,
         );
+        if (user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "goods_receipt.posted",
+              actorUserId: user.id,
+              summary: `Received ${receipt.receiptNumber} for Rs ${formatMoney(grandTotal)}`,
+              metadata: {
+                goodsReceiptId: localId,
+                receiptNumber: receipt.receiptNumber,
+                purchaseOrderId: id,
+                total: grandTotal,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
+        }
         void syncNow();
         setSuccess(receipt);
         return;
@@ -876,14 +894,14 @@ export function ReceivePurchaseOrderPage() {
           <div>
             <dt className="text-muted-foreground">Total</dt>
             <dd className="font-medium tabular-nums">
-              {success.total.toLocaleString()}
+              {formatMoney(success.total)}
             </dd>
           </div>
           {success.returnCredit > 0 ? (
             <div>
               <dt className="text-muted-foreground">Return credit</dt>
               <dd className="font-medium tabular-nums">
-                {success.returnCredit.toLocaleString()}
+                {formatMoney(success.returnCredit)}
               </dd>
             </div>
           ) : null}
@@ -1010,10 +1028,10 @@ export function ReceivePurchaseOrderPage() {
                         {line.quantity.toLocaleString()} pcs
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.unitCost.toLocaleString()}
+                        {formatMoney(line.unitCost)}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.lineTotal.toLocaleString()}
+                        {formatMoney(line.lineTotal)}
                       </td>
                       <td className="px-3 py-2">
                         <select
@@ -1116,10 +1134,10 @@ export function ReceivePurchaseOrderPage() {
                         />
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.receivingUnitCost.toLocaleString()}
+                        {formatMoney(line.receivingUnitCost)}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.currentSellingPrice.toLocaleString()}
+                        {formatMoney(line.currentSellingPrice)}
                       </td>
                       <td className="px-3 py-2">
                         <Input
@@ -1176,7 +1194,7 @@ export function ReceivePurchaseOrderPage() {
                         />
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {lineTaxTotal(line).toLocaleString()}
+                        {formatMoney(lineTaxTotal(line))}
                       </td>
                       <td className="px-3 py-2">
                         {line.vendorSkuId ? (
@@ -1211,7 +1229,7 @@ export function ReceivePurchaseOrderPage() {
       <section className="grid max-w-sm gap-3 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Subtotal</span>
-          <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(subtotal)}</span>
         </div>
         <div className="flex items-center justify-between gap-6">
           <Label htmlFor="discount">Discount %</Label>
@@ -1226,7 +1244,7 @@ export function ReceivePurchaseOrderPage() {
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Discount amount</span>
           <span className="tabular-nums">
-            {discountAmount.toLocaleString()}
+            {formatMoney(discountAmount)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
@@ -1283,13 +1301,13 @@ export function ReceivePurchaseOrderPage() {
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Return credit</span>
             <span className="tabular-nums text-green-700 dark:text-green-400">
-              −{returnCredit.toLocaleString()}
+              −{formatMoney(returnCredit)}
             </span>
           </div>
         ) : null}
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Grand total</span>
-          <span className="tabular-nums">{grandTotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(grandTotal)}</span>
         </div>
         <div className="flex items-center justify-between gap-6">
           <Label htmlFor="amount-paid">Paid</Label>
@@ -1308,7 +1326,7 @@ export function ReceivePurchaseOrderPage() {
         {header?.vendorId ? (
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Credit for this vendor</span>
-            <span className="tabular-nums">{receiptCredit.toLocaleString()}</span>
+            <span className="tabular-nums">{formatMoney(receiptCredit)}</span>
           </div>
         ) : null}
       </section>
@@ -1375,12 +1393,12 @@ export function ReceivePurchaseOrderPage() {
               <p>Warehouse: {header.warehouseName}</p>
               <p>Items: {lines.length}</p>
               <p>
-                Discount: {discountPct}% ({discountAmount.toLocaleString()})
+                Discount: {discountPct}% ({formatMoney(discountAmount)})
               </p>
-              <p>Return credit: {returnCredit.toLocaleString()}</p>
-              <p>Total: {grandTotal.toLocaleString()}</p>
-              <p>Paid: {Number.isFinite(amountPaid) ? amountPaid.toLocaleString() : "—"}</p>
-              <p>Vendor credit: {receiptCredit.toLocaleString()}</p>
+              <p>Return credit: {formatMoney(returnCredit)}</p>
+              <p>Total: {formatMoney(grandTotal)}</p>
+              <p>Paid: {Number.isFinite(amountPaid) ? formatMoney(amountPaid) : "—"}</p>
+              <p>Vendor credit: {formatMoney(receiptCredit)}</p>
             </>
           ) : null
         }

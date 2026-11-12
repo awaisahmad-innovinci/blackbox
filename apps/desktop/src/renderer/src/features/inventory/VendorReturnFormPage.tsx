@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type {
   SellUnit,
@@ -19,6 +20,7 @@ import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import {
   KEYBOARD_HINT_ADD,
@@ -315,7 +317,7 @@ export function VendorReturnFormPage() {
         <>
           <p>Vendor: {vendorName}</p>
           <p>Items: {lines.length}</p>
-          <p>Total: {subtotal.toLocaleString()}</p>
+          <p>Total: {formatMoney(subtotal)}</p>
         </>
       ),
       confirmLabel: "Post return",
@@ -394,6 +396,21 @@ export function VendorReturnFormPage() {
               createdAt: now,
             },
           });
+        }
+        if (user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "vendor_return.posted",
+              actorUserId: user.id,
+              summary: `Posted vendor return ${detail.returnNumber} for Rs ${formatMoney(detail.total)}`,
+              metadata: {
+                vendorReturnId: localId,
+                returnNumber: detail.returnNumber,
+                total: detail.total,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
         }
         void syncNow();
         setSuccess(detail);
@@ -675,10 +692,10 @@ export function VendorReturnFormPage() {
                     />
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {line.unitCost.toLocaleString()}
+                    {formatMoney(line.unitCost)}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {line.lineTotal.toLocaleString()}
+                    {formatMoney(line.lineTotal)}
                   </td>
                   <td className="px-3 py-2">
                     <Button
@@ -727,7 +744,7 @@ export function VendorReturnFormPage() {
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Total</span>
-          <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(subtotal)}</span>
         </div>
       </section>
 

@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Injectable,
@@ -24,6 +25,8 @@ import {
 } from "@blackbox/shared";
 import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
 import { allocateReceiptNumber } from "../common/allocate-document-number";
+import { getRequestTenant } from "../../common/request-tenant";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
 import {
   GoodsReceipt,
   GoodsReceiptItem,
@@ -69,6 +72,7 @@ export class GoodsReceiptsService {
     private readonly vendors: Repository<Vendor>,
     @InjectRepository(Warehouse)
     private readonly warehouses: Repository<Warehouse>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(query: ListGoodsReceiptsQueryDto): Promise<PaginatedGoodsReceipts> {
@@ -256,7 +260,7 @@ export class GoodsReceiptsService {
   ): Promise<GoodsReceiptDetail> {
     const tenantId = this.fixedTenant.tenantId;
 
-    return this.dataSource.transaction(async (manager) => {
+    const posted = await this.dataSource.transaction(async (manager) => {
       const po = await manager.getRepository(PurchaseOrder).findOne({
         where: { id: purchaseOrderId, tenantId },
         lock: { mode: "pessimistic_write" },
@@ -620,6 +624,24 @@ export class GoodsReceiptsService {
 
       return this.getByIdInManager(manager, receipt.id);
     });
+
+    const actorUserId = getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "goods_receipt.posted",
+        actorUserId,
+        summary: `Received ${posted.receiptNumber} for Rs ${formatMoney(posted.total)}`,
+        metadata: {
+          goodsReceiptId: posted.id,
+          receiptNumber: posted.receiptNumber,
+          purchaseOrderId: posted.purchaseOrderId,
+          poNumber: posted.poNumber,
+          total: posted.total,
+        },
+      });
+    }
+    return posted;
   }
 
   async getById(id: string): Promise<GoodsReceiptDetail> {

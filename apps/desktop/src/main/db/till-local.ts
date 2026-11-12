@@ -13,12 +13,15 @@ import {
   formatTillName,
   TILL_CLOSE_REASON_CASHIER_CLOSED,
   tillMaxLimit,
+  tillOpeningExceedsDrawer,
+  tillOpeningExceedsDrawerMessage,
   validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
 import { randomUUID } from "node:crypto";
 import { getLocalDb } from "./index";
+import { getManagerDrawerBalanceLocal } from "./cash-flow-local";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 
 const ACTIVE_STATUSES: TillStatus[] = [
@@ -53,6 +56,7 @@ type TillRow = {
   reopened_by_user_id: string | null;
   reopened_by_name: string | null;
   close_reason: string | null;
+  funded_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -95,6 +99,7 @@ function rowToDetail(row: TillRow): TillSessionDetail {
     reopenedByUserId: row.reopened_by_user_id,
     reopenedByName: row.reopened_by_name,
     closeReason: row.close_reason,
+    fundedByUserId: row.funded_by_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -196,11 +201,17 @@ export function openTillLocal(input: {
   tillUsername: string;
   body: OpenTillRequest;
   requireApproval: boolean;
+  funderUserId?: string;
+  funderName?: string;
 }): TillSessionDetail {
   const validationError = validateTillOpeningBalanceAmount(
     input.body.openingBalance,
   );
   if (validationError) throw new Error(validationError);
+  if (!input.funderUserId) {
+    throw new Error("A manager must open this till from their drawer.");
+  }
+  void input.requireApproval;
 
   if (findActiveSession(input.userId)) {
     throw new Error("You already have an active till session");
@@ -225,11 +236,9 @@ export function openTillLocal(input: {
 
   const now = new Date().toISOString();
   const openingBalance = input.body.openingBalance;
+  assertManagerCanFundTill(input.funderUserId, input.funderName ?? "", openingBalance);
   const openingTotal = openingBalance;
   const maxLimit = tillMaxLimit(openingBalance);
-  const approvedNow =
-    !input.requireApproval || input.body.supervisorApproved === true;
-  const status: TillStatus = approvedNow ? "OPEN" : "PENDING_APPROVAL";
   const zeroNotes = emptyTillNotes();
 
   const row: TillRow = {
@@ -238,7 +247,7 @@ export function openTillLocal(input: {
     user_id: input.userId,
     user_name: input.userName,
     till_name: formatTillName(input.tillUsername),
-    status,
+    status: "OPEN",
     note_10: zeroNotes.note10,
     note_20: zeroNotes.note20,
     note_50: zeroNotes.note50,
@@ -252,12 +261,13 @@ export function openTillLocal(input: {
     max_cash_limit: maxLimit,
     opened_at: now,
     closed_at: null,
-    approved_by_user_id: approvedNow ? input.userId : null,
-    approved_by_name: approvedNow ? input.userName : null,
-    approved_at: approvedNow ? now : null,
+    approved_by_user_id: input.funderUserId,
+    approved_by_name: input.funderName ?? "",
+    approved_at: now,
     reopened_by_user_id: null,
     reopened_by_name: null,
     close_reason: null,
+    funded_by_user_id: input.funderUserId,
     created_at: now,
     updated_at: now,
   };
@@ -269,18 +279,31 @@ export function openTillLocal(input: {
       note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
       opening_total, opening_balance, current_cash_balance, max_cash_limit,
       opened_at, closed_at, approved_by_user_id, approved_by_name, approved_at,
-      reopened_by_user_id, reopened_by_name, close_reason, created_at, updated_at
+      reopened_by_user_id, reopened_by_name, close_reason, funded_by_user_id,
+      created_at, updated_at
     ) values (
       @id, @tenant_id, @user_id, @user_name, @till_name, @status,
       @note_10, @note_20, @note_50, @note_100, @note_500, @note_1000, @note_5000,
       @opening_total, @opening_balance, @current_cash_balance, @max_cash_limit,
       @opened_at, @closed_at, @approved_by_user_id, @approved_by_name, @approved_at,
-      @reopened_by_user_id, @reopened_by_name, @close_reason, @created_at, @updated_at
+      @reopened_by_user_id, @reopened_by_name, @close_reason, @funded_by_user_id,
+      @created_at, @updated_at
     )
   `,
   ).run(row);
 
   return rowToDetail(row);
+}
+
+function assertManagerCanFundTill(
+  managerId: string,
+  managerName: string,
+  openingBalance: number,
+): void {
+  const available = getManagerDrawerBalanceLocal(managerId, managerName);
+  if (tillOpeningExceedsDrawer(openingBalance, available)) {
+    throw new Error(tillOpeningExceedsDrawerMessage(available));
+  }
 }
 
 export function approveTillLocal(input: {
@@ -293,6 +316,13 @@ export function approveTillLocal(input: {
   if (row.status !== "PENDING_APPROVAL") {
     throw new Error("Till session is not pending approval");
   }
+  if (!row.funded_by_user_id) {
+    assertManagerCanFundTill(
+      input.managerId,
+      input.managerName,
+      row.opening_balance,
+    );
+  }
 
   const db = getLocalDb();
   const now = new Date().toISOString();
@@ -303,6 +333,7 @@ export function approveTillLocal(input: {
         approved_by_user_id = @managerId,
         approved_by_name = @managerName,
         approved_at = @now,
+        funded_by_user_id = coalesce(funded_by_user_id, @managerId),
         updated_at = @now
     where id = @id and tenant_id = @tenantId
   `,
@@ -601,6 +632,7 @@ export function reopenTillLocal(input: {
   const db = getLocalDb();
   const now = new Date().toISOString();
   const openingBalance = input.body.openingBalance;
+  assertManagerCanFundTill(input.managerId, input.managerName, openingBalance);
   const openingTotal = amountOnly ? openingBalance : notesTotal;
   const maxLimit = tillMaxLimit(openingBalance);
   const zeroNotes = amountOnly ? emptyTillNotes() : null;
@@ -632,6 +664,7 @@ export function reopenTillLocal(input: {
     reopened_by_user_id: supervisorId,
     reopened_by_name: input.managerName,
     close_reason: null,
+    funded_by_user_id: input.managerId,
     created_at: now,
     updated_at: now,
   };
@@ -643,13 +676,15 @@ export function reopenTillLocal(input: {
       note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
       opening_total, opening_balance, current_cash_balance, max_cash_limit,
       opened_at, closed_at, approved_by_user_id, approved_by_name, approved_at,
-      reopened_by_user_id, reopened_by_name, close_reason, created_at, updated_at
+      reopened_by_user_id, reopened_by_name, close_reason, funded_by_user_id,
+      created_at, updated_at
     ) values (
       @id, @tenant_id, @user_id, @user_name, @till_name, @status,
       @note_10, @note_20, @note_50, @note_100, @note_500, @note_1000, @note_5000,
       @opening_total, @opening_balance, @current_cash_balance, @max_cash_limit,
       @opened_at, @closed_at, @approved_by_user_id, @approved_by_name, @approved_at,
-      @reopened_by_user_id, @reopened_by_name, @close_reason, @created_at, @updated_at
+      @reopened_by_user_id, @reopened_by_name, @close_reason, @funded_by_user_id,
+      @created_at, @updated_at
     )
   `,
   ).run(row);
@@ -667,13 +702,15 @@ export function upsertTillSessionLocal(detail: TillSessionDetail): void {
       note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
       opening_total, opening_balance, current_cash_balance, max_cash_limit,
       opened_at, closed_at, approved_by_user_id, approved_by_name, approved_at,
-      reopened_by_user_id, reopened_by_name, close_reason, created_at, updated_at
+      reopened_by_user_id, reopened_by_name, close_reason, funded_by_user_id,
+      created_at, updated_at
     ) values (
       @id, @tenant_id, @user_id, @user_name, @till_name, @status,
       @note_10, @note_20, @note_50, @note_100, @note_500, @note_1000, @note_5000,
       @opening_total, @opening_balance, @current_cash_balance, @max_cash_limit,
       @opened_at, @closed_at, @approved_by_user_id, @approved_by_name, @approved_at,
-      @reopened_by_user_id, @reopened_by_name, @close_reason, @created_at, @updated_at
+      @reopened_by_user_id, @reopened_by_name, @close_reason, @funded_by_user_id,
+      @created_at, @updated_at
     )
     on conflict(id) do update set
       user_name = excluded.user_name,
@@ -698,6 +735,7 @@ export function upsertTillSessionLocal(detail: TillSessionDetail): void {
       reopened_by_user_id = excluded.reopened_by_user_id,
       reopened_by_name = excluded.reopened_by_name,
       close_reason = excluded.close_reason,
+      funded_by_user_id = excluded.funded_by_user_id,
       updated_at = excluded.updated_at
   `,
   ).run({
@@ -726,6 +764,7 @@ export function upsertTillSessionLocal(detail: TillSessionDetail): void {
     reopened_by_user_id: detail.reopenedByUserId,
     reopened_by_name: detail.reopenedByName,
     close_reason: detail.closeReason,
+    funded_by_user_id: detail.fundedByUserId ?? null,
     created_at: detail.createdAt ?? now,
     updated_at: detail.updatedAt ?? now,
   });
