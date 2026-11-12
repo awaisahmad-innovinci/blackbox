@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { runIncrementalSync } from "@renderer/lib/api/sync";
+import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
+import { refreshSessionUserFromApi } from "@renderer/lib/session/session-user-refresh";
 
 export type SyncStatusState = {
   syncing: boolean;
@@ -70,6 +72,8 @@ export async function syncNow(): Promise<boolean> {
   setState({ syncing: true });
   try {
     const { pushed, pulled } = await runIncrementalSync();
+    void refreshSupervisorTotpCache();
+    await refreshSessionUserFromApi();
     setState({
       lastError: null,
       offline: false,

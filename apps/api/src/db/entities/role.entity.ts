@@ -2,28 +2,19 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
 } from "typeorm";
 import { RolePermission } from "./role-permission.entity";
-import { Tenant } from "./tenant.entity";
 import { UserRole } from "./user-role.entity";
 
 @Entity({ name: "roles" })
-@Unique("roles_tenant_id_key_key", ["tenantId", "key"])
-@Unique("roles_tenant_id_id_key", ["tenantId", "id"])
-@Index("roles_tenant_id_idx", ["tenantId"])
+@Unique("roles_key_key", ["key"])
 export class Role {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
-
-  @Column({ name: "tenant_id", type: "uuid" })
-  tenantId!: string;
 
   @Column({ type: "text" })
   key!: string;
@@ -39,10 +30,6 @@ export class Role {
 
   @UpdateDateColumn({ name: "updated_at", type: "timestamptz" })
   updatedAt!: Date;
-
-  @ManyToOne(() => Tenant, (tenant) => tenant.roles, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "tenant_id" })
-  tenant!: Tenant;
 
   @OneToMany(() => RolePermission, (rp) => rp.role)
   rolePermissions!: RolePermission[];

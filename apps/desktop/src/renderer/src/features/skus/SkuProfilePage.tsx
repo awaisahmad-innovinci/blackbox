@@ -8,6 +8,7 @@ import type {
   SkuSupplier,
   WarehouseStockRow,
 } from "@blackbox/shared";
+import { formatMoney, hsCodeError } from "@blackbox/shared";
 import { BackButton } from "@renderer/app/BackButton";
 import {
   FORM_DIALOG_FIELD_FULL,
@@ -36,16 +37,26 @@ import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { skusApi } from "@renderer/lib/api/skus";
-import { unitsApi } from "@renderer/lib/api/units";
 import type { UnitListItem } from "@blackbox/shared";
-import { normalizeStoredText } from "@blackbox/shared";
-import { sellingFromMargin } from "@renderer/lib/sku-pricing";
-import { loadSkuProfile } from "@renderer/lib/local-db/entity-source";
+import {
+  costWithGst,
+  normalizeStoredText,
+  purchaseUnitAllowsPackSize,
+  normalizeUnitsPerPurchaseUnit,
+} from "@blackbox/shared";
+import {
+  marginFromSellingGst,
+  optionalGstPercent,
+  sellingFromMarginGst,
+} from "@renderer/lib/sku-pricing";
+import { loadSkuProfile, loadUnits } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { useSession } from "@renderer/lib/session/context";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { SupplierPriceCells } from "@renderer/features/inventory/supplier-price-cells";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { wrapDialogOpenChange } from "@renderer/lib/on-dialog-open-change";
+import { AddCapitalDialog } from "./AddCapitalDialog";
 import { AddSkuBarcodeDialog } from "./AddSkuBarcodeDialog";
 
 function toProductSkuRow(
@@ -66,8 +77,11 @@ function toProductSkuRow(
     purchaseUnitName: sku.purchaseUnitName,
     unitsPerPurchaseUnit: sku.unitsPerPurchaseUnit,
     costPrice: sku.costPrice,
+    gstPercent: sku.gstPercent,
+    hsCode: sku.hsCode ?? null,
     sellingPrice: sku.sellingPrice,
     sellingPricePerPurchaseUnit: sku.sellingPricePerPurchaseUnit,
+    saleDiscountPercent: sku.saleDiscountPercent,
     reorderLevel: sku.reorderLevel,
     minimumStockLevel: sku.minimumStockLevel,
     maximumStockLevel: sku.maximumStockLevel,
@@ -76,16 +90,24 @@ function toProductSkuRow(
   };
 }
 
+function clampSaleDiscountPercent(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, n));
+}
+
 export function SkuProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { user } = useSession();
   const [sku, setSku] = useState<SkuDetail | null>(null);
   const [suppliers, setSuppliers] = useState<SkuSupplier[]>([]);
   const [inventory, setInventory] = useState<WarehouseStockRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [addBarcodeOpen, setAddBarcodeOpen] = useState(false);
+  const [addCapitalOpen, setAddCapitalOpen] = useState(false);
   const [units, setUnits] = useState<UnitListItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -98,9 +120,11 @@ export function SkuProfilePage() {
   const [purchaseUnitId, setPurchaseUnitId] = useState("");
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
   const [costPrice, setCostPrice] = useState("0");
+  const [gstPercent, setGstPercent] = useState("0");
+  const [hsCode, setHsCode] = useState("");
   const [marginPercent, setMarginPercent] = useState("");
   const [sellingPrice, setSellingPrice] = useState("0");
-  const [boxSellingPrice, setBoxSellingPrice] = useState("");
+  const [saleDiscountPercent, setSaleDiscountPercent] = useState("0");
   const [reorderLevel, setReorderLevel] = useState("0");
   const [minimumStockLevel, setMinimumStockLevel] = useState("0");
   const [maximumStockLevel, setMaximumStockLevel] = useState("");
@@ -129,6 +153,11 @@ export function SkuProfilePage() {
         setError(getApiErrorMessage(err, "Failed to load SKU"));
       }
     });
+    void loadUnits()
+      .then((rows) => {
+        if (!cancelled) setUnits(rows);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -145,13 +174,17 @@ export function SkuProfilePage() {
     setPurchaseUnitId(sku.purchaseUnitId ?? "");
     setUnitsPerPurchaseUnit(String(sku.unitsPerPurchaseUnit));
     setCostPrice(String(sku.costPrice));
-    setMarginPercent("");
+    setGstPercent(String(sku.gstPercent ?? 0));
+    setHsCode(sku.hsCode ?? "");
     setSellingPrice(String(sku.sellingPrice));
-    setBoxSellingPrice(
-      sku.sellingPricePerPurchaseUnit == null
-        ? ""
-        : String(sku.sellingPricePerPurchaseUnit),
+    setMarginPercent(
+      marginFromSellingGst(
+        String(sku.costPrice),
+        String(sku.gstPercent ?? 0),
+        String(sku.sellingPrice),
+      ) ?? "",
     );
+    setSaleDiscountPercent(String(sku.saleDiscountPercent ?? 0));
     setReorderLevel(String(sku.reorderLevel));
     setMinimumStockLevel(String(sku.minimumStockLevel));
     setMaximumStockLevel(
@@ -160,16 +193,30 @@ export function SkuProfilePage() {
     setTrackInventory(sku.trackInventory);
     setStatus(sku.status);
     setFormError(null);
-    void unitsApi.list().then(setUnits).catch(() => undefined);
     setEditOpen(true);
   }
 
-  const unitsPerPurchaseUnitN = Number(unitsPerPurchaseUnit);
+  const selectedPurchaseUnit = units.find((u) => u.id === purchaseUnitId);
+  const packSizeEditable = selectedPurchaseUnit
+    ? purchaseUnitAllowsPackSize(selectedPurchaseUnit)
+    : false;
+
+  function onPurchaseUnitChange(nextId: string) {
+    const unit = units.find((u) => u.id === nextId);
+    const allowsPack = unit ? purchaseUnitAllowsPackSize(unit) : false;
+    setPurchaseUnitId(nextId);
+    if (!allowsPack) setUnitsPerPurchaseUnit("1");
+  }
+
+  const unitsPerPurchaseUnitN = normalizeUnitsPerPurchaseUnit(
+    Number(unitsPerPurchaseUnit),
+    selectedPurchaseUnit ?? {},
+  );
   const costPriceN = Number(costPrice);
+  const gstPercentN = Number(gstPercent);
   const marginPercentN = marginPercent.trim() === "" ? null : Number(marginPercent);
   const sellingPriceN = Number(sellingPrice);
-  const boxSellingPriceN =
-    boxSellingPrice.trim() === "" ? null : Number(boxSellingPrice);
+  const saleDiscountPercentN = Number(saleDiscountPercent);
   const baseUnitError = baseUnitId ? null : "Base unit is required";
   const purchaseUnitError = purchaseUnitId ? null : "Purchase unit is required";
   const unitsPerError =
@@ -182,6 +229,8 @@ export function SkuProfilePage() {
     !costPrice.trim() || Number.isNaN(costPriceN) || costPriceN < 0
       ? "Cost price is required"
       : null;
+  const gstError = optionalGstPercent(gstPercent);
+  const hsError = hsCodeError(hsCode, false);
   const marginError =
     marginPercentN != null &&
     (Number.isNaN(marginPercentN) || marginPercentN < 0)
@@ -190,13 +239,15 @@ export function SkuProfilePage() {
   const sellingError =
     !sellingPrice.trim() || Number.isNaN(sellingPriceN) || sellingPriceN < 0
       ? "Selling price is required"
-      : sellingPriceN <= costPriceN
-        ? "Selling price must be greater than cost price"
+      : sellingPriceN <= costWithGst(costPriceN, Number.isNaN(gstPercentN) ? 0 : gstPercentN)
+        ? "Selling price must be greater than cost + GST"
         : null;
-  const boxSellingError =
-    boxSellingPriceN != null &&
-    (Number.isNaN(boxSellingPriceN) || boxSellingPriceN < 0)
-      ? "Box selling price must be zero or greater"
+  const saleDiscountError =
+    saleDiscountPercent.trim() !== "" &&
+    (Number.isNaN(saleDiscountPercentN) ||
+      saleDiscountPercentN < 0 ||
+      saleDiscountPercentN > 100)
+      ? "Sale discount must be between 0 and 100"
       : null;
   const canSaveEdit =
     Boolean(variantName.trim()) &&
@@ -205,26 +256,41 @@ export function SkuProfilePage() {
     !purchaseUnitError &&
     !unitsPerError &&
     !costError &&
+    !gstError &&
+    !hsError &&
     !marginError &&
     !sellingError &&
-    !boxSellingError;
+    !saleDiscountError;
 
   function onCostPriceChange(value: string) {
     setCostPrice(value);
-    const calculated = sellingFromMargin(value, marginPercent);
+    const calculated = sellingFromMarginGst(value, gstPercent, marginPercent);
+    if (calculated != null) setSellingPrice(calculated);
+  }
+
+  function onGstPercentChange(value: string) {
+    setGstPercent(value);
+    const calculated = sellingFromMarginGst(costPrice, value, marginPercent);
     if (calculated != null) setSellingPrice(calculated);
   }
 
   function onMarginPercentChange(value: string) {
     setMarginPercent(value);
-    const calculated = sellingFromMargin(costPrice, value);
+    const calculated = sellingFromMarginGst(costPrice, gstPercent, value);
     if (calculated != null) setSellingPrice(calculated);
+  }
+
+  function onSellingPriceChange(value: string) {
+    setSellingPrice(value);
+    const calculated = marginFromSellingGst(costPrice, gstPercent, value);
+    if (calculated != null) setMarginPercent(calculated);
   }
 
   async function onSaveEdit() {
     if (!id || !sku || !canSaveEdit) return;
     setSaving(true);
     setFormError(null);
+    const saleDiscountPercentValue = clampSaleDiscountPercent(saleDiscountPercent);
     const next: SkuDetail = {
       ...sku,
       variantName: normalizeStoredText(variantName),
@@ -240,8 +306,11 @@ export function SkuProfilePage() {
         sku.purchaseUnitName,
       unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
       costPrice: costPriceN,
+      gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
+      hsCode: hsCode.trim() || sku.hsCode || null,
       sellingPrice: sellingPriceN,
-      sellingPricePerPurchaseUnit: boxSellingPriceN,
+      sellingPricePerPurchaseUnit: null,
+      saleDiscountPercent: saleDiscountPercentValue,
       reorderLevel: Number(reorderLevel),
       minimumStockLevel: Number(minimumStockLevel),
       maximumStockLevel:
@@ -274,8 +343,11 @@ export function SkuProfilePage() {
         purchaseUnitId,
         unitsPerPurchaseUnit: unitsPerPurchaseUnitN,
         costPrice: costPriceN,
+        gstPercent: Number.isNaN(gstPercentN) ? 0 : gstPercentN,
+        hsCode: hsCode.trim() || undefined,
         sellingPrice: sellingPriceN,
-        sellingPricePerPurchaseUnit: boxSellingPriceN,
+        sellingPricePerPurchaseUnit: null,
+        saleDiscountPercent: saleDiscountPercentValue,
         reorderLevel: next.reorderLevel,
         minimumStockLevel: next.minimumStockLevel,
         maximumStockLevel: next.maximumStockLevel,
@@ -427,6 +499,7 @@ export function SkuProfilePage() {
         unitsPerPurchaseUnit: active.unitsPerPurchaseUnit,
         costPrice: active.costPrice,
         sellingPrice: active.sellingPrice,
+        saleDiscountPercent: active.saleDiscountPercent,
         reorderLevel: active.reorderLevel,
         minimumStockLevel: active.minimumStockLevel,
         maximumStockLevel: active.maximumStockLevel,
@@ -525,10 +598,17 @@ export function SkuProfilePage() {
           <div>
             <dt className="text-muted-foreground">Cost / Selling</dt>
             <dd className="font-medium tabular-nums">
-              {sku.costPrice} / {sku.sellingPrice}
-              {sku.sellingPricePerPurchaseUnit != null
-                ? ` (box ${sku.sellingPricePerPurchaseUnit})`
-                : ""}
+              {formatMoney(sku.costPrice)} / {formatMoney(sku.sellingPrice)} per pc
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">HS code</dt>
+            <dd className="font-medium tabular-nums">{sku.hsCode || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Sale discount %</dt>
+            <dd className="font-medium tabular-nums">
+              {sku.saleDiscountPercent ?? 0}
             </dd>
           </div>
           <div>
@@ -602,7 +682,19 @@ export function SkuProfilePage() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-medium">Inventory by warehouse</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Inventory by warehouse</h2>
+          {sku.trackInventory &&
+          user?.permissions.includes("inventory.opening.write") ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddCapitalOpen(true)}
+            >
+              Add capital
+            </Button>
+          ) : null}
+        </div>
         <div className="border-border overflow-hidden rounded-lg border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
@@ -771,7 +863,7 @@ export function SkuProfilePage() {
                 {...formSelectPickerProps()}
                 value={purchaseUnitId}
                 aria-invalid={Boolean(purchaseUnitError)}
-                onChange={(e) => setPurchaseUnitId(e.target.value)}
+                onChange={(e) => onPurchaseUnitChange(e.target.value)}
               >
                 <option value="">—</option>
                 {units.map((u) => (
@@ -787,16 +879,23 @@ export function SkuProfilePage() {
             <div className="space-y-1.5">
               <Label>Units / purchase unit *</Label>
               <Input
-                value={unitsPerPurchaseUnit}
+                value={packSizeEditable ? unitsPerPurchaseUnit : "1"}
+                readOnly={!packSizeEditable}
+                disabled={!packSizeEditable}
                 aria-invalid={Boolean(unitsPerError)}
                 onChange={(e) => setUnitsPerPurchaseUnit(e.target.value)}
               />
+              {!packSizeEditable && purchaseUnitId ? (
+                <p className="text-muted-foreground text-xs">
+                  Fixed at 1 when purchase unit is not Box.
+                </p>
+              ) : null}
               {unitsPerError ? (
                 <p className="text-destructive text-xs">{unitsPerError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Cost price *</Label>
+              <Label>Cost price / pc *</Label>
               <Input
                 value={costPrice}
                 aria-invalid={Boolean(costError)}
@@ -804,6 +903,30 @@ export function SkuProfilePage() {
               />
               {costError ? (
                 <p className="text-destructive text-xs">{costError}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>GST %</Label>
+              <Input
+                value={gstPercent}
+                aria-invalid={Boolean(gstError)}
+                placeholder="0"
+                onChange={(e) => onGstPercentChange(e.target.value)}
+              />
+              {gstError ? (
+                <p className="text-destructive text-xs">{gstError}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>HS code</Label>
+              <Input
+                value={hsCode}
+                aria-invalid={Boolean(hsError)}
+                placeholder="1704.909"
+                onChange={(e) => setHsCode(e.target.value)}
+              />
+              {hsError ? (
+                <p className="text-destructive text-xs">{hsError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
@@ -819,26 +942,29 @@ export function SkuProfilePage() {
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Selling price *</Label>
+              <Label>Selling price / pc *</Label>
               <Input
                 value={sellingPrice}
                 aria-invalid={Boolean(sellingError)}
-                onChange={(e) => setSellingPrice(e.target.value)}
+                onChange={(e) => onSellingPriceChange(e.target.value)}
               />
               {sellingError ? (
                 <p className="text-destructive text-xs">{sellingError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
-              <Label>Box selling price</Label>
+              <Label>Sale discount %</Label>
               <Input
-                value={boxSellingPrice}
-                aria-invalid={Boolean(boxSellingError)}
-                placeholder="Optional fixed box price"
-                onChange={(e) => setBoxSellingPrice(e.target.value)}
+                value={saleDiscountPercent}
+                aria-invalid={Boolean(saleDiscountError)}
+                placeholder="0"
+                onChange={(e) => setSaleDiscountPercent(e.target.value)}
               />
-              {boxSellingError ? (
-                <p className="text-destructive text-xs">{boxSellingError}</p>
+              <p className="text-muted-foreground text-xs">
+                Default discount on POS sale lines for this SKU (0–100).
+              </p>
+              {saleDiscountError ? (
+                <p className="text-destructive text-xs">{saleDiscountError}</p>
               ) : null}
             </div>
             <div className="space-y-1.5">
@@ -905,11 +1031,28 @@ export function SkuProfilePage() {
         </DialogContent>
       </Dialog>
 
+      {id && sku.trackInventory ? (
+        <AddCapitalDialog
+          open={addCapitalOpen}
+          skuId={id}
+          sku={sku.sku}
+          variantName={sku.variantName}
+          baseUnitName={sku.baseUnitName}
+          onClose={() => setAddCapitalOpen(false)}
+          onAdded={() => {
+            void reload().catch((err: unknown) => {
+              setError(getApiErrorMessage(err, "Failed to load SKU"));
+            });
+          }}
+        />
+      ) : null}
+
       {id ? (
         <AddSkuBarcodeDialog
           open={addBarcodeOpen}
           skuId={id}
           unitsPerPurchaseUnit={sku?.unitsPerPurchaseUnit ?? 1}
+          purchaseUnitName={sku?.purchaseUnitName ?? null}
           onClose={() => setAddBarcodeOpen(false)}
           onAdded={onBarcodeAdded}
         />

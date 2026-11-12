@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type {
   InventoryOutListItem,
@@ -232,7 +233,7 @@ export function InventoryOutListPage() {
                   <td className="px-4 py-3">{row.reference ?? "—"}</td>
                   <td className="px-4 py-3">{row.status}</td>
                   <td className="px-4 py-3 tabular-nums">
-                    {row.total.toLocaleString()}
+                    {formatMoney(row.total)}
                   </td>
                   <td className="px-4 py-3 tabular-nums">{row.itemCount}</td>
                 </ListTableRow>

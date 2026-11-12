@@ -7,7 +7,7 @@ import type {
   StockMovementRow,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { PRODUCT_TYPE_LABELS } from "@blackbox/shared";
+import { formatMoney, PRODUCT_TYPE_LABELS } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { BackButton } from "@renderer/app/BackButton";
 import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
@@ -325,8 +325,8 @@ export function ProductProfilePage() {
                     </td>
                     <td className="px-4 py-3">{s.sku}</td>
                     <td className="px-4 py-3">{s.barcode || "—"}</td>
-                    <td className="px-4 py-3 tabular-nums">{s.costPrice}</td>
-                    <td className="px-4 py-3 tabular-nums">{s.sellingPrice}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(s.costPrice)}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(s.sellingPrice)}</td>
                     <td className="px-4 py-3 capitalize">{s.status}</td>
                   </ListTableRow>
                 ))
@@ -357,8 +357,8 @@ export function ProductProfilePage() {
               <tr>
                 <th className="px-4 py-3 font-medium">Vendor</th>
                 <th className="px-4 py-3 font-medium">SKU</th>
-                <th className="px-4 py-3 font-medium">Price/pc</th>
-                <th className="px-4 py-3 font-medium">Price/box</th>
+                <th className="px-4 py-3 font-medium">Last price/pc</th>
+                <th className="px-4 py-3 font-medium">Last price/box</th>
                 <th className="px-4 py-3 font-medium">MOQ</th>
                 <th className="px-4 py-3 font-medium">Lead</th>
                 <th className="px-4 py-3 font-medium">Preferred</th>
@@ -419,13 +419,14 @@ export function ProductProfilePage() {
                 <th className="px-4 py-3 font-medium">On hand</th>
                 <th className="px-4 py-3 font-medium">Reserved</th>
                 <th className="px-4 py-3 font-medium">Available</th>
+                <th className="px-4 py-3 font-medium">Floor</th>
               </tr>
             </thead>
             <tbody>
               {inventory.length === 0 ? (
                 <tr className="border-border border-t">
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-muted-foreground px-4 py-6 text-center"
                   >
                     No stock lines.
@@ -448,6 +449,9 @@ export function ProductProfilePage() {
                     </td>
                     <td className="px-4 py-3 tabular-nums">
                       {row.quantityAvailable}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {row.floorQuantity ?? 0}
                     </td>
                   </ListTableRow>
                 ))

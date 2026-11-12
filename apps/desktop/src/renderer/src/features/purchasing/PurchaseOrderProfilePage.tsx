@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderDetail } from "@blackbox/shared";
+import {
+  displayPurchaseUnitCost,
+  formatPoOrderQuantity,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
@@ -14,6 +19,7 @@ import {
   isDeviceBound,
 } from "@renderer/lib/local-db/local-write";
 import { syncNow } from "@renderer/lib/sync/sync-status";
+import { PendingVendorReturnsSection } from "./PendingVendorReturnsSection";
 
 export function PurchaseOrderProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -270,14 +276,22 @@ export function PurchaseOrderProfilePage() {
                       </ListTableLink>
                     </td>
                     <td className="px-4 py-3">
-                      {item.purchaseUnitName || "—"}
-                    </td>
-                    <td className="px-4 py-3 tabular-nums">{item.quantity}</td>
-                    <td className="px-4 py-3 tabular-nums">
-                      {item.unitCost.toLocaleString()}
+                      {(item.orderUnit ?? "box") === "box"
+                        ? (item.purchaseUnitName ?? "box")
+                        : (item.baseUnitName ?? "pc")}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
-                      {item.lineTotal.toLocaleString()}
+                      {formatPoOrderQuantity(item)}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {formatMoney(displayPurchaseUnitCost(
+                        item.unitCost,
+                        item.orderUnit ?? "box",
+                        item.unitsPerPurchaseUnit,
+                      ))}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {formatMoney(item.lineTotal)}
                     </td>
                   </ListTableRow>
                 ))
@@ -287,10 +301,15 @@ export function PurchaseOrderProfilePage() {
         </div>
       </section>
 
+      <PendingVendorReturnsSection
+        vendorId={po.vendorId}
+        vendorName={po.vendorName}
+      />
+
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Total</span>
-          <span className="tabular-nums">{po.total.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(po.total)}</span>
         </div>
       </section>
       </PrintDocument>
@@ -303,7 +322,7 @@ export function PurchaseOrderProfilePage() {
           po ? (
             <>
               <p>Vendor: {po.vendorName}</p>
-              <p>Total: {po.total.toLocaleString()}</p>
+              <p>Total: {formatMoney(po.total)}</p>
               <p>Items: {po.items.length}</p>
             </>
           ) : null

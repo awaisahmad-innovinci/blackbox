@@ -7,16 +7,31 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
   EntityStatus,
+  OpeningStockRequest,
   SkuBarcodeLookupResult,
   SkuDetail,
   SkuSearchResult,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { normalizeStoredText } from "@blackbox/shared";
-import { Repository } from "typeorm";
+import {
+  costWithGst,
+  normalizeHsCode,
+  normalizeStoredText,
+  normalizeUnitsPerPurchaseUnit,
+  vendorPurchasePriceFromSku,
+} from "@blackbox/shared";
+import { DataSource, Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
-import { InventoryStock, ProductSku, Unit } from "../../db/entities";
+import {
+  InventoryMovement,
+  InventoryStock,
+  ProductSku,
+  Unit,
+  VendorSku,
+  Warehouse,
+} from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { getInventoryOutBalanceQty } from "../inventory-out/inventory-out-balance";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
 import { SkuBarcodesService } from "./sku-barcodes.service";
 
@@ -31,6 +46,10 @@ function toNumOrNull(value: string | null | undefined): number | null {
   return Number(value);
 }
 
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
 @Injectable()
 export class SkusService {
   constructor(
@@ -41,7 +60,10 @@ export class SkusService {
     private readonly units: Repository<Unit>,
     @InjectRepository(InventoryStock)
     private readonly stock: Repository<InventoryStock>,
+    @InjectRepository(VendorSku)
+    private readonly vendorSkus: Repository<VendorSku>,
     private readonly skuBarcodes: SkuBarcodesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async search(
@@ -86,6 +108,7 @@ export class SkusService {
         variantName: sku.variantName,
         sku: sku.sku,
         barcode: sku.barcode,
+        hsCode: sku.hsCode,
       }));
     }
 
@@ -105,12 +128,15 @@ export class SkusService {
       barcode: sku.barcode,
       quantityAvailable: availableBySku.get(sku.id) ?? 0,
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
     }));
   }
 
   async findByBarcode(
     barcode: string,
     warehouseId: string,
+    balanceSource: "stock" | "pos" = "stock",
   ): Promise<SkuSearchResult> {
     const tenantId = this.fixedTenant.tenantId;
     const code = barcode.trim();
@@ -130,9 +156,20 @@ export class SkusService {
     });
     if (!sku) throw new NotFoundException("SKU not found for barcode");
 
-    const stock = await this.stock.findOne({
-      where: { tenantId, productSkuId: sku.id, warehouseId },
-    });
+    let quantityAvailable = 0;
+    if (balanceSource === "pos") {
+      quantityAvailable = await getInventoryOutBalanceQty(
+        this.stock.manager,
+        tenantId,
+        warehouseId,
+        sku.id,
+      );
+    } else {
+      const stock = await this.stock.findOne({
+        where: { tenantId, productSkuId: sku.id, warehouseId },
+      });
+      quantityAvailable = stock ? toNum(stock.quantityAvailable) : 0;
+    }
 
     return {
       id: sku.id,
@@ -141,14 +178,17 @@ export class SkusService {
       variantName: sku.variantName,
       sku: sku.sku,
       barcode: sku.barcode,
-      quantityAvailable: stock ? toNum(stock.quantityAvailable) : 0,
+      quantityAvailable,
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
       scannedQuantityMultiplier: match.quantityMultiplier,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit, 1),
       baseUnitName: sku.baseUnit?.name ?? null,
       purchaseUnitName: sku.purchaseUnit?.name ?? null,
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(sku.saleDiscountPercent),
     };
   }
 
@@ -184,6 +224,8 @@ export class SkusService {
       purchaseUnitName: sku.purchaseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
       reorderLevel: toNum(sku.reorderLevel),
@@ -212,9 +254,9 @@ export class SkusService {
     if (!sku) throw new NotFoundException("SKU not found");
 
     await this.assertUnits(tenantId, dto.baseUnitId, dto.purchaseUnitId);
-    if (dto.sellingPrice <= dto.costPrice) {
+    if (dto.sellingPrice <= costWithGst(dto.costPrice, dto.gstPercent ?? 0)) {
       throw new BadRequestException(
-        "Selling price must be greater than cost price",
+        "Selling price must be greater than cost + GST",
       );
     }
 
@@ -224,13 +266,23 @@ export class SkusService {
     sku.sizeUnit = dto.sizeUnit?.trim() || null;
     sku.baseUnitId = dto.baseUnitId;
     sku.purchaseUnitId = dto.purchaseUnitId;
-    sku.unitsPerPurchaseUnit = String(dto.unitsPerPurchaseUnit);
+    sku.unitsPerPurchaseUnit = String(
+      await this.resolveUnitsPerPurchaseUnit(
+        tenantId,
+        dto.purchaseUnitId,
+        dto.unitsPerPurchaseUnit,
+      ),
+    );
     sku.costPrice = String(dto.costPrice);
+    sku.gstPercent = String(dto.gstPercent ?? 0);
+    const nextHsCode = normalizeHsCode(dto.hsCode);
+    if (nextHsCode) sku.hsCode = nextHsCode;
     sku.sellingPrice = String(dto.sellingPrice);
     sku.sellingPricePerPurchaseUnit =
       dto.sellingPricePerPurchaseUnit == null
         ? null
         : String(dto.sellingPricePerPurchaseUnit);
+    sku.saleDiscountPercent = String(dto.saleDiscountPercent ?? 0);
     sku.reorderLevel = String(dto.reorderLevel ?? 0);
     sku.minimumStockLevel = String(dto.minimumStockLevel ?? 0);
     sku.maximumStockLevel =
@@ -240,6 +292,18 @@ export class SkusService {
 
     try {
       await this.skus.save(sku);
+      const purchasePrice = vendorPurchasePriceFromSku({
+        costPrice: toNum(sku.costPrice),
+        unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit, 1),
+      });
+      await this.vendorSkus.update(
+        { tenantId, productSkuId: id },
+        {
+          purchaseUnitId: sku.purchaseUnitId,
+          unitsPerPurchaseUnit: sku.unitsPerPurchaseUnit,
+          purchasePrice: String(purchasePrice),
+        },
+      );
       return this.getById(id);
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -284,6 +348,83 @@ export class SkusService {
     }));
   }
 
+  async addOpeningStock(
+    id: string,
+    input: OpeningStockRequest,
+  ): Promise<WarehouseStockRow> {
+    const tenantId = this.fixedTenant.tenantId;
+    const quantity = round4(Number(input.quantity));
+    if (!(quantity > 0)) {
+      throw new BadRequestException("Quantity must be greater than zero");
+    }
+
+    const sku = await this.skus.findOne({
+      where: { id, tenantId },
+      relations: { product: true },
+    });
+    if (!sku) throw new NotFoundException("SKU not found");
+    if (!sku.trackInventory) {
+      throw new BadRequestException("This SKU does not track inventory");
+    }
+
+    const warehouse = await this.dataSource.getRepository(Warehouse).findOne({
+      where: { id: input.warehouseId, tenantId },
+    });
+    if (!warehouse || warehouse.status !== "active") {
+      throw new BadRequestException("Warehouse not found");
+    }
+
+    const reason = input.reason?.trim() || "Add capital";
+    const stock = await this.dataSource.transaction(async (manager) => {
+      await manager.save(
+        manager.create(InventoryMovement, {
+          tenantId,
+          productSkuId: sku.id,
+          warehouseId: warehouse.id,
+          movementType: "OPENING_BALANCE",
+          quantity: String(quantity),
+          referenceType: "opening_balance",
+          referenceId: null,
+          reason,
+        }),
+      );
+
+      let row = await manager.findOne(InventoryStock, {
+        where: {
+          tenantId,
+          productSkuId: sku.id,
+          warehouseId: warehouse.id,
+        },
+      });
+      if (!row) {
+        row = manager.create(InventoryStock, {
+          tenantId,
+          productSkuId: sku.id,
+          warehouseId: warehouse.id,
+          quantityOnHand: "0",
+          quantityReserved: "0",
+          quantityAvailable: "0",
+        });
+      }
+      const onHand = round4(toNum(row.quantityOnHand) + quantity);
+      const reserved = toNum(row.quantityReserved);
+      row.quantityOnHand = String(onHand);
+      row.quantityAvailable = String(round4(onHand - reserved));
+      return manager.save(row);
+    });
+
+    return {
+      warehouseId: warehouse.id,
+      warehouseName: warehouse.name,
+      productSkuId: sku.id,
+      sku: sku.sku,
+      variantName: sku.variantName,
+      quantityOnHand: toNum(stock.quantityOnHand),
+      quantityReserved: toNum(stock.quantityReserved),
+      quantityAvailable: toNum(stock.quantityAvailable),
+    };
+  }
+
   private mapDetail(
     sku: ProductSku,
     barcodes: SkuDetail["barcodes"],
@@ -305,8 +446,11 @@ export class SkusService {
       purchaseUnitName: sku.purchaseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(sku.unitsPerPurchaseUnit),
       costPrice: toNum(sku.costPrice),
+      gstPercent: toNum(sku.gstPercent),
+      hsCode: sku.hsCode,
       sellingPrice: toNum(sku.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(sku.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(sku.saleDiscountPercent),
       reorderLevel: toNum(sku.reorderLevel),
       minimumStockLevel: toNum(sku.minimumStockLevel),
       maximumStockLevel: toNumOrNull(sku.maximumStockLevel),
@@ -325,5 +469,20 @@ export class SkusService {
       const unit = await this.units.findOne({ where: { id: unitId, tenantId } });
       if (!unit) throw new BadRequestException("Invalid unit");
     }
+  }
+
+  private async resolveUnitsPerPurchaseUnit(
+    tenantId: string,
+    purchaseUnitId: string,
+    raw: number,
+  ): Promise<number> {
+    const unit = await this.units.findOne({
+      where: { id: purchaseUnitId, tenantId },
+    });
+    if (!unit) return normalizeUnitsPerPurchaseUnit(raw, {});
+    return normalizeUnitsPerPurchaseUnit(raw, {
+      name: unit.name,
+      abbreviation: unit.abbreviation,
+    });
   }
 }

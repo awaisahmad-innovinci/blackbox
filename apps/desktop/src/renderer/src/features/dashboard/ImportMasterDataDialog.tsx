@@ -1,5 +1,8 @@
 import { useMemo, useRef, useState } from "react";
-import { MASTER_DATA_IMPORT_FILES } from "@blackbox/shared";
+import {
+  MASTER_DATA_07_PRODUCT_SKU_HEADERS,
+  MASTER_DATA_IMPORT_FILES,
+} from "@blackbox/shared";
 import type {
   MasterDataImportError,
   MasterDataImportResult,
@@ -25,7 +28,7 @@ const EXPECTED_FILES = new Set<string>(MASTER_DATA_IMPORT_FILES);
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImported: (result: MasterDataImportResult) => Promise<void>;
+  onImported: (result: MasterDataImportResult) => void;
 };
 
 function classify(list: File[]): {
@@ -97,6 +100,13 @@ export function ImportMasterDataDialog({
     return Array.from(groups.entries());
   }, [errors]);
 
+  const show07HeaderHint = errors.some(
+    (error) =>
+      error.file === "07_product_skus.csv" &&
+      error.line === 1 &&
+      error.message.includes("Headers must exactly match"),
+  );
+
   function reset() {
     setSelection(null);
     setMessage(null);
@@ -133,19 +143,11 @@ export function ImportMasterDataDialog({
     try {
       const imported = await inventoryImportsApi.uploadMasterData(selection);
       setResult(imported);
-      setMessage("Cloud import complete. Syncing imported data locally…");
-      try {
-        await onImported(imported);
-        setMessage("File successfully uploaded.");
-        setSucceeded(true);
-      } catch (syncError: unknown) {
-        setSucceeded(false);
-        setMessage(
-          `Cloud import succeeded, but local Sync failed. Use the Dashboard Sync button to retry. ${
-            syncError instanceof Error ? syncError.message : ""
-          }`.trim(),
-        );
-      }
+      onImported(imported);
+      setMessage(
+        "Saved online. The local database will update in the background.",
+      );
+      setSucceeded(true);
     } catch (error: unknown) {
       if (error instanceof MasterDataImportApiError) {
         setErrors(error.errors);
@@ -172,8 +174,9 @@ export function ImportMasterDataDialog({
           <DialogTitle>Upload old master data</DialogTitle>
           <DialogDescription>
             Select one master-data CSV at a time. Existing records are updated
-            instead of duplicated. The import writes to the cloud database
-            first, then refreshes the matching data in local SQLite.
+            instead of duplicated. The file is saved to the online database.
+            The local database updates in the background, and another file can
+            be uploaded while that sync is still running.
           </DialogDescription>
         </DialogHeader>
 
@@ -264,6 +267,12 @@ export function ImportMasterDataDialog({
                       </li>
                     ))}
                   </ul>
+                  {fileName === "07_product_skus.csv" && show07HeaderHint ? (
+                    <p className="text-muted-foreground mt-3 text-xs break-all">
+                      Current template header:{" "}
+                      {MASTER_DATA_07_PRODUCT_SKU_HEADERS.join(",")}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -284,7 +293,7 @@ export function ImportMasterDataDialog({
             disabled={!canUpload || busy}
             onClick={() => void upload()}
           >
-            {busy ? "Importing…" : "Upload and import"}
+            {busy ? "Uploading…" : "Upload"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -35,6 +35,9 @@ export class ProductSku {
   @Column({ type: "text", nullable: true })
   barcode!: string | null;
 
+  @Column({ name: "hs_code", type: "text", nullable: true })
+  hsCode!: string | null;
+
   @Column({ name: "variant_name", type: "text", default: "" })
   variantName!: string;
 
@@ -69,6 +72,15 @@ export class ProductSku {
   costPrice!: string;
 
   @Column({
+    name: "gst_percent",
+    type: "numeric",
+    precision: 8,
+    scale: 4,
+    default: 0,
+  })
+  gstPercent!: string;
+
+  @Column({
     name: "selling_price",
     type: "numeric",
     precision: 14,
@@ -85,6 +97,15 @@ export class ProductSku {
     nullable: true,
   })
   sellingPricePerPurchaseUnit!: string | null;
+
+  @Column({
+    name: "sale_discount_percent",
+    type: "numeric",
+    precision: 8,
+    scale: 4,
+    default: 0,
+  })
+  saleDiscountPercent!: string;
 
   @Column({
     name: "reorder_level",

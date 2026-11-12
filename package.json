@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:web": "pnpm --filter @blackbox/web dev",
+    "dev:platform": "pnpm --filter @blackbox/platform dev",
     "dev:desktop": "pnpm --filter @blackbox/desktop dev",
     "dev:api": "pnpm --filter @blackbox/api dev",
     "build": "turbo run build",
@@ -15,9 +16,11 @@
     "start:api": "pnpm --filter @blackbox/api start:prod",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "build:import-templates-xlsx": "node scripts/build-import-templates-workbook.mjs"
   },
   "devDependencies": {
+    "exceljs": "^4.4.0",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   },

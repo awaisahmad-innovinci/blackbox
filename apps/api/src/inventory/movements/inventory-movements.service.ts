@@ -103,25 +103,25 @@ export class InventoryMovementsService {
       .leftJoin("vendors", "v", "v.id = gr.vendor_id")
       .select([
         "m.id AS id",
-        "m.product_sku_id AS productSkuId",
+        `m.product_sku_id AS "productSkuId"`,
         "s.sku AS sku",
-        "s.variant_name AS variantName",
-        "p.id AS productId",
-        "p.name AS productName",
-        "m.warehouse_id AS warehouseId",
-        "w.name AS warehouseName",
-        "m.movement_type AS movementType",
+        `s.variant_name AS "variantName"`,
+        `p.id AS "productId"`,
+        `p.name AS "productName"`,
+        `m.warehouse_id AS "warehouseId"`,
+        `w.name AS "warehouseName"`,
+        `m.movement_type AS "movementType"`,
         "m.quantity AS quantity",
-        "m.reference_type AS referenceType",
-        "m.reference_id AS referenceId",
-        "v.id AS vendorId",
-        "v.name AS vendorName",
+        `m.reference_type AS "referenceType"`,
+        `m.reference_id AS "referenceId"`,
+        `v.id AS "vendorId"`,
+        `v.name AS "vendorName"`,
         "m.reason AS reason",
-        "m.created_at AS createdAt",
+        `m.created_at AS "createdAt"`,
       ])
       .where("m.tenant_id = :tenantId", { tenantId })
       .andWhere("m.movement_type IN (:...types)", {
-        types: ["PURCHASE_RECEIPT", "INVENTORY_OUT"],
+        types: ["PURCHASE_RECEIPT", "INVENTORY_OUT", "INVENTORY_OUT_RETURN"],
       })
       .andWhere("m.created_at >= :from", { from })
       .andWhere("m.created_at < :toExclusive", { toExclusive })
@@ -134,9 +134,12 @@ export class InventoryMovementsService {
 
     for (const r of rows) {
       const item = this.toReportListItem(r);
-      const day = String(r.createdAt).slice(0, 10);
+      const day = item.createdAt.slice(0, 10);
       const bucket = qtyByDay.get(day) ?? { inboundQty: 0, outboundQty: 0 };
-      if (item.movementType === "PURCHASE_RECEIPT") {
+      if (
+        item.movementType === "PURCHASE_RECEIPT" ||
+        item.movementType === "INVENTORY_OUT_RETURN"
+      ) {
         inboundItems.push(item);
         bucket.inboundQty += item.quantity;
       } else if (item.movementType === "INVENTORY_OUT") {

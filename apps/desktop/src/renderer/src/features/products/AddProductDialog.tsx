@@ -207,13 +207,12 @@ export function AddProductDialog({
         };
         try {
           await window.blackbox.localDb?.upsertProduct(local);
-          await window.blackbox.sync.enqueue({
+          await window.blackbox.sync.commit({
             stream: "master_data",
             entityType: "product",
             entityId: localId,
             operation: "UPSERT",
             payload: local as unknown as Record<string, unknown>,
-            baseEntityVersion: 0,
           });
           setSaving(false);
           setForm(emptyForm());

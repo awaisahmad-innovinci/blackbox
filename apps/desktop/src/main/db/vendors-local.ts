@@ -1,4 +1,5 @@
 import type { VendorDetail, VendorSku } from "@blackbox/shared";
+import { vendorPurchasePriceFromSku } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 
 function nowIso(): string {
@@ -130,6 +131,36 @@ export function upsertVendorSkuLocal(row: VendorSku): void {
     createdAt: ts,
     updatedAt: ts,
     serverUpdatedAt: ts,
+  });
+}
+
+/** Keep vendor link purchase packaging aligned with product SKU after SKU edits. */
+export function syncVendorSkusPurchaseFromProductSkuLocal(input: {
+  productSkuId: string;
+  purchaseUnitId: string | null;
+  unitsPerPurchaseUnit: number;
+  costPrice: number;
+}): void {
+  const db = getLocalDb();
+  const ts = nowIso();
+  const purchasePrice = vendorPurchasePriceFromSku({
+    costPrice: input.costPrice,
+    unitsPerPurchaseUnit: input.unitsPerPurchaseUnit,
+  });
+  db.prepare(
+    `update vendor_skus set
+       purchase_unit_id = @purchaseUnitId,
+       units_per_purchase_unit = @unitsPerPurchaseUnit,
+       purchase_price = @purchasePrice,
+       updated_at = @updatedAt,
+       sync_status = 'synced'
+     where product_sku_id = @productSkuId`,
+  ).run({
+    productSkuId: input.productSkuId,
+    purchaseUnitId: input.purchaseUnitId,
+    unitsPerPurchaseUnit: input.unitsPerPurchaseUnit,
+    purchasePrice,
+    updatedAt: ts,
   });
 }
 

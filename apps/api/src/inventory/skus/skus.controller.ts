@@ -8,9 +8,11 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import type {
   CreateSkuBarcodeRequest,
+  OpeningStockRequest,
   SkuBarcode,
   SkuBarcodeLookupResult,
   SkuDetail,
@@ -18,8 +20,19 @@ import type {
   SkuSupplier,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { IsOptional, IsString, IsUUID, Min, IsNumber } from "class-validator";
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  IsNumber,
+} from "class-validator";
 import { Type } from "class-transformer";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../rbac/permissions.guard";
+import { RequirePermissions } from "../../rbac/require-permissions.decorator";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
 import { VendorSkusService } from "../vendors/vendor-skus.service";
 import { SkuBarcodesService } from "./sku-barcodes.service";
@@ -41,11 +54,30 @@ class ByBarcodeQueryDto {
 
   @IsUUID()
   warehouseId!: string;
+
+  @IsOptional()
+  @IsIn(["stock", "pos"])
+  balance?: "stock" | "pos";
 }
 
 class ExistsByBarcodeQueryDto {
   @IsString()
   barcode!: string;
+}
+
+class OpeningStockBodyDto implements OpeningStockRequest {
+  @IsUUID()
+  warehouseId!: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.0001)
+  quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 class CreateSkuBarcodeBodyDto implements CreateSkuBarcodeRequest {
@@ -83,7 +115,11 @@ export class SkusController {
   findByBarcode(
     @Query() query: ByBarcodeQueryDto,
   ): Promise<SkuSearchResult> {
-    return this.skus.findByBarcode(query.barcode, query.warehouseId);
+    return this.skus.findByBarcode(
+      query.barcode,
+      query.warehouseId,
+      query.balance ?? "stock",
+    );
   }
 
   @Get(":id")
@@ -102,6 +138,16 @@ export class SkusController {
   @Post(":id/deactivate")
   deactivate(@Param("id", ParseUUIDPipe) id: string): Promise<SkuDetail> {
     return this.skus.deactivate(id);
+  }
+
+  @Post(":id/opening-stock")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("inventory.opening.write")
+  addOpeningStock(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: OpeningStockBodyDto,
+  ): Promise<WarehouseStockRow> {
+    return this.skus.addOpeningStock(id, dto);
   }
 
   @Get(":id/inventory")

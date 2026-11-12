@@ -17,3 +17,24 @@ export async function resolveDataSourceMode(): Promise<DataSourceMode> {
     return "api";
   }
 }
+
+/** True when the device SQLite database is open (Electron POS). */
+export async function isLocalDbConnected(): Promise<boolean> {
+  const localDb = window.blackbox?.localDb;
+  if (!localDb?.getStatus) return false;
+  try {
+    const status = await localDb.getStatus();
+    return status.connected;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * POS catalog reads (search / barcode) use SQLite whenever the local DB is
+ * ready — not only after a full cloud pull.
+ */
+export async function shouldUseLocalCatalog(): Promise<boolean> {
+  if (!window.blackbox?.localDb?.searchSkus) return false;
+  return isLocalDbConnected();
+}

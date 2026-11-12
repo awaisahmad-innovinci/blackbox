@@ -130,6 +130,12 @@ export default function DeviceDetailPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <dt className="text-muted-foreground text-xs tracking-wide uppercase">
+                      Register code
+                    </dt>
+                    <dd className="mt-1 font-mono">{device.code ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs tracking-wide uppercase">
                       Trusted
                     </dt>
                     <dd className="mt-1">

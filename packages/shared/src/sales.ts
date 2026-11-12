@@ -1,0 +1,426 @@
+import type { ManagerDrawerBalance } from "./cash-flow";
+import type { TillStatus } from "./till";
+import type { FbrInvoiceStatus } from "./fbr";
+import { splitInclusiveGst } from "./inventory";
+
+export const SALE_STATUSES = ["DRAFT", "POSTED", "VOID"] as const;
+export type SaleStatus = (typeof SALE_STATUSES)[number];
+
+export const SALE_PAYMENT_METHODS = ["CASH", "CARD", "CREDIT"] as const;
+export type SalePaymentMethod = (typeof SALE_PAYMENT_METHODS)[number];
+
+export type SellUnit = "pc" | "box";
+
+export const DEFAULT_SALE_CUSTOMER_NAME = "CASH SALES CUSTOMER";
+
+export interface SalePaymentRow {
+  id: string;
+  method: SalePaymentMethod;
+  amount: number;
+  reference: string;
+}
+
+export interface SaleLineRow {
+  id: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  gstPercent: number;
+  sellUnit: SellUnit;
+  discountPercent: number;
+  focQuantity: number;
+  /** Harmonized System code snapshotted from the SKU when the sale is posted. */
+  hsCode?: string | null;
+  /** Draft bill only: this line's billed quantity has been corrected at least once. */
+  quantityCorrected?: boolean;
+}
+
+export interface SaleDetail {
+  id: string;
+  saleNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  status: SaleStatus;
+  subtotal: number;
+  gstRate: number;
+  gstAmount: number;
+  salesTaxRate: number;
+  salesTaxAmount: number;
+  total: number;
+  customerName: string;
+  /** Cash received from customer; null for card/credit sales. */
+  cashTendered: number | null;
+  notes: string;
+  deviceId: string | null;
+  postedBy: string | null;
+  postedByName: string | null;
+  postedAt: string | null;
+  items: SaleLineRow[];
+  payments: SalePaymentRow[];
+  createdAt: string;
+  updatedAt: string;
+  fbrInvoiceNumber?: string | null;
+  fbrStatus?: FbrInvoiceStatus | null;
+  fbrError?: string | null;
+  fbrSubmittedAt?: string | null;
+  fbrSellerNtn?: string | null;
+}
+
+export interface SaleListItem {
+  id: string;
+  saleNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  status: SaleStatus;
+  total: number;
+  itemCount: number;
+  postedAt: string | null;
+  fbrStatus?: FbrInvoiceStatus | null;
+}
+
+export interface SaleListQuery {
+  search?: string;
+  warehouseId?: string;
+  status?: SaleStatus;
+  dateFrom?: string;
+  dateTo?: string;
+  /** When true, only sales with any line focQuantity > 0. When false, exclude those. */
+  hasFoc?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedSales {
+  items: SaleListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const SALE_REGISTER_KINDS = ["sale", "return"] as const;
+export type SaleRegisterKind = (typeof SALE_REGISTER_KINDS)[number];
+
+export const SALE_REGISTER_STATUSES = [
+  "DRAFT",
+  "POSTED",
+  "VOID",
+  "PENDING",
+  "COMPLETED",
+] as const;
+
+/** One row on the combined sales and returns list. */
+export interface SaleRegisterItem {
+  id: string;
+  kind: SaleRegisterKind;
+  number: string;
+  relatedSaleNumber: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  status: string;
+  itemCount: number;
+  amount: number;
+  at: string | null;
+  fbrStatus?: FbrInvoiceStatus | null;
+}
+
+export interface SaleRegisterQuery {
+  search?: string;
+  warehouseId?: string;
+  kind?: SaleRegisterKind;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  /** When true, only bills with any line focQuantity > 0. When false, exclude those. */
+  hasFoc?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedSaleRegister {
+  items: SaleRegisterItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CreateSaleLineRequest {
+  productSkuId: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  gstPercent?: number;
+  sellUnit?: SellUnit;
+  barcode?: string | null;
+  discountPercent?: number;
+  focQuantity?: number;
+  hsCode?: string | null;
+}
+
+export interface CreateSalePaymentRequest {
+  method: SalePaymentMethod;
+  amount: number;
+  reference?: string;
+}
+
+export interface CreateSaleRequest {
+  warehouseId: string;
+  saleNumber?: string;
+  gstRate?: number;
+  salesTaxRate?: number;
+  customerName?: string;
+  cashTendered?: number;
+  notes?: string;
+  /** Required when any line has focQuantity > 0 (manager/owner who approved FOC). */
+  supervisorUserId?: string;
+  /** Pending return voucher to apply as credit when posting this sale. */
+  pendingReturnId?: string;
+  /** When true, post a simple bill and do not report the sale to FBR. */
+  fbrExcluded?: boolean;
+  items: CreateSaleLineRequest[];
+  payments: CreateSalePaymentRequest[];
+}
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
+export function saleBillTotals(
+  subtotal: number,
+  gstRate: number,
+  salesTaxRate: number,
+): { gstAmount: number; salesTaxAmount: number; total: number } {
+  const base = round4(subtotal);
+  const gstAmount = round4(base * (gstRate / 100));
+  const salesTaxAmount = round4(base * (salesTaxRate / 100));
+  return {
+    gstAmount,
+    salesTaxAmount,
+    total: round4(base + gstAmount + salesTaxAmount),
+  };
+}
+
+/** Option A — bill totals from GST-inclusive line totals and per-line GST %. */
+export function saleBillTotalsFromInclusiveLines(
+  lines: { lineTotal: number; gstPercent: number }[],
+): {
+  subtotal: number;
+  gstAmount: number;
+  salesTaxAmount: number;
+  total: number;
+} {
+  let subtotal = 0;
+  let gstAmount = 0;
+  let total = 0;
+  for (const line of lines) {
+    const inclusive = round4(line.lineTotal);
+    const { exGst, gstAmount: lineGst } = splitInclusiveGst(
+      inclusive,
+      line.gstPercent ?? 0,
+    );
+    subtotal = round4(subtotal + exGst);
+    gstAmount = round4(gstAmount + lineGst);
+    total = round4(total + inclusive);
+  }
+  return { subtotal, gstAmount, salesTaxAmount: 0, total };
+}
+
+export function saleLineTotal(quantity: number, unitPrice: number): number {
+  return round4(quantity * unitPrice);
+}
+
+/** Max cash tender allowed for a bill (5000, 10000, 15000, …). */
+export function maxCashTender(billTotal: number): number {
+  if (billTotal <= 0) return 5000;
+  return Math.ceil(billTotal / 5000) * 5000;
+}
+
+export interface ReturnableSaleLine {
+  saleLineId: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  soldQuantity: number;
+  returnedQuantity: number;
+  returnableQuantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  sellUnit: SellUnit;
+}
+
+export interface SaleReturnLineRow {
+  id: string;
+  saleLineId: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  lineTotal: number;
+  sellUnit: SellUnit;
+}
+
+export type SaleReturnStatus = "PENDING" | "COMPLETED";
+
+export type SaleReturnCompletionMode = "SALE_OFFSET" | "STANDALONE_CASH";
+
+export interface SaleReturnDetail {
+  id: string;
+  returnNumber: string;
+  saleId: string;
+  saleNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  status: SaleReturnStatus;
+  subtotal: number;
+  gstRate: number;
+  gstAmount: number;
+  salesTaxRate: number;
+  salesTaxAmount: number;
+  refundTotal: number;
+  refundMethod: SalePaymentMethod;
+  notes: string;
+  /** @deprecated Use issuedBy — kept for sync compatibility */
+  processedBy: string | null;
+  /** @deprecated Use issuedByName */
+  processedByName: string | null;
+  issuedBy: string | null;
+  issuedByName: string | null;
+  refundedBy: string | null;
+  refundedByName: string | null;
+  refundedAt: string | null;
+  appliedToSaleId: string | null;
+  completionMode: SaleReturnCompletionMode | null;
+  sale: SaleDetail;
+  items: SaleReturnLineRow[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleReturnListItem {
+  id: string;
+  returnNumber: string;
+  saleId: string;
+  saleNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  status: SaleReturnStatus;
+  refundTotal: number;
+  refundMethod: SalePaymentMethod;
+  lineCount: number;
+  issuedByName: string | null;
+  refundedByName: string | null;
+  createdAt: string;
+}
+
+export interface SaleReturnListQuery {
+  search?: string;
+  warehouseId?: string;
+  saleId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  hasFoc?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedSaleReturns {
+  items: SaleReturnListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  refundTotalSum: number;
+}
+
+export interface CreateSaleReturnLineRequest {
+  saleLineId: string;
+  productSkuId: string;
+  quantity: number;
+}
+
+export interface CreateSaleReturnRequest {
+  saleId: string;
+  returnNumber?: string;
+  returnDate?: string;
+  notes?: string;
+  items: CreateSaleReturnLineRequest[];
+}
+
+/** Cashier lookup — scan or enter return number at till. */
+export interface SaleReturnLookupSummary {
+  id: string;
+  returnNumber: string;
+  status: SaleReturnStatus;
+  refundTotal: number;
+  refundMethod: SalePaymentMethod;
+  saleId: string;
+  saleNumber: string;
+  issuedByName: string | null;
+  refundedByName: string | null;
+  refundedAt: string | null;
+  lineCount: number;
+}
+
+/** Cash still sitting in a cashier till (not collected into a manager drawer). */
+export interface CashierTillBalance {
+  userId: string;
+  userName: string;
+  tillName: string;
+  status: TillStatus;
+  currentCashBalance: number;
+}
+
+export interface CashSubmissionToday {
+  managerUserId: string;
+  managerName: string;
+  amount: number;
+}
+
+/** Manager dashboard — today's till collections (no refund cash metrics). */
+export interface ManagerDashboardSummary {
+  /** Local calendar date (YYYY-MM-DD). */
+  date: string;
+  tillCashCollectedAmount: number;
+  customerReturnCount: number;
+  /** Signed-in manager's drawer after floats, collections, till floats, expenses, and handovers. */
+  drawerBalance: number;
+  /** Owner sees every manager. A manager sees only their own row. */
+  drawers: ManagerDrawerBalance[];
+  /** Open tills with cash that has not been collected yet. */
+  cashierTills: CashierTillBalance[];
+  /** Cash managers handed to the owner today. */
+  cashSubmittedToday: number;
+  cashSubmissionsToday: CashSubmissionToday[];
+}
+
+/** Owner web dashboard — today's cloud sales, cash, and inventory counts. */
+export interface OwnerBusinessOverview {
+  /** UTC calendar date (YYYY-MM-DD), same day as the manager summary. */
+  date: string;
+  salesCount: number;
+  salesTotal: number;
+  cashPayments: number;
+  cardPayments: number;
+  creditPayments: number;
+  refundCount: number;
+  refundTotal: number;
+  cashierTills: CashierTillBalance[];
+  tillCashTotal: number;
+  drawers: ManagerDrawerBalance[];
+  cashSubmittedToday: number;
+  cashSubmissionsToday: CashSubmissionToday[];
+  productCount: number;
+  lowStockCount: number;
+  pendingPurchaseOrderCount: number;
+}

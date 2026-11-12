@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate, useParams } from "react-router-dom";
 import type {
   GoodsReceiptDetail,
@@ -12,12 +13,15 @@ import type {
 } from "@blackbox/shared";
 import {
   buildReceivedAtIso,
+  formatPoOrderQuantity,
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   goodsReceiptGrandTotal,
+  goodsReceiptLineTotal,
   landedUnitByQuantity,
-  lineTotalAfterDiscount,
+  poOrderUnitLabel,
   roundMoney4,
+  toPurchaseQuantity,
   VENDOR_RETURN_REASON_LABELS,
 } from "@blackbox/shared";
 import { FORM_GRID } from "@renderer/lib/form-layout";
@@ -38,6 +42,7 @@ import {
 } from "@renderer/components/form-enter-nav";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { syncNow } from "@renderer/lib/sync/sync-status";
@@ -52,9 +57,23 @@ type DraftLine = ReceivingLineDraft & {
   bonusQuantity: number;
   receivingUnitCost: number;
   discountPercent: number;
+  saleTax: number;
+  advTax: number;
+  gst: number;
   originalPoUnitCost: number;
   originalSellingPrice: number;
 };
+
+function lineTaxTotal(line: DraftLine): number {
+  return goodsReceiptLineTotal(
+    receivePurchaseQty(line),
+    line.receivingUnitCost,
+    line.discountPercent,
+    line.saleTax,
+    line.advTax,
+    line.gst,
+  );
+}
 
 function costChanged(line: DraftLine): boolean {
   return line.receivingUnitCost !== line.originalPoUnitCost;
@@ -66,6 +85,14 @@ function saleChanged(line: DraftLine): boolean {
 
 function pricesChanged(line: DraftLine): boolean {
   return costChanged(line) || saleChanged(line);
+}
+
+function receivePurchaseQty(line: DraftLine): number {
+  return toPurchaseQuantity(
+    line.receiveQuantity,
+    line.orderUnit ?? "box",
+    line.unitsPerPurchaseUnit,
+  );
 }
 
 async function buildReceivedPurchaseOrderPayload(
@@ -290,6 +317,8 @@ export function ReceivePurchaseOrderPage() {
   const [incentive, setIncentive] = useState("0");
   const [shelfRent, setShelfRent] = useState("0");
   const [discount, setDiscount] = useState("0");
+  const [paidInput, setPaidInput] = useState("");
+  const [paidTouched, setPaidTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -303,6 +332,7 @@ export function ReceivePurchaseOrderPage() {
     purchaseOrderItemId: string;
     purchaseUnitName: string | null;
     unitsPerPurchaseUnit: number;
+    gstPercent: number;
   } | null>(null);
 
   const [pendingReturns, setPendingReturns] = useState<
@@ -330,6 +360,9 @@ export function ReceivePurchaseOrderPage() {
             bonusQuantity: 0,
             receivingUnitCost: item.poUnitCost,
             discountPercent: 0,
+            saleTax: item.poItemTax ?? 0,
+            advTax: 0,
+            gst: 0,
             originalPoUnitCost: item.poUnitCost,
             originalSellingPrice: item.currentSellingPrice,
           })),
@@ -379,24 +412,34 @@ export function ReceivePurchaseOrderPage() {
 
   const subtotal = useMemo(
     () =>
-      Math.round(
-        lines.reduce(
-          (sum, l) =>
-            sum +
-            lineTotalAfterDiscount(
-              l.receiveQuantity,
-              l.receivingUnitCost,
-              l.discountPercent,
-            ),
-          0,
-        ) * 10000,
-      ) / 10000,
+      roundMoney4(
+        lines.reduce((sum, line) => sum + lineTaxTotal(line), 0),
+      ),
     [lines],
   );
   const totalReceiveQty = useMemo(
     () => lines.reduce((sum, line) => sum + line.receiveQuantity, 0),
     [lines],
   );
+  const totalReceivePurchaseQty = useMemo(
+    () =>
+      lines.reduce(
+        (sum, line) =>
+          sum + (receivePurchaseQty(line) > 0 ? receivePurchaseQty(line) : 0),
+        0,
+      ),
+    [lines],
+  );
+  const receiveQtyColumnLabel = useMemo(() => {
+    if (lines.length === 0) return "Receive qty";
+    const first = lines[0]!;
+    const firstUnit = first.orderUnit ?? "box";
+    const sameUnit = lines.every(
+      (line) => (line.orderUnit ?? "box") === firstUnit,
+    );
+    if (!sameUnit) return "Receive qty";
+    return `Receive qty (${poOrderUnitLabel(firstUnit, first.purchaseUnitName, first.baseUnitName)})`;
+  }, [lines]);
   const discountPct = Number(discount) || 0;
   const discountAmount =
     Math.round(((subtotal * discountPct) / 100) * 10000) / 10000;
@@ -453,6 +496,15 @@ export function ReceivePurchaseOrderPage() {
       returnCredit,
     ],
   );
+  const paidDisplay = paidTouched ? paidInput : String(grandTotal);
+  const amountPaid = useMemo(() => {
+    const n = Number(paidDisplay);
+    return Number.isFinite(n) ? roundMoney4(n) : Number.NaN;
+  }, [paidDisplay]);
+  const receiptCredit = useMemo(() => {
+    if (!Number.isFinite(amountPaid)) return 0;
+    return roundMoney4(Math.max(0, grandTotal - amountPaid));
+  }, [amountPaid, grandTotal]);
   const returnAdjustments = useMemo(
     () => buildReturnAdjustments(pendingReturns, returnSettlements),
     [pendingReturns, returnSettlements],
@@ -461,7 +513,15 @@ export function ReceivePurchaseOrderPage() {
   function updateLine(
     purchaseOrderItemId: string,
     patch: Partial<
-      Pick<DraftLine, "receiveQuantity" | "bonusQuantity" | "discountPercent">
+      Pick<
+        DraftLine,
+        | "receiveQuantity"
+        | "bonusQuantity"
+        | "discountPercent"
+        | "saleTax"
+        | "advTax"
+        | "gst"
+      >
     >,
   ) {
     setLines((prev) =>
@@ -478,9 +538,17 @@ export function ReceivePurchaseOrderPage() {
         setError("Received quantity must be >= 0");
         return false;
       }
-      if (line.receiveQuantity > line.orderedQuantity) {
+      if (receivePurchaseQty(line) > line.orderedQuantity) {
         setError(
-          "Received quantity cannot be greater than ordered quantity.",
+          `Received quantity cannot be greater than ordered quantity (${formatPoOrderQuantity(
+            {
+              quantity: line.orderedQuantity,
+              orderUnit: line.orderUnit,
+              unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+              purchaseUnitName: line.purchaseUnitName,
+              baseUnitName: line.baseUnitName,
+            },
+          )}).`,
         );
         return false;
       }
@@ -496,6 +564,10 @@ export function ReceivePurchaseOrderPage() {
         setError("Line discount % must be between 0 and 100");
         return false;
       }
+      if (line.saleTax < 0 || line.advTax < 0 || line.gst < 0) {
+        setError("Line tax amounts must be >= 0");
+        return false;
+      }
     }
     if (discountPct < 0 || discountPct > 100) {
       setError("Discount % must be between 0 and 100");
@@ -503,6 +575,10 @@ export function ReceivePurchaseOrderPage() {
     }
     if (totalReceiveQty <= 0) {
       setError("You cannot receive with 0 quantity.");
+      return false;
+    }
+    if (!Number.isFinite(amountPaid) || amountPaid < 0 || amountPaid > grandTotal) {
+      setError("Paid amount must be between 0 and the grand total");
       return false;
     }
     return true;
@@ -541,6 +617,7 @@ export function ReceivePurchaseOrderPage() {
           otherCharges: 0,
           returnCredit,
           total: grandTotal,
+          amountPaid,
           notes: "",
           items: lines.map((l) => ({
             id: crypto.randomUUID(),
@@ -555,16 +632,15 @@ export function ReceivePurchaseOrderPage() {
             purchaseUnitName: l.purchaseUnitName,
             unitsPerPurchaseUnit: l.unitsPerPurchaseUnit,
             orderedQuantity: l.orderedQuantity,
-            receivedQuantity: l.receiveQuantity,
+            receivedQuantity: receivePurchaseQty(l),
             bonusQuantity: l.bonusQuantity,
             poUnitCost: l.poUnitCost,
             receivingUnitCost: l.receivingUnitCost,
             discountPercent: l.discountPercent,
-            lineTotal: lineTotalAfterDiscount(
-              l.receiveQuantity,
-              l.receivingUnitCost,
-              l.discountPercent,
-            ),
+            saleTax: l.saleTax,
+            advTax: l.advTax,
+            gst: l.gst,
+            lineTotal: lineTaxTotal(l),
           })),
           createdAt: now,
           updatedAt: now,
@@ -578,6 +654,46 @@ export function ReceivePurchaseOrderPage() {
             returnAdjustments,
           },
         });
+        if (header.vendorId && grandTotal > 0) {
+          const chargeId = crypto.randomUUID();
+          await commitLocalChange({
+            entityType: "vendor_ledger_entry",
+            entityId: chargeId,
+            operation: "UPSERT",
+            payload: {
+              id: chargeId,
+              vendorId: header.vendorId,
+              entryType: "CHARGE",
+              amount: grandTotal,
+              goodsReceiptId: localId,
+              receiptNumber,
+              note: `Receipt ${receiptNumber}`,
+              occurredAt: now,
+              createdAt: now,
+              updatedAt: now,
+            },
+          });
+        }
+        if (header.vendorId && amountPaid > 0) {
+          const paymentId = crypto.randomUUID();
+          await commitLocalChange({
+            entityType: "vendor_ledger_entry",
+            entityId: paymentId,
+            operation: "UPSERT",
+            payload: {
+              id: paymentId,
+              vendorId: header.vendorId,
+              entryType: "PAYMENT",
+              amount: amountPaid,
+              goodsReceiptId: localId,
+              receiptNumber,
+              note: `Payment on receipt ${receiptNumber}`,
+              occurredAt: now,
+              createdAt: now,
+              updatedAt: now,
+            },
+          });
+        }
         const poPayload = await buildReceivedPurchaseOrderPayload(
           id,
           header,
@@ -589,28 +705,27 @@ export function ReceivePurchaseOrderPage() {
           operation: "UPSERT",
           payload: poPayload,
         });
-        const totalReceivedQty = lines.reduce(
-          (sum, l) => sum + (l.receiveQuantity > 0 ? l.receiveQuantity : 0),
-          0,
-        );
+        const totalReceivedQty = totalReceivePurchaseQty;
         const skuIdsWithProductUpsert = new Set<string>();
         for (const line of lines) {
           const unitsPer =
             line.unitsPerPurchaseUnit > 0 ? line.unitsPerPurchaseUnit : 1;
-          const billedDelta = line.receiveQuantity * unitsPer;
-          const stockDelta =
-            line.receiveQuantity * unitsPer + line.bonusQuantity;
+          const purchaseQty = receivePurchaseQty(line);
+          const billedDelta = purchaseQty * unitsPer;
+          const stockDelta = purchaseQty * unitsPer + line.bonusQuantity;
           if (!(stockDelta > 0)) continue;
           const movementId = crypto.randomUUID();
           if (billedDelta > 0) {
+            const lineTaxes = line.saleTax + line.advTax + line.gst;
             const netUnit = landedUnitByQuantity(
-              line.receiveQuantity,
+              purchaseQty,
               line.receivingUnitCost,
               line.discountPercent,
               totalReceivedQty,
               discountAmount,
               costCharges,
               costCredits,
+              lineTaxes,
             );
             const avg = await window.blackbox?.localDb?.applyPurchaseAvgCost(
               line.productSkuId,
@@ -663,6 +778,22 @@ export function ReceivePurchaseOrderPage() {
           returnSettlements,
           now,
         );
+        if (user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "goods_receipt.posted",
+              actorUserId: user.id,
+              summary: `Received ${receipt.receiptNumber} for Rs ${formatMoney(grandTotal)}`,
+              metadata: {
+                goodsReceiptId: localId,
+                receiptNumber: receipt.receiptNumber,
+                purchaseOrderId: id,
+                total: grandTotal,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
+        }
         void syncNow();
         setSuccess(receipt);
         return;
@@ -686,14 +817,18 @@ export function ReceivePurchaseOrderPage() {
         gst: gstN,
         incentive: incentiveN,
         shelfRent: shelfRentN,
+        amountPaid,
         returnAdjustments:
           returnAdjustments.length > 0 ? returnAdjustments : undefined,
         items: lines.map((l) => ({
           purchaseOrderItemId: l.purchaseOrderItemId,
-          receivedQuantity: l.receiveQuantity,
+          receivedQuantity: receivePurchaseQty(l),
           bonusQuantity: l.bonusQuantity,
           receivingUnitCost: l.receivingUnitCost,
           discountPercent: l.discountPercent,
+          saleTax: l.saleTax,
+          advTax: l.advTax,
+          gst: l.gst,
         })),
       });
 
@@ -759,14 +894,14 @@ export function ReceivePurchaseOrderPage() {
           <div>
             <dt className="text-muted-foreground">Total</dt>
             <dd className="font-medium tabular-nums">
-              {success.total.toLocaleString()}
+              {formatMoney(success.total)}
             </dd>
           </div>
           {success.returnCredit > 0 ? (
             <div>
               <dt className="text-muted-foreground">Return credit</dt>
               <dd className="font-medium tabular-nums">
-                {success.returnCredit.toLocaleString()}
+                {formatMoney(success.returnCredit)}
               </dd>
             </div>
           ) : null}
@@ -893,10 +1028,10 @@ export function ReceivePurchaseOrderPage() {
                         {line.quantity.toLocaleString()} pcs
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.unitCost.toLocaleString()}
+                        {formatMoney(line.unitCost)}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.lineTotal.toLocaleString()}
+                        {formatMoney(line.lineTotal)}
                       </td>
                       <td className="px-3 py-2">
                         <select
@@ -936,11 +1071,14 @@ export function ReceivePurchaseOrderPage() {
                   <th className="px-3 py-2 font-medium">Product</th>
                   <th className="px-3 py-2 font-medium">SKU</th>
                   <th className="px-3 py-2 font-medium">Ordered</th>
-                  <th className="px-3 py-2 font-medium">Receive qty</th>
+                  <th className="px-3 py-2 font-medium">{receiveQtyColumnLabel}</th>
                   <th className="px-3 py-2 font-medium">FOC (pcs)</th>
                   <th className="px-3 py-2 font-medium">PO price</th>
                   <th className="px-3 py-2 font-medium">Sale price</th>
                   <th className="px-3 py-2 font-medium">Discount %</th>
+                  <th className="px-3 py-2 font-medium">S.Tax</th>
+                  <th className="px-3 py-2 font-medium">Adv tax</th>
+                  <th className="px-3 py-2 font-medium">GST</th>
                   <th className="px-3 py-2 font-medium">Total</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
@@ -956,7 +1094,13 @@ export function ReceivePurchaseOrderPage() {
                       </td>
                       <td className="px-3 py-2">{line.sku}</td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.orderedQuantity} {line.purchaseUnitName || ""}
+                        {formatPoOrderQuantity({
+                          quantity: line.orderedQuantity,
+                          orderUnit: line.orderUnit,
+                          unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+                          purchaseUnitName: line.purchaseUnitName,
+                          baseUnitName: line.baseUnitName,
+                        })}
                       </td>
                       <td className="px-3 py-2">
                         <Input
@@ -990,10 +1134,10 @@ export function ReceivePurchaseOrderPage() {
                         />
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.receivingUnitCost.toLocaleString()}
+                        {formatMoney(line.receivingUnitCost)}
                       </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {line.currentSellingPrice.toLocaleString()}
+                        {formatMoney(line.currentSellingPrice)}
                       </td>
                       <td className="px-3 py-2">
                         <Input
@@ -1010,12 +1154,47 @@ export function ReceivePurchaseOrderPage() {
                           }}
                         />
                       </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-20"
+                          value={String(line.saleTax)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              saleTax: Number.isNaN(n) ? line.saleTax : n,
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-20"
+                          value={String(line.advTax)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              advTax: Number.isNaN(n) ? line.advTax : n,
+                            });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-8 w-20"
+                          value={String(line.gst)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            updateLine(line.purchaseOrderItemId, {
+                              gst: Number.isNaN(n) ? line.gst : n,
+                            });
+                          }}
+                        />
+                      </td>
                       <td className="px-3 py-2 tabular-nums">
-                        {lineTotalAfterDiscount(
-                          line.receiveQuantity,
-                          line.receivingUnitCost,
-                          line.discountPercent,
-                        ).toLocaleString()}
+                        {formatMoney(lineTaxTotal(line))}
                       </td>
                       <td className="px-3 py-2">
                         {line.vendorSkuId ? (
@@ -1031,6 +1210,7 @@ export function ReceivePurchaseOrderPage() {
                                 purchaseOrderItemId: line.purchaseOrderItemId,
                                 purchaseUnitName: line.purchaseUnitName,
                                 unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+                                gstPercent: line.gstPercent ?? 0,
                               })
                             }
                           >
@@ -1049,7 +1229,7 @@ export function ReceivePurchaseOrderPage() {
       <section className="grid max-w-sm gap-3 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Subtotal</span>
-          <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(subtotal)}</span>
         </div>
         <div className="flex items-center justify-between gap-6">
           <Label htmlFor="discount">Discount %</Label>
@@ -1057,13 +1237,14 @@ export function ReceivePurchaseOrderPage() {
             id="discount"
             className="h-8 w-28"
             value={discount}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setDiscount(e.target.value)}
           />
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Discount amount</span>
           <span className="tabular-nums">
-            {discountAmount.toLocaleString()}
+            {formatMoney(discountAmount)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
@@ -1072,6 +1253,7 @@ export function ReceivePurchaseOrderPage() {
             id="sale-tax"
             className="h-8 w-28"
             value={saleTax}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setSaleTax(e.target.value)}
           />
         </div>
@@ -1081,6 +1263,7 @@ export function ReceivePurchaseOrderPage() {
             id="adv-tax"
             className="h-8 w-28"
             value={advTax}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setAdvTax(e.target.value)}
           />
         </div>
@@ -1090,6 +1273,7 @@ export function ReceivePurchaseOrderPage() {
             id="gst"
             className="h-8 w-28"
             value={gst}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setGst(e.target.value)}
           />
         </div>
@@ -1099,6 +1283,7 @@ export function ReceivePurchaseOrderPage() {
             id="incentive"
             className="h-8 w-28"
             value={incentive}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setIncentive(e.target.value)}
           />
         </div>
@@ -1108,6 +1293,7 @@ export function ReceivePurchaseOrderPage() {
             id="shelf-rent"
             className="h-8 w-28"
             value={shelfRent}
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => setShelfRent(e.target.value)}
           />
         </div>
@@ -1115,14 +1301,34 @@ export function ReceivePurchaseOrderPage() {
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Return credit</span>
             <span className="tabular-nums text-green-700 dark:text-green-400">
-              −{returnCredit.toLocaleString()}
+              −{formatMoney(returnCredit)}
             </span>
           </div>
         ) : null}
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Grand total</span>
-          <span className="tabular-nums">{grandTotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(grandTotal)}</span>
         </div>
+        <div className="flex items-center justify-between gap-6">
+          <Label htmlFor="amount-paid">Paid</Label>
+          <Input
+            id="amount-paid"
+            className="h-8 w-28"
+            inputMode="decimal"
+            value={paidDisplay}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => {
+              setPaidTouched(true);
+              setPaidInput(e.target.value);
+            }}
+          />
+        </div>
+        {header?.vendorId ? (
+          <div className="flex justify-between gap-6">
+            <span className="text-muted-foreground">Credit for this vendor</span>
+            <span className="tabular-nums">{formatMoney(receiptCredit)}</span>
+          </div>
+        ) : null}
       </section>
 
       <div className="flex flex-wrap gap-3">
@@ -1155,6 +1361,7 @@ export function ReceivePurchaseOrderPage() {
           currentSellingPrice={priceEdit.currentSellingPrice}
           purchaseUnitName={priceEdit.purchaseUnitName}
           unitsPerPurchaseUnit={priceEdit.unitsPerPurchaseUnit}
+          gstPercent={priceEdit.gstPercent}
           onClose={() => setPriceEdit(null)}
           onSaved={(newPrice, newSellingPrice) => {
             setLines((prev) =>
@@ -1186,10 +1393,12 @@ export function ReceivePurchaseOrderPage() {
               <p>Warehouse: {header.warehouseName}</p>
               <p>Items: {lines.length}</p>
               <p>
-                Discount: {discountPct}% ({discountAmount.toLocaleString()})
+                Discount: {discountPct}% ({formatMoney(discountAmount)})
               </p>
-              <p>Return credit: {returnCredit.toLocaleString()}</p>
-              <p>Total: {grandTotal.toLocaleString()}</p>
+              <p>Return credit: {formatMoney(returnCredit)}</p>
+              <p>Total: {formatMoney(grandTotal)}</p>
+              <p>Paid: {Number.isFinite(amountPaid) ? formatMoney(amountPaid) : "—"}</p>
+              <p>Vendor credit: {formatMoney(receiptCredit)}</p>
             </>
           ) : null
         }

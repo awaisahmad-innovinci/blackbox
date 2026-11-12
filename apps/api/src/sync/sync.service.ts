@@ -11,6 +11,10 @@ import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   landedUnitByQuantity,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
+  formatMoney,
+  isCashExpenseCategory,
   roundMoney4,
   streamForEntity,
   weightedAvgUnitCost,
@@ -18,9 +22,13 @@ import {
   type SyncEntityType,
   type SyncPushItemResult,
   type SyncPushResponse,
+  type SyncEntityVersionHeadsResponse,
   type SyncPullResponse,
   type SyncStatusResponse,
   type SyncStream,
+  inventoryMovementAffectsWarehouseStock,
+  asFbrInvoiceStatus,
+  type InventoryMovementType,
 } from "@blackbox/shared";
 import {
   normalizeOptionalStoredText,
@@ -39,7 +47,15 @@ import {
   GoodsReceiptItem,
   InventoryMovement,
   InventoryOut,
+  InventoryOutLine,
   InventoryOutItem,
+  InventoryOutReturn,
+  InventoryOutReturnItem,
+  Sale,
+  SaleLine,
+  SalePayment,
+  SaleReturn,
+  SaleReturnLine,
   InventoryStock,
   Product,
   ProductSku,
@@ -52,12 +68,17 @@ import {
   Unit,
   Vendor,
   VendorContact,
+  VendorLedgerEntry,
+  CashExpense,
+  ManagerDrawerOpening,
+  ManagerDrawerSubmission,
   VendorGroup,
   VendorReturn,
   VendorReturnItem,
   VendorSku,
   Warehouse,
 } from "../db/entities";
+import { applyInventoryOutBalanceDelta } from "../inventory/inventory-out/inventory-out-balance";
 import type { SyncChangeInputDto, SyncPushDto } from "./dto/sync.dto";
 
 const RETENTION_DAYS = 90;
@@ -144,19 +165,73 @@ export class SyncService {
       };
     }
 
+    const foreignOrigin =
+      "(c.origin_device_id IS NULL OR c.origin_device_id != :deviceId)";
+
+    const firstForeignRaw = await this.changes
+      .createQueryBuilder("c")
+      .select("MIN(c.seq)", "minSeq")
+      .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+      .andWhere("c.stream = :stream", { stream })
+      .andWhere("c.seq > :cursor", { cursor })
+      .andWhere(foreignOrigin, { deviceId: device.id })
+      .getRawOne<{ minSeq: string | null }>();
+
+    const firstForeignSeq = firstForeignRaw?.minSeq
+      ? Number(firstForeignRaw.minSeq)
+      : null;
+
+    if (firstForeignSeq === null || !Number.isFinite(firstForeignSeq)) {
+      const maxRaw = await this.changes
+        .createQueryBuilder("c")
+        .select("MAX(c.seq)", "maxSeq")
+        .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+        .andWhere("c.stream = :stream", { stream })
+        .andWhere("c.seq > :cursor", { cursor })
+        .getRawOne<{ maxSeq: string | null }>();
+      const maxSeq = maxRaw?.maxSeq ? Number(maxRaw.maxSeq) : cursor;
+      const nextCursor = String(
+        Number.isFinite(maxSeq) && maxSeq > cursor ? maxSeq : cursor,
+      );
+
+      await this.upsertCursor(user.tenantId, device.id, stream, String(cursor));
+      await this.touchDevice(device.id, user.tenantId, null);
+
+      return {
+        changes: [],
+        nextCursor,
+        hasMore: false,
+        serverSeq: String(serverHead),
+      };
+    }
+
     const rows = await this.changes
       .createQueryBuilder("c")
       .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
       .andWhere("c.stream = :stream", { stream })
-      .andWhere("c.seq > :cursor", { cursor })
+      .andWhere("c.seq >= :firstForeignSeq", { firstForeignSeq })
+      .andWhere(foreignOrigin, { deviceId: device.id })
       .orderBy("c.seq", "ASC")
       .take(limit + 1)
       .getMany();
 
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
+    const hasMoreInPage = rows.length > limit;
+    const page = hasMoreInPage ? rows.slice(0, limit) : rows;
     const nextCursor =
       page.length > 0 ? String(page[page.length - 1]!.seq) : String(cursor);
+
+    let hasMore = hasMoreInPage;
+    if (!hasMore && page.length > 0) {
+      const lastSeq = page[page.length - 1]!.seq;
+      const moreForeign = await this.changes
+        .createQueryBuilder("c")
+        .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+        .andWhere("c.stream = :stream", { stream })
+        .andWhere("c.seq > :lastSeq", { lastSeq })
+        .andWhere(foreignOrigin, { deviceId: device.id })
+        .getCount();
+      hasMore = moreForeign > 0;
+    }
 
     await this.upsertCursor(user.tenantId, device.id, stream, String(cursor));
     await this.touchDevice(device.id, user.tenantId, null);
@@ -203,6 +278,65 @@ export class SyncService {
       lastError: device.lastSyncError,
       needsFullResync: device.needsFullResync,
       streams,
+    };
+  }
+
+  async entityVersionHeads(
+    user: TenantContext,
+    stream: string,
+    options?: {
+      page?: number;
+      pageSize?: number;
+      entityType?: string;
+      entityId?: string;
+    },
+  ): Promise<SyncEntityVersionHeadsResponse> {
+    await this.requireTrustedDevice(user);
+    if (!SYNC_STREAMS.includes(stream as SyncStream)) {
+      throw new BadRequestException("Unknown sync stream");
+    }
+    const page = Math.max(Number(options?.page) || 1, 1);
+    const pageSize = Math.min(Math.max(Number(options?.pageSize) || 2000, 1), 5000);
+    const offset = (page - 1) * pageSize;
+
+    const qb = this.changes
+      .createQueryBuilder("c")
+      .select("c.entity_type", "entityType")
+      .addSelect("c.entity_id", "entityId")
+      .addSelect("MAX(c.entity_version)", "entityVersion")
+      .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+      .andWhere("c.stream = :stream", { stream })
+      .andWhere("c.operation != :eventOp", { eventOp: "EVENT" })
+      .groupBy("c.entity_type")
+      .addGroupBy("c.entity_id")
+      .orderBy("c.entity_type", "ASC")
+      .addOrderBy("c.entity_id", "ASC")
+      .offset(offset)
+      .limit(pageSize + 1);
+
+    if (options?.entityType) {
+      qb.andWhere("c.entity_type = :entityType", {
+        entityType: options.entityType,
+      });
+    }
+    if (options?.entityId) {
+      qb.andWhere("c.entity_id = :entityId", { entityId: options.entityId });
+    }
+
+    const rows = await qb.getRawMany<{
+      entityType: string;
+      entityId: string;
+      entityVersion: string;
+    }>();
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+    return {
+      items: pageRows.map((row) => ({
+        entityType: row.entityType as SyncEntityType,
+        entityId: row.entityId,
+        entityVersion: Number(row.entityVersion) || 0,
+      })),
+      hasMore,
     };
   }
 
@@ -253,6 +387,12 @@ export class SyncService {
     if (!originDeviceId) return;
 
     await this.dataSource.transaction(async (manager) => {
+      const head = await this.entityVersionHead(
+        manager,
+        tenantId,
+        input.entityType,
+        input.entityId,
+      );
       await this.insertChange(manager, {
         tenantId,
         originDeviceId,
@@ -262,7 +402,7 @@ export class SyncService {
         entityId: input.entityId,
         operation: input.operation,
         payload: input.payload,
-        baseEntityVersion: 0,
+        baseEntityVersion: head,
       });
     });
   }
@@ -309,6 +449,30 @@ export class SyncService {
       })
       .execute();
     return { deleted: result.affected ?? 0 };
+  }
+
+  /** Opening warehouse qty is owner-only and cannot decrease stock. */
+  private assertOpeningBalanceAllowed(
+    user: TenantContext,
+    item: SyncChangeInputDto,
+  ): void {
+    if (item.operation !== "EVENT" || item.entityType !== "inventory_movement") {
+      return;
+    }
+    if (String(item.payload.movementType ?? "") !== "OPENING_BALANCE") return;
+    if (!user.permissions.includes("inventory.opening.write")) {
+      throw new ForbiddenException(
+        "Opening warehouse quantity requires inventory.opening.write",
+      );
+    }
+    const qty = Number(item.payload.quantity ?? 0);
+    const delta =
+      item.payload.delta != null ? Number(item.payload.delta) : qty;
+    if (!(qty > 0) || !(delta > 0)) {
+      throw new BadRequestException(
+        "Opening warehouse quantity must be greater than zero",
+      );
+    }
   }
 
   private async applyPushItem(
@@ -359,13 +523,16 @@ export class SyncService {
               message: "Document is immutable after post",
             };
           }
-          const head = await manager
+          const headRow = await manager
             .createQueryBuilder(SyncChange, "c")
             .where("c.tenant_id = :tenantId", { tenantId: user.tenantId })
+            .andWhere("c.entity_type = :entityType", {
+              entityType: item.entityType,
+            })
             .andWhere("c.entity_id = :entityId", { entityId: item.entityId })
             .orderBy("c.entity_version", "DESC")
             .getOne();
-          const currentVersion = head?.entityVersion ?? 0;
+          const currentVersion = headRow?.entityVersion ?? 0;
           if (
             item.baseEntityVersion < currentVersion &&
             stream !== "inventory"
@@ -378,10 +545,10 @@ export class SyncService {
                 entityType: item.entityType,
                 entityId: item.entityId,
                 localChangeId: item.changeId,
-                cloudChangeId: head?.changeId ?? null,
+                cloudChangeId: headRow?.changeId ?? null,
                 reason: "entity_version mismatch",
                 localPayload: item.payload,
-                cloudPayload: head?.payload ?? null,
+                cloudPayload: headRow?.payload ?? null,
                 resolution: "pending",
               }),
             );
@@ -392,6 +559,8 @@ export class SyncService {
             };
           }
         }
+
+        this.assertOpeningBalanceAllowed(user, item);
 
         const saved = await this.insertChange(manager, {
           tenantId: user.tenantId,
@@ -485,11 +654,13 @@ export class SyncService {
       });
       if (existing) return;
       const qty = Number(change.payload.quantity ?? 0);
+      const movementType = String(
+        change.payload.movementType ?? "STOCK_ADJUSTMENT",
+      ) as InventoryMovementType;
       const signed =
         change.payload.delta != null
           ? Number(change.payload.delta)
-          : String(change.payload.movementType) === "INVENTORY_OUT" ||
-              String(change.payload.movementType) === "RETURN"
+          : movementType === "INVENTORY_OUT" || movementType === "RETURN"
             ? -qty
             : qty;
       const skuId = String(change.payload.productSkuId ?? "");
@@ -503,35 +674,35 @@ export class SyncService {
           tenantId,
           productSkuId: skuId,
           warehouseId,
-          movementType: String(
-            change.payload.movementType ?? "STOCK_ADJUSTMENT",
-          ),
+          movementType,
           quantity: String(qty),
           referenceType: (change.payload.referenceType as string) ?? null,
           referenceId: (change.payload.referenceId as string) ?? null,
           reason: String(change.payload.reason ?? ""),
         }),
       );
-      let stock = await manager.findOne(InventoryStock, {
-        where: { tenantId, productSkuId: skuId, warehouseId },
-      });
-      if (!stock) {
-        stock = manager.create(InventoryStock, {
-          tenantId,
-          productSkuId: skuId,
-          warehouseId,
-          quantityOnHand: "0",
-          quantityReserved: "0",
-          quantityAvailable: "0",
+      if (inventoryMovementAffectsWarehouseStock(movementType)) {
+        let stock = await manager.findOne(InventoryStock, {
+          where: { tenantId, productSkuId: skuId, warehouseId },
         });
+        if (!stock) {
+          stock = manager.create(InventoryStock, {
+            tenantId,
+            productSkuId: skuId,
+            warehouseId,
+            quantityOnHand: "0",
+            quantityReserved: "0",
+            quantityAvailable: "0",
+          });
+        }
+        const next = Number(stock.quantityOnHand) + signed;
+        if (next < 0) throw new Error("Insufficient stock");
+        stock.quantityOnHand = String(next);
+        stock.quantityAvailable = String(
+          next - Number(stock.quantityReserved || 0),
+        );
+        await manager.save(stock);
       }
-      const next = Number(stock.quantityOnHand) + signed;
-      if (next < 0) throw new Error("Insufficient stock");
-      stock.quantityOnHand = String(next);
-      stock.quantityAvailable = String(
-        next - Number(stock.quantityReserved || 0),
-      );
-      await manager.save(stock);
       return;
     }
 
@@ -610,11 +781,19 @@ export class SyncService {
             (p.purchaseUnitId as string | null | undefined) ?? row.purchaseUnitId ?? null,
           unitsPerPurchaseUnit: String(p.unitsPerPurchaseUnit ?? row.unitsPerPurchaseUnit ?? 1),
           costPrice: String(p.costPrice ?? row.costPrice ?? 0),
+          gstPercent: String(p.gstPercent ?? row.gstPercent ?? 0),
+          hsCode:
+            p.hsCode == null || String(p.hsCode).trim() === ""
+              ? (row.hsCode ?? null)
+              : String(p.hsCode).trim(),
           sellingPrice: String(p.sellingPrice ?? row.sellingPrice ?? 0),
           sellingPricePerPurchaseUnit:
             p.sellingPricePerPurchaseUnit == null
               ? row.sellingPricePerPurchaseUnit
               : String(p.sellingPricePerPurchaseUnit),
+          saleDiscountPercent: String(
+            p.saleDiscountPercent ?? row.saleDiscountPercent ?? 0,
+          ),
           reorderLevel: String(p.reorderLevel ?? row.reorderLevel ?? 0),
           minimumStockLevel: String(p.minimumStockLevel ?? row.minimumStockLevel ?? 0),
           maximumStockLevel:
@@ -754,8 +933,46 @@ export class SyncService {
         await this.upsertGoodsReceipt(manager, tenantId, change.entityId, p);
         break;
       }
+      case "vendor_ledger_entry": {
+        await this.upsertVendorLedgerEntry(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "cash_expense": {
+        await this.upsertCashExpense(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "manager_drawer_opening": {
+        await this.upsertManagerDrawerOpening(
+          manager,
+          tenantId,
+          change.entityId,
+          p,
+        );
+        break;
+      }
+      case "manager_drawer_submission": {
+        await this.upsertManagerDrawerSubmission(
+          manager,
+          tenantId,
+          change.entityId,
+          p,
+        );
+        break;
+      }
       case "inventory_out": {
         await this.upsertInventoryOut(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "inventory_out_return": {
+        await this.upsertInventoryOutReturn(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "sale": {
+        await this.upsertSale(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "sale_return": {
+        await this.upsertSaleReturn(manager, tenantId, change.entityId, p);
         break;
       }
       case "vendor_return": {
@@ -791,6 +1008,30 @@ export class SyncService {
     }
     if (entityType === "inventory_out") {
       const row = await manager.findOne(InventoryOut, {
+        where: { id: entityId, tenantId },
+      });
+      if (row && row.status === "POSTED") {
+        return { status: row.status };
+      }
+    }
+    if (entityType === "inventory_out_return") {
+      const row = await manager.findOne(InventoryOutReturn, {
+        where: { id: entityId, tenantId },
+      });
+      if (row && row.status === "POSTED") {
+        return { status: row.status };
+      }
+    }
+    if (entityType === "sale") {
+      const row = await manager.findOne(Sale, {
+        where: { id: entityId, tenantId },
+      });
+      if (row && (row.status === "POSTED" || row.status === "VOID")) {
+        return { status: row.status };
+      }
+    }
+    if (entityType === "sale_return") {
+      const row = await manager.findOne(SaleReturn, {
         where: { id: entityId, tenantId },
       });
       if (row && row.status === "POSTED") {
@@ -851,6 +1092,7 @@ export class SyncService {
             vendorSkuId: (item.vendorSkuId as string | null) ?? null,
             purchaseUnitId: (item.purchaseUnitId as string | null) ?? null,
             unitsPerPurchaseUnit: String(item.unitsPerPurchaseUnit ?? 1),
+            orderUnit: String(item.orderUnit ?? "box"),
             quantity: String(item.quantity ?? 0),
             unitCost: String(item.unitCost ?? 0),
             tax: String(item.tax ?? 0),
@@ -860,6 +1102,227 @@ export class SyncService {
         );
       }
     }
+  }
+
+  private async upsertCashExpense(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const recordedByUserId = String(p.recordedByUserId ?? "");
+    if (!recordedByUserId) throw new Error("manager not found");
+    const category = String(p.category ?? "");
+    if (!isCashExpenseCategory(category)) {
+      throw new Error("expense category is invalid");
+    }
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("expense amount must be greater than zero");
+    const totals = await manager.query<
+      {
+        opening_float: string;
+        collected: string;
+        expenses: string;
+        till_floats: string;
+        submitted: string;
+      }[]
+    >(
+      `select
+         coalesce((
+           select sum(amount) from manager_drawer_openings
+           where tenant_id = $1 and manager_user_id = $2
+         ), 0) as opening_float,
+         coalesce((
+           select sum(withdrawal_total) from till_withdrawals
+           where tenant_id = $1 and withdrawn_by_user_id = $2
+         ), 0) as collected,
+         coalesce((
+           select sum(amount) from cash_expenses
+           where tenant_id = $1 and recorded_by_user_id = $2 and id <> $3
+         ), 0) as expenses,
+         coalesce((
+           select sum(opening_balance) from till_sessions
+           where tenant_id = $1 and funded_by_user_id = $2
+         ), 0) as till_floats,
+         coalesce((
+           select sum(amount) from manager_drawer_submissions
+           where tenant_id = $1 and manager_user_id = $2
+         ), 0) as submitted`,
+      [tenantId, recordedByUserId, entityId],
+    );
+    const totalsRow = totals[0];
+    const available = roundMoney4(
+      Number(totalsRow?.opening_float ?? 0) +
+        Number(totalsRow?.collected ?? 0) -
+        Number(totalsRow?.expenses ?? 0) -
+        Number(totalsRow?.till_floats ?? 0) -
+        Number(totalsRow?.submitted ?? 0),
+    );
+    if (expenseExceedsDrawer(amount, available)) {
+      throw new Error(expenseOverDrawerMessage(available));
+    }
+    const existing = await manager.findOne(CashExpense, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ?? manager.create(CashExpense, { id: entityId, tenantId });
+    Object.assign(row, {
+      recordedByUserId,
+      recordedByName: String(p.recordedByName ?? row.recordedByName ?? ""),
+      category,
+      amount: String(amount),
+      note: String(p.note ?? row.note ?? ""),
+      occurredAt: p.occurredAt
+        ? new Date(String(p.occurredAt))
+        : (row.occurredAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
+  private async upsertManagerDrawerOpening(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const managerUserId = String(p.managerUserId ?? "");
+    const openedByUserId = String(p.openedByUserId ?? "");
+    if (!managerUserId || !openedByUserId) {
+      throw new Error("manager not found");
+    }
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("opening amount must be greater than zero");
+    const existing = await manager.findOne(ManagerDrawerOpening, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(ManagerDrawerOpening, { id: entityId, tenantId });
+    Object.assign(row, {
+      managerUserId,
+      managerName: String(p.managerName ?? row.managerName ?? ""),
+      amount: String(amount),
+      openedByUserId,
+      openedByName: String(p.openedByName ?? row.openedByName ?? ""),
+      openedAt: p.openedAt
+        ? new Date(String(p.openedAt))
+        : (row.openedAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
+  private async upsertManagerDrawerSubmission(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const managerUserId = String(p.managerUserId ?? "");
+    if (!managerUserId) throw new Error("manager not found");
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("There is no cash to submit");
+    const totals = await manager.query<
+      {
+        opening_float: string;
+        collected: string;
+        expenses: string;
+        till_floats: string;
+        submitted: string;
+      }[]
+    >(
+      `select
+         coalesce((
+           select sum(amount) from manager_drawer_openings
+           where tenant_id = $1 and manager_user_id = $2
+         ), 0) as opening_float,
+         coalesce((
+           select sum(withdrawal_total) from till_withdrawals
+           where tenant_id = $1 and withdrawn_by_user_id = $2
+         ), 0) as collected,
+         coalesce((
+           select sum(amount) from cash_expenses
+           where tenant_id = $1 and recorded_by_user_id = $2
+         ), 0) as expenses,
+         coalesce((
+           select sum(opening_balance) from till_sessions
+           where tenant_id = $1 and funded_by_user_id = $2
+         ), 0) as till_floats,
+         coalesce((
+           select sum(amount) from manager_drawer_submissions
+           where tenant_id = $1 and manager_user_id = $2 and id <> $3
+         ), 0) as submitted`,
+      [tenantId, managerUserId, entityId],
+    );
+    const totalsRow = totals[0];
+    const available = roundMoney4(
+      Number(totalsRow?.opening_float ?? 0) +
+        Number(totalsRow?.collected ?? 0) -
+        Number(totalsRow?.expenses ?? 0) -
+        Number(totalsRow?.till_floats ?? 0) -
+        Number(totalsRow?.submitted ?? 0),
+    );
+    if (!(available > 0) || expenseExceedsDrawer(amount, available)) {
+      throw new Error(
+        available > 0
+          ? `Submit no more than the drawer balance of Rs ${formatMoney(available)}`
+          : "There is no cash to submit",
+      );
+    }
+    const existing = await manager.findOne(ManagerDrawerSubmission, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(ManagerDrawerSubmission, { id: entityId, tenantId });
+    Object.assign(row, {
+      managerUserId,
+      managerName: String(p.managerName ?? row.managerName ?? ""),
+      amount: String(amount),
+      submittedAt: p.submittedAt
+        ? new Date(String(p.submittedAt))
+        : (row.submittedAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
+  private async upsertVendorLedgerEntry(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const vendorId = String(p.vendorId ?? "");
+    if (!vendorId) throw new Error("vendor not found");
+    const entryType = String(p.entryType ?? "");
+    if (entryType !== "CHARGE" && entryType !== "PAYMENT") {
+      throw new Error("ledger entry type is invalid");
+    }
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("ledger amount must be greater than zero");
+    const existing = await manager.findOne(VendorLedgerEntry, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(VendorLedgerEntry, { id: entityId, tenantId });
+    Object.assign(row, {
+      vendorId,
+      entryType,
+      amount: String(amount),
+      goodsReceiptId:
+        (p.goodsReceiptId as string | null | undefined) ??
+        row.goodsReceiptId ??
+        null,
+      receiptNumber:
+        (p.receiptNumber as string | null | undefined) ??
+        row.receiptNumber ??
+        null,
+      note: String(p.note ?? row.note ?? ""),
+      occurredAt: p.occurredAt
+        ? new Date(String(p.occurredAt))
+        : (row.occurredAt ?? new Date()),
+    });
+    await manager.save(row);
   }
 
   private async upsertGoodsReceipt(
@@ -895,6 +1358,9 @@ export class SyncService {
       otherCharges: "0",
       returnCredit: String(p.returnCredit ?? row.returnCredit ?? 0),
       total: String(p.total ?? row.total ?? 0),
+      amountPaid: String(
+        p.amountPaid ?? row.amountPaid ?? p.total ?? row.total ?? 0,
+      ),
       notes: "",
     });
     if (!row.purchaseOrderId) throw new Error("purchase order not found");
@@ -924,6 +1390,9 @@ export class SyncService {
             poUnitCost: String(item.poUnitCost ?? 0),
             receivingUnitCost: String(item.receivingUnitCost ?? 0),
             discountPercent: String(item.discountPercent ?? 0),
+            saleTax: String(item.saleTax ?? 0),
+            advTax: String(item.advTax ?? 0),
+            gst: String(item.gst ?? 0),
             lineTotal: String(item.lineTotal ?? 0),
           }),
         );
@@ -1041,6 +1510,10 @@ export class SyncService {
       }
 
       if (billedDelta > 0) {
+        const lineTaxes =
+          Number(item.saleTax ?? 0) +
+          Number(item.advTax ?? 0) +
+          Number(item.gst ?? 0);
         const netUnitCost = landedUnitByQuantity(
           received,
           Number(item.receivingUnitCost ?? 0),
@@ -1049,6 +1522,7 @@ export class SyncService {
           voucher.headerDiscount,
           voucher.costCharges,
           voucher.costCredits,
+          lineTaxes,
         );
         const newCost = roundMoney4(netUnitCost / unitsPer);
         state.cost = weightedAvgUnitCost(
@@ -1148,20 +1622,471 @@ export class SyncService {
     if (!row.warehouseId) throw new Error("warehouse not found");
     await manager.save(row);
     if (Array.isArray(p.items)) {
-      await manager.delete(InventoryOutItem, {
+      await manager.delete(InventoryOutLine, {
         inventoryOutId: entityId,
         tenantId,
       });
       for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const unitCost = Number(item.unitCost ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
         await manager.save(
-          manager.create(InventoryOutItem, {
+          manager.create(InventoryOutLine, {
             id: String(item.id ?? randomUUID()),
             tenantId,
             inventoryOutId: entityId,
-            productSkuId: String(item.productSkuId ?? ""),
-            quantity: String(item.quantity ?? 0),
-            unitCost: String(item.unitCost ?? 0),
+            productSkuId,
+            quantity: String(qty),
+            unitCost: String(unitCost),
           }),
+        );
+        if (productSkuId && qty > 0) {
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            qty,
+            unitCost,
+          );
+        }
+      }
+    }
+  }
+
+  private async upsertInventoryOutReturn(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await manager.findOne(InventoryOutReturn, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ??
+      manager.create(InventoryOutReturn, { id: entityId, tenantId });
+    Object.assign(row, {
+      returnNumber: String(
+        p.returnNumber ?? row.returnNumber ?? `SYNC-${entityId.slice(0, 8)}`,
+      ),
+      warehouseId: String(p.warehouseId ?? row.warehouseId ?? ""),
+      returnDate: String(
+        p.returnDate ?? row.returnDate ?? new Date().toISOString().slice(0, 10),
+      ),
+      notes: String(p.notes ?? row.notes ?? ""),
+      status: String(p.status ?? row.status ?? "POSTED"),
+      subtotal: String(p.subtotal ?? row.subtotal ?? 0),
+      total: String(p.total ?? row.total ?? 0),
+    });
+    if (!row.warehouseId) throw new Error("warehouse not found");
+    await manager.save(row);
+    const isFirstPost = !existing && String(row.status) === "POSTED";
+    const returnReason = `Inventory out return ${row.returnNumber}`;
+    const stockRepo = manager.getRepository(InventoryStock);
+    if (Array.isArray(p.items)) {
+      await manager.delete(InventoryOutReturnItem, {
+        inventoryOutReturnId: entityId,
+        tenantId,
+      });
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const unitCost = Number(item.unitCost ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
+        const itemId = String(item.id ?? randomUUID());
+        await manager.save(
+          manager.create(InventoryOutReturnItem, {
+            id: itemId,
+            tenantId,
+            inventoryOutReturnId: entityId,
+            productSkuId,
+            inventoryOutItemId: (item.inventoryOutItemId as string | null) ?? null,
+            quantity: String(qty),
+            unitCost: String(unitCost),
+          }),
+        );
+        if (productSkuId && qty > 0) {
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            -qty,
+            unitCost,
+          );
+          if (isFirstPost) {
+            const movementExists = await manager.findOne(InventoryMovement, {
+              where: { id: itemId, tenantId },
+            });
+            if (!movementExists) {
+              await manager.save(
+                manager.create(InventoryMovement, {
+                  id: itemId,
+                  tenantId,
+                  productSkuId,
+                  warehouseId: row.warehouseId,
+                  movementType: "INVENTORY_OUT_RETURN",
+                  quantity: String(qty),
+                  referenceType: "inventory_out_return",
+                  referenceId: entityId,
+                  reason: returnReason,
+                }),
+              );
+              let stock = await manager.findOne(InventoryStock, {
+                where: {
+                  tenantId,
+                  productSkuId,
+                  warehouseId: row.warehouseId,
+                },
+              });
+              if (!stock) {
+                stock = manager.create(InventoryStock, {
+                  tenantId,
+                  productSkuId,
+                  warehouseId: row.warehouseId,
+                  quantityOnHand: "0",
+                  quantityReserved: "0",
+                  quantityAvailable: "0",
+                });
+              }
+              const onHand = roundMoney4(Number(stock.quantityOnHand) + qty);
+              const reserved = Number(stock.quantityReserved || 0);
+              stock.quantityOnHand = String(onHand);
+              stock.quantityAvailable = String(roundMoney4(onHand - reserved));
+              await stockRepo.save(stock);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private async upsertSaleReturn(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await manager.findOne(SaleReturn, {
+      where: { id: entityId, tenantId },
+    });
+    if (existing?.status === "COMPLETED") return;
+
+    const row =
+      existing ?? manager.create(SaleReturn, { id: entityId, tenantId });
+    Object.assign(row, {
+      returnNumber: String(
+        p.returnNumber ?? row.returnNumber ?? `SYNC-${entityId.slice(0, 8)}`,
+      ),
+      saleId: String(p.saleId ?? row.saleId ?? ""),
+      warehouseId: String(p.warehouseId ?? row.warehouseId ?? ""),
+      returnDate: String(
+        p.returnDate ?? row.returnDate ?? new Date().toISOString().slice(0, 10),
+      ),
+      status: String(p.status ?? row.status ?? "PENDING"),
+      subtotal: String(p.subtotal ?? row.subtotal ?? 0),
+      gstRate: String(p.gstRate ?? row.gstRate ?? 0),
+      gstAmount: String(p.gstAmount ?? row.gstAmount ?? 0),
+      salesTaxRate: String(p.salesTaxRate ?? row.salesTaxRate ?? 0),
+      salesTaxAmount: String(p.salesTaxAmount ?? row.salesTaxAmount ?? 0),
+      refundTotal: String(p.refundTotal ?? row.refundTotal ?? 0),
+      refundMethod: String(p.refundMethod ?? row.refundMethod ?? "CASH"),
+      notes: String(p.notes ?? row.notes ?? ""),
+      processedBy: (p.processedBy as string | null | undefined) ?? row.processedBy ?? null,
+      issuedBy:
+        (p.issuedBy as string | null | undefined) ??
+        row.issuedBy ??
+        (p.processedBy as string | null | undefined) ??
+        row.processedBy ??
+        null,
+      issuedByName:
+        (p.issuedByName as string | null | undefined) ?? row.issuedByName ?? null,
+      refundedBy:
+        (p.refundedBy as string | null | undefined) ?? row.refundedBy ?? null,
+      refundedByName:
+        (p.refundedByName as string | null | undefined) ??
+        row.refundedByName ??
+        null,
+      refundedAt:
+        p.refundedAt != null
+          ? new Date(String(p.refundedAt))
+          : row.refundedAt,
+      appliedToSaleId:
+        (p.appliedToSaleId as string | null | undefined) ??
+        row.appliedToSaleId ??
+        null,
+      completionMode:
+        (p.completionMode as string | null | undefined) ??
+        row.completionMode ??
+        null,
+    });
+    if (!row.saleId) throw new Error("sale not found");
+    if (!row.warehouseId) throw new Error("warehouse not found");
+    await manager.save(row);
+
+    if (Array.isArray(p.items)) {
+      await manager.delete(SaleReturnLine, {
+        saleReturnId: entityId,
+        tenantId,
+      });
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
+        const unitPrice = Number(item.unitPrice ?? 0);
+        await manager.save(
+          manager.create(SaleReturnLine, {
+            id: String(item.id ?? randomUUID()),
+            tenantId,
+            saleReturnId: entityId,
+            saleLineId: String(item.saleLineId ?? ""),
+            productSkuId,
+            quantity: String(qty),
+            unitPrice: String(unitPrice),
+            discountPercent: String(item.discountPercent ?? 0),
+            lineTotal: String(item.lineTotal ?? 0),
+            sellUnit: String(item.sellUnit ?? "pc"),
+            barcode: (item.barcode as string | null | undefined) ?? null,
+          }),
+        );
+        if (productSkuId && qty > 0 && !existing && row.status !== "COMPLETED") {
+          const balance = await manager.findOne(InventoryOutItem, {
+            where: { tenantId, warehouseId: row.warehouseId, productSkuId },
+          });
+          const unitCost = balance
+            ? Number(balance.unitCost ?? 0)
+            : unitPrice;
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            qty,
+            unitCost,
+          );
+          await manager.save(
+            manager.create(InventoryMovement, {
+              id: randomUUID(),
+              tenantId,
+              productSkuId,
+              warehouseId: row.warehouseId,
+              movementType: "SALE_RETURN",
+              quantity: String(qty),
+              referenceType: "sale_return",
+              referenceId: entityId,
+              reason: `Return ${row.returnNumber} for sale`,
+            }),
+          );
+        }
+      }
+    }
+  }
+
+  async upsertPostedSale(
+    tenantId: string,
+    entityId: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await this.upsertSale(manager, tenantId, entityId, payload);
+    });
+  }
+
+  private async upsertSale(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const existing = await manager.findOne(Sale, {
+      where: { id: entityId, tenantId },
+    });
+    const byId = await manager.findOne(Sale, { where: { id: entityId } });
+    // #region agent log
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"B",location:"sync.service.ts:upsertSale",message:"sale lookup before save",data:{entityId,tenantId,foundForTenant:Boolean(existing),foundById:Boolean(byId),existingTenantId:byId?.tenantId??null,sameTenant:byId?byId.tenantId===tenantId:null,incomingStatus:p.status??null,incomingSaleNumber:p.saleNumber??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    const row = existing ?? manager.create(Sale, { id: entityId, tenantId });
+    const prevStatus = row.status;
+    Object.assign(row, {
+      saleNumber: String(
+        p.saleNumber ?? row.saleNumber ?? `SYNC-${entityId.slice(0, 8)}`,
+      ),
+      warehouseId: String(p.warehouseId ?? row.warehouseId ?? ""),
+      status: String(p.status ?? row.status ?? "POSTED"),
+      subtotal: String(p.subtotal ?? row.subtotal ?? 0),
+      gstRate: String(p.gstRate ?? row.gstRate ?? 0),
+      gstAmount: String(p.gstAmount ?? row.gstAmount ?? 0),
+      salesTaxRate: String(p.salesTaxRate ?? row.salesTaxRate ?? 0),
+      salesTaxAmount: String(p.salesTaxAmount ?? row.salesTaxAmount ?? 0),
+      total: String(p.total ?? row.total ?? 0),
+      deviceId: (p.deviceId as string | null | undefined) ?? row.deviceId ?? null,
+      postedBy: (p.postedBy as string | null | undefined) ?? row.postedBy ?? null,
+      postedAt: p.postedAt ? new Date(String(p.postedAt)) : row.postedAt,
+      customerName: String(
+        p.customerName ?? row.customerName ?? "CASH SALES CUSTOMER",
+      ),
+      postedByName:
+        (p.postedByName as string | null | undefined) ?? row.postedByName ?? null,
+      cashTendered:
+        p.cashTendered != null && p.cashTendered !== ""
+          ? String(p.cashTendered)
+          : row.cashTendered,
+      notes: String(p.notes ?? row.notes ?? ""),
+    });
+    const incomingFbrInvoice =
+      p.fbrInvoiceNumber != null && String(p.fbrInvoiceNumber).trim() !== ""
+        ? String(p.fbrInvoiceNumber).trim()
+        : null;
+    const incomingFbrStatus = String(p.fbrStatus ?? "");
+    const serverTerminal =
+      row.fbrStatus === "submitted" ||
+      row.fbrStatus === "failed" ||
+      row.fbrStatus === "excluded";
+    const incomingDowngradesServer =
+      !incomingFbrInvoice &&
+      serverTerminal &&
+      (incomingFbrStatus === "" ||
+        incomingFbrStatus === "pending" ||
+        (incomingFbrStatus === "excluded" &&
+          (row.fbrStatus === "submitted" || row.fbrStatus === "failed")));
+    const keepServerFbr =
+      (Boolean(row.fbrInvoiceNumber) && !incomingFbrInvoice) ||
+      incomingDowngradesServer;
+    if (!keepServerFbr) {
+      row.fbrInvoiceNumber = incomingFbrInvoice ?? row.fbrInvoiceNumber ?? null;
+      const incomingStatus = asFbrInvoiceStatus(p.fbrStatus);
+      if (incomingStatus) {
+        row.fbrStatus = incomingStatus;
+      } else if (!row.fbrStatus) {
+        row.fbrStatus = "pending";
+      }
+      if (p.fbrError !== undefined) {
+        const errorText = p.fbrError == null ? "" : String(p.fbrError).trim();
+        row.fbrError = errorText || null;
+      }
+      if (p.fbrSubmittedAt) {
+        row.fbrSubmittedAt = new Date(String(p.fbrSubmittedAt));
+      }
+      const incomingNtn =
+        p.fbrSellerNtn != null && String(p.fbrSellerNtn).trim() !== ""
+          ? String(p.fbrSellerNtn).trim()
+          : null;
+      if (incomingNtn) row.fbrSellerNtn = incomingNtn;
+    }
+    if (!row.warehouseId) throw new Error("warehouse not found");
+    try {
+      await manager.save(row);
+    } catch (error: unknown) {
+      const driverCode =
+        error &&
+        typeof error === "object" &&
+        "driverError" in error &&
+        (error as { driverError?: { code?: string } }).driverError?.code
+          ? String(
+              (error as { driverError?: { code?: string } }).driverError?.code,
+            )
+          : "";
+      // #region agent log
+      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"C",location:"sync.service.ts:upsertSale:save",message:"sale save failed",data:{entityId,tenantId,wasInsert:!existing,pgCode:driverCode},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      throw error;
+    }
+
+    if (Array.isArray(p.items)) {
+      await manager.delete(SaleLine, { saleId: entityId, tenantId });
+      await manager.delete(SalePayment, { saleId: entityId, tenantId });
+
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const focQty = Math.max(0, Math.floor(Number(item.focQuantity ?? 0)));
+        const inventoryQty = qty + focQty;
+        const productSkuId = String(item.productSkuId ?? "");
+        const unitPrice = Number(item.unitPrice ?? 0);
+        let hsCode =
+          item.hsCode != null && String(item.hsCode).trim() !== ""
+            ? String(item.hsCode).trim()
+            : null;
+        if (!hsCode && productSkuId) {
+          const sku = await manager.findOne(ProductSku, {
+            where: { id: productSkuId, tenantId },
+            select: { id: true, hsCode: true },
+          });
+          hsCode = sku?.hsCode ?? null;
+        }
+        await manager.save(
+          manager.create(SaleLine, {
+            id: String(item.id ?? randomUUID()),
+            tenantId,
+            saleId: entityId,
+            productSkuId,
+            quantity: String(qty),
+            unitPrice: String(unitPrice),
+            lineTotal: String(item.lineTotal ?? qty * unitPrice),
+            gstPercent: String(item.gstPercent ?? 0),
+            discountPercent: String(item.discountPercent ?? 0),
+            focQuantity: String(focQty),
+            sellUnit: String(item.sellUnit ?? "pc"),
+            barcode: (item.barcode as string | null | undefined) ?? null,
+            hsCode,
+          }),
+        );
+
+        if (
+          productSkuId &&
+          inventoryQty > 0 &&
+          row.status === "POSTED" &&
+          prevStatus !== "POSTED"
+        ) {
+          const balance = await manager.findOne(InventoryOutItem, {
+            where: { tenantId, warehouseId: row.warehouseId, productSkuId },
+          });
+          const unitCost = balance
+            ? Number(balance.unitCost ?? 0)
+            : unitPrice;
+          await applyInventoryOutBalanceDelta(
+            manager,
+            tenantId,
+            row.warehouseId,
+            productSkuId,
+            -inventoryQty,
+            unitCost,
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(p.payments)) {
+      for (const payment of p.payments as Array<Record<string, unknown>>) {
+        await manager.save(
+          manager.create(SalePayment, {
+            id: String(payment.id ?? randomUUID()),
+            tenantId,
+            saleId: entityId,
+            method: String(payment.method ?? "CASH"),
+            amount: String(payment.amount ?? 0),
+            reference: String(payment.reference ?? ""),
+          }),
+        );
+      }
+    }
+
+    if (row.status === "VOID" && prevStatus === "POSTED" && Array.isArray(p.items)) {
+      for (const item of p.items as Array<Record<string, unknown>>) {
+        const qty = Number(item.quantity ?? 0);
+        const productSkuId = String(item.productSkuId ?? "");
+        if (!productSkuId || !(qty > 0)) continue;
+        const balance = await manager.findOne(InventoryOutItem, {
+          where: { tenantId, warehouseId: row.warehouseId, productSkuId },
+        });
+        const unitCost = balance
+          ? Number(balance.unitCost ?? 0)
+          : Number(item.unitPrice ?? 0);
+        await applyInventoryOutBalanceDelta(
+          manager,
+          tenantId,
+          row.warehouseId,
+          productSkuId,
+          qty,
+          unitCost,
         );
       }
     }
@@ -1191,6 +2116,10 @@ export class SyncService {
       (row as { status: string }).status = "inactive";
     }
     await manager.save(row);
+  }
+
+  async assertCanSync(user: TenantContext): Promise<void> {
+    await this.requireTrustedDevice(user);
   }
 
   private async requireTrustedDevice(user: TenantContext): Promise<Device> {
@@ -1304,6 +2233,22 @@ export class SyncService {
       { id: deviceId, tenantId },
       { lastSyncAt: new Date(), lastSyncError: error },
     );
+  }
+
+  private async entityVersionHead(
+    manager: EntityManager,
+    tenantId: string,
+    entityType: string,
+    entityId: string,
+  ): Promise<number> {
+    const head = await manager
+      .createQueryBuilder(SyncChange, "c")
+      .where("c.tenant_id = :tenantId", { tenantId })
+      .andWhere("c.entity_type = :entityType", { entityType })
+      .andWhere("c.entity_id = :entityId", { entityId })
+      .orderBy("c.entity_version", "DESC")
+      .getOne();
+    return head?.entityVersion ?? 0;
   }
 
   private toDto(row: SyncChange): SyncChangeDto {

@@ -1,16 +1,24 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsBoolean,
   IsIn,
   IsNumber,
+  Matches,
   IsOptional,
   IsString,
   IsUUID,
   Min,
+  Max,
   MinLength,
   ValidateIf,
 } from "class-validator";
-import { ENTITY_STATUSES, PRODUCT_TYPES } from "@blackbox/shared";
+import {
+  ENTITY_STATUSES,
+  HS_CODE_MESSAGE,
+  HS_CODE_PATTERN,
+  PRODUCT_TYPES,
+  normalizeHsCode,
+} from "@blackbox/shared";
 
 export class ListProductsQueryDto {
   @IsOptional()
@@ -107,6 +115,25 @@ export class CreateProductSkuDto {
   @Min(0)
   costPrice!: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  gstPercent?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value !== "string") return value;
+    return normalizeHsCode(value) ?? value;
+  })
+  @ValidateIf((_, value) => value != null && String(value).trim() !== "")
+  @IsString()
+  @Matches(HS_CODE_PATTERN, {
+    message: HS_CODE_MESSAGE,
+  })
+  hsCode?: string | null;
+
   @Type(() => Number)
   @IsNumber()
   @Min(0)
@@ -118,6 +145,13 @@ export class CreateProductSkuDto {
   @IsNumber()
   @Min(0)
   sellingPricePerPurchaseUnit?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  saleDiscountPercent?: number;
 
   @IsOptional()
   @Type(() => Number)

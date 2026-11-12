@@ -1,0 +1,229 @@
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import type { SaleDetail } from "@blackbox/shared";
+import { Button } from "@blackbox/ui/button";
+import { PrintButton } from "@renderer/components/print-button";
+import { PrintDocument } from "@renderer/components/print-document";
+import { useConfirm } from "@renderer/components/confirm-provider";
+import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { submitPostedSaleToFbr } from "@renderer/lib/sales/submit-fbr";
+import { loadSale, loadSaleReturnCreditForSale } from "@renderer/lib/local-db/entity-source";
+import { useSalesAccess } from "@renderer/lib/use-sales-access";
+import { defaultRouteForUser } from "@renderer/lib/sales-access";
+import { SaleThermalReceipt, type SaleReturnCreditReceipt } from "./sale-thermal-receipt";
+import { useSession } from "@renderer/lib/session/context";
+
+export function SaleDetailPage() {
+  const { id = "" } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const printBill = Boolean(
+    (location.state as { printBill?: boolean } | null)?.printBill,
+  );
+  const printedBillFor = useRef<string | null>(null);
+  const confirm = useConfirm();
+  const { user } = useSession();
+  const permissions = user?.permissions ?? [];
+  const { canReadList, canWrite } = useSalesAccess();
+  const [detail, setDetail] = useState<SaleDetail | null>(null);
+  const [returnCredit, setReturnCredit] =
+    useState<SaleReturnCreditReceipt | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submittingFbr, setSubmittingFbr] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+
+  useEffect(() => {
+    if (!canReadList && !canWrite) {
+      navigate(defaultRouteForUser(permissions), { replace: true });
+    }
+  }, [canReadList, canWrite, navigate, permissions]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+    void Promise.all([loadSale(id), loadSaleReturnCreditForSale(id)])
+      .then(([row, credit]) => {
+        if (!cancelled) {
+          setDetail(row);
+          if (credit && row.status === "POSTED") {
+            setReturnCredit({
+              returnNumber: credit.returnNumber,
+              amount: credit.amount,
+              cashBack: Math.max(0, credit.amount - row.total),
+            });
+          } else {
+            setReturnCredit(null);
+          }
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, "Sale not found"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (loading || !detail || !printBill) return;
+    if (detail.status !== "POSTED") return;
+    if (printedBillFor.current === detail.id) return;
+    printedBillFor.current = detail.id;
+    window.print();
+  }, [loading, detail, printBill]);
+
+  async function onDiscardDraft() {
+    if (!detail || detail.status !== "DRAFT") return;
+    const ok = await confirm({
+      title: "Discard held bill?",
+      description: `${detail.saleNumber} will be removed from this device.`,
+      confirmLabel: "Discard",
+    });
+    if (!ok) return;
+
+    setDiscarding(true);
+    setError(null);
+    try {
+      const result = await window.blackbox?.localDb?.deleteSaleDraft?.(detail.id);
+      if (!result?.ok) {
+        setError("Held bill not found or already removed");
+        return;
+      }
+      navigate("/sales/held");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to discard held bill"));
+    } finally {
+      setDiscarding(false);
+    }
+  }
+
+  async function onSubmitFbr() {
+    if (!detail || detail.status !== "POSTED") return;
+    setSubmittingFbr(true);
+    setError(null);
+    try {
+      const updated = await submitPostedSaleToFbr(detail);
+      setDetail(updated);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "FBR invoice was not issued"));
+    } finally {
+      setSubmittingFbr(false);
+    }
+  }
+
+  if (loading) {
+    return <p className="text-muted-foreground text-sm">Loading sale…</p>;
+  }
+
+  if (!detail) {
+    return (
+      <div className="space-y-4">
+        <p className="text-destructive text-sm">{error ?? "Sale not found"}</p>
+        <Button variant="outline" onClick={() => navigate("/sales")}>
+          Back to sales
+        </Button>
+      </div>
+    );
+  }
+
+  const isDraft = detail.status === "DRAFT";
+  const fbrEnabled = user?.fbrEnabled === true;
+
+  return (
+    <div className="space-y-6">
+      <div className="print:hidden space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {detail.saleNumber}
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {detail.warehouseName} · {isDraft ? "Held" : detail.status}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {fbrEnabled &&
+            !isDraft &&
+            detail.fbrStatus !== "submitted" &&
+            detail.fbrStatus !== "excluded" &&
+            !detail.fbrInvoiceNumber ? (
+              <Button
+                variant="outline"
+                disabled={submittingFbr}
+                onClick={() => void onSubmitFbr()}
+              >
+                {submittingFbr ? "Sending to FBR…" : "Retry FBR invoice"}
+              </Button>
+            ) : null}
+            {!isDraft ? <PrintButton openDrawerOnPrint /> : null}
+            {isDraft && canWrite ? (
+              <>
+                <Button onClick={() => navigate(`/sales/new/${detail.id}`)}>
+                  Resume
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={discarding}
+                  onClick={() => void onDiscardDraft()}
+                >
+                  {discarding ? "Discarding…" : "Discard"}
+                </Button>
+              </>
+            ) : null}
+            <Button
+              variant="outline"
+              onClick={() => navigate(isDraft ? "/sales/held" : "/sales")}
+            >
+              Back to list
+            </Button>
+          </div>
+        </div>
+
+        {error ? (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {fbrEnabled &&
+        !isDraft &&
+        detail.fbrStatus === "failed" &&
+        detail.fbrError &&
+        !detail.fbrInvoiceNumber ? (
+          <p className="text-destructive text-sm" role="alert">
+            {detail.fbrError}
+          </p>
+        ) : null}
+
+        {isDraft ? (
+          <p className="text-muted-foreground text-sm">
+            This bill is held on this device only. Stock is reserved until you post
+            or discard it.
+          </p>
+        ) : null}
+      </div>
+      {!isDraft ? (
+        <PrintDocument showStoreHeader={false}>
+          <SaleThermalReceipt
+            detail={detail}
+            businessName={user?.tenantName?.trim() ?? ""}
+            businessAddress={user?.businessAddress}
+            businessPhone={user?.businessPhone}
+            cashierName={
+              detail.postedByName?.trim() || user?.fullName?.trim() || "—"
+            }
+            returnCredit={returnCredit ?? undefined}
+            fbrEnabled={fbrEnabled}
+          />
+        </PrintDocument>
+      ) : null}
+    </div>
+  );
+}

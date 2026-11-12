@@ -20,6 +20,7 @@ export type SessionValue = {
   signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshDeviceState: () => Promise<void>;
+  refreshSessionUser: () => Promise<void>;
 };
 
 export const SessionContext = createContext<SessionValue | null>(null);

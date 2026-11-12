@@ -32,6 +32,7 @@ import { vendorsApi } from "@renderer/lib/api/vendors";
 import { loadVendor } from "@renderer/lib/local-db/entity-source";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { allocateVendorCode } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
 import {
@@ -409,7 +410,14 @@ export function VendorFormPage() {
     let saved: VendorDetail;
     try {
       if (await isDeviceBound()) {
-        const localId = isEdit && id ? id : crypto.randomUUID();
+        let localId = isEdit && id ? id : null;
+        if (!localId) {
+          const existingId = await resolveCanonicalEntityId({
+            entityType: "vendor",
+            vendorCode,
+          });
+          localId = existingId ?? crypto.randomUUID();
+        }
         const now = new Date().toISOString();
         const contacts: VendorDetail["contacts"] = [];
         const addContact = (

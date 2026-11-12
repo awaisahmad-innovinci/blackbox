@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type {
   InventoryOutDetail,
@@ -31,6 +32,7 @@ import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -289,6 +291,21 @@ export function InventoryOutPage() {
             },
           });
         }
+        if (user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "inventory_out.posted",
+              actorUserId: user.id,
+              summary: `Posted inventory out ${detail.outNumber} for Rs ${formatMoney(detail.total)}`,
+              metadata: {
+                inventoryOutId: localId,
+                outNumber: detail.outNumber,
+                total: detail.total,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
+        }
         void syncNow();
         setSuccess(detail);
         return;
@@ -306,6 +323,14 @@ export function InventoryOutPage() {
 
       try {
         await window.blackbox?.localDb?.upsertInventoryOut(detail);
+        for (const item of detail.items) {
+          await window.blackbox?.localDb?.applyInventoryOutBalanceDelta?.(
+            detail.warehouseId,
+            item.productSkuId,
+            item.quantity,
+            item.unitCost,
+          );
+        }
       } catch {
         /* optional cache */
       }
@@ -512,7 +537,7 @@ export function InventoryOutPage() {
                   <td className="px-4 py-3 tabular-nums">
                     {line.quantityAvailable}
                   </td>
-                  <td className="px-4 py-3 tabular-nums">{unitPrice(line)}</td>
+                  <td className="px-4 py-3 tabular-nums">{formatMoney(unitPrice(line))}</td>
                   <td className="px-4 py-3">
                     {line.unitsPerPurchaseUnit > 1 ? (
                       <select
@@ -588,7 +613,7 @@ export function InventoryOutPage() {
                     ) : null}
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {lineTotal(line).toLocaleString()}
+                    {formatMoney(lineTotal(line))}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button
@@ -621,11 +646,11 @@ export function InventoryOutPage() {
         <section className="ml-auto grid max-w-sm gap-2 text-sm">
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Subtotal</span>
-            <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+            <span className="tabular-nums">{formatMoney(subtotal)}</span>
           </div>
           <div className="flex justify-between gap-6 font-medium">
             <span>Total</span>
-            <span className="tabular-nums">{total.toLocaleString()}</span>
+            <span className="tabular-nums">{formatMoney(total)}</span>
           </div>
         </section>
       </section>
@@ -724,9 +749,9 @@ function InventoryOutBillTable({
                 <td className="px-4 py-3">{item.productLabel}</td>
                 <td className="px-4 py-3">{item.sku}</td>
                 <td className="px-4 py-3 tabular-nums">{item.quantity}</td>
-                <td className="px-4 py-3 tabular-nums">{item.unitCost}</td>
+                <td className="px-4 py-3 tabular-nums">{formatMoney(item.unitCost)}</td>
                 <td className="px-4 py-3 tabular-nums">
-                  {item.lineTotal.toLocaleString()}
+                  {formatMoney(item.lineTotal)}
                 </td>
               </tr>
             ))}
@@ -736,11 +761,11 @@ function InventoryOutBillTable({
       <section className="ml-auto grid max-w-sm gap-2 text-sm">
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Subtotal</span>
-          <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(subtotal)}</span>
         </div>
         <div className="flex justify-between gap-6 font-medium">
           <span>Total</span>
-          <span className="tabular-nums">{total.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(total)}</span>
         </div>
       </section>
     </section>

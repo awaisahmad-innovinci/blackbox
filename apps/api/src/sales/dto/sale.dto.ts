@@ -1,0 +1,241 @@
+import { Transform, Type } from "class-transformer";
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import {
+  SALE_PAYMENT_METHODS,
+  SALE_REGISTER_KINDS,
+  SALE_REGISTER_STATUSES,
+  SALE_STATUSES,
+  type SalePaymentMethod,
+  type SaleRegisterKind,
+  type SaleStatus,
+} from "@blackbox/shared";
+
+export class CreateSaleLineDto {
+  @IsUUID()
+  productSkuId!: string;
+
+  /** May be 0 for a FOC-only line (requires focQuantity > 0, lineTotal 0). */
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  quantity!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  unitPrice!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  lineTotal!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  gstPercent?: number;
+
+  @IsOptional()
+  @IsIn(["pc", "box"])
+  sellUnit?: "pc" | "box";
+
+  @IsOptional()
+  @IsString()
+  barcode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  hsCode?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  discountPercent?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  focQuantity?: number;
+}
+
+export class CreateSalePaymentDto {
+  @IsIn([...SALE_PAYMENT_METHODS])
+  method!: SalePaymentMethod;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.0001)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
+}
+
+export class CreateSaleDto {
+  @IsUUID()
+  warehouseId!: string;
+
+  @IsOptional()
+  @IsString()
+  @Min(1)
+  saleNumber?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  gstRate?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  salesTaxRate?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  customerName?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  cashTendered?: number;
+
+  @IsOptional()
+  @IsUUID()
+  supervisorUserId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  pendingReturnId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  fbrExcluded?: boolean;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateSaleLineDto)
+  items!: CreateSaleLineDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateSalePaymentDto)
+  payments?: CreateSalePaymentDto[];
+}
+
+export class ListSalesQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string;
+
+  @IsOptional()
+  @IsIn([...SALE_STATUSES])
+  status?: SaleStatus;
+
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  hasFoc?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  pageSize?: number;
+}
+
+export class ListSaleRegisterQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string;
+
+  @IsOptional()
+  @IsIn([...SALE_REGISTER_KINDS])
+  kind?: SaleRegisterKind;
+
+  @IsOptional()
+  @IsIn([...SALE_REGISTER_STATUSES])
+  status?: (typeof SALE_REGISTER_STATUSES)[number];
+
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === true || value === "true") return true;
+    if (value === false || value === "false") return false;
+    return undefined;
+  })
+  @IsBoolean()
+  hasFoc?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  pageSize?: number;
+}
+
+export class SubmitSaleFbrDto {
+  @IsOptional()
+  @IsObject()
+  sale?: Record<string, unknown>;
+}

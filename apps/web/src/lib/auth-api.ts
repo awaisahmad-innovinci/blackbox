@@ -5,7 +5,6 @@ import type {
   LoginRequest,
   MessageResponse,
   ResetPasswordRequest,
-  SignupTenantRequest,
 } from "@blackbox/shared";
 import { apiFetch, apiJson, clearClientSession, setSessionFromAuthResponse } from "./api-client";
 import { getRefreshToken } from "./auth-storage";
@@ -20,16 +19,6 @@ export async function loginRequest(
     client: "web",
   };
   const res = await apiJson<AuthResponse>("/auth/login", "POST", payload, {
-    skipAuth: true,
-  });
-  setSessionFromAuthResponse(res.tokens);
-  return res;
-}
-
-export async function signupTenantRequest(
-  payload: SignupTenantRequest,
-): Promise<AuthResponse> {
-  const res = await apiJson<AuthResponse>("/auth/signup-tenant", "POST", payload, {
     skipAuth: true,
   });
   setSessionFromAuthResponse(res.tokens);

@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Injectable,
@@ -22,6 +23,8 @@ import {
   Warehouse,
 } from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
+import { getRequestTenant } from "../../common/request-tenant";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
 import {
   CreatePurchaseOrderDto,
   ListPurchaseOrdersQueryDto,
@@ -55,6 +58,7 @@ export class PurchaseOrdersService {
     private readonly vendorSkus: Repository<VendorSku>,
     @InjectRepository(ProductSku)
     private readonly skus: Repository<ProductSku>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(query: ListPurchaseOrdersQueryDto): Promise<PaginatedPurchaseOrders> {
@@ -164,7 +168,7 @@ export class PurchaseOrdersService {
     const lines = await this.items.find({
       where: { purchaseOrderId: id, tenantId },
       relations: {
-        productSku: { product: true },
+        productSku: { product: true, baseUnit: true },
         vendorSku: true,
         purchaseUnit: true,
       },
@@ -178,7 +182,7 @@ export class PurchaseOrdersService {
     const tenantId = this.fixedTenant.tenantId;
     const enforceMoq = Boolean(dto.submit);
 
-    return this.dataSource.transaction(async (manager) => {
+    const created = await this.dataSource.transaction(async (manager) => {
       await this.assertVendorWarehouse(
         manager,
         tenantId,
@@ -236,6 +240,22 @@ export class PurchaseOrdersService {
 
       return this.getByIdInManager(manager, saved.id);
     });
+
+    const actorUserId = getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "purchase_order.created",
+        actorUserId,
+        summary: `Created purchase order ${created.poNumber} for Rs ${formatMoney(created.total)}`,
+        metadata: {
+          purchaseOrderId: created.id,
+          poNumber: created.poNumber,
+          total: created.total,
+        },
+      });
+    }
+    return created;
   }
 
   async update(
@@ -512,7 +532,7 @@ export class PurchaseOrdersService {
     const lines = await manager.getRepository(PurchaseOrderItem).find({
       where: { purchaseOrderId: id, tenantId },
       relations: {
-        productSku: { product: true },
+        productSku: { product: true, baseUnit: true },
         vendorSku: true,
         purchaseUnit: true,
       },
@@ -535,7 +555,9 @@ export class PurchaseOrdersService {
       vendorSkuCode: l.vendorSku?.vendorSkuCode ?? null,
       purchaseUnitId: l.purchaseUnitId,
       purchaseUnitName: l.purchaseUnit?.name ?? null,
+      baseUnitName: l.productSku?.baseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(l.unitsPerPurchaseUnit),
+      orderUnit: (l.orderUnit === "pc" ? "pc" : "box") as "pc" | "box",
       quantity: toNum(l.quantity),
       unitCost: toNum(l.unitCost),
       discount: toNum(l.discount),
@@ -602,6 +624,7 @@ export class PurchaseOrdersService {
       vendorSkuId: string;
       purchaseUnitId: string | null;
       unitsPerPurchaseUnit: string;
+      orderUnit: string;
       quantity: string;
       unitCost: string;
       tax: string;
@@ -616,6 +639,7 @@ export class PurchaseOrdersService {
       vendorSkuId: string;
       purchaseUnitId: string | null;
       unitsPerPurchaseUnit: string;
+      orderUnit: string;
       quantity: string;
       unitCost: string;
       tax: string;
@@ -683,6 +707,7 @@ export class PurchaseOrdersService {
         vendorSkuId: item.vendorSkuId,
         purchaseUnitId: vs.purchaseUnitId,
         unitsPerPurchaseUnit: String(unitsPerPurchaseUnit),
+        orderUnit: item.orderUnit === "pc" ? "pc" : "box",
         quantity: String(item.quantity),
         unitCost: String(item.unitCost),
         tax: String(tax),

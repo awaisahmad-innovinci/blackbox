@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useNavigate } from "react-router-dom";
 import type {
   SellUnit,
@@ -19,6 +20,7 @@ import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import {
   KEYBOARD_HINT_ADD,
@@ -31,6 +33,8 @@ import { useConfirm } from "@renderer/components/confirm-provider";
 import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
 import { focusLineQty } from "@renderer/lib/focus-line-qty";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import { allocateVendorReturnNumber } from "@renderer/lib/document-numbers";
+import { useSession } from "@renderer/lib/session/context";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -66,6 +70,7 @@ function round4(n: number): number {
 export function VendorReturnFormPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { user } = useSession();
   const [vendors, setVendors] = useState<VendorListItem[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseListItem[]>([]);
   const [vendorId, setVendorId] = useState("");
@@ -312,7 +317,7 @@ export function VendorReturnFormPage() {
         <>
           <p>Vendor: {vendorName}</p>
           <p>Items: {lines.length}</p>
-          <p>Total: {subtotal.toLocaleString()}</p>
+          <p>Total: {formatMoney(subtotal)}</p>
         </>
       ),
       confirmLabel: "Post return",
@@ -324,6 +329,7 @@ export function VendorReturnFormPage() {
       if (await isDeviceBound()) {
         const localId = crypto.randomUUID();
         const now = new Date().toISOString();
+        const returnNumber = await allocateVendorReturnNumber(user?.tenantName ?? "");
         const vendorName = vendors.find((v) => v.id === vendorId)?.name ?? "";
         const warehouseName =
           warehouses.find((w) => w.id === warehouseId)?.name ?? "";
@@ -347,7 +353,7 @@ export function VendorReturnFormPage() {
         }));
         const detail: VendorReturnDetail = {
           id: localId,
-          returnNumber: `LOCAL-${localId.slice(0, 8)}`,
+          returnNumber,
           vendorId,
           vendorName,
           warehouseId,
@@ -390,6 +396,21 @@ export function VendorReturnFormPage() {
               createdAt: now,
             },
           });
+        }
+        if (user?.id) {
+          await logActivityEvent(
+            {
+              eventType: "vendor_return.posted",
+              actorUserId: user.id,
+              summary: `Posted vendor return ${detail.returnNumber} for Rs ${formatMoney(detail.total)}`,
+              metadata: {
+                vendorReturnId: localId,
+                returnNumber: detail.returnNumber,
+                total: detail.total,
+              },
+            },
+            { actorName: user.fullName?.trim() || user.username },
+          );
         }
         void syncNow();
         setSuccess(detail);
@@ -671,10 +692,10 @@ export function VendorReturnFormPage() {
                     />
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {line.unitCost.toLocaleString()}
+                    {formatMoney(line.unitCost)}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {line.lineTotal.toLocaleString()}
+                    {formatMoney(line.lineTotal)}
                   </td>
                   <td className="px-3 py-2">
                     <Button
@@ -723,7 +744,7 @@ export function VendorReturnFormPage() {
       <section className="grid max-w-sm gap-2 text-sm sm:ml-auto">
         <div className="flex justify-between gap-6 border-t pt-2 font-medium">
           <span>Total</span>
-          <span className="tabular-nums">{subtotal.toLocaleString()}</span>
+          <span className="tabular-nums">{formatMoney(subtotal)}</span>
         </div>
       </section>
 

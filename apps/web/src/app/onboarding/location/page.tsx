@@ -61,11 +61,13 @@ export default function OnboardingLocationPage() {
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const address = String(form.get("address") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
     try {
       await completeOnboardingLocation({
         name: String(form.get("name") ?? ""),
         city: String(form.get("city") ?? ""),
         ...(address ? { address } : {}),
+        ...(phone ? { phone } : {}),
       });
       router.push("/onboarding/welcome");
     } catch (err) {
@@ -114,6 +116,16 @@ export default function OnboardingLocationPage() {
               placeholder="Street, area (optional)"
             />
             <FieldHint>Optional — you can add more detail later.</FieldHint>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              placeholder="+92 300 1234567 (optional)"
+            />
+            <FieldHint>Optional — printed on sale receipts when set.</FieldHint>
           </div>
           <FormError>{error}</FormError>
           <Button type="submit" className="w-full" disabled={loading}>

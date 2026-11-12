@@ -23,14 +23,16 @@ Cloud (NestJS + Postgres) is the only hub. Devices never sync with each other.
 
 Push body: `{ stream, changes: [{ changeId, entityType, entityId, operation, baseEntityVersion, payload }] }` (max 100 items).
 
-Pull returns `{ changes, nextCursor, hasMore, serverSeq }`. The window is `seq > cursor` for that stream (origin rows included). The client skips apply when `originDeviceId` is itself, then advances `pull_cursor` to `nextCursor` in the same SQLite transaction as apply.
+Pull returns `{ changes, nextCursor, hasMore, serverSeq }`. The server returns only changes whose `origin_device_id` is **not** the requesting device (other POS devices and the per-tenant `cloud-hub` device for admin REST writes). When only this device's changes exist ahead of the cursor, the server skip-aheads `nextCursor` to the stream tail without transferring payloads. The client still defensively skips apply when `originDeviceId` is itself, then advances `pull_cursor` to `nextCursor` in the same SQLite transaction as apply.
+
+Incremental sync on desktop lists the outbox once, pushes pending rows grouped by stream, calls `GET /sync/status`, then pulls only streams where `lag > 0`.
 
 Cloud `sync_cursors` stores the **committed** cursor the device sent, not the delivered head.
 
 ## Streams
 
 - `master_data` — LWW via `entity_version` on the change log
-- `inventory` — `EVENT` movements; stock is a projection (`delta` or INVENTORY_OUT sign)
+- `inventory` — `EVENT` movements; warehouse `inventory_stock` is a projection from movement `delta` (or INVENTORY_OUT / RETURN sign). **`SALE` and `SALE_RETURN` movements are audit-only** — they do not change warehouse stock; floor qty is updated by `sale` / `sale_return` entity UPSERTs (`inventory_out_items` balance).
 - `purchasing` — document UPSERT snapshots
 - `auth_snapshot` — reserved (pull-only later)
 
@@ -64,3 +66,7 @@ Retry of the same `changeId` is a cloud unique `(tenant_id, change_id)` no-op (`
 `POST /sync/retain` (permission `devices.manage`) marks trusted devices silent for 30 days as `needs_full_resync`, then deletes log rows older than 90 days **and** behind every remaining live trusted device cursor.
 
 Full resync: dashboard Sync falls back to REST `runFullPull` when `needsFullResync` is set or no prior pull exists, then advances per-stream cursors to `serverSeq` and calls `POST /sync/full-resync-complete` to clear the flag. Without that call `pull` would keep returning empty pages and incremental sync would never resume.
+
+REST full pull does **not** replay the sync change log, so `local_entity_versions` would stay stale without a follow-up **`GET /sync/entity-version-heads`** (streams `master_data` and `purchasing`). The desktop seeds those heads after full pull, master-data import pull, and full-resync-complete. Push uses `baseEntityVersion` from `local_entity_versions` at commit time.
+
+Desktop creates must reuse the same entity UUID as CSV/cloud rows (match keys: `vendor_code`, taxonomy `name`, `sku`, warehouse `code`, etc.) via `resolveCanonicalEntityId` before `sync.commit`.

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type Database from "better-sqlite3";
 import type { SyncEntityType, SyncOperation, SyncStream } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
@@ -28,10 +29,7 @@ export function enqueueOutbox(input: {
   }
   const changeId = randomUUID();
   const db = getLocalDb();
-  const baseVersion =
-    input.baseEntityVersion !== undefined
-      ? input.baseEntityVersion
-      : getLocalEntityVersion(input.entityType, input.entityId);
+  const baseVersion = getLocalEntityVersion(input.entityType, input.entityId);
   db.prepare(
     `insert into local_sync_outbox (
       change_id, tenant_id, origin_device_id, stream, entity_type, entity_id,
@@ -51,20 +49,48 @@ export function enqueueOutbox(input: {
     payload: JSON.stringify(input.payload),
     baseVersion,
   });
+  if (input.operation !== "EVENT") {
+    bumpLocalEntityVersion(input.entityType, input.entityId, baseVersion);
+  }
   return changeId;
 }
 
+export function listPendingOutboxForEntity(
+  entityType: string,
+  entityId: string,
+): OutboxRow[] {
+  return listPendingOutboxRows(
+    `status in ('pending', 'pushing')
+       and entity_type = @entityType
+       and entity_id = @entityId`,
+    { entityType, entityId },
+  );
+}
+
 export function listPendingOutbox(limit = 100): OutboxRow[] {
+  return listPendingOutboxRows(
+    `status in ('pending', 'pushing')`,
+    {},
+    "order by created_at, change_id limit @limit",
+    { limit },
+  );
+}
+
+function listPendingOutboxRows(
+  where: string,
+  whereParams: Record<string, string>,
+  tail = "order by created_at, change_id",
+  tailParams: Record<string, string | number> = {},
+): OutboxRow[] {
   const rows = getLocalDb()
     .prepare(
       `select change_id as changeId, stream, entity_type as entityType,
               entity_id as entityId, operation, payload, base_entity_version as baseEntityVersion
        from local_sync_outbox
-       where status in ('pending', 'pushing')
-       order by created_at, change_id
-       limit @limit`,
+       where ${where}
+       ${tail}`,
     )
-    .all({ limit }) as Array<OutboxRow & { payload: string }>;
+    .all({ ...whereParams, ...tailParams }) as Array<OutboxRow & { payload: string }>;
   return rows.map((row) => ({
     ...row,
     payload: JSON.parse(row.payload) as Record<string, unknown>,
@@ -141,9 +167,9 @@ export function markOutboxRejected(changeId: string, error: string): void {
     .run({ changeId, error });
 }
 
-export function resetStalePushing(): void {
-  getLocalDb()
-    .prepare(
+export function resetStalePushing(conn?: Database.Database): void {
+  const db = conn ?? getLocalDb();
+  db.prepare(
       `update local_sync_outbox set status = 'pending'
        where status = 'pushing'
          and datetime(created_at) <= datetime('now', '-2 minutes')`,

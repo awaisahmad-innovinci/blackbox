@@ -33,6 +33,10 @@ export class Device {
   @Column({ type: "text" })
   name!: string;
 
+  /** Short register code (C1, C2) for device-scoped document numbers. */
+  @Column({ type: "text", nullable: true })
+  code!: string | null;
+
   /** DB check: pending | trusted | revoked */
   @Column({ type: "text", default: "pending" })
   status!: string;

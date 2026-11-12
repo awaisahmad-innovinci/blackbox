@@ -3,6 +3,7 @@ import {
   isValidElement,
   type ComponentProps,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -59,8 +60,24 @@ export function ListTableRow({
     }
   }
 
+  function onClick(event: MouseEvent<HTMLTableRowElement>): void {
+    if (!onActivate) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("input, button, select, textarea, a")) return;
+    onActivate();
+  }
+
   return (
-    <tr tabIndex={0} className={cn(LIST_TABLE_ROW_CLASS, className)} onKeyDown={onKeyDown}>
+    <tr
+      tabIndex={0}
+      className={cn(
+        LIST_TABLE_ROW_CLASS,
+        onActivate && "cursor-pointer",
+        className,
+      )}
+      onKeyDown={onKeyDown}
+      onClick={onClick}
+    >
       {children}
     </tr>
   );

@@ -39,6 +39,47 @@ export class TenantsService {
       throw new NotFoundException("Tenant not found");
     }
     tenant.name = dto.name.trim();
+    if (dto.requireManagerApprovalRemoveSaleLine !== undefined) {
+      tenant.requireManagerApprovalRemoveSaleLine =
+        dto.requireManagerApprovalRemoveSaleLine;
+    }
+    if (dto.requireManagerApprovalTillOpen !== undefined) {
+      tenant.requireManagerApprovalTillOpen = dto.requireManagerApprovalTillOpen;
+    }
+    if (dto.requireManagerApprovalTillWithdraw !== undefined) {
+      tenant.requireManagerApprovalTillWithdraw =
+        dto.requireManagerApprovalTillWithdraw;
+    }
+    if (dto.requireManagerApprovalFoc !== undefined) {
+      tenant.requireManagerApprovalFoc = dto.requireManagerApprovalFoc;
+    }
+    if (dto.defaultGstRate !== undefined) {
+      tenant.defaultGstRate = dto.defaultGstRate;
+    }
+    if (dto.defaultSalesTaxRate !== undefined) {
+      tenant.defaultSalesTaxRate = dto.defaultSalesTaxRate;
+    }
+    if (dto.fbrEnabled !== undefined) {
+      tenant.fbrEnabled = dto.fbrEnabled;
+    }
+    if (dto.fbrEnvironment !== undefined) {
+      tenant.fbrEnvironment = dto.fbrEnvironment;
+    }
+    if (dto.fbrToken !== undefined && dto.fbrToken.trim() !== "") {
+      tenant.fbrToken = dto.fbrToken.trim();
+    }
+    if (dto.fbrSellerNtn !== undefined) {
+      tenant.fbrSellerNtn = dto.fbrSellerNtn.trim() || null;
+    }
+    if (dto.fbrSellerProvince !== undefined) {
+      tenant.fbrSellerProvince = dto.fbrSellerProvince || null;
+    }
+    if (dto.fbrSellerAddress !== undefined) {
+      tenant.fbrSellerAddress = dto.fbrSellerAddress.trim() || null;
+    }
+    if (dto.fbrScenarioId !== undefined && dto.fbrScenarioId.trim()) {
+      tenant.fbrScenarioId = dto.fbrScenarioId.trim();
+    }
     await this.tenants.save(tenant);
     return toTenantResponse(tenant);
   }
@@ -83,6 +124,10 @@ export class TenantsService {
       dto.address === undefined || dto.address.trim() === ""
         ? null
         : dto.address.trim();
+    const phone =
+      dto.phone === undefined || dto.phone.trim() === ""
+        ? null
+        : dto.phone.trim();
 
     await this.dataSource.transaction(async (manager) => {
       const location = manager.create(Location, {
@@ -90,6 +135,7 @@ export class TenantsService {
         name: dto.name.trim(),
         city: dto.city.trim(),
         address,
+        phone,
       });
       await manager.save(location);
 

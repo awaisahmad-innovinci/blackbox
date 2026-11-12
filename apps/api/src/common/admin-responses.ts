@@ -13,6 +13,19 @@ export type TenantResponse = {
   currency: string | null;
   onboardingCompleted: boolean;
   onboardingCompletedAt: Date | null;
+  requireManagerApprovalRemoveSaleLine: boolean;
+  requireManagerApprovalTillOpen: boolean;
+  requireManagerApprovalTillWithdraw: boolean;
+  requireManagerApprovalFoc: boolean;
+  defaultGstRate: number;
+  defaultSalesTaxRate: number;
+  fbrEnabled: boolean;
+  fbrEnvironment: string;
+  fbrTokenConfigured: boolean;
+  fbrSellerNtn: string | null;
+  fbrSellerProvince: string | null;
+  fbrSellerAddress: string | null;
+  fbrScenarioId: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -32,7 +45,6 @@ export type UserResponse = {
 
 export type RoleResponse = {
   id: string;
-  tenantId: string;
   key: string;
   name: string;
   isSystem: boolean;
@@ -52,6 +64,7 @@ export type DeviceResponse = {
   tenantId: string;
   fingerprint: string;
   name: string;
+  code: string | null;
   status: string;
   trustedAt: Date | null;
   revokedAt: Date | null;
@@ -72,6 +85,20 @@ export function toTenantResponse(tenant: Tenant): TenantResponse {
     currency: tenant.currency,
     onboardingCompleted: tenant.onboardingCompletedAt != null,
     onboardingCompletedAt: tenant.onboardingCompletedAt,
+    requireManagerApprovalRemoveSaleLine:
+      tenant.requireManagerApprovalRemoveSaleLine,
+    requireManagerApprovalTillOpen: tenant.requireManagerApprovalTillOpen,
+    requireManagerApprovalTillWithdraw: tenant.requireManagerApprovalTillWithdraw,
+    requireManagerApprovalFoc: tenant.requireManagerApprovalFoc,
+    defaultGstRate: tenant.defaultGstRate,
+    defaultSalesTaxRate: tenant.defaultSalesTaxRate,
+    fbrEnabled: tenant.fbrEnabled === true,
+    fbrEnvironment: tenant.fbrEnvironment || "sandbox",
+    fbrTokenConfigured: Boolean(tenant.fbrToken?.trim()),
+    fbrSellerNtn: tenant.fbrSellerNtn,
+    fbrSellerProvince: tenant.fbrSellerProvince,
+    fbrSellerAddress: tenant.fbrSellerAddress,
+    fbrScenarioId: tenant.fbrScenarioId || "SN026",
     createdAt: tenant.createdAt,
     updatedAt: tenant.updatedAt,
   };
@@ -98,7 +125,6 @@ export function toRoleResponse(
 ): RoleResponse {
   return {
     id: role.id,
-    tenantId: role.tenantId,
     key: role.key,
     name: role.name,
     isSystem: role.isSystem,
@@ -124,6 +150,7 @@ export function toDeviceResponse(device: Device): DeviceResponse {
     tenantId: device.tenantId,
     fingerprint: device.fingerprint,
     name: device.name,
+    code: device.code,
     status: device.status,
     trustedAt: device.trustedAt,
     revokedAt: device.revokedAt,

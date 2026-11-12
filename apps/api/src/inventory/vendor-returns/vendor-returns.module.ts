@@ -14,9 +14,11 @@ import {
 } from "../../db/entities";
 import { VendorReturnsController } from "./vendor-returns.controller";
 import { VendorReturnsService } from "./vendor-returns.service";
+import { ActivityLogModule } from "../../activity-log/activity-log.module";
 
 @Module({
   imports: [
+    ActivityLogModule,
     TypeOrmModule.forFeature([
       VendorReturn,
       VendorReturnItem,

@@ -143,6 +143,34 @@ export class CreateVendorDto {
 
 export class UpdateVendorDto extends CreateVendorDto {}
 
+export class ListVendorCreditsQueryDto {
+  @IsOptional()
+  @IsUUID()
+  vendorId?: string;
+}
+
+export class ListVendorPaymentsQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  vendorId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  pageSize?: number;
+}
+
 export class ListVendorsQueryDto {
   @IsOptional()
   @IsString()

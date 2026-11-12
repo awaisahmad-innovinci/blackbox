@@ -10,13 +10,45 @@ export const INVENTORY_MOVEMENT_TYPES = [
   "OPENING_BALANCE",
   "PURCHASE_RECEIPT",
   "SALE",
+  "SALE_RETURN",
   "STOCK_ADJUSTMENT",
   "TRANSFER_IN",
   "TRANSFER_OUT",
   "RETURN",
   "INVENTORY_OUT",
+  "INVENTORY_OUT_RETURN",
 ] as const;
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
+
+/** Human-readable labels for in/out report and movement lists. */
+export const INVENTORY_MOVEMENT_TYPE_LABELS: Record<
+  InventoryMovementType,
+  string
+> = {
+  OPENING_BALANCE: "Opening balance",
+  PURCHASE_RECEIPT: "Purchase receipt",
+  SALE: "Sale",
+  SALE_RETURN: "Sale return",
+  STOCK_ADJUSTMENT: "Stock adjustment",
+  TRANSFER_IN: "Transfer in",
+  TRANSFER_OUT: "Transfer out",
+  RETURN: "Vendor return",
+  INVENTORY_OUT: "Inventory out",
+  INVENTORY_OUT_RETURN: "Inventory out return",
+};
+
+export function inventoryMovementTypeLabel(
+  type: InventoryMovementType,
+): string {
+  return INVENTORY_MOVEMENT_TYPE_LABELS[type] ?? type;
+}
+
+/** POS sales/returns adjust floor balance via sale entities, not warehouse stock. */
+export function inventoryMovementAffectsWarehouseStock(
+  movementType: InventoryMovementType,
+): boolean {
+  return movementType !== "SALE" && movementType !== "SALE_RETURN";
+}
 
 export const INVENTORY_OUT_STATUSES = ["POSTED", "CANCELLED"] as const;
 export type InventoryOutStatus = (typeof INVENTORY_OUT_STATUSES)[number];
@@ -66,6 +98,74 @@ export const GOODS_RECEIPT_STATUSES = [
 ] as const;
 export type GoodsReceiptStatus = (typeof GOODS_RECEIPT_STATUSES)[number];
 
+export const VENDOR_LEDGER_ENTRY_TYPES = ["CHARGE", "PAYMENT"] as const;
+export type VendorLedgerEntryType = (typeof VENDOR_LEDGER_ENTRY_TYPES)[number];
+
+/** One charge or payment on a vendor's account. Credit owed is charges minus payments. */
+export interface VendorLedgerEntry {
+  id: string;
+  vendorId: string;
+  entryType: VendorLedgerEntryType;
+  amount: number;
+  goodsReceiptId: string | null;
+  receiptNumber: string | null;
+  note: string;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorLedger {
+  credit: number;
+  entries: VendorLedgerEntry[];
+}
+
+export interface RecordVendorPaymentRequest {
+  amount: number;
+  note?: string;
+}
+
+export interface VendorPaymentListItem {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  amount: number;
+  receiptNumber: string | null;
+  note: string;
+  occurredAt: string;
+}
+
+export interface VendorPaymentListQuery {
+  search?: string;
+  vendorId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedVendorPayments {
+  items: VendorPaymentListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface VendorCreditSummary {
+  vendorId: string;
+  vendorName: string;
+  charges: number;
+  payments: number;
+  credit: number;
+}
+
+export interface VendorCreditLedger {
+  totalCredit: number;
+  vendors: VendorCreditSummary[];
+}
+
+export interface VendorCreditQuery {
+  vendorId?: string;
+}
+
 export const VENDOR_CONTACT_TYPES = [
   "PRIMARY",
   "OTHER",
@@ -80,6 +180,7 @@ export const PAYMENT_TERMS = [
   "15_DAYS",
   "30_DAYS",
   "45_DAYS",
+  "BILL_TO_BILL",
   "CUSTOM",
 ] as const;
 export type PaymentTerms = (typeof PAYMENT_TERMS)[number];
@@ -90,6 +191,7 @@ export const PAYMENT_TERMS_LABELS: Record<PaymentTerms, string> = {
   "15_DAYS": "15 Days",
   "30_DAYS": "30 Days",
   "45_DAYS": "45 Days",
+  BILL_TO_BILL: "Bill to bill",
   CUSTOM: "Custom",
 };
 
@@ -116,6 +218,64 @@ export interface DashboardSummary {
   lowStockItems: number;
   pendingPurchaseOrders: number;
   recentReceipts: number;
+}
+
+/** POS cashier dashboard — today's sales metrics from local device data. */
+export interface CashierDashboardSummary {
+  /** Local calendar date (YYYY-MM-DD). */
+  date: string;
+  totalSalesAmount: number;
+  /** Posted simple bills (not sent to FBR) for today. */
+  nonFbrSalesAmount: number;
+  cashReceivedAmount: number;
+  cardPaymentsAmount: number;
+  heldBillsCount: number;
+  refundTotalAmount: number;
+  /** Till opening float for this cashier today. */
+  openingBalanceAmount: number;
+  /** Cash collected from this cashier's till today. */
+  cashWithdrawnAmount: number;
+  cashInHandAmount: number;
+}
+
+/** Manager reports — floor (POS out) vs warehouse stock per SKU. */
+export interface ManagerStockOverviewRow {
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  floorQuantity: number;
+  warehouseQuantity: number;
+  totalQuantity: number;
+  reorderLevel: number;
+}
+
+export interface ManagerStockOverviewQuery {
+  warehouseId?: string;
+  /** Barcode or variant name substring. */
+  q?: string;
+  /** Product name substring. */
+  product?: string;
+  /** SKU code substring. */
+  sku?: string;
+  /** Show rows where floor qty is at or below this value. */
+  floorQtyAtMost?: number;
+  /** Show rows where warehouse qty is at or below this value. */
+  warehouseQtyAtMost?: number;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedManagerStockOverview {
+  items: ManagerStockOverviewRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  floorTotal: number;
+  warehouseTotal: number;
 }
 
 export interface VendorContactInput {
@@ -240,7 +400,10 @@ export interface VendorSku {
   purchasePrice: number;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  purchaseUnitAbbreviation?: string | null;
   unitsPerPurchaseUnit: number;
+  /** Base unit label from product SKU (for pc ordering). */
+  baseUnitName?: string | null;
   minimumOrderQuantity: number;
   leadTimeDays: number;
   isPreferred: boolean;
@@ -297,6 +460,10 @@ export interface SkuSearchResult {
   purchaseUnitName?: string | null;
   sellingPrice?: number;
   sellingPricePerPurchaseUnit?: number | null;
+  /** Default POS line discount % for this SKU. */
+  saleDiscountPercent?: number;
+  gstPercent?: number;
+  hsCode?: string | null;
 }
 
 /** Tenant-wide barcode lookup for duplicate detection (any SKU/product status). */
@@ -313,7 +480,149 @@ export interface CreateSkuBarcodeRequest {
   quantityMultiplier?: number;
 }
 
+/** First warehouse quantity the owner already has, posted as OPENING_BALANCE. */
+export interface OpeningStockRequest {
+  warehouseId: string;
+  quantity: number;
+  reason?: string;
+}
+
 export type SellUnit = "pc" | "box";
+export type OrderUnit = SellUnit;
+
+export function isBoxUnit(unit: {
+  name?: string | null;
+  abbreviation?: string | null;
+}): boolean {
+  const abbr = (unit.abbreviation ?? "").trim().toLowerCase();
+  const name = (unit.name ?? "").trim().toLowerCase();
+  return abbr === "box" || name === "box";
+}
+
+export function purchaseUnitAllowsPackSize(input: {
+  name?: string | null;
+  abbreviation?: string | null;
+}): boolean {
+  return isBoxUnit(input);
+}
+
+export function poAllowsOrderUnitChoice(input: {
+  purchaseUnitName?: string | null;
+  purchaseUnitAbbreviation?: string | null;
+}): boolean {
+  return purchaseUnitAllowsPackSize({
+    name: input.purchaseUnitName,
+    abbreviation: input.purchaseUnitAbbreviation,
+  });
+}
+
+export function normalizeUnitsPerPurchaseUnit(
+  unitsPer: number,
+  purchaseUnit: { name?: string | null; abbreviation?: string | null },
+): number {
+  if (!purchaseUnitAllowsPackSize(purchaseUnit)) return 1;
+  const n = Number(unitsPer);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return n;
+}
+
+export function toPurchaseQuantity(
+  displayQuantity: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  if (orderUnit === "box") return round4(displayQuantity);
+  return round4(displayQuantity / unitsPer);
+}
+
+export function toDisplayQuantity(
+  purchaseQuantity: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  if (orderUnit === "box") return round4(purchaseQuantity);
+  return round4(purchaseQuantity * unitsPer);
+}
+
+export function displayPurchaseUnitCost(
+  purchasePrice: number,
+  orderUnit: OrderUnit,
+  unitsPerPurchaseUnit: number,
+): number {
+  if (orderUnit === "box") return round4(purchasePrice);
+  return pieceCostFromPurchase(purchasePrice, unitsPerPurchaseUnit);
+}
+
+export function defaultOrderUnitForScan(
+  scannedQuantityMultiplier: number,
+  unitsPerPurchaseUnit: number,
+): OrderUnit {
+  const unitsPer = unitsPerPurchaseUnit > 0 ? unitsPerPurchaseUnit : 1;
+  return scannedQuantityMultiplier >= unitsPer && unitsPer > 1 ? "box" : "pc";
+}
+
+export function lineTotalForPurchase(input: {
+  displayQuantity: number;
+  purchasePrice: number;
+  unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
+}): {
+  purchaseQuantity: number;
+  displayQuantity: number;
+  displayUnitCost: number;
+  lineTotal: number;
+} {
+  const orderUnit = input.orderUnit ?? "box";
+  const purchaseQuantity = toPurchaseQuantity(
+    input.displayQuantity,
+    orderUnit,
+    input.unitsPerPurchaseUnit,
+  );
+  const displayUnitCost = displayPurchaseUnitCost(
+    input.purchasePrice,
+    orderUnit,
+    input.unitsPerPurchaseUnit,
+  );
+  return {
+    purchaseQuantity,
+    displayQuantity: round4(input.displayQuantity),
+    displayUnitCost,
+    lineTotal: round4(purchaseQuantity * input.purchasePrice),
+  };
+}
+
+export function formatPoOrderQuantity(item: {
+  quantity: number;
+  orderUnit?: OrderUnit;
+  unitsPerPurchaseUnit: number;
+  purchaseUnitName?: string | null;
+  baseUnitName?: string | null;
+}): string {
+  const orderUnit = item.orderUnit ?? "box";
+  const displayQty = toDisplayQuantity(
+    item.quantity,
+    orderUnit,
+    item.unitsPerPurchaseUnit,
+  );
+  const unitLabel =
+    orderUnit === "box"
+      ? (item.purchaseUnitName ?? "box")
+      : (item.baseUnitName ?? "pc");
+  return `${displayQty.toLocaleString()} ${unitLabel}`;
+}
+
+export function poOrderUnitLabel(
+  orderUnit?: OrderUnit,
+  purchaseUnitName?: string | null,
+  baseUnitName?: string | null,
+): string {
+  const unit = orderUnit ?? "box";
+  return unit === "box"
+    ? (purchaseUnitName ?? "box")
+    : (baseUnitName ?? "pc");
+}
 
 export function lineTotalForScan(input: {
   quantityMultiplier: number;
@@ -372,6 +681,8 @@ export interface SkuBarcodeLookupResult {
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent: number;
+  hsCode: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
   reorderLevel: number;
@@ -400,8 +711,11 @@ export interface SkuDetail {
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent: number;
+  hsCode: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  saleDiscountPercent: number;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -479,6 +793,8 @@ export interface ProductDetail {
   id: string;
   name: string;
   productCode: string;
+  /** Stable CSV / master-data key; matches cloud `products.import_key`. */
+  importKey?: string | null;
   brandId: string | null;
   brandName: string | null;
   categoryId: string | null;
@@ -535,8 +851,11 @@ export interface ProductSkuDetail {
   purchaseUnitName: string | null;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent: number;
+  hsCode: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit: number | null;
+  saleDiscountPercent: number;
   reorderLevel: number;
   minimumStockLevel: number;
   maximumStockLevel: number | null;
@@ -554,8 +873,11 @@ export interface CreateProductSkuRequest {
   purchaseUnitId: string;
   unitsPerPurchaseUnit: number;
   costPrice: number;
+  gstPercent?: number;
+  hsCode?: string | null;
   sellingPrice: number;
   sellingPricePerPurchaseUnit?: number | null;
+  saleDiscountPercent?: number;
   reorderLevel?: number;
   minimumStockLevel?: number;
   maximumStockLevel?: number | null;
@@ -586,6 +908,15 @@ export function roundMoney4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
+/** Display money with exactly two decimal places. Does not change stored precision. */
+export function formatMoney(value: number): string {
+  const amount = Number.isFinite(value) ? value : 0;
+  return amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function pieceCostFromPurchase(
   purchasePrice: number,
   unitsPerPurchaseUnit: number,
@@ -594,12 +925,63 @@ export function pieceCostFromPurchase(
   return roundMoney4(purchasePrice / unitsPer);
 }
 
+/** Vendor link purchase price per purchase unit from catalog cost per base unit. */
+export function vendorPurchasePriceFromSku(input: {
+  costPrice: number;
+  unitsPerPurchaseUnit: number;
+}): number {
+  const unitsPer =
+    input.unitsPerPurchaseUnit > 0 ? input.unitsPerPurchaseUnit : 1;
+  return roundMoney4(input.costPrice * unitsPer);
+}
+
 /** Markup on cost: cost 100 + margin 40% → 140 */
 export function sellingPriceFromCostMargin(
   cost: number,
   marginPercent: number,
 ): number {
   return roundMoney4(cost * (1 + marginPercent / 100));
+}
+
+/** Cost including GST: cost 100 + GST 18% → 118 */
+export function costWithGst(cost: number, gstPercent: number): number {
+  const gst = Number.isFinite(gstPercent) ? Math.max(0, gstPercent) : 0;
+  return roundMoney4(cost * (1 + gst / 100));
+}
+
+/** GST-inclusive selling price: margin applied on cost + GST base. */
+export function sellingPriceFromCostMarginGst(
+  cost: number,
+  gstPercent: number,
+  marginPercent: number,
+): number {
+  const base = costWithGst(cost, gstPercent);
+  return roundMoney4(base * (1 + marginPercent / 100));
+}
+
+/** Inverse of sellingPriceFromCostMarginGst: margin % implied by sale over cost + GST. */
+export function marginPercentFromCostSellingGst(
+  cost: number,
+  gstPercent: number,
+  sellingPrice: number,
+): number | null {
+  if (!Number.isFinite(sellingPrice)) return null;
+  const base = costWithGst(cost, gstPercent);
+  if (!(base > 0)) return null;
+  return roundMoney4((sellingPrice / base - 1) * 100);
+}
+
+/** Split a GST-inclusive amount into ex-GST and GST portions. */
+export function splitInclusiveGst(
+  inclusiveAmount: number,
+  gstPercent: number,
+): { exGst: number; gstAmount: number } {
+  const gst = Number.isFinite(gstPercent) ? Math.max(0, gstPercent) : 0;
+  if (gst <= 0) {
+    return { exGst: roundMoney4(inclusiveAmount), gstAmount: 0 };
+  }
+  const exGst = roundMoney4(inclusiveAmount / (1 + gst / 100));
+  return { exGst, gstAmount: roundMoney4(inclusiveAmount - exGst) };
 }
 
 /** Weighted average unit cost after a purchase receipt (base-unit qty and cost). */
@@ -627,6 +1009,23 @@ export function lineTotalAfterDiscount(
 ): number {
   const pct = clampDiscountPercent(discountPercent);
   return roundMoney4(qty * unitCost * (1 - pct / 100));
+}
+
+/** Goods receipt line total: discounted base + per-line tax amounts. */
+export function goodsReceiptLineTotal(
+  qty: number,
+  unitCost: number,
+  discountPercent: number,
+  saleTax = 0,
+  advTax = 0,
+  gst = 0,
+): number {
+  return roundMoney4(
+    lineTotalAfterDiscount(qty, unitCost, discountPercent) +
+      Number(saleTax ?? 0) +
+      Number(advTax ?? 0) +
+      Number(gst ?? 0),
+  );
 }
 
 /** Net purchase-unit cost after line % and a header discount rate (0–1). */
@@ -718,9 +1117,11 @@ export function landedUnitByQuantity(
   headerDiscountAmount: number,
   costCharges: number,
   costCredits = 0,
+  lineTaxes = 0,
 ): number {
   const lineNet = lineTotalAfterDiscount(qty, unitCost, discountPercent);
-  const lineUnit = qty > 0 ? lineNet / qty : 0;
+  const lineWithTaxes = roundMoney4(lineNet + Number(lineTaxes || 0));
+  const lineUnit = qty > 0 ? lineWithTaxes / qty : 0;
   const totalQty =
     Number.isFinite(totalReceivedQty) && totalReceivedQty > 0
       ? totalReceivedQty
@@ -760,6 +1161,8 @@ export interface WarehouseStockRow {
   quantityOnHand: number;
   quantityReserved: number;
   quantityAvailable: number;
+  /** POS floor balance for this SKU and warehouse. Omitted when not loaded. */
+  floorQuantity?: number;
 }
 
 export interface StockMovementRow {
@@ -802,7 +1205,9 @@ export interface PurchaseOrderItemRow {
   vendorSkuCode: string | null;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  baseUnitName?: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
   quantity: number;
   unitCost: number;
   discount: number;
@@ -851,6 +1256,7 @@ export interface CreatePurchaseOrderItemRequest {
   vendorSkuId: string;
   quantity: number;
   unitCost: number;
+  orderUnit?: OrderUnit;
   discount?: number;
   tax?: number;
 }
@@ -903,11 +1309,16 @@ export interface ReceivingLineDraft {
   vendorSkuCode: string | null;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  baseUnitName?: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
   orderedQuantity: number;
   poUnitCost: number;
+  /** PO line tax amount — pre-fills receive row sale tax. */
+  poItemTax?: number;
   currentVendorPurchasePrice: number | null;
   currentSellingPrice: number;
+  gstPercent?: number;
 }
 
 export interface ReceivingDraft {
@@ -927,6 +1338,9 @@ export interface CreateGoodsReceiptItemRequest {
   bonusQuantity?: number;
   receivingUnitCost: number;
   discountPercent?: number;
+  saleTax?: number;
+  advTax?: number;
+  gst?: number;
 }
 
 export interface GoodsReceiptReturnAdjustment {
@@ -948,6 +1362,8 @@ export interface CreateGoodsReceiptRequest {
   tax?: number;
   /** @deprecated ignored; always stored as 0 */
   otherCharges?: number;
+  /** Cash paid now. Defaults to the grand total. The remainder is vendor credit. */
+  amountPaid?: number;
   items: CreateGoodsReceiptItemRequest[];
   returnAdjustments?: GoodsReceiptReturnAdjustment[];
 }
@@ -970,6 +1386,9 @@ export interface GoodsReceiptItemRow {
   poUnitCost: number;
   receivingUnitCost: number;
   discountPercent: number;
+  saleTax: number;
+  advTax: number;
+  gst: number;
   lineTotal: number;
 }
 
@@ -998,6 +1417,8 @@ export interface GoodsReceiptDetail {
   otherCharges: number;
   returnCredit: number;
   total: number;
+  /** Cash paid when the receipt was posted. */
+  amountPaid: number;
   notes: string;
   items: GoodsReceiptItemRow[];
   createdAt: string;
@@ -1101,6 +1522,77 @@ export interface InventoryOutListQuery {
 
 export interface PaginatedInventoryOuts {
   items: InventoryOutListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const INVENTORY_OUT_RETURN_STATUSES = ["POSTED", "CANCELLED"] as const;
+export type InventoryOutReturnStatus =
+  (typeof INVENTORY_OUT_RETURN_STATUSES)[number];
+
+export interface CreateInventoryOutReturnItemRequest {
+  productSkuId: string;
+  quantity: number;
+}
+
+export interface CreateInventoryOutReturnRequest {
+  warehouseId: string;
+  returnDate?: string;
+  notes?: string;
+  items: CreateInventoryOutReturnItemRequest[];
+}
+
+export interface InventoryOutReturnItemRow {
+  id: string;
+  productSkuId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  barcode: string | null;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+  inventoryOutItemId: string | null;
+}
+
+export interface InventoryOutReturnDetail {
+  id: string;
+  returnNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  notes: string;
+  status: InventoryOutReturnStatus;
+  subtotal: number;
+  total: number;
+  items: InventoryOutReturnItemRow[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryOutReturnListItem {
+  id: string;
+  returnNumber: string;
+  warehouseId: string;
+  warehouseName: string;
+  returnDate: string;
+  status: InventoryOutReturnStatus;
+  total: number;
+  itemCount: number;
+}
+
+export interface InventoryOutReturnListQuery {
+  search?: string;
+  warehouseId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedInventoryOutReturns {
+  items: InventoryOutReturnListItem[];
   total: number;
   page: number;
   pageSize: number;
@@ -1287,9 +1779,110 @@ export const MASTER_DATA_IMPORT_FILES = [
   "07_product_skus.csv",
   "08_vendors.csv",
   "09_vendor_skus.csv",
+  "10_product_sku_barcodes.csv",
 ] as const;
 
 export type MasterDataImportFile = (typeof MASTER_DATA_IMPORT_FILES)[number];
+
+/** Canonical header row for 07_product_skus.csv (keep in sync with docs template). */
+export const MASTER_DATA_07_PRODUCT_SKU_HEADERS = [
+  "product_import_key",
+  "sku",
+  "barcode",
+  "barcode_quantity_multiplier",
+  "variant_name",
+  "size_value",
+  "size_unit",
+  "base_unit_abbreviation",
+  "purchase_unit_abbreviation",
+  "units_per_purchase_unit",
+  "cost_price",
+  "selling_price",
+  "selling_price_per_purchase_unit",
+  "gst_percent",
+  "hs_code",
+  "reorder_level",
+  "minimum_stock_level",
+  "maximum_stock_level",
+  "track_inventory",
+  "status",
+] as const;
+
+/** 07 template after GST, before hs_code. */
+export const PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS = [
+  "product_import_key",
+  "sku",
+  "barcode",
+  "barcode_quantity_multiplier",
+  "variant_name",
+  "size_value",
+  "size_unit",
+  "base_unit_abbreviation",
+  "purchase_unit_abbreviation",
+  "units_per_purchase_unit",
+  "cost_price",
+  "selling_price",
+  "selling_price_per_purchase_unit",
+  "gst_percent",
+  "reorder_level",
+  "minimum_stock_level",
+  "maximum_stock_level",
+  "track_inventory",
+  "status",
+] as const;
+
+/** Legacy 07 template before barcode_quantity_multiplier and gst_percent. */
+export const LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS = [
+  "product_import_key",
+  "sku",
+  "barcode",
+  "variant_name",
+  "size_value",
+  "size_unit",
+  "base_unit_abbreviation",
+  "purchase_unit_abbreviation",
+  "units_per_purchase_unit",
+  "cost_price",
+  "selling_price",
+  "selling_price_per_purchase_unit",
+  "reorder_level",
+  "minimum_stock_level",
+  "maximum_stock_level",
+  "track_inventory",
+  "status",
+] as const;
+
+export type MasterData07ProductSkuColumn =
+  (typeof MASTER_DATA_07_PRODUCT_SKU_HEADERS)[number];
+
+export function formatMasterDataHeaderMismatchMessage(input: {
+  file: MasterDataImportFile;
+  actualColumnCount: number;
+  expectedHeaders: readonly string[];
+}): string {
+  const expectedLen = input.expectedHeaders.length;
+  let message = `Headers must exactly match: ${input.expectedHeaders.join(",")}. Got ${input.actualColumnCount} columns, expected ${expectedLen}.`;
+  if (input.file !== "07_product_skus.csv") return message;
+
+  const currentLen = MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
+  const previousLen = PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
+  const legacyLen = LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS.length;
+  if (
+    input.actualColumnCount === currentLen &&
+    (expectedLen === legacyLen || expectedLen === previousLen)
+  ) {
+    message +=
+      " Restart or redeploy the API — this server uses an older 07_product_skus template.";
+  } else if (
+    (input.actualColumnCount === legacyLen ||
+      input.actualColumnCount === previousLen) &&
+    expectedLen === currentLen
+  ) {
+    message +=
+      " Use the current template (includes hs_code) or an older 17- or 19-column file.";
+  }
+  return message;
+}
 
 export interface MasterDataImportError {
   file: MasterDataImportFile | "archive";

@@ -1,3 +1,4 @@
+import { formatMoney } from "@blackbox/shared";
 import {
   BadRequestException,
   Injectable,
@@ -17,13 +18,15 @@ import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   goodsReceiptGrandTotal,
+  goodsReceiptLineTotal,
   landedUnitByQuantity,
-  lineTotalAfterDiscount,
   roundMoney4,
   weightedAvgUnitCost,
 } from "@blackbox/shared";
 import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
 import { allocateReceiptNumber } from "../common/allocate-document-number";
+import { getRequestTenant } from "../../common/request-tenant";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
 import {
   GoodsReceipt,
   GoodsReceiptItem,
@@ -33,6 +36,7 @@ import {
   PurchaseOrder,
   PurchaseOrderItem,
   Vendor,
+  VendorLedgerEntry,
   VendorReturn,
   VendorReturnItem,
   VendorSku,
@@ -68,6 +72,7 @@ export class GoodsReceiptsService {
     private readonly vendors: Repository<Vendor>,
     @InjectRepository(Warehouse)
     private readonly warehouses: Repository<Warehouse>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async list(query: ListGoodsReceiptsQueryDto): Promise<PaginatedGoodsReceipts> {
@@ -199,7 +204,7 @@ export class GoodsReceiptsService {
     const lines = await this.orderItems.find({
       where: { purchaseOrderId, tenantId },
       relations: {
-        productSku: { product: true },
+        productSku: { product: true, baseUnit: true },
         vendorSku: true,
         purchaseUnit: true,
       },
@@ -225,11 +230,15 @@ export class GoodsReceiptsService {
         vendorSkuCode: line.vendorSku?.vendorSkuCode ?? null,
         purchaseUnitId: line.purchaseUnitId,
         purchaseUnitName: line.purchaseUnit?.name ?? null,
+        baseUnitName: line.productSku?.baseUnit?.name ?? null,
         unitsPerPurchaseUnit: toNum(line.unitsPerPurchaseUnit) || 1,
+        orderUnit: line.orderUnit === "pc" ? "pc" : "box",
         orderedQuantity: toNum(line.quantity),
         poUnitCost: toNum(line.unitCost),
+        poItemTax: toNum(line.tax),
         currentVendorPurchasePrice,
         currentSellingPrice: toNum(line.productSku?.sellingPrice),
+        gstPercent: toNum(line.productSku?.gstPercent),
       });
     }
 
@@ -251,7 +260,7 @@ export class GoodsReceiptsService {
   ): Promise<GoodsReceiptDetail> {
     const tenantId = this.fixedTenant.tenantId;
 
-    return this.dataSource.transaction(async (manager) => {
+    const posted = await this.dataSource.transaction(async (manager) => {
       const po = await manager.getRepository(PurchaseOrder).findOne({
         where: { id: purchaseOrderId, tenantId },
         lock: { mode: "pessimistic_write" },
@@ -307,6 +316,9 @@ export class GoodsReceiptsService {
         poUnitCost: string;
         receivingUnitCost: string;
         discountPercent: string;
+        saleTax: string;
+        advTax: string;
+        gst: string;
         lineTotal: string;
         billedDelta: number;
         stockDelta: number;
@@ -340,12 +352,21 @@ export class GoodsReceiptsService {
             "Line discount % must be between 0 and 100",
           );
         }
+        const lineSaleTax = item.saleTax ?? 0;
+        const lineAdvTax = item.advTax ?? 0;
+        const lineGst = item.gst ?? 0;
+        if (lineSaleTax < 0 || lineAdvTax < 0 || lineGst < 0) {
+          throw new BadRequestException("Line tax amounts must be >= 0");
+        }
 
         const unitsPer = toNum(poLine.unitsPerPurchaseUnit) || 1;
-        const lineTotal = lineTotalAfterDiscount(
+        const lineTotal = goodsReceiptLineTotal(
           item.receivedQuantity,
           item.receivingUnitCost,
           discountPercent,
+          lineSaleTax,
+          lineAdvTax,
+          lineGst,
         );
         subtotal = round4(subtotal + lineTotal);
         const billedDelta = round4(item.receivedQuantity * unitsPer);
@@ -365,6 +386,9 @@ export class GoodsReceiptsService {
           poUnitCost: String(toNum(poLine.unitCost)),
           receivingUnitCost: String(item.receivingUnitCost),
           discountPercent: String(discountPercent),
+          saleTax: String(lineSaleTax),
+          advTax: String(lineAdvTax),
+          gst: String(lineGst),
           lineTotal: String(lineTotal),
           billedDelta,
           stockDelta,
@@ -398,6 +422,8 @@ export class GoodsReceiptsService {
       );
 
       for (const line of builtLines) {
+        const lineTaxes =
+          toNum(line.saleTax) + toNum(line.advTax) + toNum(line.gst);
         line.avgNetUnit = landedUnitByQuantity(
           toNum(line.receivedQuantity),
           toNum(line.receivingUnitCost),
@@ -406,6 +432,7 @@ export class GoodsReceiptsService {
           discount,
           costCharges,
           costCredits,
+          lineTaxes,
         );
       }
 
@@ -426,6 +453,13 @@ export class GoodsReceiptsService {
         shelfRent,
         returnCredit,
       });
+      const amountPaid =
+        dto.amountPaid == null ? total : round4(Number(dto.amountPaid));
+      if (amountPaid < 0 || amountPaid > total) {
+        throw new BadRequestException(
+          "Paid amount must be between 0 and the grand total",
+        );
+      }
 
       const receiptNumber = await allocateReceiptNumber(manager, tenantId);
       const receivedAt = new Date();
@@ -450,9 +484,39 @@ export class GoodsReceiptsService {
           otherCharges: "0",
           returnCredit: String(returnCredit),
           total: String(total),
+          amountPaid: String(amountPaid),
           notes: "",
         }),
       );
+
+      if (po.vendorId && total > 0) {
+        await manager.getRepository(VendorLedgerEntry).save(
+          manager.getRepository(VendorLedgerEntry).create({
+            tenantId,
+            vendorId: po.vendorId,
+            entryType: "CHARGE",
+            amount: String(total),
+            goodsReceiptId: receipt.id,
+            receiptNumber,
+            note: `Receipt ${receiptNumber}`,
+            occurredAt: receivedAt,
+          }),
+        );
+      }
+      if (po.vendorId && amountPaid > 0) {
+        await manager.getRepository(VendorLedgerEntry).save(
+          manager.getRepository(VendorLedgerEntry).create({
+            tenantId,
+            vendorId: po.vendorId,
+            entryType: "PAYMENT",
+            amount: String(amountPaid),
+            goodsReceiptId: receipt.id,
+            receiptNumber,
+            note: `Payment on receipt ${receiptNumber}`,
+            occurredAt: receivedAt,
+          }),
+        );
+      }
 
       for (const line of builtLines) {
         await manager.getRepository(GoodsReceiptItem).save(
@@ -470,6 +534,9 @@ export class GoodsReceiptsService {
             poUnitCost: line.poUnitCost,
             receivingUnitCost: line.receivingUnitCost,
             discountPercent: line.discountPercent,
+            saleTax: line.saleTax,
+            advTax: line.advTax,
+            gst: line.gst,
             lineTotal: line.lineTotal,
           }),
         );
@@ -557,6 +624,24 @@ export class GoodsReceiptsService {
 
       return this.getByIdInManager(manager, receipt.id);
     });
+
+    const actorUserId = getRequestTenant()?.userId;
+    if (actorUserId) {
+      await this.activityLog.logFromContext({
+        tenantId,
+        eventType: "goods_receipt.posted",
+        actorUserId,
+        summary: `Received ${posted.receiptNumber} for Rs ${formatMoney(posted.total)}`,
+        metadata: {
+          goodsReceiptId: posted.id,
+          receiptNumber: posted.receiptNumber,
+          purchaseOrderId: posted.purchaseOrderId,
+          poNumber: posted.poNumber,
+          total: posted.total,
+        },
+      });
+    }
+    return posted;
   }
 
   async getById(id: string): Promise<GoodsReceiptDetail> {
@@ -606,6 +691,9 @@ export class GoodsReceiptsService {
       poUnitCost: toNum(l.poUnitCost),
       receivingUnitCost: toNum(l.receivingUnitCost),
       discountPercent: toNum(l.discountPercent),
+      saleTax: toNum(l.saleTax),
+      advTax: toNum(l.advTax),
+      gst: toNum(l.gst),
       lineTotal: toNum(l.lineTotal),
     }));
 
@@ -632,6 +720,7 @@ export class GoodsReceiptsService {
       otherCharges: toNum(receipt.otherCharges),
       returnCredit: toNum(receipt.returnCredit),
       total: toNum(receipt.total),
+      amountPaid: toNum(receipt.amountPaid),
       notes: receipt.notes,
       items,
       createdAt: receipt.createdAt.toISOString(),

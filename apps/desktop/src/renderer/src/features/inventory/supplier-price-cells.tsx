@@ -1,4 +1,4 @@
-import { pieceCostFromPurchase } from "@blackbox/shared";
+import { formatMoney, pieceCostFromPurchase } from "@blackbox/shared";
 
 export function SupplierPriceCells({
   purchasePrice,
@@ -13,9 +13,9 @@ export function SupplierPriceCells({
 
   return (
     <>
-      <td className="px-4 py-3 tabular-nums">{pricePerPc}</td>
+      <td className="px-4 py-3 tabular-nums">{formatMoney(pricePerPc)}</td>
       <td className="px-4 py-3 tabular-nums">
-        {unitsPer > 1 ? purchasePrice : "—"}
+        {unitsPer > 1 ? formatMoney(purchasePrice) : "—"}
       </td>
     </>
   );

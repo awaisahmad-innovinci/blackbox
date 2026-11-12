@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
 import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard";
@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@blackbox/ui/dropdown-menu";
 import { useSession } from "@renderer/lib/session/context";
+import { useCatalogSync } from "@renderer/lib/sync/catalog-sync";
+import { LAST_FULL_PULL_AT_KEY } from "@renderer/lib/local-db/pull";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { NavDropdownMenuItem } from "@renderer/components/nav-dropdown-menu-item";
@@ -17,14 +19,25 @@ import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog
 import type { TaxonomyKind } from "@renderer/lib/app-nav-keyboard";
 import { notifyTaxonomyCreated } from "@renderer/lib/taxonomy-created-sync";
 import {
-  APP_NAV_SECTIONS,
-  appNavShortcutLabel,
   NAV_DROPDOWN_MENUS,
+  appNavShortcutLabel,
+  visibleNavSections,
   type NavDropdownId,
 } from "@renderer/lib/app-nav-keyboard";
+import {
+  defaultRouteForUser,
+  isRouteAllowed,
+} from "@renderer/lib/sales-access";
 import { afterDialogClosed } from "@renderer/lib/on-dialog-open-change";
 import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
+import { TotpEnrollDialog } from "@renderer/features/auth/TotpEnrollDialog";
+import {
+  canEnrollTotp,
+  refreshSupervisorTotpCache,
+  totpApi,
+} from "@renderer/lib/api/totp";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
+import { useTillGuardedLogout } from "@renderer/lib/use-till-guarded-logout";
 
 const DEVICE_LABEL: Record<string, string> = {
   unknown: "Device status unknown",
@@ -33,6 +46,14 @@ const DEVICE_LABEL: Record<string, string> = {
   trusted: "Device trusted",
   revoked: "Device revoked",
 };
+
+function formatFullSyncAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
 
 function navItemClass(active: boolean): string {
   return cn(
@@ -46,17 +67,29 @@ function navItemClass(active: boolean): string {
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, offline, deviceState, signOut } = useSession();
+  const { user, offline, deviceState } = useSession();
   const sync = useSyncStatus();
-  const [logoutOpen, setLogoutOpen] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const catalog = useCatalogSync();
+  const [lastFullSync, setLastFullSync] = useState<string | null>(null);
+  const { requestLogout, logoutDialogs } = useTillGuardedLogout();
+  const permissions = user?.permissions ?? [];
+  const sections = useMemo(
+    () => visibleNavSections(permissions),
+    [permissions],
+  );
   const [openNavDropdown, setOpenNavDropdown] = useState<NavDropdownId | null>(
     null,
   );
   const [globalTaxonomyKind, setGlobalTaxonomyKind] =
     useState<TaxonomyKind | null>(null);
+  const [totpEnrollOpen, setTotpEnrollOpen] = useState(false);
+  const [totpResetOpen, setTotpResetOpen] = useState(false);
+  const [totpBusy, setTotpBusy] = useState(false);
+  const supervisorCapable = user ? canEnrollTotp(user) : false;
   const { activeIndex, setNavRef, handleMenubarKeyDown, onNavFocus } =
     useAppNavKeyboard({
+      sections,
+      permissions,
       openNavDropdown,
       setOpenNavDropdown,
       onGlobalTaxonomyShortcut: setGlobalTaxonomyKind,
@@ -65,6 +98,44 @@ export function AppShell() {
   useEffect(() => {
     releaseStuckModalState({ retry: true });
   }, [location.pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.blackbox?.localDb
+      ?.getSyncMeta?.(LAST_FULL_PULL_AT_KEY)
+      .then((value) => {
+        if (!cancelled) setLastFullSync(value ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [catalog.finishedAt]);
+
+  useEffect(() => {
+    if (!user || offline || !supervisorCapable) return;
+    if (sessionStorage.getItem("blackbox.totp.enroll.dismissed") === "1") {
+      return;
+    }
+    void (async () => {
+      try {
+        const status = await totpApi.status();
+        if (!status.enrolled) setTotpEnrollOpen(true);
+      } catch {
+        /* offline or API unavailable */
+      }
+    })();
+  }, [user, offline, supervisorCapable]);
+
+  useEffect(() => {
+    if (!user || offline) return;
+    void refreshSupervisorTotpCache();
+  }, [user, offline]);
+
+  useEffect(() => {
+    if (!isRouteAllowed(location.pathname, permissions)) {
+      navigate(defaultRouteForUser(permissions), { replace: true });
+    }
+  }, [location.pathname, navigate, permissions]);
 
   function hasOpenModal(): boolean {
     return (
@@ -98,17 +169,12 @@ export function AppShell() {
     location.pathname.startsWith("/purchase-orders") ||
     location.pathname.startsWith("/purchasing") ||
     location.pathname.startsWith("/goods-receipts");
-
-  const dashboardSection = APP_NAV_SECTIONS[0]!;
-  const warehousesSection = APP_NAV_SECTIONS[1]!;
-  const inventorySection = APP_NAV_SECTIONS[2]!;
-  const purchasingSection = APP_NAV_SECTIONS[3]!;
-  const vendorsSection = APP_NAV_SECTIONS[4]!;
+  const salesActive = location.pathname.startsWith("/sales");
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <header className="border-border/80 bg-card/40 sticky top-0 z-10 border-b backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-none items-center gap-6 px-8 lg:px-10">
+        <div className="mx-auto flex min-h-14 w-full max-w-none items-center gap-6 px-8 py-2 lg:px-10">
           <Link to="/" className="text-lg font-semibold tracking-tight">
             Blackbox
           </Link>
@@ -118,124 +184,84 @@ export function AppShell() {
             className="flex items-center gap-1"
             onKeyDown={handleMenubarKeyDown}
           >
-            <NavLink
-              ref={setNavRef(0)}
-              to={dashboardSection.to}
-              end
-              role="menuitem"
-              tabIndex={activeIndex === 0 ? 0 : -1}
-              aria-keyshortcuts={appNavShortcutLabel(dashboardSection.shortcut)}
-              title={`${dashboardSection.label} (${appNavShortcutLabel(dashboardSection.shortcut)})`}
-              onFocus={() => onNavFocus(0)}
-              className={({ isActive }) => navItemClass(isActive)}
-            >
-              {dashboardSection.label}
-            </NavLink>
-            <NavLink
-              ref={setNavRef(1)}
-              to={warehousesSection.to}
-              role="menuitem"
-              tabIndex={activeIndex === 1 ? 0 : -1}
-              aria-keyshortcuts={appNavShortcutLabel(warehousesSection.shortcut)}
-              title={`${warehousesSection.label} (${appNavShortcutLabel(warehousesSection.shortcut)})`}
-              onFocus={() => onNavFocus(1)}
-              className={({ isActive }) => navItemClass(isActive)}
-            >
-              {warehousesSection.label}
-            </NavLink>
-            <DropdownMenu
-              open={openNavDropdown === "inventory"}
-              onOpenChange={(open) => handleNavDropdownChange("inventory", open)}
-            >
-              <DropdownMenuTrigger
-                ref={setNavRef(2)}
-                role="menuitem"
-                tabIndex={activeIndex === 2 ? 0 : -1}
-                aria-keyshortcuts={appNavShortcutLabel(inventorySection.shortcut)}
-                title={`${inventorySection.label} (${appNavShortcutLabel(inventorySection.shortcut)})`}
-                onFocus={() => onNavFocus(2)}
-                className={navItemClass(inventoryActive)}
-              >
-                {inventorySection.label}
-                <span className="text-[10px] opacity-70" aria-hidden>
-                  ▼
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {NAV_DROPDOWN_MENUS.inventory.map((item, index) => (
-                  <NavDropdownMenuItem
-                    key={item.to}
-                    index={index}
-                    label={item.label}
-                    onSelect={() => navigate(item.to)}
-                  />
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu
-              open={openNavDropdown === "purchasing"}
-              onOpenChange={(open) => handleNavDropdownChange("purchasing", open)}
-            >
-              <DropdownMenuTrigger
-                ref={setNavRef(3)}
-                role="menuitem"
-                tabIndex={activeIndex === 3 ? 0 : -1}
-                aria-keyshortcuts={appNavShortcutLabel(purchasingSection.shortcut)}
-                title={`${purchasingSection.label} (${appNavShortcutLabel(purchasingSection.shortcut)})`}
-                onFocus={() => onNavFocus(3)}
-                className={navItemClass(purchasingActive)}
-              >
-                {purchasingSection.label}
-                <span className="text-[10px] opacity-70" aria-hidden>
-                  ▼
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {NAV_DROPDOWN_MENUS.purchasing.map((item, index) => (
-                  <NavDropdownMenuItem
-                    key={item.to}
-                    index={index}
-                    label={item.label}
-                    onSelect={() => navigate(item.to)}
-                  />
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu
-              open={openNavDropdown === "vendors"}
-              onOpenChange={(open) => handleNavDropdownChange("vendors", open)}
-            >
-              <DropdownMenuTrigger
-                ref={setNavRef(4)}
-                role="menuitem"
-                tabIndex={activeIndex === 4 ? 0 : -1}
-                aria-keyshortcuts={appNavShortcutLabel(
-                  vendorsSection.shortcut,
-                  vendorsSection.requireCtrl,
-                )}
-                title={`${vendorsSection.label} (${appNavShortcutLabel(
-                  vendorsSection.shortcut,
-                  vendorsSection.requireCtrl,
-                )})`}
-                onFocus={() => onNavFocus(4)}
-                className={navItemClass(vendorsActive)}
-              >
-                {vendorsSection.label}
-                <span className="text-[10px] opacity-70" aria-hidden>
-                  ▼
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {NAV_DROPDOWN_MENUS.vendors.map((item, index) => (
-                  <NavDropdownMenuItem
-                    key={item.to}
-                    index={index}
-                    label={item.label}
-                    onSelect={() => navigate(item.to)}
-                  />
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {sections.map((section, index) => {
+              if (section.kind === "link") {
+                const active =
+                  section.id === "dashboard"
+                    ? location.pathname === "/"
+                    : section.id === "sale"
+                      ? salesActive
+                      : location.pathname.startsWith(section.to);
+                return (
+                  <NavLink
+                    key={section.id}
+                    ref={setNavRef(index)}
+                    to={section.to}
+                    end={section.id === "dashboard"}
+                    role="menuitem"
+                    tabIndex={activeIndex === index ? 0 : -1}
+                    aria-keyshortcuts={appNavShortcutLabel(section.shortcut)}
+                    title={`${section.label} (${appNavShortcutLabel(section.shortcut)})`}
+                    onFocus={() => onNavFocus(index)}
+                    className={({ isActive }) =>
+                      navItemClass(isActive || active)
+                    }
+                  >
+                    {section.label}
+                  </NavLink>
+                );
+              }
+
+              const dropdownActive =
+                section.dropdownId === "inventory"
+                  ? inventoryActive
+                  : section.dropdownId === "purchasing"
+                    ? purchasingActive
+                    : vendorsActive;
+
+              return (
+                <DropdownMenu
+                  key={section.id}
+                  open={openNavDropdown === section.dropdownId}
+                  onOpenChange={(open) =>
+                    handleNavDropdownChange(section.dropdownId, open)
+                  }
+                >
+                  <DropdownMenuTrigger
+                    ref={setNavRef(index)}
+                    role="menuitem"
+                    tabIndex={activeIndex === index ? 0 : -1}
+                    aria-keyshortcuts={appNavShortcutLabel(
+                      section.shortcut,
+                      "requireCtrl" in section ? section.requireCtrl : false,
+                    )}
+                    title={`${section.label} (${appNavShortcutLabel(
+                      section.shortcut,
+                      "requireCtrl" in section ? section.requireCtrl : false,
+                    )})`}
+                    onFocus={() => onNavFocus(index)}
+                    className={navItemClass(dropdownActive)}
+                  >
+                    {section.label}
+                    <span className="text-[10px] opacity-70" aria-hidden>
+                      ▼
+                    </span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {NAV_DROPDOWN_MENUS[section.dropdownId].map(
+                      (item, menuIndex) => (
+                        <NavDropdownMenuItem
+                          key={item.to}
+                          index={menuIndex}
+                          label={item.label}
+                          onSelect={() => navigate(item.to)}
+                        />
+                      ),
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            })}
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
@@ -259,6 +285,7 @@ export function AppShell() {
                     ? `${sync.pending} queued`
                     : "Synced"}
             </button>
+            <div className="flex flex-col items-end">
             <DropdownMenu>
               <DropdownMenuTrigger className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
                 {user?.fullName ?? user?.username ?? "Account"}
@@ -272,14 +299,37 @@ export function AppShell() {
                   </p>
                 </div>
                 <DropdownMenuSeparator />
+                {supervisorCapable && !offline ? (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() => setTotpEnrollOpen(true)}
+                    >
+                      Set up authentication code
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setTotpResetOpen(true)}>
+                      Reset authentication code
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
                 <DropdownMenuItem onSelect={() => void syncNow()}>
                   Sync now
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setLogoutOpen(true)}>
+                <DropdownMenuItem onSelect={() => void requestLogout()}>
                   Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {catalog.active && catalog.message ? (
+              <p className="text-muted-foreground px-3 text-xs">
+                {catalog.message}
+              </p>
+            ) : lastFullSync ? (
+              <p className="text-muted-foreground px-3 text-xs">
+                Last full sync {formatFullSyncAt(lastFullSync)}
+              </p>
+            ) : null}
+            </div>
           </div>
         </div>
       </header>
@@ -309,24 +359,7 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      <ConfirmDialog
-        open={logoutOpen}
-        onOpenChange={setLogoutOpen}
-        title="Are you sure you want to logout?"
-        description="Are you sure you want to logout?"
-        confirmLabel="Yes"
-        cancelLabel="Cancel"
-        loading={loggingOut}
-        onConfirm={async () => {
-          setLoggingOut(true);
-          try {
-            await signOut();
-          } finally {
-            setLoggingOut(false);
-            setLogoutOpen(false);
-          }
-        }}
-      />
+      {logoutDialogs}
 
       {globalTaxonomyKind ? (
         <AddTaxonomyDialog
@@ -348,6 +381,39 @@ export function AppShell() {
           }}
         />
       ) : null}
+
+      <TotpEnrollDialog
+        open={totpEnrollOpen}
+        onOpenChange={(open) => {
+          setTotpEnrollOpen(open);
+          if (!open) {
+            sessionStorage.setItem("blackbox.totp.enroll.dismissed", "1");
+          }
+        }}
+        onEnrolled={() => {
+          sessionStorage.removeItem("blackbox.totp.enroll.dismissed");
+        }}
+      />
+
+      <ConfirmDialog
+        open={totpResetOpen}
+        onOpenChange={setTotpResetOpen}
+        title="Reset authentication code?"
+        description="Existing authentication codes will stop working on this device until you scan a new QR code."
+        confirmLabel="Reset authentication code"
+        loading={totpBusy}
+        onConfirm={async () => {
+          setTotpBusy(true);
+          try {
+            await totpApi.resetSelf();
+            await window.blackbox?.totp?.replaceSupervisorCache([]);
+            setTotpResetOpen(false);
+            setTotpEnrollOpen(true);
+          } finally {
+            setTotpBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

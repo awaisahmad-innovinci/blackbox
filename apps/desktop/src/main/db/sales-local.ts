@@ -1,0 +1,347 @@
+import type { SaleDetail } from "@blackbox/shared";
+import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import type Database from "better-sqlite3";
+import { applyInventoryOutBalanceDeltaLocal, getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
+import { getLocalDb } from "./index";
+
+function removeStaleSaleByNumber(
+  db: Database.Database,
+  tenantId: string,
+  saleNumber: string,
+  keepId: string,
+): void {
+  const stale = db
+    .prepare(
+      `select id, status, warehouse_id as warehouseId
+       from sales
+       where tenant_id = @tenantId and sale_number = @saleNumber and id != @keepId
+       limit 1`,
+    )
+    .get({ tenantId, saleNumber, keepId }) as
+    | { id: string; status: string; warehouseId: string }
+    | undefined;
+
+  if (!stale) return;
+
+  if (stale.status === "POSTED") {
+    const lines = db
+      .prepare(
+        `select product_sku_id as productSkuId, quantity, foc_quantity as focQuantity, unit_price as unitPrice
+         from sale_lines where sale_id = ?`,
+      )
+      .all(stale.id) as Array<{
+      productSkuId: string;
+      quantity: number;
+      focQuantity: number;
+      unitPrice: number;
+    }>;
+
+    for (const line of lines) {
+      applyInventoryOutBalanceDeltaLocal(
+        stale.warehouseId,
+        line.productSkuId,
+        line.quantity + (line.focQuantity ?? 0),
+        line.unitPrice,
+      );
+    }
+  }
+
+  db.prepare("delete from sale_payments where sale_id = ?").run(stale.id);
+  db.prepare("delete from sale_lines where sale_id = ?").run(stale.id);
+  db.prepare("delete from sales where id = ?").run(stale.id);
+}
+
+function mergeFbrFields(
+  db: Database.Database,
+  detail: SaleDetail,
+): Pick<
+  SaleDetail,
+  | "fbrInvoiceNumber"
+  | "fbrStatus"
+  | "fbrError"
+  | "fbrSubmittedAt"
+  | "fbrSellerNtn"
+> {
+  const existing = db
+    .prepare(
+      `select
+         fbr_invoice_number as fbrInvoiceNumber,
+         fbr_status as fbrStatus,
+         fbr_error as fbrError,
+         fbr_submitted_at as fbrSubmittedAt,
+         fbr_seller_ntn as fbrSellerNtn
+       from sales where id = ?`,
+    )
+    .get(detail.id) as
+    | {
+        fbrInvoiceNumber: string | null;
+        fbrStatus: string | null;
+        fbrError: string | null;
+        fbrSubmittedAt: string | null;
+        fbrSellerNtn: string | null;
+      }
+    | undefined;
+
+  const incomingStatus = detail.fbrStatus ?? null;
+  const existingTerminal =
+    existing?.fbrStatus === "failed" ||
+    existing?.fbrStatus === "submitted" ||
+    existing?.fbrStatus === "excluded";
+  const incomingWouldEraseTerminal =
+    incomingStatus == null ||
+    incomingStatus === "pending" ||
+    (incomingStatus === "excluded" &&
+      (existing?.fbrStatus === "failed" || existing?.fbrStatus === "submitted"));
+  const keepExisting =
+    existing != null &&
+    !detail.fbrInvoiceNumber &&
+    (Boolean(existing.fbrInvoiceNumber) ||
+      (existingTerminal && incomingWouldEraseTerminal));
+  if (keepExisting && existing) {
+    return {
+      fbrInvoiceNumber: existing.fbrInvoiceNumber,
+      fbrStatus: asFbrInvoiceStatus(existing.fbrStatus) ?? "submitted",
+      fbrError: existing.fbrInvoiceNumber ? null : existing.fbrError,
+      fbrSubmittedAt: existing.fbrSubmittedAt,
+      fbrSellerNtn: detail.fbrSellerNtn || existing.fbrSellerNtn,
+    };
+  }
+
+  return {
+    fbrInvoiceNumber: detail.fbrInvoiceNumber ?? null,
+    fbrStatus:
+      detail.fbrStatus ??
+      asFbrInvoiceStatus(existing?.fbrStatus) ??
+      (detail.status === "POSTED" ? "pending" : null),
+    fbrError: detail.fbrError ?? null,
+    fbrSubmittedAt: detail.fbrSubmittedAt ?? null,
+    fbrSellerNtn: detail.fbrSellerNtn ?? existing?.fbrSellerNtn ?? null,
+  };
+}
+
+export function upsertSaleLocal(
+  detail: SaleDetail,
+  options?: { syncStatus?: "synced" | "local" },
+): void {
+  const syncStatus = options?.syncStatus ?? "synced";
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    removeStaleSaleByNumber(
+      db,
+      DEMO_STORE_TENANT_ID,
+      detail.saleNumber,
+      detail.id,
+    );
+
+    const fbr = mergeFbrFields(db, detail);
+    db.prepare(
+      `insert into sales (
+        id, tenant_id, sale_number, warehouse_id, status,
+        subtotal, gst_rate, gst_amount, sales_tax_rate, sales_tax_amount, total,
+        device_id, posted_by, posted_at, customer_name, posted_by_name, cash_tendered, notes,
+        fbr_invoice_number, fbr_status, fbr_error, fbr_submitted_at, fbr_seller_ntn,
+        created_at, updated_at, sync_status, server_updated_at
+      ) values (
+        @id, @tenantId, @saleNumber, @warehouseId, @status,
+        @subtotal, @gstRate, @gstAmount, @salesTaxRate, @salesTaxAmount, @total,
+        @deviceId, @postedBy, @postedAt, @customerName, @postedByName, @cashTendered, @notes,
+        @fbrInvoiceNumber, @fbrStatus, @fbrError, @fbrSubmittedAt, @fbrSellerNtn,
+        @createdAt, @updatedAt, @syncStatus, @serverUpdatedAt
+      )
+      on conflict(id) do update set
+        sale_number = excluded.sale_number,
+        warehouse_id = excluded.warehouse_id,
+        status = excluded.status,
+        subtotal = excluded.subtotal,
+        gst_rate = excluded.gst_rate,
+        gst_amount = excluded.gst_amount,
+        sales_tax_rate = excluded.sales_tax_rate,
+        sales_tax_amount = excluded.sales_tax_amount,
+        total = excluded.total,
+        device_id = excluded.device_id,
+        posted_by = excluded.posted_by,
+        posted_at = excluded.posted_at,
+        customer_name = excluded.customer_name,
+        posted_by_name = excluded.posted_by_name,
+        cash_tendered = excluded.cash_tendered,
+        notes = excluded.notes,
+        fbr_invoice_number = excluded.fbr_invoice_number,
+        fbr_status = excluded.fbr_status,
+        fbr_error = excluded.fbr_error,
+        fbr_submitted_at = excluded.fbr_submitted_at,
+        fbr_seller_ntn = excluded.fbr_seller_ntn,
+        updated_at = excluded.updated_at,
+        sync_status = excluded.sync_status,
+        server_updated_at = excluded.server_updated_at`,
+    ).run({
+      id: detail.id,
+      tenantId: DEMO_STORE_TENANT_ID,
+      saleNumber: detail.saleNumber,
+      warehouseId: detail.warehouseId,
+      status: detail.status,
+      subtotal: detail.subtotal,
+      gstRate: detail.gstRate,
+      gstAmount: detail.gstAmount,
+      salesTaxRate: detail.salesTaxRate,
+      salesTaxAmount: detail.salesTaxAmount,
+      total: detail.total,
+      deviceId: detail.deviceId,
+      postedBy: detail.postedBy,
+      postedAt: detail.postedAt,
+      customerName: detail.customerName,
+      postedByName: detail.postedByName,
+      cashTendered: detail.cashTendered,
+      notes: detail.notes,
+      fbrInvoiceNumber: fbr.fbrInvoiceNumber,
+      fbrStatus: fbr.fbrStatus,
+      fbrError: fbr.fbrError,
+      fbrSubmittedAt: fbr.fbrSubmittedAt,
+      fbrSellerNtn: fbr.fbrSellerNtn,
+      createdAt: detail.createdAt,
+      updatedAt: detail.updatedAt,
+      syncStatus,
+      serverUpdatedAt: syncStatus === "synced" ? detail.updatedAt : null,
+    });
+
+    db.prepare("delete from sale_lines where sale_id = ?").run(detail.id);
+    db.prepare("delete from sale_payments where sale_id = ?").run(detail.id);
+
+    const insertLine = db.prepare(
+      `insert into sale_lines (
+        id, tenant_id, sale_id, product_sku_id, quantity, unit_price, line_total,
+        gst_percent, discount_percent, foc_quantity, quantity_corrected, sell_unit, barcode, hs_code, created_at, updated_at, sync_status, server_updated_at
+      ) values (
+        @id, @tenantId, @saleId, @productSkuId, @quantity, @unitPrice, @lineTotal,
+        @gstPercent, @discountPercent, @focQuantity, @quantityCorrected, @sellUnit, @barcode, @hsCode, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+      )`,
+    );
+
+    for (const item of detail.items) {
+      insertLine.run({
+        id: item.id,
+        tenantId: DEMO_STORE_TENANT_ID,
+        saleId: detail.id,
+        productSkuId: item.productSkuId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+        gstPercent: item.gstPercent ?? 0,
+        discountPercent: item.discountPercent ?? 0,
+        focQuantity: item.focQuantity ?? 0,
+        quantityCorrected: item.quantityCorrected ? 1 : 0,
+        sellUnit: item.sellUnit,
+        barcode: item.barcode,
+        hsCode: item.hsCode ?? null,
+        createdAt: detail.updatedAt,
+        updatedAt: detail.updatedAt,
+        serverUpdatedAt: detail.updatedAt,
+      });
+    }
+
+    const insertPayment = db.prepare(
+      `insert into sale_payments (
+        id, tenant_id, sale_id, method, amount, reference,
+        created_at, updated_at, sync_status, server_updated_at
+      ) values (
+        @id, @tenantId, @saleId, @method, @amount, @reference,
+        @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+      )`,
+    );
+
+    for (const payment of detail.payments) {
+      insertPayment.run({
+        id: payment.id,
+        tenantId: DEMO_STORE_TENANT_ID,
+        saleId: detail.id,
+        method: payment.method,
+        amount: payment.amount,
+        reference: payment.reference,
+        createdAt: detail.updatedAt,
+        updatedAt: detail.updatedAt,
+        serverUpdatedAt: detail.updatedAt,
+      });
+    }
+  });
+  tx();
+}
+
+/** Device-local held bill — not synced until posted. */
+export function upsertSaleDraftLocal(detail: SaleDetail): void {
+  upsertSaleLocal({ ...detail, status: "DRAFT" }, { syncStatus: "local" });
+}
+
+export function deleteSaleDraftLocal(id: string): boolean {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select id from sales where id = ? and tenant_id = ? and status = 'DRAFT' and sync_status = 'local'`,
+    )
+    .get(id, DEMO_STORE_TENANT_ID) as { id: string } | undefined;
+  if (!row) return false;
+  const tx = db.transaction(() => {
+    db.prepare("delete from sale_payments where sale_id = ?").run(id);
+    db.prepare("delete from sale_lines where sale_id = ?").run(id);
+    db.prepare("delete from sales where id = ?").run(id);
+  });
+  tx();
+  return true;
+}
+
+export function countDraftSalesLocal(): number {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select count(*) as cnt from sales where tenant_id = ? and status = 'DRAFT' and sync_status = 'local'`,
+    )
+    .get(DEMO_STORE_TENANT_ID) as { cnt: number };
+  return Number(row.cnt);
+}
+
+export function getDraftSaleReservedQtyLocal(
+  warehouseId: string,
+  productSkuId: string,
+  excludeSaleId?: string | null,
+): number {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select coalesce(sum(l.quantity + coalesce(l.foc_quantity, 0)), 0) as qty
+       from sale_lines l
+       inner join sales s on s.id = l.sale_id and s.tenant_id = l.tenant_id
+       where s.tenant_id = @tenantId
+         and s.status = 'DRAFT'
+         and s.sync_status = 'local'
+         and s.warehouse_id = @warehouseId
+         and l.product_sku_id = @productSkuId
+         and (@excludeSaleId = '' or s.id != @excludeSaleId)`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      warehouseId,
+      productSkuId,
+      excludeSaleId: excludeSaleId ?? "",
+    }) as { qty: number };
+  return Number(row.qty);
+}
+
+export function getPosAvailableForSaleLocal(
+  warehouseId: string,
+  productSkuId: string,
+  excludeSaleId?: string | null,
+): number {
+  const balance = getInventoryOutBalanceQtyLocal(warehouseId, productSkuId);
+  const reserved = getDraftSaleReservedQtyLocal(
+    warehouseId,
+    productSkuId,
+    excludeSaleId,
+  );
+  return Math.max(0, Math.round((balance - reserved) * 10000) / 10000);
+}
+
+export function upsertSalesLocal(rows: SaleDetail[]): void {
+  const db = getLocalDb();
+  const tx = db.transaction(() => {
+    for (const row of rows) upsertSaleLocal(row);
+  });
+  tx();
+}

@@ -1,0 +1,39 @@
+import { useSession } from "@renderer/lib/session/context";
+import {
+  canAccessSale,
+  canAccessSalesList,
+  canAccessStockOverview,
+  canAccessTill,
+  canManageTill,
+  canAccessActivity,
+  canAccessTaxReports,
+  canAccessSaleReturn,
+  canAccessSaleRefund,
+  canVoidSale,
+  isCashierOnlyNav,
+  isWarehouseOnlyNav,
+  showInventoryDashboard,
+  showManagerDashboard,
+} from "./sales-access";
+
+export function useSalesAccess() {
+  const { user } = useSession();
+  const permissions = user?.permissions ?? [];
+
+  return {
+    canWrite: canAccessSale(permissions),
+    canReadList: canAccessSalesList(permissions),
+    canAccessStockOverview: canAccessStockOverview(permissions),
+    canReadTill: canAccessTill(permissions),
+    canManageTill: canManageTill(permissions),
+    canReadActivity: canAccessActivity(permissions),
+    canReadTaxReports: canAccessTaxReports(permissions),
+    canVoid: canVoidSale(permissions),
+    canReturn: canAccessSaleReturn(permissions),
+    canRefund: canAccessSaleRefund(permissions),
+    cashierOnly: isCashierOnlyNav(permissions),
+    warehouseOnly: isWarehouseOnlyNav(permissions),
+    showManagerDashboard: showManagerDashboard(permissions),
+    showInventoryDashboard: showInventoryDashboard(permissions),
+  };
+}

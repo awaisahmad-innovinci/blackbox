@@ -17,7 +17,12 @@ import type {
   StockMovementRow,
   WarehouseStockRow,
 } from "@blackbox/shared";
-import { nextSkuCodeForProduct } from "@blackbox/shared";
+import {
+  costWithGst,
+  normalizeHsCode,
+  nextSkuCodeForProduct,
+  normalizeUnitsPerPurchaseUnit,
+} from "@blackbox/shared";
 import {
   normalizeOptionalStoredText,
   normalizeStoredText,
@@ -28,6 +33,7 @@ import {
   Brand,
   Category,
   InventoryMovement,
+  InventoryOutItem,
   InventoryStock,
   Product,
   ProductSku,
@@ -71,6 +77,8 @@ export class ProductsService {
     private readonly vendorSkus: Repository<VendorSku>,
     @InjectRepository(InventoryStock)
     private readonly stock: Repository<InventoryStock>,
+    @InjectRepository(InventoryOutItem)
+    private readonly floorItems: Repository<InventoryOutItem>,
     @InjectRepository(InventoryMovement)
     private readonly movements: Repository<InventoryMovement>,
     private readonly skuBarcodes: SkuBarcodesService,
@@ -236,6 +244,7 @@ export class ProductsService {
       id: product.id,
       name: product.name,
       productCode: product.productCode,
+      importKey: product.importKey ?? null,
       brandId: product.brandId,
       brandName,
       categoryId: product.categoryId,
@@ -325,10 +334,14 @@ export class ProductsService {
     const tenantId = this.fixedTenant.tenantId;
     const product = await this.requireProduct(productId);
     await this.assertUnits(tenantId, dto.baseUnitId, dto.purchaseUnitId);
-    if (dto.sellingPrice <= dto.costPrice) {
+    if (dto.sellingPrice <= costWithGst(dto.costPrice, dto.gstPercent ?? 0)) {
       throw new BadRequestException(
-        "Selling price must be greater than cost price",
+        "Selling price must be greater than cost + GST",
       );
+    }
+    const hsCode = normalizeHsCode(dto.hsCode);
+    if (!hsCode) {
+      throw new BadRequestException("HS code is required");
     }
 
     const existing = await this.skus.find({
@@ -342,6 +355,12 @@ export class ProductsService {
         existing.map((row) => row.sku),
       );
 
+    const unitsPerPurchaseUnit = await this.resolveUnitsPerPurchaseUnit(
+      tenantId,
+      dto.purchaseUnitId,
+      dto.unitsPerPurchaseUnit,
+    );
+
     try {
       const saved = await this.skus.save(
         this.skus.create({
@@ -354,13 +373,16 @@ export class ProductsService {
           sizeUnit: dto.sizeUnit?.trim() || null,
           baseUnitId: dto.baseUnitId,
           purchaseUnitId: dto.purchaseUnitId,
-          unitsPerPurchaseUnit: String(dto.unitsPerPurchaseUnit),
+          unitsPerPurchaseUnit: String(unitsPerPurchaseUnit),
           costPrice: String(dto.costPrice),
+          gstPercent: String(dto.gstPercent ?? 0),
+          hsCode,
           sellingPrice: String(dto.sellingPrice),
           sellingPricePerPurchaseUnit:
             dto.sellingPricePerPurchaseUnit == null
               ? null
               : String(dto.sellingPricePerPurchaseUnit),
+          saleDiscountPercent: String(dto.saleDiscountPercent ?? 0),
           reorderLevel: String(dto.reorderLevel ?? 0),
           minimumStockLevel: String(dto.minimumStockLevel ?? 0),
           maximumStockLevel:
@@ -426,25 +448,56 @@ export class ProductsService {
     const tenantId = this.fixedTenant.tenantId;
     await this.requireProduct(productId);
 
-    const rows = await this.stock
-      .createQueryBuilder("st")
-      .innerJoinAndSelect("st.productSku", "s")
-      .innerJoinAndSelect("st.warehouse", "w")
-      .where("st.tenant_id = :tenantId", { tenantId })
-      .andWhere("s.product_id = :productId", { productId })
-      .orderBy("w.name", "ASC")
-      .addOrderBy("s.sku", "ASC")
-      .getMany();
+    const rows = (await this.floorItems.query(
+      `select
+         keys.warehouse_id as "warehouseId",
+         w.name as "warehouseName",
+         keys.product_sku_id as "productSkuId",
+         s.sku as sku,
+         s.variant_name as "variantName",
+         coalesce(st.quantity_on_hand, 0) as "quantityOnHand",
+         coalesce(st.quantity_reserved, 0) as "quantityReserved",
+         coalesce(st.quantity_available, 0) as "quantityAvailable",
+         coalesce(out.quantity, 0) as "floorQuantity"
+       from (
+         select st.warehouse_id, st.product_sku_id
+         from inventory_stock st
+         inner join product_skus s
+           on s.id = st.product_sku_id and s.tenant_id = st.tenant_id
+         where s.product_id = $1 and st.tenant_id = $2
+         union
+         select out.warehouse_id, out.product_sku_id
+         from inventory_out_items out
+         inner join product_skus s
+           on s.id = out.product_sku_id and s.tenant_id = out.tenant_id
+         where s.product_id = $1 and out.tenant_id = $2 and out.quantity <> 0
+       ) keys
+       inner join product_skus s
+         on s.id = keys.product_sku_id and s.tenant_id = $2
+       inner join warehouses w
+         on w.id = keys.warehouse_id and w.tenant_id = $2
+       left join inventory_stock st
+         on st.tenant_id = $2
+        and st.warehouse_id = keys.warehouse_id
+        and st.product_sku_id = keys.product_sku_id
+       left join inventory_out_items out
+         on out.tenant_id = $2
+        and out.warehouse_id = keys.warehouse_id
+        and out.product_sku_id = keys.product_sku_id
+       order by w.name asc, s.sku asc`,
+      [productId, tenantId],
+    )) as Array<Record<string, unknown>>;
 
-    return rows.map((st) => ({
-      warehouseId: st.warehouseId,
-      warehouseName: st.warehouse.name,
-      productSkuId: st.productSkuId,
-      sku: st.productSku.sku,
-      variantName: st.productSku.variantName,
-      quantityOnHand: toNum(st.quantityOnHand),
-      quantityReserved: toNum(st.quantityReserved),
-      quantityAvailable: toNum(st.quantityAvailable),
+    return rows.map((row) => ({
+      warehouseId: String(row.warehouseId),
+      warehouseName: String(row.warehouseName),
+      productSkuId: String(row.productSkuId),
+      sku: String(row.sku),
+      variantName: String(row.variantName ?? ""),
+      quantityOnHand: toNum(String(row.quantityOnHand ?? "")),
+      quantityReserved: toNum(String(row.quantityReserved ?? "")),
+      quantityAvailable: toNum(String(row.quantityAvailable ?? "")),
+      floorQuantity: toNum(String(row.floorQuantity ?? "")),
     }));
   }
 
@@ -494,8 +547,11 @@ export class ProductsService {
       purchaseUnitName: s.purchaseUnit?.name ?? null,
       unitsPerPurchaseUnit: toNum(s.unitsPerPurchaseUnit),
       costPrice: toNum(s.costPrice),
+      gstPercent: toNum(s.gstPercent),
+      hsCode: s.hsCode,
       sellingPrice: toNum(s.sellingPrice),
       sellingPricePerPurchaseUnit: toNumOrNull(s.sellingPricePerPurchaseUnit),
+      saleDiscountPercent: toNum(s.saleDiscountPercent),
       reorderLevel: toNum(s.reorderLevel),
       minimumStockLevel: toNum(s.minimumStockLevel),
       maximumStockLevel: toNumOrNull(s.maximumStockLevel),
@@ -564,6 +620,21 @@ export class ProductsService {
       const unit = await this.units.findOne({ where: { id: unitId, tenantId } });
       if (!unit) throw new BadRequestException("Invalid unit");
     }
+  }
+
+  private async resolveUnitsPerPurchaseUnit(
+    tenantId: string,
+    purchaseUnitId: string,
+    raw: number,
+  ): Promise<number> {
+    const unit = await this.units.findOne({
+      where: { id: purchaseUnitId, tenantId },
+    });
+    if (!unit) return normalizeUnitsPerPurchaseUnit(raw, {});
+    return normalizeUnitsPerPurchaseUnit(raw, {
+      name: unit.name,
+      abbreviation: unit.abbreviation,
+    });
   }
 
   private async nameMap(

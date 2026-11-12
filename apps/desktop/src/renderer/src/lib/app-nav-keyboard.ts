@@ -1,3 +1,9 @@
+import {
+  canAccessSalesList,
+  canAccessSaleReturn,
+  isCashierOnlyNav,
+} from "./sales-access";
+
 export type NavDropdownId = "inventory" | "purchasing" | "vendors";
 
 export type NavDropdownItem = { label: string; to: string };
@@ -11,6 +17,7 @@ export const NAV_DROPDOWN_MENUS: Record<NavDropdownId, NavDropdownItem[]> = {
     { label: "Brands", to: "/brands" },
     { label: "Categories", to: "/categories" },
     { label: "Inventory Out", to: "/inventory/out" },
+    { label: "Out Returns", to: "/inventory/out-returns" },
     { label: "Vendor Returns", to: "/inventory/returns" },
     { label: "In / out report", to: "/inventory/reports" },
   ],
@@ -22,16 +29,42 @@ export const NAV_DROPDOWN_MENUS: Record<NavDropdownId, NavDropdownItem[]> = {
   vendors: [
     { label: "Add Vendor", to: "/vendors/new" },
     { label: "See Vendors", to: "/vendors" },
+    { label: "Vendor Payments", to: "/vendors/payments" },
     { label: "Vendor Groups", to: "/vendor-groups" },
   ],
 };
 
 export type AppNavSectionId =
   | "dashboard"
+  | "sale"
+  | "activity"
+  | "taxReport"
   | "warehouses"
   | "inventory"
   | "purchasing"
   | "vendors";
+
+type AppNavLinkSection = {
+  id: AppNavSectionId;
+  label: string;
+  shortcut: string;
+  kind: "link";
+  to: string;
+  requiresPermission?: string;
+  requireCtrl?: boolean;
+};
+
+type AppNavDropdownSection = {
+  id: AppNavSectionId;
+  label: string;
+  shortcut: string;
+  kind: "dropdown";
+  dropdownId: NavDropdownId;
+  requiresPermission?: string;
+  requireCtrl?: boolean;
+};
+
+export type AppNavSection = AppNavLinkSection | AppNavDropdownSection;
 
 export const APP_NAV_SECTIONS = [
   {
@@ -42,11 +75,36 @@ export const APP_NAV_SECTIONS = [
     to: "/",
   },
   {
+    id: "sale",
+    label: "Sale",
+    shortcut: "s",
+    kind: "link",
+    to: "/sales/new",
+    requiresPermission: "sales.write",
+  },
+  {
+    id: "activity",
+    label: "Activity",
+    shortcut: "a",
+    kind: "link",
+    to: "/activity",
+    requiresPermission: "activity.read",
+  },
+  {
+    id: "taxReport",
+    label: "Tax report",
+    shortcut: "t",
+    kind: "link",
+    to: "/reports/taxes",
+    requiresPermission: "tax.reports.read",
+  },
+  {
     id: "warehouses",
     label: "Warehouses",
     shortcut: "w",
     kind: "link",
     to: "/warehouses",
+    requiresPermission: "warehouses.read",
   },
   {
     id: "inventory",
@@ -54,6 +112,7 @@ export const APP_NAV_SECTIONS = [
     shortcut: "i",
     kind: "dropdown",
     dropdownId: "inventory",
+    requiresPermission: "inventory.access",
   },
   {
     id: "purchasing",
@@ -61,6 +120,7 @@ export const APP_NAV_SECTIONS = [
     shortcut: "p",
     kind: "dropdown",
     dropdownId: "purchasing",
+    requiresPermission: "purchasing.access",
   },
   {
     id: "vendors",
@@ -69,6 +129,7 @@ export const APP_NAV_SECTIONS = [
     requireCtrl: true,
     kind: "dropdown",
     dropdownId: "vendors",
+    requiresPermission: "vendors.access",
   },
 ] as const;
 
@@ -184,4 +245,99 @@ export function matchNavDropdownItem(
 
   event.preventDefault();
   return item.to;
+}
+
+function resolveSaleNavSection(permissions: string[]): AppNavLinkSection | null {
+  if (isCashierOnlyNav(permissions)) {
+    const sale = APP_NAV_SECTIONS.find((s) => s.id === "sale");
+    if (!sale || sale.kind !== "link") return null;
+    return {
+      id: "sale",
+      label: sale.label,
+      shortcut: sale.shortcut,
+      kind: "link",
+      to: sale.to,
+      requiresPermission: sale.requiresPermission,
+    };
+  }
+  if (
+    canAccessSalesList(permissions) ||
+    canAccessSaleReturn(permissions)
+  ) {
+    return {
+      id: "sale",
+      label: "Sales",
+      shortcut: "s",
+      kind: "link",
+      to: "/sales",
+    };
+  }
+  return null;
+}
+
+function navSectionRequiresPermission(
+  section: (typeof APP_NAV_SECTIONS)[number],
+): string | undefined {
+  if ("requiresPermission" in section && section.requiresPermission) {
+    return section.requiresPermission;
+  }
+  return undefined;
+}
+
+function isNavSectionVisible(
+  section: (typeof APP_NAV_SECTIONS)[number],
+  permissions: string[],
+): boolean {
+  const required = navSectionRequiresPermission(section);
+  if (required) {
+    return permissions.includes(required);
+  }
+  return true;
+}
+
+export function visibleNavSections(permissions: string[]): AppNavSection[] {
+  if (isCashierOnlyNav(permissions)) {
+    return APP_NAV_SECTIONS.filter(
+      (s) => s.id === "dashboard" || s.id === "sale",
+    ).map((section) => normalizeNavSection(section));
+  }
+
+  return APP_NAV_SECTIONS.flatMap((section) => {
+    if (section.id === "sale") {
+      const resolved = resolveSaleNavSection(permissions);
+      return resolved ? [resolved] : [];
+    }
+    if (!isNavSectionVisible(section, permissions)) {
+      return [];
+    }
+    return [normalizeNavSection(section)];
+  });
+}
+
+function normalizeNavSection(
+  section: (typeof APP_NAV_SECTIONS)[number],
+): AppNavSection {
+  if (section.kind === "dropdown") {
+    return {
+      id: section.id,
+      label: section.label,
+      shortcut: section.shortcut,
+      kind: "dropdown",
+      dropdownId: section.dropdownId,
+      ...("requiresPermission" in section
+        ? { requiresPermission: section.requiresPermission }
+        : {}),
+      ...("requireCtrl" in section ? { requireCtrl: section.requireCtrl } : {}),
+    };
+  }
+  return {
+    id: section.id,
+    label: section.label,
+    shortcut: section.shortcut,
+    kind: "link",
+    to: section.to,
+    ...("requiresPermission" in section
+      ? { requiresPermission: section.requiresPermission }
+      : {}),
+  };
 }

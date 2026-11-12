@@ -1,6 +1,7 @@
 import type {
   CreateProductSkuRequest,
   CreateSkuBarcodeRequest,
+  OpeningStockRequest,
   SkuBarcode,
   SkuBarcodeLookupResult,
   SkuDetail,
@@ -19,11 +20,16 @@ export const skusApi = {
     const query = params.toString() ? `?${params.toString()}` : "";
     return apiFetch<SkuSearchResult[]>(`/skus${query}`);
   },
-  byBarcode(barcode: string, warehouseId: string): Promise<SkuSearchResult> {
+  byBarcode(
+    barcode: string,
+    warehouseId: string,
+    options?: { balance?: "stock" | "pos" },
+  ): Promise<SkuSearchResult> {
     const params = new URLSearchParams({
       barcode: barcode.trim(),
       warehouseId,
     });
+    if (options?.balance === "pos") params.set("balance", "pos");
     return apiFetch<SkuSearchResult>(`/skus/by-barcode?${params.toString()}`);
   },
   lookupByBarcode(barcode: string): Promise<SkuBarcodeLookupResult> {
@@ -48,6 +54,15 @@ export const skusApi = {
   },
   listInventory(id: string): Promise<WarehouseStockRow[]> {
     return apiFetch<WarehouseStockRow[]>(`/skus/${id}/inventory`);
+  },
+  addOpeningStock(
+    id: string,
+    body: OpeningStockRequest,
+  ): Promise<WarehouseStockRow> {
+    return apiFetch<WarehouseStockRow>(`/skus/${id}/opening-stock`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   },
   listVendors(id: string): Promise<SkuSupplier[]> {
     return apiFetch<SkuSupplier[]>(`/skus/${id}/vendors`);

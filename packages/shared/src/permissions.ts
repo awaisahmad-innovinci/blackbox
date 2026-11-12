@@ -16,7 +16,22 @@ export const PERMISSIONS = [
   "devices.read",
   "devices.manage",
   "sync.use",
+  "warehouses.read",
   "warehouses.write",
+  "inventory.access",
+  "inventory.opening.write",
+  "purchasing.access",
+  "vendors.access",
+  "sales.read",
+  "sales.write",
+  "sales.non_fbr",
+  "sales.void",
+  "sales.return",
+  "sales.refund",
+  "till.read",
+  "till.manage",
+  "activity.read",
+  "tax.reports.read",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -35,7 +50,24 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   "devices.read": "List and view devices",
   "devices.manage": "Register, trust, revoke, and manage device associations",
   "sync.use": "Push and pull incremental desktop sync",
+  "warehouses.read": "View warehouses",
   "warehouses.write": "Create, update, and deactivate warehouses",
+  "inventory.access":
+    "Access inventory module (products, brands, stock movements, reports)",
+  "inventory.opening.write": "Record opening warehouse quantity",
+  "purchasing.access":
+    "Access purchasing module (purchase orders, goods receipts)",
+  "vendors.access": "Access vendors module (vendors and vendor groups)",
+  "sales.read": "View sales bills and receipts",
+  "sales.write": "Create and post sales bills",
+  "sales.non_fbr": "Post sales as simple bills that are not sent to FBR",
+  "sales.void": "Void posted sales bills",
+  "sales.return": "Process customer sale returns",
+  "sales.refund": "Complete pending customer return refunds at till",
+  "till.read": "View own cash till session",
+  "till.manage": "Approve, withdraw, and reopen cashier tills",
+  "activity.read": "View POS activity and approval log",
+  "tax.reports.read": "View tax paid and collected reports",
 };
 
 export function isPermission(value: string): value is Permission {

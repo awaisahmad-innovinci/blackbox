@@ -7,5 +7,6 @@ import { RolesService } from "./roles.service";
   imports: [RbacModule],
   controllers: [RolesController],
   providers: [RolesService],
+  exports: [RolesService],
 })
 export class RolesModule {}

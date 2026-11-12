@@ -4,7 +4,8 @@
 
 @media print {
   @page {
-    margin: 12mm;
+    margin: 4mm 5mm 6mm;
+    size: 80mm auto;
   }
 
   body {
@@ -12,6 +13,24 @@
     color: black !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print-document],
+  [data-print-document] * {
+    visibility: visible;
+  }
+
+  [data-print-document] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   header,
@@ -38,5 +57,51 @@
   thead {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  [data-thermal-receipt] {
+    box-sizing: border-box !important;
+    color: #000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    line-height: 1.35 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 2mm 4mm 18mm !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-thermal-receipt] * {
+    color: #000 !important;
+  }
+
+  [data-thermal-receipt] .thermal-rule {
+    border: none !important;
+    border-top: 1px solid #000 !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-barcode {
+    break-inside: avoid;
+    margin-bottom: 4px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-barcode svg {
+    color: #000 !important;
+    fill: #000 !important;
+    stroke: #000 !important;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-feed {
+    display: block !important;
+    height: 12mm !important;
+    min-height: 12mm !important;
+    visibility: visible !important;
   }
 }

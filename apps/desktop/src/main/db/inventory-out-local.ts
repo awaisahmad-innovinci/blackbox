@@ -4,6 +4,65 @@ import { getLocalDb } from "./index";
 
 export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
   const db = getLocalDb();
+  // #region agent log
+  {
+    const conflict = db
+      .prepare(
+        `select id, out_number as outNumber, status, sync_status as syncStatus,
+           (select count(*) from local_sync_outbox o
+            where o.entity_id = inventory_outs.id and o.status != 'acked') as pendingOutbox
+         from inventory_outs
+         where tenant_id = @tenantId and out_number = @outNumber and id != @id`,
+      )
+      .get({
+        tenantId: DEMO_STORE_TENANT_ID,
+        outNumber: detail.outNumber,
+        id: detail.id,
+      }) as
+      | {
+          id: string;
+          outNumber: string;
+          status: string;
+          syncStatus: string;
+          pendingOutbox: number;
+        }
+      | undefined;
+    const sameId = db
+      .prepare(
+        "select out_number as outNumber from inventory_outs where id = ?",
+      )
+      .get(detail.id) as { outNumber: string } | undefined;
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "5b973a",
+      },
+      body: JSON.stringify({
+        sessionId: "5b973a",
+        runId: "run1",
+        hypothesisId: "A/B/E",
+        location: "inventory-out-local.ts:upsertInventoryOutLocal",
+        message: "inventory out upsert pre-check",
+        data: {
+          incomingId: detail.id.slice(0, 8),
+          incomingNumber: detail.outNumber,
+          sameIdExists: Boolean(sameId),
+          sameIdNumber: sameId?.outNumber ?? null,
+          conflict: conflict
+            ? {
+                id: conflict.id.slice(0, 8),
+                status: conflict.status,
+                syncStatus: conflict.syncStatus,
+                pendingOutbox: conflict.pendingOutbox,
+              }
+            : null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }
+  // #endregion
   const tx = db.transaction(() => {
     db.prepare(
       `insert into inventory_outs (
@@ -41,12 +100,12 @@ export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
       serverUpdatedAt: detail.updatedAt,
     });
 
-    db.prepare("delete from inventory_out_items where inventory_out_id = ?").run(
+    db.prepare("delete from inventory_out_lines where inventory_out_id = ?").run(
       detail.id,
     );
 
-    const insertItem = db.prepare(
-      `insert into inventory_out_items (
+    const insertLine = db.prepare(
+      `insert into inventory_out_lines (
         id, tenant_id, inventory_out_id, product_sku_id, quantity, unit_cost,
         created_at, updated_at, sync_status, server_updated_at
       ) values (
@@ -56,7 +115,7 @@ export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
     );
 
     for (const item of detail.items) {
-      insertItem.run({
+      insertLine.run({
         id: item.id,
         tenantId: DEMO_STORE_TENANT_ID,
         inventoryOutId: detail.id,
@@ -74,8 +133,66 @@ export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
 
 export function upsertInventoryOutsLocal(rows: InventoryOutDetail[]): void {
   const db = getLocalDb();
+  // #region agent log
+  {
+    const byNumber = new Map<string, number>();
+    for (const row of rows) {
+      byNumber.set(row.outNumber, (byNumber.get(row.outNumber) ?? 0) + 1);
+    }
+    const duplicateNumbers = [...byNumber.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([outNumber, count]) => ({ outNumber, count }));
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "5b973a",
+      },
+      body: JSON.stringify({
+        sessionId: "5b973a",
+        runId: "run1",
+        hypothesisId: "C/D",
+        location: "inventory-out-local.ts:upsertInventoryOutsLocal",
+        message: "inventory out batch received",
+        data: {
+          batchSize: rows.length,
+          duplicateNumbers,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }
+  // #endregion
   const tx = db.transaction(() => {
-    for (const row of rows) upsertInventoryOutLocal(row);
+    for (const row of rows) {
+      try {
+        upsertInventoryOutLocal(row);
+      } catch (err) {
+        // #region agent log
+        fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5b973a",
+          },
+          body: JSON.stringify({
+            sessionId: "5b973a",
+            runId: "run1",
+            hypothesisId: "D",
+            location: "inventory-out-local.ts:upsertInventoryOutsLocal:catch",
+            message: "inventory out row failed and page will roll back",
+            data: {
+              failedId: row.id.slice(0, 8),
+              failedNumber: row.outNumber,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        throw err;
+      }
+    }
   });
   tx();
 }

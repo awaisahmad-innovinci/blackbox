@@ -1,0 +1,793 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import type { DrawerPerson, TillListItem, TillSessionDetail } from "@blackbox/shared";
+import {
+  computeTillDenominationTotal,
+  emptyTillNotes,
+  formatMoney,
+  isTillNearLimit,
+  TILL_MAX_CASH_BALANCE_TO_CLOSE,
+  validateTillCanCloseBalance,
+  validateTillOpeningBalance,
+  validateTillOpeningBalanceAmount,
+} from "@blackbox/shared";
+import { Button } from "@blackbox/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@blackbox/ui/dialog";
+import { Input } from "@blackbox/ui/input";
+import { Label } from "@blackbox/ui/label";
+import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { tillsApi } from "@renderer/lib/api/tills";
+import {
+  createEmptyTillFormState,
+  TillDenominationForm,
+} from "@renderer/components/till-denomination-form";
+import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
+import { CollectCashDialog } from "@renderer/features/sales/CollectCashDialog";
+import { OpenTillDialog } from "@renderer/features/sales/OpenTillDialog";
+import { PosCardTerminalSettingsDialog } from "@renderer/features/sales/PosCardTerminalSettingsDialog";
+import { PosPrinterSettingsDialog } from "@renderer/features/sales/PosPrinterSettingsDialog";
+import { ReopenTillDialog } from "@renderer/features/sales/ReopenTillDialog";
+import {
+  approveTill,
+  closeTill,
+  collectCashTill,
+  loadCurrentTill,
+  loadLatestTillSession,
+  loadTills,
+  openTill,
+  reopenTill,
+  withdrawTill,
+} from "@renderer/lib/local-db/till-source";
+import { requireManagerTillWithdrawApproval } from "@renderer/lib/manager-approval";
+import { useSession } from "@renderer/lib/session/context";
+import { defaultRouteForUser } from "@renderer/lib/sales-access";
+import { useSalesAccess } from "@renderer/lib/use-sales-access";
+
+function statusLabel(status: TillSessionDetail["status"]): string {
+  if (status === "PENDING_APPROVAL") return "Pending approval";
+  if (status === "OPEN") return "Open";
+  if (status === "CLOSED_LIMIT") return "Limit reached";
+  return "Closed";
+}
+
+export function TillPage() {
+  const navigate = useNavigate();
+  const { user } = useSession();
+  const permissions = user?.permissions ?? [];
+  const { canReadTill, canManageTill, canWrite, canRefund } = useSalesAccess();
+  const { promptSupervisorTotp } = useSupervisorTotp();
+  const requireTillWithdrawApproval = requireManagerTillWithdrawApproval(user);
+
+  const [session, setSession] = useState<TillSessionDetail | null>(null);
+  const [latestClosedSession, setLatestClosedSession] =
+    useState<TillSessionDetail | null>(null);
+  const [managerItems, setManagerItems] = useState<TillListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [fundOpen, setFundOpen] = useState(false);
+  const [cashiers, setCashiers] = useState<DrawerPerson[]>([]);
+  const [cashierId, setCashierId] = useState("");
+  const [fundAmount, setFundAmount] = useState("");
+  const [fundError, setFundError] = useState<string | null>(null);
+  const [managerDialog, setManagerDialog] = useState<
+    | { kind: "collect"; tillId: string }
+    | { kind: "withdraw"; tillId: string }
+    | { kind: "reopen"; tillId: string }
+    | null
+  >(null);
+  const [managerForm, setManagerForm] = useState(createEmptyTillFormState());
+  const [collectDialogOpen, setCollectDialogOpen] = useState(false);
+  const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false);
+  const [cardTerminalSettingsOpen, setCardTerminalSettingsOpen] = useState(false);
+  const [openingDrawer, setOpeningDrawer] = useState(false);
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [openDialogOpen, setOpenDialogOpen] = useState(false);
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!canReadTill) navigate(defaultRouteForUser(permissions), { replace: true });
+  }, [canReadTill, navigate, permissions]);
+
+  async function refresh(): Promise<void> {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const current = await loadCurrentTill(user.id);
+      setSession(current);
+      if (!current && !canManageTill) {
+        const latest = await loadLatestTillSession(user.id);
+        setLatestClosedSession(latest?.status === "CLOSED" ? latest : null);
+      } else {
+        setLatestClosedSession(null);
+      }
+      if (canManageTill) {
+        const rows = await loadTills({
+          status: undefined,
+        });
+        setManagerItems(
+          rows.filter((row) =>
+            ["PENDING_APPROVAL", "OPEN", "CLOSED_LIMIT", "CLOSED"].includes(
+              row.status,
+            ),
+          ),
+        );
+      }
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load till"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, [user?.id, canManageTill]);
+
+  useEffect(() => {
+    function onFocus() {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    }
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [user?.id, canManageTill]);
+
+  async function onOpenFundDialog(): Promise<void> {
+    setFundOpen(true);
+    setFundError(null);
+    try {
+      const rows = await tillsApi.listCashiers();
+      setCashiers(rows);
+      setCashierId((current) => current || rows[0]?.id || "");
+    } catch (err: unknown) {
+      setCashiers([]);
+      setFundError(getApiErrorMessage(err, "Could not load cashiers. Connect and try again."));
+    }
+  }
+
+  async function onFundCashier(): Promise<void> {
+    if (!user) return;
+    const cashier = cashiers.find((row) => row.id === cashierId);
+    const balance = Number(fundAmount);
+    const validationError = validateTillOpeningBalanceAmount(balance);
+    if (!cashier) {
+      setFundError("Choose a cashier");
+      return;
+    }
+    if (validationError) {
+      setFundError(validationError);
+      return;
+    }
+    setBusy(true);
+    setFundError(null);
+    try {
+      await openTill({
+        userId: cashier.id,
+        userName: cashier.fullName.trim() || cashier.username,
+        tillUsername: cashier.username,
+        body: {
+          ...emptyTillNotes(),
+          openingBalance: balance,
+        },
+        requireApproval: false,
+        funderUserId: user.id,
+        funderName: user.fullName?.trim() || user.username,
+      });
+      setFundOpen(false);
+      setFundAmount("");
+      await refresh();
+    } catch (err: unknown) {
+      setFundError(getApiErrorMessage(err, "Failed to open till"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onApprove(id: string): Promise<void> {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await approveTill({
+        id,
+        managerId: user.id,
+        managerName: user.fullName?.trim() || user.username,
+      });
+      await refresh();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to approve till"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onManagerSubmit(): Promise<void> {
+    if (!user || !managerDialog) return;
+
+    if (managerDialog.kind === "reopen") {
+      const balance = Number(managerForm.openingBalance);
+      const validationError = validateTillOpeningBalance(
+        managerForm.notes,
+        balance,
+      );
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    } else if (computeTillDenominationTotal(managerForm.notes) <= 0) {
+      setError("Enter at least one note count.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      if (managerDialog.kind === "collect") {
+        let supervisorUserId: string | undefined;
+        let supervisorDisplayName: string | undefined;
+        if (requireTillWithdrawApproval) {
+          const totp = await promptSupervisorTotp();
+          if (!totp.approved) return;
+          supervisorUserId = totp.supervisorUserId;
+          supervisorDisplayName = totp.supervisorDisplayName;
+        }
+        await collectCashTill({
+          id: managerDialog.tillId,
+          managerId: user.id,
+          managerName: user.fullName?.trim() || user.username,
+          supervisorDisplayName,
+          body: {
+            ...managerForm.notes,
+            supervisorUserId,
+          },
+        });
+      } else if (managerDialog.kind === "withdraw") {
+        if (requireTillWithdrawApproval) {
+          const totp = await promptSupervisorTotp();
+          if (!totp.approved) return;
+        }
+        await withdrawTill({
+          id: managerDialog.tillId,
+          managerId: user.id,
+          managerName: user.fullName?.trim() || user.username,
+          body: managerForm.notes,
+        });
+      } else {
+        const balance = Number(managerForm.openingBalance);
+        await reopenTill({
+          id: managerDialog.tillId,
+          managerId: user.id,
+          managerName: user.fullName?.trim() || user.username,
+          body: {
+            ...managerForm.notes,
+            openingBalance: balance,
+          },
+        });
+      }
+      setManagerDialog(null);
+      setManagerForm(createEmptyTillFormState());
+      await refresh();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Till action failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCloseTill(): Promise<void> {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await closeTill({
+        userId: user.id,
+        userName: user.fullName?.trim() || user.username,
+      });
+      setCloseDialogOpen(false);
+      await refresh();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to close till"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const progressPct =
+    session && session.maxCashLimit > 0
+      ? Math.min(100, (session.currentCashBalance / session.maxCashLimit) * 100)
+      : 0;
+
+  const closeBalanceError = session
+    ? validateTillCanCloseBalance(session.currentCashBalance)
+    : null;
+
+  async function onOpenDrawer(): Promise<void> {
+    setOpeningDrawer(true);
+    setError(null);
+    try {
+      await window.blackbox?.pos?.openCashDrawer?.();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to open cash drawer"));
+    } finally {
+      setOpeningDrawer(false);
+    }
+  }
+
+  const showDrawerControls = canManageTill || canWrite;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">My till</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Cash drawer session and balance
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {showDrawerControls ? (
+            <>
+              <Button
+                variant="outline"
+                disabled={openingDrawer}
+                onClick={() => void onOpenDrawer()}
+              >
+                {openingDrawer ? "Opening…" : "Open drawer"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setPrinterSettingsOpen(true)}
+              >
+                Printer settings
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCardTerminalSettingsOpen(true)}
+              >
+                Card terminal
+              </Button>
+            </>
+          ) : null}
+          {canRefund ? (
+            <Button variant="outline" onClick={() => navigate("/sales/refund-return")}>
+              Refund return
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={() => navigate("/sales/new")}>
+            Back to sale
+          </Button>
+        </div>
+      </div>
+
+      {error ? (
+        <p className="text-destructive text-sm" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {loading ? (
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      ) : session ? (
+        <div className="border-border space-y-4 rounded-lg border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-medium">{session.tillName}</p>
+              <p className="text-muted-foreground text-sm">
+                {session.userName} · Status: {statusLabel(session.status)}
+              </p>
+            </div>
+            {session.status === "CLOSED_LIMIT" ? (
+              <p className="text-destructive text-sm">
+                {requireTillWithdrawApproval
+                  ? "Cash limit reached. Tap Withdraw cash — a manager must authorize with an authentication code first; the till reopens when cash is below the limit."
+                  : "Cash limit reached. Tap Withdraw cash to remove enough cash; the till reopens for sales when below the limit."}
+              </p>
+            ) : isTillNearLimit(session) ? (
+              <p className="text-amber-700 text-sm dark:text-amber-400">
+                Till is near the cash limit. Tap Withdraw cash and ask a manager
+                to authorize.
+              </p>
+            ) : null}
+          </div>
+
+          {!canManageTill &&
+          (session.status === "OPEN" || session.status === "CLOSED_LIMIT") ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setCollectDialogOpen(true)}
+              >
+                Withdraw cash
+              </Button>
+              {session.status === "OPEN" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setCloseDialogOpen(true)}
+                >
+                  Close till
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-muted-foreground text-xs">Opening balance</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {formatMoney(session.openingBalance)}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Current cash</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {formatMoney(session.currentCashBalance)}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Max limit</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {formatMoney(session.maxCashLimit)}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="bg-muted h-2 overflow-hidden rounded-full">
+              <div
+                className="bg-primary h-full transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {formatMoney(session.currentCashBalance)} /{" "}
+              {formatMoney(session.maxCashLimit)} cash in till
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {!loading && !session && !canManageTill && latestClosedSession ? (
+        <div className="border-border space-y-4 rounded-lg border p-4">
+          <h2 className="text-lg font-medium">Till closed</h2>
+          <p className="text-muted-foreground text-sm">
+            Ask a manager to approve with their authentication code. The opening balance comes from that manager&apos;s drawer.
+          </p>
+          <div>
+            <p className="text-muted-foreground text-xs">Last session cash</p>
+            <p className="text-lg font-semibold tabular-nums">
+              Rs {formatMoney(latestClosedSession.currentCashBalance)}
+            </p>
+          </div>
+          <Button disabled={busy} onClick={() => setReopenDialogOpen(true)}>
+            Open till
+          </Button>
+        </div>
+      ) : null}
+
+      {!loading && !session && !canManageTill && !latestClosedSession ? (
+        <div className="border-border space-y-4 rounded-lg border p-4">
+          <h2 className="text-lg font-medium">Open till</h2>
+          <p className="text-muted-foreground text-sm">
+            Ask a manager to approve with their authentication code. The opening balance comes from that manager&apos;s drawer.
+          </p>
+          <Button disabled={busy} onClick={() => setOpenDialogOpen(true)}>
+            Open till
+          </Button>
+        </div>
+      ) : null}
+
+      {canManageTill ? (
+        <div className="border-border space-y-4 rounded-lg border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-medium">Manage cashier tills</h2>
+            <Button disabled={busy} onClick={() => void onOpenFundDialog()}>
+              Open cashier till
+            </Button>
+          </div>
+          {managerItems.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No tills need manager action.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted/40 text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Till</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Current cash</th>
+                    <th className="px-4 py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {managerItems.map((row) => (
+                    <tr key={row.id} className="border-border border-t">
+                      <td className="px-4 py-3">{row.tillName}</td>
+                      <td className="px-4 py-3">{statusLabel(row.status)}</td>
+                      <td className="px-4 py-3 tabular-nums">
+                        {formatMoney(row.currentCashBalance)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {row.status === "PENDING_APPROVAL" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => void onApprove(row.id)}
+                            >
+                              Approve
+                            </Button>
+                          ) : null}
+                          {row.status === "OPEN" || row.status === "CLOSED_LIMIT" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => {
+                                setManagerDialog({
+                                  kind: "collect",
+                                  tillId: row.id,
+                                });
+                                setManagerForm(createEmptyTillFormState());
+                              }}
+                            >
+                              Collect cash
+                            </Button>
+                          ) : null}
+                          {row.status === "CLOSED_LIMIT" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => {
+                                setManagerDialog({ kind: "withdraw", tillId: row.id });
+                                setManagerForm(createEmptyTillFormState());
+                              }}
+                            >
+                              Withdraw
+                            </Button>
+                          ) : null}
+                          {row.status === "CLOSED" ? (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => {
+                                setManagerDialog({ kind: "reopen", tillId: row.id });
+                                setManagerForm(createEmptyTillFormState());
+                              }}
+                            >
+                              Reopen
+                            </Button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      <Dialog
+        open={managerDialog != null}
+        onOpenChange={(open) => {
+          if (!open) setManagerDialog(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {managerDialog?.kind === "collect"
+                ? "Collect cash"
+                : managerDialog?.kind === "withdraw"
+                  ? "Withdraw cash"
+                  : "Reopen till"}
+            </DialogTitle>
+          </DialogHeader>
+          <TillDenominationForm
+            notes={managerForm.notes}
+            openingBalance={managerForm.openingBalance}
+            onNotesChange={(notes) => {
+              const total = computeTillDenominationTotal(notes);
+              setManagerForm({
+                notes,
+                openingBalance:
+                  managerDialog?.kind === "reopen"
+                    ? String(total)
+                    : managerForm.openingBalance,
+              });
+            }}
+            onOpeningBalanceChange={(value) =>
+              setManagerForm((current) => ({ ...current, openingBalance: value }))
+            }
+            disabled={busy || managerDialog?.kind !== "reopen"}
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => setManagerDialog(null)}
+            >
+              Cancel
+            </Button>
+            <Button disabled={busy} onClick={() => void onManagerSubmit()}>
+              {busy ? "Saving…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Close till</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            Close your till for this shift? You will not be able to post sales
+            until a manager reopens your till.
+          </p>
+          {session ? (
+            <>
+              <p className="text-sm font-medium tabular-nums">
+                Current cash in till: Rs{" "}
+                {formatMoney(session.currentCashBalance)}
+              </p>
+              {closeBalanceError ? (
+                <p className="text-destructive text-sm" role="alert">
+                  {closeBalanceError} Use Withdraw cash first, then try again.
+                </p>
+              ) : session.currentCashBalance <= TILL_MAX_CASH_BALANCE_TO_CLOSE ? (
+                <p className="text-muted-foreground text-sm">
+                  Till balance is Rs {TILL_MAX_CASH_BALANCE_TO_CLOSE} or less. You
+                  can close now.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => setCloseDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={busy || Boolean(closeBalanceError)}
+              onClick={() => void onCloseTill()}
+            >
+              {busy ? "Closing…" : "Close till"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={fundOpen}
+        onOpenChange={(open) => {
+          if (!open) setFundOpen(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open cashier till</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm">
+              The opening balance is taken from your drawer.
+            </p>
+            <label className="grid gap-1 text-sm">
+              Cashier
+              <select
+                className="border-input bg-background h-9 rounded-md border px-2"
+                value={cashierId}
+                onChange={(event) => setCashierId(event.target.value)}
+              >
+                {cashiers.length === 0 ? (
+                  <option value="">No cashiers loaded</option>
+                ) : null}
+                {cashiers.map((cashier) => (
+                  <option key={cashier.id} value={cashier.id}>
+                    {cashier.fullName.trim() || cashier.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="space-y-2">
+              <Label htmlFor="fundOpeningBalance">Opening balance (Rs)</Label>
+              <Input
+                id="fundOpeningBalance"
+                inputMode="decimal"
+                value={fundAmount}
+                onChange={(event) => setFundAmount(event.target.value)}
+              />
+            </div>
+            {fundError ? (
+              <p className="text-destructive text-sm">{fundError}</p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={busy} onClick={() => setFundOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={busy} onClick={() => void onFundCashier()}>
+              {busy ? "Opening…" : "Open till"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {user && !canManageTill ? (
+        <OpenTillDialog
+          open={openDialogOpen}
+          onOpenChange={setOpenDialogOpen}
+          cashierUserId={user.id}
+          cashierName={user.fullName?.trim() || user.username}
+          cashierUsername={user.username}
+          requireApproval
+          onSuccess={(detail) => {
+            setSession(detail);
+            setLatestClosedSession(null);
+          }}
+        />
+      ) : null}
+
+      {latestClosedSession && user && !canManageTill ? (
+        <ReopenTillDialog
+          open={reopenDialogOpen}
+          onOpenChange={setReopenDialogOpen}
+          closedSessionId={latestClosedSession.id}
+          cashierUserId={user.id}
+          cashierName={user.fullName?.trim() || user.username}
+          requireApproval
+          onSuccess={(detail) => {
+            setSession(detail);
+            setLatestClosedSession(null);
+          }}
+        />
+      ) : null}
+
+      {session && user ? (
+        <CollectCashDialog
+          open={collectDialogOpen}
+          onOpenChange={setCollectDialogOpen}
+          session={session}
+          cashierUserId={user.id}
+          cashierName={user.fullName?.trim() || user.username}
+          requireApproval={requireTillWithdrawApproval}
+          onSuccess={(updated) => setSession(updated)}
+        />
+      ) : null}
+
+      <PosPrinterSettingsDialog
+        open={printerSettingsOpen}
+        onOpenChange={setPrinterSettingsOpen}
+      />
+      <PosCardTerminalSettingsDialog
+        open={cardTerminalSettingsOpen}
+        onOpenChange={setCardTerminalSettingsOpen}
+      />
+    </div>
+  );
+}

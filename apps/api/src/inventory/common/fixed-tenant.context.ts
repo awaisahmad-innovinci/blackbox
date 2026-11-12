@@ -9,11 +9,10 @@ import { getRequestTenant } from "../../common/request-tenant";
 @Injectable()
 export class FixedTenantContext implements OnModuleInit {
   private readonly logger = new Logger(FixedTenantContext.name);
-  private readonly fallbackTenantId: string;
+  private readonly fallbackTenantId: any;
 
   constructor(config: ConfigService) {
-    this.fallbackTenantId =
-      config.get<string>("DEV_TENANT_ID")?.trim() || DEMO_STORE_TENANT_ID;
+    this.fallbackTenantId = getRequestTenant()?.tenantId;
   }
 
   get tenantId(): string {

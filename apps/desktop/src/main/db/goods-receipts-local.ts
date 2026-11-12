@@ -9,12 +9,12 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       `insert into goods_receipts (
         id, tenant_id, receipt_number, purchase_order_id, vendor_id, warehouse_id,
         status, received_at, voucher_number, subtotal, discount, tax, adv_tax, gst,
-        incentive, shelf_rent, other_charges, return_credit, total, notes,
+        incentive, shelf_rent, other_charges, return_credit, total, amount_paid, notes,
         created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @receiptNumber, @purchaseOrderId, @vendorId, @warehouseId,
         @status, @receivedAt, @voucherNumber, @subtotal, @discount, @tax, @advTax, @gst,
-        @incentive, @shelfRent, @otherCharges, @returnCredit, @total, @notes,
+        @incentive, @shelfRent, @otherCharges, @returnCredit, @total, @amountPaid, @notes,
         @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )
       on conflict(id) do update set
@@ -35,6 +35,7 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
         other_charges = excluded.other_charges,
         return_credit = excluded.return_credit,
         total = excluded.total,
+        amount_paid = excluded.amount_paid,
         notes = excluded.notes,
         updated_at = excluded.updated_at,
         sync_status = 'synced',
@@ -59,6 +60,7 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       otherCharges: 0,
       returnCredit: detail.returnCredit ?? 0,
       total: detail.total,
+      amountPaid: detail.amountPaid ?? detail.total,
       notes: "",
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
@@ -73,12 +75,14 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
       `insert into goods_receipt_items (
         id, tenant_id, goods_receipt_id, purchase_order_item_id, product_sku_id,
         vendor_sku_id, purchase_unit_id, units_per_purchase_unit, ordered_quantity,
-        received_quantity, bonus_quantity, po_unit_cost, receiving_unit_cost, discount_percent, line_total,
+        received_quantity, bonus_quantity, po_unit_cost, receiving_unit_cost, discount_percent,
+        sale_tax, adv_tax, gst, line_total,
         created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @goodsReceiptId, @purchaseOrderItemId, @productSkuId,
         @vendorSkuId, @purchaseUnitId, @unitsPerPurchaseUnit, @orderedQuantity,
-        @receivedQuantity, @bonusQuantity, @poUnitCost, @receivingUnitCost, @discountPercent, @lineTotal,
+        @receivedQuantity, @bonusQuantity, @poUnitCost, @receivingUnitCost, @discountPercent,
+        @saleTax, @advTax, @gst, @lineTotal,
         @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )`,
     );
@@ -99,6 +103,9 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
         poUnitCost: item.poUnitCost,
         receivingUnitCost: item.receivingUnitCost,
         discountPercent: item.discountPercent ?? 0,
+        saleTax: item.saleTax ?? 0,
+        advTax: item.advTax ?? 0,
+        gst: item.gst ?? 0,
         lineTotal: item.lineTotal,
         createdAt: detail.updatedAt,
         updatedAt: detail.updatedAt,
@@ -109,10 +116,65 @@ export function upsertGoodsReceiptLocal(detail: GoodsReceiptDetail): void {
   tx();
 }
 
+type ReceiptNumberConflict = {
+  id: string;
+  pendingOutbox: number;
+};
+
+function findReceiptNumberConflict(
+  receiptNumber: string,
+  incomingId: string,
+): ReceiptNumberConflict | undefined {
+  const db = getLocalDb();
+  return db
+    .prepare(
+      `select id,
+         (select count(*) from local_sync_outbox o
+          where o.entity_id = goods_receipts.id and o.status != 'acked') as pendingOutbox
+       from goods_receipts
+       where tenant_id = @tenantId and receipt_number = @receiptNumber and id != @id`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      receiptNumber,
+      id: incomingId,
+    }) as ReceiptNumberConflict | undefined;
+}
+
+function replaceStaleReceipt(staleId: string, incomingId: string): void {
+  const db = getLocalDb();
+  db.prepare("delete from goods_receipt_items where goods_receipt_id = ?").run(
+    staleId,
+  );
+  db.prepare(
+    "update vendor_ledger_entries set goods_receipt_id = ? where goods_receipt_id = ?",
+  ).run(incomingId, staleId);
+  db.prepare(
+    "update vendor_return_items set goods_receipt_id = ? where goods_receipt_id = ?",
+  ).run(incomingId, staleId);
+  db.prepare("delete from goods_receipts where id = ?").run(staleId);
+}
+
 export function upsertGoodsReceiptsLocal(rows: GoodsReceiptDetail[]): void {
   const db = getLocalDb();
-  const tx = db.transaction(() => {
-    for (const row of rows) upsertGoodsReceiptLocal(row);
-  });
-  tx();
+  for (const row of rows) {
+    try {
+      const tx = db.transaction(() => {
+        const conflict = findReceiptNumberConflict(row.receiptNumber, row.id);
+        if (conflict && conflict.pendingOutbox > 0) {
+          console.warn(
+            `Skipping goods receipt ${row.receiptNumber}: local receipt ${conflict.id} is still waiting to sync`,
+          );
+          return;
+        }
+        if (conflict) replaceStaleReceipt(conflict.id, row.id);
+        upsertGoodsReceiptLocal(row);
+      });
+      tx();
+    } catch (err) {
+      console.warn(
+        `Skipping goods receipt ${row.receiptNumber}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 }

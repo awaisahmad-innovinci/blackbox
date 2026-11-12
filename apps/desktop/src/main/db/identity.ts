@@ -11,18 +11,51 @@ export type DeviceIdentity = {
 };
 
 const FILE = "device-identity.json";
+const FINGERPRINT_FILE = "device-fingerprint";
 
 function dir(): string {
   return app.getPath("userData");
 }
 
-export function getOrCreateFingerprint(): string {
-  const path = join(dir(), "device-fingerprint");
-  if (existsSync(path)) return readFileSync(path, "utf8").trim();
-  const raw = `${hostname()}:${process.pid}:${Date.now()}:${randomUUID()}`;
-  const fingerprint = createHash("sha256").update(raw).digest("hex").slice(0, 32);
+function fingerprintHash(input: string): string {
+  return createHash("sha256").update(input).digest("hex").slice(0, 32);
+}
+
+function readOsMachineId(): string | null {
+  if (process.platform === "linux") {
+    for (const path of ["/etc/machine-id", "/var/lib/dbus/machine-id"]) {
+      if (!existsSync(path)) continue;
+      const value = readFileSync(path, "utf8").trim();
+      if (value) return value;
+    }
+  }
+  return null;
+}
+
+/** Stable fingerprint from the OS machine id; null when unavailable. */
+export function getStableMachineFingerprint(): string | null {
+  const machineId = readOsMachineId();
+  if (!machineId) return null;
+  return fingerprintHash(`blackbox:${machineId}`);
+}
+
+export function persistFingerprint(fingerprint: string): void {
   mkdirSync(dir(), { recursive: true });
-  writeFileSync(path, fingerprint, "utf8");
+  writeFileSync(join(dir(), FINGERPRINT_FILE), fingerprint, "utf8");
+}
+
+export function getOrCreateFingerprint(): string {
+  const path = join(dir(), FINGERPRINT_FILE);
+  if (existsSync(path)) {
+    const stored = readFileSync(path, "utf8").trim();
+    if (stored) return stored;
+  }
+
+  const stable = getStableMachineFingerprint();
+  const fingerprint =
+    stable ??
+    fingerprintHash(`${hostname()}:${process.pid}:${Date.now()}:${randomUUID()}`);
+  persistFingerprint(fingerprint);
   return fingerprint;
 }
 

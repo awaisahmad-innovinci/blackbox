@@ -1,0 +1,88 @@
+export const ACTIVITY_LOG_EVENT_TYPES = [
+  "sale.line_removed",
+  "sale.line_qty_adjusted",
+  "sale.foc_posted",
+  "sale.return_posted",
+  "sale.return_issued",
+  "sale.return_refunded",
+  "till.opened",
+  "till.cash_collected",
+  "till.limit_reached",
+  "till.withdrawn_full",
+  "till.reopened",
+  "till.closed",
+  "sale.posted",
+  "purchase_order.created",
+  "goods_receipt.posted",
+  "inventory_out.posted",
+  "inventory_out_return.posted",
+  "vendor_return.posted",
+  "cash_expense.recorded",
+  "drawer.opened",
+  "drawer.submitted",
+] as const;
+
+export type ActivityLogEventType = (typeof ACTIVITY_LOG_EVENT_TYPES)[number];
+
+export type ActivityLogItem = {
+  id: string;
+  eventType: ActivityLogEventType;
+  actorUserId: string;
+  actorName: string;
+  supervisorUserId: string | null;
+  supervisorName: string | null;
+  subjectUserId: string | null;
+  subjectName: string | null;
+  summary: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ActivityLogListQuery = {
+  dateFrom?: string;
+  dateTo?: string;
+  eventType?: ActivityLogEventType;
+  page?: number;
+  pageSize?: number;
+};
+
+export type PaginatedActivityLogs = {
+  items: ActivityLogItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type CreateActivityLogRequest = {
+  id?: string;
+  eventType: ActivityLogEventType;
+  actorUserId: string;
+  supervisorUserId?: string | null;
+  subjectUserId?: string | null;
+  summary: string;
+  metadata?: Record<string, unknown>;
+};
+
+export const ACTIVITY_LOG_EVENT_LABELS: Record<ActivityLogEventType, string> = {
+  "sale.line_removed": "Sale line removed",
+  "sale.line_qty_adjusted": "Sale line quantity adjusted",
+  "sale.foc_posted": "FOC sale posted",
+  "sale.return_posted": "Customer sale return",
+  "sale.return_issued": "Return voucher issued",
+  "sale.return_refunded": "Return refund completed",
+  "till.opened": "Till opened",
+  "till.cash_collected": "Cash collected from till",
+  "till.limit_reached": "Till cash limit reached",
+  "till.withdrawn_full": "Till fully withdrawn",
+  "till.reopened": "Till reopened",
+  "till.closed": "Till closed",
+  "sale.posted": "Sale posted",
+  "purchase_order.created": "Purchase order created",
+  "goods_receipt.posted": "Purchase order received",
+  "inventory_out.posted": "Inventory out posted",
+  "inventory_out_return.posted": "Inventory out return posted",
+  "vendor_return.posted": "Vendor return posted",
+  "cash_expense.recorded": "Expense recorded",
+  "drawer.opened": "Manager drawer opened",
+  "drawer.submitted": "Cash submitted to owner",
+};

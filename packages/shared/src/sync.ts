@@ -1,3 +1,21 @@
+import type {
+  Brand,
+  Category,
+  GoodsReceiptDetail,
+  InventoryOutDetail,
+  ProductDetail,
+  ProductSkuDetail,
+  PurchaseOrderDetail,
+  SkuBarcode,
+  UnitListItem,
+  VendorDetail,
+  VendorGroup,
+  VendorReturnDetail,
+  VendorSku,
+  WarehouseListItem,
+  WarehouseStockRow,
+} from "./inventory";
+
 export const SYNC_STREAMS = [
   "auth_snapshot",
   "master_data",
@@ -12,8 +30,29 @@ export type SyncOperation = (typeof SYNC_OPERATIONS)[number];
 
 export const SYNC_PUSH_BATCH_SIZE = 100;
 export const SYNC_PULL_BATCH_SIZE = 200;
+export const SYNC_CATALOG_PAGE_SIZE = 100;
 export const SYNC_MAX_BODY_BYTES = 1024 * 1024;
 export const SYNC_MAX_PAYLOAD_BYTES = 64 * 1024;
+
+export const SYNC_CATALOG_SECTIONS = [
+  "reference",
+  "products",
+  "vendors",
+  "stock",
+  "documents",
+] as const;
+
+export type SyncCatalogSection = (typeof SYNC_CATALOG_SECTIONS)[number];
+
+export const SYNC_CATALOG_DOCUMENT_KINDS = [
+  "purchaseOrders",
+  "goodsReceipts",
+  "inventoryOuts",
+  "vendorReturns",
+] as const;
+
+export type SyncCatalogDocumentKind =
+  (typeof SYNC_CATALOG_DOCUMENT_KINDS)[number];
 
 export type MasterDataEntityType =
   | "unit"
@@ -34,8 +73,17 @@ export type InventoryEntityType =
 export type PurchasingEntityType =
   | "purchase_order"
   | "goods_receipt"
+  | "vendor_ledger_entry"
   | "inventory_out"
-  | "vendor_return";
+  | "inventory_out_return"
+  | "vendor_return"
+  | "sale"
+  | "sale_return"
+  | "till_session"
+  | "till_withdrawal"
+  | "cash_expense"
+  | "manager_drawer_opening"
+  | "manager_drawer_submission";
 
 export type SyncEntityType =
   | MasterDataEntityType
@@ -114,6 +162,49 @@ export interface SyncConflictAckRequest {
   resolution: "accepted_local" | "accepted_cloud" | "merged";
 }
 
+export interface SyncEntityVersionHead {
+  entityType: SyncEntityType;
+  entityId: string;
+  entityVersion: number;
+}
+
+export interface SyncEntityVersionHeadsResponse {
+  items: SyncEntityVersionHead[];
+  hasMore: boolean;
+}
+
+export interface SyncCatalogPage<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface SyncCatalogReference {
+  units: UnitListItem[];
+  brands: Brand[];
+  categories: Category[];
+  vendorGroups: VendorGroup[];
+  warehouses: WarehouseListItem[];
+}
+
+export interface SyncCatalogProductRow {
+  product: ProductDetail;
+  skus: ProductSkuDetail[];
+  barcodes: SkuBarcode[];
+}
+
+export interface SyncCatalogVendorRow {
+  vendor: VendorDetail;
+  links: VendorSku[];
+}
+
+export type SyncCatalogStockPage = SyncCatalogPage<WarehouseStockRow>;
+export type SyncCatalogPurchaseOrderPage = SyncCatalogPage<PurchaseOrderDetail>;
+export type SyncCatalogGoodsReceiptPage = SyncCatalogPage<GoodsReceiptDetail>;
+export type SyncCatalogInventoryOutPage = SyncCatalogPage<InventoryOutDetail>;
+export type SyncCatalogVendorReturnPage = SyncCatalogPage<VendorReturnDetail>;
+
 export function streamForEntity(entityType: SyncEntityType): SyncStream {
   if (entityType === "auth_snapshot") return "auth_snapshot";
   if (
@@ -125,8 +216,17 @@ export function streamForEntity(entityType: SyncEntityType): SyncStream {
   if (
     entityType === "purchase_order" ||
     entityType === "goods_receipt" ||
+    entityType === "vendor_ledger_entry" ||
     entityType === "inventory_out" ||
-    entityType === "vendor_return"
+    entityType === "inventory_out_return" ||
+    entityType === "vendor_return" ||
+    entityType === "sale" ||
+    entityType === "sale_return" ||
+    entityType === "till_session" ||
+    entityType === "till_withdrawal" ||
+    entityType === "cash_expense" ||
+    entityType === "manager_drawer_opening" ||
+    entityType === "manager_drawer_submission"
   ) {
     return "purchasing";
   }

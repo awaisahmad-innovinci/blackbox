@@ -39,6 +39,30 @@ export function bumpLocalEntityVersion(
   setLocalEntityVersion(entityType, entityId, baseEntityVersion + 1);
 }
 
+export function seedLocalEntityVersions(
+  items: Array<{
+    entityType: string;
+    entityId: string;
+    entityVersion: number;
+  }>,
+): void {
+  if (items.length === 0) return;
+  const db = getLocalDb();
+  const stmt = db.prepare(
+    `insert into local_entity_versions (entity_type, entity_id, entity_version)
+     values (@entityType, @entityId, @entityVersion)
+     on conflict(entity_type, entity_id) do update set
+       entity_version = max(local_entity_versions.entity_version, excluded.entity_version)`,
+  );
+  const run = db.transaction(() => {
+    for (const item of items) {
+      if (item.entityVersion <= 0) continue;
+      stmt.run(item);
+    }
+  });
+  run();
+}
+
 export function backfillLocalEntityVersions(db: import("better-sqlite3").Database): void {
   db.prepare(
     `insert into local_entity_versions (entity_type, entity_id, entity_version)

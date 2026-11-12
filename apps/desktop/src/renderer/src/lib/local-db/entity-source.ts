@@ -4,8 +4,20 @@ import type {
   InventoryInOutReport,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
   PaginatedInventoryOuts,
+  PaginatedInventoryOutReturns,
+  PaginatedSales,
+  PaginatedSaleRegister,
+  PaginatedSaleReturns,
   PaginatedVendors,
+  ReturnableSaleLine,
+  SaleDetail,
+  SaleListQuery,
+  SaleRegisterQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
   ProductDetail,
   ProductSkuDetail,
   ProductSupplierRow,
@@ -21,12 +33,19 @@ import type {
   EntityStatus,
   UnitListItem,
   VendorDetail,
+  PaginatedVendorPayments,
+  VendorCreditLedger,
+  VendorCreditQuery,
+  VendorLedger,
+  VendorPaymentListQuery,
   VendorListQuery,
   VendorReturnDetail,
   VendorReturnListQuery,
   PaginatedVendorReturns,
   PaginatedGoodsReceipts,
   PaginatedProducts,
+  ManagerStockOverviewQuery,
+  PaginatedManagerStockOverview,
   PendingVendorReturnLine,
   ProductListQuery,
   VendorSku,
@@ -34,9 +53,13 @@ import type {
   WarehouseStockRow,
 } from "@blackbox/shared";
 import { ApiError } from "@renderer/lib/api/client";
+import { dashboardApi } from "@renderer/lib/api/dashboard";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
+import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
+import { salesApi } from "@renderer/lib/api/sales";
+import { saleReturnsApi } from "@renderer/lib/api/sale-returns";
 import { productsApi } from "@renderer/lib/api/products";
 import { purchaseOrdersApi } from "@renderer/lib/api/purchase-orders";
 import { brandsApi } from "@renderer/lib/api/brands";
@@ -47,7 +70,11 @@ import { vendorSkusApi } from "@renderer/lib/api/vendor-skus";
 import { vendorReturnsApi } from "@renderer/lib/api/vendor-returns";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
-import { resolveDataSourceMode } from "@renderer/lib/local-db/data-source";
+import {
+  resolveDataSourceMode,
+  shouldUseLocalCatalog,
+} from "@renderer/lib/local-db/data-source";
+import { isDeviceBound } from "@renderer/lib/local-db/local-write";
 
 export type ProductProfileData = {
   product: ProductDetail;
@@ -130,9 +157,41 @@ export async function loadVendorProfile(
   return { vendor, skus };
 }
 
+export async function loadVendorCredits(
+  query: VendorCreditQuery = {},
+): Promise<VendorCreditLedger> {
+  if (await isDeviceBound()) {
+    const local = await window.blackbox?.localDb?.listVendorCredits?.(query);
+    if (local) return local;
+  }
+  return vendorsApi.listCredits(query);
+}
+
+export async function loadVendorPayments(
+  query: VendorPaymentListQuery = {},
+): Promise<PaginatedVendorPayments> {
+  if (await isDeviceBound()) {
+    const local = await window.blackbox?.localDb?.listVendorPayments?.(query);
+    if (local) return local;
+  }
+  return vendorsApi.listPayments(query);
+}
+
+export async function loadVendorLedger(vendorId: string): Promise<VendorLedger> {
+  if (await isDeviceBound()) {
+    const local = await window.blackbox?.localDb?.getVendorLedger?.(vendorId);
+    if (local) return local;
+  }
+  return vendorsApi.ledger(vendorId);
+}
+
 export async function loadSkuProfile(id: string): Promise<SkuProfileData> {
   const local = await window.blackbox?.localDb?.getSkuProfile(id);
   if (local) return local;
+
+  if (await shouldUseLocalCatalog()) {
+    throw new ApiError("SKU not found", 404);
+  }
 
   const sku = await skusApi.get(id);
   const [suppliers, inventory] = await Promise.all([
@@ -186,6 +245,178 @@ export async function loadInventoryOuts(
     return window.blackbox.localDb.listInventoryOuts(query);
   }
   return inventoryOutApi.list(query);
+}
+
+export async function loadInventoryOutReturns(
+  query: InventoryOutReturnListQuery = {},
+): Promise<PaginatedInventoryOutReturns> {
+  try {
+    const local = await window.blackbox?.localDb?.listInventoryOutReturns?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return inventoryOutReturnsApi.list(query);
+}
+
+export async function loadInventoryOutReturn(
+  id: string,
+): Promise<InventoryOutReturnDetail> {
+  const local = await window.blackbox?.localDb?.getInventoryOutReturn?.(id);
+  if (local) return local;
+  return inventoryOutReturnsApi.get(id);
+}
+
+export async function loadSales(
+  query: SaleListQuery = {},
+): Promise<PaginatedSales> {
+  try {
+    const local = await window.blackbox?.localDb?.listSales?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return salesApi.list(query);
+}
+
+export async function loadSaleRegister(
+  query: SaleRegisterQuery = {},
+): Promise<PaginatedSaleRegister> {
+  try {
+    const local = await window.blackbox?.localDb?.listSaleRegister?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return salesApi.register(query);
+}
+
+export async function loadSale(id: string): Promise<SaleDetail> {
+  const local = await window.blackbox?.localDb?.getSale?.(id);
+  if (local) return local;
+  return salesApi.get(id);
+}
+
+export async function loadSaleReturns(
+  query: SaleReturnListQuery = {},
+): Promise<PaginatedSaleReturns> {
+  try {
+    const local = await window.blackbox?.localDb?.listSaleReturns?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return saleReturnsApi.list(query);
+}
+
+export async function loadSaleReturn(id: string): Promise<SaleReturnDetail> {
+  const local = await window.blackbox?.localDb?.getSaleReturn?.(id);
+  if (local) return local;
+  return saleReturnsApi.get(id);
+}
+
+export async function lookupSaleReturn(
+  returnNumber: string,
+): Promise<import("@blackbox/shared").SaleReturnLookupSummary> {
+  try {
+    const local = await window.blackbox?.localDb?.lookupSaleReturn?.(returnNumber);
+    if (local) return local;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (
+      message.startsWith("Already processed by") ||
+      message === "Return voucher not found"
+    ) {
+      throw err;
+    }
+    /* fall through for online lookup */
+  }
+  return saleReturnsApi.lookup(returnNumber);
+}
+
+export type ResolvedSaleRef = { id: string; saleNumber: string };
+export type ResolvedSaleReturnRef = { id: string; returnNumber: string };
+
+export async function resolveSaleByNumber(
+  saleNumber: string,
+): Promise<ResolvedSaleRef | null> {
+  const trimmed = saleNumber.trim();
+  if (!trimmed) return null;
+
+  try {
+    const local = await window.blackbox?.localDb?.resolveSaleByNumber?.(trimmed);
+    if (local !== undefined) return local;
+  } catch {
+    /* fall through */
+  }
+
+  const remote = await salesApi.list({ search: trimmed, pageSize: 5 });
+  const match = remote.items.find(
+    (item) => item.saleNumber.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return match ? { id: match.id, saleNumber: match.saleNumber } : null;
+}
+
+export async function resolveSaleReturnByNumber(
+  returnNumber: string,
+): Promise<ResolvedSaleReturnRef | null> {
+  const trimmed = returnNumber.trim();
+  if (!trimmed) return null;
+
+  try {
+    const local =
+      await window.blackbox?.localDb?.resolveSaleReturnByNumber?.(trimmed);
+    if (local !== undefined) return local;
+  } catch {
+    /* fall through */
+  }
+
+  const remote = await saleReturnsApi.list({ search: trimmed, pageSize: 5 });
+  const match = remote.items.find(
+    (item) => item.returnNumber.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return match ? { id: match.id, returnNumber: match.returnNumber } : null;
+}
+
+export async function loadSaleReturnCreditForSale(
+  saleId: string,
+): Promise<{ returnNumber: string; amount: number } | null> {
+  try {
+    const local =
+      await window.blackbox?.localDb?.getSaleReturnCreditForSale?.(saleId);
+    if (local) return local;
+  } catch {
+    /* optional */
+  }
+  return null;
+}
+
+export async function loadReturnableSaleLines(
+  saleId: string,
+): Promise<ReturnableSaleLine[]> {
+  try {
+    const local = await window.blackbox?.localDb?.getReturnableSaleLines?.(saleId);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return saleReturnsApi.returnableLines(saleId);
+}
+
+export async function loadInventoryOutReturnableQuantity(
+  warehouseId: string,
+  productSkuId: string,
+): Promise<{ quantityAvailable: number }> {
+  try {
+    const local = await window.blackbox?.localDb?.inventoryOutReturnableQuantity?.(
+      warehouseId,
+      productSkuId,
+    );
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return inventoryOutReturnsApi.returnableQuantity(warehouseId, productSkuId);
 }
 
 export async function loadVendorReturns(
@@ -299,6 +530,18 @@ export async function loadWarehouses(
   return warehousesApi.list({ status });
 }
 
+export async function loadManagerStockOverview(
+  query: ManagerStockOverviewQuery = {},
+): Promise<PaginatedManagerStockOverview> {
+  try {
+    const local = await window.blackbox?.localDb?.listManagerStockOverview?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through to API */
+  }
+  return dashboardApi.listManagerStockOverview(query);
+}
+
 export async function loadWarehouse(id: string): Promise<WarehouseListItem> {
   const local = await window.blackbox?.localDb?.getWarehouse?.(id);
   if (local) return local;
@@ -355,6 +598,15 @@ export async function loadSkuSearch(
   q?: string,
   warehouseId?: string,
 ): Promise<SkuSearchResult[]> {
+  if (await shouldUseLocalCatalog()) {
+    const search = window.blackbox?.localDb?.searchSkus;
+    if (!search) return [];
+    try {
+      return await search(q, warehouseId);
+    } catch {
+      return [];
+    }
+  }
   const mode = await resolveDataSourceMode();
   if (mode === "local" && window.blackbox?.localDb?.searchSkus) {
     return window.blackbox.localDb.searchSkus(q, warehouseId);
@@ -501,17 +753,84 @@ export async function resolveVendorReturnScan(
 export async function loadSkuByBarcode(
   barcode: string,
   warehouseId: string,
+  options?: { balance?: "stock" | "pos"; excludeDraftSaleId?: string | null },
 ): Promise<SkuSearchResult> {
+  const balance = options?.balance ?? "stock";
+  const excludeDraftSaleId = options?.excludeDraftSaleId ?? null;
+  const useLocalCatalog = await shouldUseLocalCatalog();
   try {
     const local = await window.blackbox?.localDb?.getSkuByBarcode?.(
       barcode,
       warehouseId,
+      balance,
+      excludeDraftSaleId,
     );
     if (local) return local;
   } catch {
-    /* fall through to API */
+    if (useLocalCatalog) {
+      throw new ApiError("SKU not found for barcode", 404);
+    }
   }
-  return skusApi.byBarcode(barcode, warehouseId);
+  if (useLocalCatalog) {
+    throw new ApiError("SKU not found for barcode", 404);
+  }
+  const remote = await skusApi.byBarcode(barcode, warehouseId, options);
+  if (balance === "pos") {
+    try {
+      const reserved = await window.blackbox?.localDb?.getDraftSaleReservedQty?.(
+        warehouseId,
+        remote.id,
+        excludeDraftSaleId,
+      );
+      if (reserved && reserved > 0) {
+        return {
+          ...remote,
+          quantityAvailable: Math.max(
+            0,
+            (remote.quantityAvailable ?? 0) - reserved,
+          ),
+        };
+      }
+    } catch {
+      /* ignore reservation adjustment */
+    }
+  }
+  return remote;
+}
+
+export async function loadPosAvailableForSale(
+  warehouseId: string,
+  productSkuId: string,
+  excludeDraftSaleId?: string | null,
+): Promise<number> {
+  try {
+    const local = await window.blackbox?.localDb?.getPosAvailableForSale?.(
+      warehouseId,
+      productSkuId,
+      excludeDraftSaleId ?? null,
+    );
+    if (local != null) return local;
+  } catch {
+    /* fall through */
+  }
+
+  const { quantityAvailable } = await loadInventoryOutReturnableQuantity(
+    warehouseId,
+    productSkuId,
+  );
+  try {
+    const reserved = await window.blackbox?.localDb?.getDraftSaleReservedQty?.(
+      warehouseId,
+      productSkuId,
+      excludeDraftSaleId ?? null,
+    );
+    if (reserved && reserved > 0) {
+      return Math.max(0, quantityAvailable - reserved);
+    }
+  } catch {
+    /* ignore reservation adjustment */
+  }
+  return quantityAvailable;
 }
 
 export async function lookupSkuByCode(
@@ -533,12 +852,14 @@ export async function lookupSkuByBarcode(
 ): Promise<SkuBarcodeLookupResult | null> {
   const code = barcode.trim();
   if (!code) return null;
+  const useLocalCatalog = await shouldUseLocalCatalog();
   try {
     const local = await window.blackbox?.localDb?.lookupSkuByBarcode?.(code);
     if (local) return local;
   } catch {
-    /* fall through to API */
+    if (useLocalCatalog) return null;
   }
+  if (useLocalCatalog) return null;
   try {
     return await skusApi.lookupByBarcode(code);
   } catch (error: unknown) {

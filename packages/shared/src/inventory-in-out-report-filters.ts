@@ -22,11 +22,10 @@ export function matchesInventoryInOutMovement(
   if (filters.warehouseId && item.warehouseId !== filters.warehouseId) {
     return false;
   }
-  if (
-    filters.vendorIds.length > 0 &&
-    (!item.vendorId || !filters.vendorIds.includes(item.vendorId))
-  ) {
-    return false;
+  if (filters.vendorIds.length > 0 && item.movementType === "PURCHASE_RECEIPT") {
+    if (!item.vendorId || !filters.vendorIds.includes(item.vendorId)) {
+      return false;
+    }
   }
   if (
     filters.productIds.length > 0 &&
@@ -98,6 +97,21 @@ function buildByDay(
       outboundQty: bucket?.outboundQty ?? 0,
     };
   });
+}
+
+export function hasInventoryInOutReportActiveFilters(
+  filters: InventoryInOutReportClientFilters,
+): boolean {
+  const defaults = DEFAULT_INVENTORY_IN_OUT_REPORT_FILTERS;
+  return (
+    filters.direction !== defaults.direction ||
+    filters.productSkuIds.length > 0 ||
+    filters.productIds.length > 0 ||
+    filters.vendorIds.length > 0 ||
+    filters.warehouseId !== defaults.warehouseId ||
+    filters.qtyMin.trim() !== "" ||
+    filters.qtyMax.trim() !== ""
+  );
 }
 
 export function applyInventoryInOutReportFilters(

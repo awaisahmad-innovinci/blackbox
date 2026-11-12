@@ -8,7 +8,13 @@ import type {
   VendorDetail,
   VendorSku,
 } from "@blackbox/shared";
-import { normalizeStoredText } from "@blackbox/shared";
+import { hsCodeError } from "@blackbox/shared";
+import {
+  normalizeStoredText,
+  costWithGst,
+  purchaseUnitAllowsPackSize,
+  normalizeUnitsPerPurchaseUnit,
+} from "@blackbox/shared";
 import { FORM_DIALOG_FIELD_FULL, FORM_DIALOG_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -38,11 +44,14 @@ import { productsApi } from "@renderer/lib/api/products";
 import { allocateSkuCode } from "@renderer/lib/document-numbers";
 import { loadUnits, lookupSkuByBarcode, lookupSkuByCode } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import {
+  marginFromSellingGst,
   optionalNonNegativeMargin,
-  sellingFromMargin,
-  sellingGreaterThanCost,
+  optionalGstPercent,
+  sellingFromMarginGst,
+  sellingGreaterThanCostWithGst,
 } from "@renderer/lib/sku-pricing";
 import { createVendorSkuLink } from "@renderer/features/vendors/create-vendor-sku-link";
 
@@ -56,8 +65,11 @@ const emptyForm = {
   purchaseUnitId: "",
   unitsPerPurchaseUnit: "",
   costPrice: "",
+  gstPercent: "0",
+  hsCode: "",
   marginPercent: "",
   sellingPrice: "",
+  saleDiscountPercent: "0",
   reorderLevel: "0",
   minimumStockLevel: "0",
   maximumStockLevel: "",
@@ -191,10 +203,34 @@ export function AddProductSkuDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function onPurchaseUnitChange(purchaseUnitId: string) {
+    const unit = units.find((u) => u.id === purchaseUnitId);
+    const allowsPack = unit ? purchaseUnitAllowsPackSize(unit) : false;
+    setForm((prev) => ({
+      ...prev,
+      purchaseUnitId,
+      unitsPerPurchaseUnit: allowsPack ? prev.unitsPerPurchaseUnit || "1" : "1",
+    }));
+  }
+
+  const selectedPurchaseUnit = units.find((u) => u.id === form.purchaseUnitId);
+  const packSizeEditable = selectedPurchaseUnit
+    ? purchaseUnitAllowsPackSize(selectedPurchaseUnit)
+    : false;
+
   function onCostPriceChange(value: string) {
     setForm((prev) => {
       const next = { ...prev, costPrice: value };
-      const calculated = sellingFromMargin(value, prev.marginPercent);
+      const calculated = sellingFromMarginGst(value, prev.gstPercent, prev.marginPercent);
+      if (calculated != null) next.sellingPrice = calculated;
+      return next;
+    });
+  }
+
+  function onGstPercentChange(value: string) {
+    setForm((prev) => {
+      const next = { ...prev, gstPercent: value };
+      const calculated = sellingFromMarginGst(prev.costPrice, value, prev.marginPercent);
       if (calculated != null) next.sellingPrice = calculated;
       return next;
     });
@@ -203,8 +239,21 @@ export function AddProductSkuDialog({
   function onMarginPercentChange(value: string) {
     setForm((prev) => {
       const next = { ...prev, marginPercent: value };
-      const calculated = sellingFromMargin(prev.costPrice, value);
+      const calculated = sellingFromMarginGst(prev.costPrice, prev.gstPercent, value);
       if (calculated != null) next.sellingPrice = calculated;
+      return next;
+    });
+  }
+
+  function onSellingPriceChange(value: string) {
+    setForm((prev) => {
+      const next = { ...prev, sellingPrice: value };
+      const calculated = marginFromSellingGst(
+        prev.costPrice,
+        prev.gstPercent,
+        value,
+      );
+      if (calculated != null) next.marginPercent = calculated;
       return next;
     });
   }
@@ -230,11 +279,17 @@ export function AddProductSkuDialog({
         form.costPrice.trim() || attempted
           ? requiredNonNegative(form.costPrice, "Cost price/pc")
           : null,
+      gstPercent: optionalGstPercent(form.gstPercent),
+      hsCode: hsCodeError(form.hsCode, attempted || Boolean(form.hsCode.trim())),
       marginPercent: optionalNonNegativeMargin(form.marginPercent),
       sellingPrice:
         form.sellingPrice.trim() || attempted
           ? requiredNonNegative(form.sellingPrice, "Selling price/pc") ||
-            sellingGreaterThanCost(form.costPrice, form.sellingPrice)
+            sellingGreaterThanCostWithGst(
+              form.costPrice,
+              form.gstPercent,
+              form.sellingPrice,
+            )
           : null,
     }),
     [form, attempted],
@@ -247,9 +302,11 @@ export function AddProductSkuDialog({
     !requiredSelect(form.purchaseUnitId, "Purchase unit") &&
     !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
     !requiredNonNegative(form.costPrice, "Cost price/pc") &&
+    !optionalGstPercent(form.gstPercent) &&
+    !hsCodeError(form.hsCode, true) &&
     !optionalNonNegativeMargin(form.marginPercent) &&
     !requiredNonNegative(form.sellingPrice, "Selling price/pc") &&
-    !sellingGreaterThanCost(form.costPrice, form.sellingPrice) &&
+    !sellingGreaterThanCostWithGst(form.costPrice, form.gstPercent, form.sellingPrice) &&
     !duplicateLookup &&
     !barcodeChecking;
 
@@ -257,9 +314,16 @@ export function AddProductSkuDialog({
     setAttempted(true);
     if (!canSave) return;
 
+    const purchaseUnit = units.find((u) => u.id === form.purchaseUnitId);
+    const unitsPerNormalized = normalizeUnitsPerPurchaseUnit(
+      Number(form.unitsPerPurchaseUnit),
+      purchaseUnit ?? {},
+    );
+
     const nums = {
-      unitsPerPurchaseUnit: Number(form.unitsPerPurchaseUnit),
+      unitsPerPurchaseUnit: unitsPerNormalized,
       costPrice: Number(form.costPrice),
+      gstPercent: Number(form.gstPercent || 0),
       sellingPrice: Number(form.sellingPrice),
       reorderLevel: Number(form.reorderLevel),
       minimumStockLevel: Number(form.minimumStockLevel),
@@ -275,8 +339,12 @@ export function AddProductSkuDialog({
         return;
       }
     }
-    if (nums.sellingPrice <= nums.costPrice) {
-      setError("Selling price/pc must be greater than cost price/pc");
+    if (nums.gstPercent > 100) {
+      setError("gstPercent must be between 0 and 100");
+      return;
+    }
+    if (nums.sellingPrice <= costWithGst(nums.costPrice, nums.gstPercent)) {
+      setError("Selling price/pc must be greater than cost + GST");
       return;
     }
 
@@ -290,7 +358,13 @@ export function AddProductSkuDialog({
       purchaseUnitId: form.purchaseUnitId,
       unitsPerPurchaseUnit: nums.unitsPerPurchaseUnit,
       costPrice: nums.costPrice,
+      gstPercent: nums.gstPercent,
+      hsCode: form.hsCode.trim(),
       sellingPrice: nums.sellingPrice,
+      saleDiscountPercent: Math.min(
+        100,
+        Math.max(0, Number(form.saleDiscountPercent) || 0),
+      ),
       reorderLevel: nums.reorderLevel,
       minimumStockLevel: nums.minimumStockLevel,
       maximumStockLevel: nums.maximumStockLevel,
@@ -335,7 +409,11 @@ export function AddProductSkuDialog({
           setForm((prev) => ({ ...prev, sku: skuCode }));
         }
 
-        const localId = crypto.randomUUID();
+        const existingSkuId = await resolveCanonicalEntityId({
+          entityType: "product_sku",
+          sku: skuCode,
+        });
+        const localId = existingSkuId ?? crypto.randomUUID();
         const baseUnit = units.find((u) => u.id === body.baseUnitId);
         const purchaseUnit = units.find((u) => u.id === body.purchaseUnitId);
         row = {
@@ -352,7 +430,10 @@ export function AddProductSkuDialog({
           purchaseUnitName: purchaseUnit?.name ?? null,
           unitsPerPurchaseUnit: body.unitsPerPurchaseUnit,
           costPrice: body.costPrice,
+          gstPercent: body.gstPercent ?? 0,
+          hsCode: body.hsCode?.trim() || null,
           sellingPrice: body.sellingPrice,
+          saleDiscountPercent: body.saleDiscountPercent ?? 0,
           sellingPricePerPurchaseUnit: body.sellingPricePerPurchaseUnit ?? null,
           reorderLevel: body.reorderLevel ?? 0,
           minimumStockLevel: body.minimumStockLevel ?? 0,
@@ -577,7 +658,7 @@ export function AddProductSkuDialog({
               {...formSelectPickerProps()}
               value={form.purchaseUnitId}
               aria-invalid={Boolean(fieldErrors.purchaseUnitId)}
-              onChange={(e) => setField("purchaseUnitId", e.target.value)}
+              onChange={(e) => onPurchaseUnitChange(e.target.value)}
             >
               <option value="">—</option>
               {units.map((u) => (
@@ -595,10 +676,17 @@ export function AddProductSkuDialog({
           <div className="space-y-1.5">
             <Label>Units / purchase unit *</Label>
             <Input
-              value={form.unitsPerPurchaseUnit}
+              value={packSizeEditable ? form.unitsPerPurchaseUnit : "1"}
+              readOnly={!packSizeEditable}
+              disabled={!packSizeEditable}
               aria-invalid={Boolean(fieldErrors.unitsPerPurchaseUnit)}
               onChange={(e) => setField("unitsPerPurchaseUnit", e.target.value)}
             />
+            {!packSizeEditable && form.purchaseUnitId ? (
+              <p className="text-muted-foreground text-xs">
+                Fixed at 1 when purchase unit is not Box.
+              </p>
+            ) : null}
             {fieldErrors.unitsPerPurchaseUnit ? (
               <p className="text-destructive text-xs">
                 {fieldErrors.unitsPerPurchaseUnit}
@@ -614,6 +702,30 @@ export function AddProductSkuDialog({
             />
             {fieldErrors.costPrice ? (
               <p className="text-destructive text-xs">{fieldErrors.costPrice}</p>
+            ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>GST %</Label>
+            <Input
+              value={form.gstPercent}
+              aria-invalid={Boolean(fieldErrors.gstPercent)}
+              placeholder="0"
+              onChange={(e) => onGstPercentChange(e.target.value)}
+            />
+            {fieldErrors.gstPercent ? (
+              <p className="text-destructive text-xs">{fieldErrors.gstPercent}</p>
+            ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>HS code *</Label>
+            <Input
+              value={form.hsCode}
+              aria-invalid={Boolean(fieldErrors.hsCode)}
+              placeholder="1704.909"
+              onChange={(e) => setField("hsCode", e.target.value)}
+            />
+            {fieldErrors.hsCode ? (
+              <p className="text-destructive text-xs">{fieldErrors.hsCode}</p>
             ) : null}
           </div>
           <div className="space-y-1.5">
@@ -633,13 +745,24 @@ export function AddProductSkuDialog({
             <Input
               value={form.sellingPrice}
               aria-invalid={Boolean(fieldErrors.sellingPrice)}
-              onChange={(e) => setField("sellingPrice", e.target.value)}
+              onChange={(e) => onSellingPriceChange(e.target.value)}
             />
             {fieldErrors.sellingPrice ? (
               <p className="text-destructive text-xs">
                 {fieldErrors.sellingPrice}
               </p>
             ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Sale discount %</Label>
+            <Input
+              value={form.saleDiscountPercent}
+              placeholder="0"
+              onChange={(e) => setField("saleDiscountPercent", e.target.value)}
+            />
+            <p className="text-muted-foreground text-xs">
+              Default discount on POS sale lines for this SKU (0–100).
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Reorder level</Label>

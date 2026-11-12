@@ -10,20 +10,37 @@ import type {
   InventoryMovementListItem,
   InventoryOutDetail,
   InventoryOutListQuery,
+  InventoryOutReturnDetail,
+  InventoryOutReturnListQuery,
+  ManagerStockOverviewQuery,
   ProductDetail,
   ProductListQuery,
   ProductSkuDetail,
   PurchaseOrderDetail,
   PurchaseOrderListQuery,
+  SaleDetail,
+  SaleListQuery,
+  SaleRegisterQuery,
+  SaleReturnDetail,
+  SaleReturnListQuery,
+  OpenTillRequest,
+  ReopenTillRequest,
+  TillListItem,
+  TillSessionDetail,
+  TillStatus,
+  WithdrawTillRequest,
   UnitListItem,
   VendorDetail,
   VendorGroup,
   VendorListQuery,
+  VendorCreditQuery,
+  VendorPaymentListQuery,
   VendorReturnDetail,
   VendorReturnListQuery,
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  DocumentCounterType,
 } from "@blackbox/shared";
 import {
   closeLocalDb,
@@ -33,13 +50,70 @@ import {
   reopenLocalDb,
 } from "./db";
 import {
+  completeSaleReturnStandaloneLocal,
+  completeSaleReturnWithSaleLocal,
+  listSaleReturnNumbersLocal,
+  getSaleReturnCreditForSaleLocal,
+  lookupSaleReturnLocal,
+  resolveSaleReturnByNumberLocal,
+  upsertSaleReturnLocal,
+} from "./db/sale-returns-local";
+import {
   upsertGoodsReceiptLocal,
   upsertGoodsReceiptsLocal,
 } from "./db/goods-receipts-local";
 import {
+  getVendorLedgerLocal,
+  listVendorCreditsLocal,
+  listVendorPaymentsLocal,
+} from "./db/vendor-ledger-local";
+import {
   upsertInventoryOutLocal,
   upsertInventoryOutsLocal,
 } from "./db/inventory-out-local";
+import {
+  applyInventoryOutBalanceDeltaLocal,
+  rebuildInventoryOutBalanceFromDocumentsLocal,
+} from "./db/inventory-out-balance-local";
+import {
+  upsertInventoryOutReturnLocal,
+  upsertInventoryOutReturnsLocal,
+} from "./db/inventory-out-returns-local";
+import {
+  countDraftSalesLocal,
+  deleteSaleDraftLocal,
+  getDraftSaleReservedQtyLocal,
+  getPosAvailableForSaleLocal,
+  upsertSaleDraftLocal,
+  upsertSaleLocal,
+  upsertSalesLocal,
+} from "./db/sales-local";
+import {
+  appendPendingActivityLog,
+  appendLocalActivityLog,
+  deletePendingActivityLog,
+  listLocalActivityLogs,
+  listPendingActivityLogs,
+  markActivityLogSynced,
+} from "./db/activity-log-local";
+import {
+  applyTillCashFromSaleLocal,
+  applyTillCashRefundLocal,
+  applyTillReturnCreditOnSaleLocal,
+  assertTillCanPayRefundLocal,
+  approveTillLocal,
+  assertTillCanPostSaleLocal,
+  collectCashByAmountLocal,
+  collectCashLocal,
+  closeTillLocal,
+  getCurrentTillLocal,
+  getLatestTillSessionLocal,
+  listTillsLocal,
+  openTillLocal,
+  reopenTillLocal,
+  upsertTillSessionLocal,
+  withdrawTillLocal,
+} from "./db/till-local";
 import {
   upsertVendorReturnLocal,
   upsertVendorReturnsLocal,
@@ -62,6 +136,12 @@ import {
 import { upsertWarehousesLocal } from "./db/warehouses-local";
 import { getSyncMeta, setSyncMeta } from "./db/sync-meta";
 import {
+  hasSupervisorTotpLocal,
+  listSupervisorTotpUsersLocal,
+  replaceSupervisorTotpLocal,
+} from "./db/supervisor-totp-local";
+import { verifySupervisorTotpCode } from "./totp-verify";
+import {
   upsertBrandsLocal,
   upsertCategoriesLocal,
   upsertUnitsLocal,
@@ -77,6 +157,12 @@ import {
 import {
   getGoodsReceiptLocal,
   getInventoryOutLocal,
+  getInventoryOutReturnLocal,
+  getSaleLocal,
+  listPendingFbrSalesLocal,
+  getReturnableSaleLinesLocal,
+  getSaleReturnLocal,
+  resolveSaleByNumberLocal,
   getVendorReturnLocal,
   getProductLocal,
   getProductProfileLocal,
@@ -100,8 +186,12 @@ import {
   listSkuBarcodesLocal,
   upsertSkuBarcodeLocal,
 } from "./db/sku-barcodes-local";
+import { getCashFlowLocal } from "./db/cash-flow-local";
 import {
+  getCashierDashboardSummaryLocal,
   getDashboardSummaryLocal,
+  getManagerDashboardSummaryLocal,
+  listManagerStockOverviewLocal,
   listBrandsLocal,
   getBrandLocal,
   listCategoriesLocal,
@@ -112,7 +202,14 @@ import {
   listPoNumbersLocal,
   listReceiptNumbersLocal,
   listOutNumbersLocal,
+  listOutReturnNumbersLocal,
+  listHoldNumbersLocal,
+  listSaleNumbersLocal,
   listInventoryOutsLocal,
+  listInventoryOutReturnsLocal,
+  listSalesLocal,
+  listSaleRegisterLocal,
+  listSaleReturnsLocal,
   listVendorGroupsLocal,
   getVendorGroupLocal,
   listUnitsLocal,
@@ -123,9 +220,13 @@ import {
   listPendingVendorReturnsLocal,
   lastPurchaseCostLocal,
   vendorReturnableQuantityLocal,
+  inventoryOutReturnableQuantityLocal,
 } from "./db/queries-local";
+import { allocateDocumentNumberLocal } from "./db/document-counters-local";
 import {
   getOrCreateFingerprint,
+  getStableMachineFingerprint,
+  persistFingerprint,
   readIdentity,
   writeIdentity,
   type DeviceIdentity,
@@ -133,6 +234,7 @@ import {
 import {
   enqueueOutbox,
   listPendingOutbox,
+  listPendingOutboxForEntity,
   markOutboxAcked,
   markOutboxPending,
   markOutboxPushing,
@@ -142,6 +244,14 @@ import {
   resetStalePushing,
 } from "./db/outbox-local";
 import { applyPullBatch, commitLocalMutation } from "./db/sync-apply";
+import {
+  resolveCanonicalEntityId,
+  type CanonicalEntityLookup,
+} from "./db/canonical-id-local";
+import { seedLocalEntityVersions } from "./db/entity-versions-local";
+import { registerPosHandlers } from "./pos/register-pos-handlers";
+
+let appMainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
   const preloadPath = join(__dirname, "../preload/index.js");
@@ -180,10 +290,24 @@ function createWindow(): void {
   } else {
     void mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
+
+  appMainWindow = mainWindow;
 }
 
 function registerIpc(): void {
   ipcMain.handle("localDb:getStatus", () => getLocalDbStatus());
+  ipcMain.handle("localDb:rebuildPosBalanceFromDocuments", () => {
+    rebuildInventoryOutBalanceFromDocumentsLocal();
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:revealDatabaseInFolder", () => {
+    const status = getLocalDbStatus();
+    if (!status.connected || !status.path) {
+      return { ok: false as const, message: "Local database is not connected." };
+    }
+    shell.showItemInFolder(status.path);
+    return { ok: true as const };
+  });
   ipcMain.handle("localDb:getSyncMeta", (_event, key: string) =>
     getSyncMeta(key),
   );
@@ -314,6 +438,58 @@ function registerIpc(): void {
     },
   );
   ipcMain.handle(
+    "localDb:upsertInventoryOutReturns",
+    (_event, rows: InventoryOutReturnDetail[]) => {
+      upsertInventoryOutReturnsLocal(rows);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:upsertInventoryOutReturn",
+    (_event, detail: InventoryOutReturnDetail) => {
+      upsertInventoryOutReturnLocal(detail);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:upsertSales",
+    (_event, rows: SaleDetail[]) => {
+      upsertSalesLocal(rows);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle("localDb:upsertSale", (_event, detail: SaleDetail) => {
+    upsertSaleLocal(detail);
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:upsertSaleDraft", (_event, detail: SaleDetail) => {
+    upsertSaleDraftLocal(detail);
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:deleteSaleDraft", (_event, id: string) => ({
+    ok: deleteSaleDraftLocal(id),
+  }));
+  ipcMain.handle("localDb:countDraftSales", () => countDraftSalesLocal());
+  ipcMain.handle(
+    "localDb:getDraftSaleReservedQty",
+    (
+      _event,
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) =>
+      getDraftSaleReservedQtyLocal(warehouseId, productSkuId, excludeSaleId),
+  );
+  ipcMain.handle(
+    "localDb:getPosAvailableForSale",
+    (
+      _event,
+      warehouseId: string,
+      productSkuId: string,
+      excludeSaleId?: string | null,
+    ) => getPosAvailableForSaleLocal(warehouseId, productSkuId, excludeSaleId),
+  );
+  ipcMain.handle(
     "localDb:upsertVendorReturn",
     (_event, detail: VendorReturnDetail) => {
       upsertVendorReturnLocal(detail);
@@ -353,19 +529,325 @@ function registerIpc(): void {
     (_event, query: GoodsReceiptListQuery = {}) =>
       listGoodsReceiptsLocal(query),
   );
+  ipcMain.handle("localDb:getVendorLedger", (_event, vendorId: string) =>
+    getVendorLedgerLocal(vendorId),
+  );
+  ipcMain.handle(
+    "localDb:listVendorPayments",
+    (_event, query: VendorPaymentListQuery = {}) =>
+      listVendorPaymentsLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listVendorCredits",
+    (_event, query: VendorCreditQuery = {}) => listVendorCreditsLocal(query),
+  );
   ipcMain.handle("localDb:listPoNumbers", () => listPoNumbersLocal());
   ipcMain.handle("localDb:listSkuCodes", () => listSkuCodesLocal());
   ipcMain.handle("localDb:listReceiptNumbers", () =>
     listReceiptNumbersLocal(),
   );
   ipcMain.handle("localDb:listOutNumbers", () => listOutNumbersLocal());
+  ipcMain.handle("localDb:listOutReturnNumbers", () =>
+    listOutReturnNumbersLocal(),
+  );
+  ipcMain.handle("localDb:listSaleNumbers", () => listSaleNumbersLocal());
+  ipcMain.handle("localDb:listHoldNumbers", () => listHoldNumbersLocal());
+  ipcMain.handle(
+    "localDb:allocateDocumentNumber",
+    (
+      _event,
+      input: {
+        documentType: DocumentCounterType;
+        tenantName: string;
+        deviceCode: string;
+      },
+    ) => allocateDocumentNumberLocal(input),
+  );
   ipcMain.handle(
     "localDb:listInventoryOuts",
     (_event, query: InventoryOutListQuery = {}) =>
       listInventoryOutsLocal(query),
   );
+  ipcMain.handle(
+    "localDb:listInventoryOutReturns",
+    (_event, query: InventoryOutReturnListQuery = {}) =>
+      listInventoryOutReturnsLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listSales",
+    (_event, query: SaleListQuery = {}) => listSalesLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listSaleRegister",
+    (_event, query: SaleRegisterQuery = {}) => listSaleRegisterLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:getCurrentTill",
+    (_event, userId: string) => getCurrentTillLocal(userId),
+  );
+  ipcMain.handle(
+    "localDb:getLatestTillSession",
+    (_event, userId: string) => getLatestTillSessionLocal(userId),
+  );
+  ipcMain.handle(
+    "localDb:listTills",
+    (_event, query: { status?: TillStatus; userId?: string } = {}) =>
+      listTillsLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:openTill",
+    (
+      _event,
+      input: {
+        userId: string;
+        userName: string;
+        tillUsername: string;
+        body: OpenTillRequest;
+        requireApproval: boolean;
+        funderUserId?: string;
+        funderName?: string;
+      },
+    ) => openTillLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:approveTill",
+    (
+      _event,
+      input: { id: string; managerId: string; managerName: string },
+    ) => approveTillLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:withdrawTill",
+    (
+      _event,
+      input: {
+        id: string;
+        managerId: string;
+        managerName: string;
+        body: WithdrawTillRequest;
+      },
+    ) => withdrawTillLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:collectCashTill",
+    (
+      _event,
+      input: {
+        id: string;
+        managerId: string;
+        managerName: string;
+        body: WithdrawTillRequest;
+      },
+    ) => collectCashLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:collectCashByAmount",
+    (
+      _event,
+      input: {
+        userId: string;
+        userName: string;
+        amount: number;
+        supervisorUserId?: string;
+        collectedByName?: string;
+      },
+    ) => collectCashByAmountLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:closeTill",
+    (
+      _event,
+      input: {
+        userId: string;
+        userName: string;
+      },
+    ) => closeTillLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:reopenTill",
+    (
+      _event,
+      input: {
+        id: string;
+        managerId: string;
+        managerName: string;
+        body: ReopenTillRequest;
+      },
+    ) => reopenTillLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:upsertTillSession",
+    (_event, detail: TillSessionDetail) => {
+      upsertTillSessionLocal(detail);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:appendPendingActivityLog",
+    (
+      _event,
+      input: { id: string; payload: import("@blackbox/shared").CreateActivityLogRequest },
+    ) => {
+      appendPendingActivityLog(input.id, input.payload);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:appendLocalActivityLog",
+    (_event, item: import("@blackbox/shared").ActivityLogItem) => {
+      appendLocalActivityLog(item);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:listLocalActivityLogs",
+    (_event, query: import("@blackbox/shared").ActivityLogListQuery = {}) =>
+      listLocalActivityLogs(query),
+  );
+  ipcMain.handle(
+    "localDb:markActivityLogSynced",
+    (_event, id: string) => {
+      markActivityLogSynced(id);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle("localDb:listPendingActivityLogs", () =>
+    listPendingActivityLogs(),
+  );
+  ipcMain.handle(
+    "localDb:deletePendingActivityLog",
+    (_event, id: string) => {
+      deletePendingActivityLog(id);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:assertTillCanPostSale",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        cashPaymentTotal: number;
+      },
+    ) => {
+      assertTillCanPostSaleLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:applyTillCashFromSale",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        cashPaymentTotal: number;
+      },
+    ) => {
+      applyTillCashFromSaleLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:applyTillCashRefund",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        refundAmount: number;
+      },
+    ) => {
+      applyTillCashRefundLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:applyTillReturnCreditOnSale",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        cashPaymentTotal: number;
+        cashBackFromCredit: number;
+      },
+    ) => {
+      applyTillReturnCreditOnSaleLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:assertTillCanPayRefund",
+    (
+      _event,
+      input: {
+        userId: string;
+        skipForManager?: boolean;
+        refundAmount: number;
+      },
+    ) => {
+      assertTillCanPayRefundLocal(input);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:inventoryOutReturnableQuantity",
+    (_event, warehouseId: string, productSkuId: string) =>
+      inventoryOutReturnableQuantityLocal(warehouseId, productSkuId),
+  );
+  ipcMain.handle(
+    "localDb:applyInventoryOutBalanceDelta",
+    (
+      _event,
+      warehouseId: string,
+      productSkuId: string,
+      deltaQty: number,
+      unitCost: number,
+    ) => {
+      applyInventoryOutBalanceDeltaLocal(
+        warehouseId,
+        productSkuId,
+        deltaQty,
+        unitCost,
+      );
+      return { ok: true as const };
+    },
+  );
   ipcMain.handle("localDb:getDashboardSummary", () =>
     getDashboardSummaryLocal(),
+  );
+  ipcMain.handle(
+    "localDb:getCashierDashboardSummary",
+    (_event, userId: string) => getCashierDashboardSummaryLocal(userId),
+  );
+  ipcMain.handle(
+    "localDb:getManagerDashboardSummary",
+    (_event, userId: string, seeAll?: boolean, managerName?: string) =>
+      getManagerDashboardSummaryLocal(
+        userId,
+        Boolean(seeAll),
+        managerName ?? "",
+      ),
+  );
+  ipcMain.handle(
+    "localDb:getCashFlow",
+    (
+      _event,
+      query: {
+        userId: string;
+        managerName: string;
+        seeAll: boolean;
+        from: string;
+        to: string;
+      },
+    ) => getCashFlowLocal(query),
+  );
+  ipcMain.handle(
+    "localDb:listManagerStockOverview",
+    (_event, query: ManagerStockOverviewQuery) =>
+      listManagerStockOverviewLocal(query),
   );
   ipcMain.handle(
     "localDb:listBrands",
@@ -450,8 +932,19 @@ function registerIpc(): void {
   );
   ipcMain.handle(
     "localDb:getSkuByBarcode",
-    (_event, barcode: string, warehouseId: string) =>
-      getSkuByBarcodeLocal(barcode, warehouseId),
+    (
+      _event,
+      barcode: string,
+      warehouseId: string,
+      balanceSource?: "stock" | "pos",
+      excludeDraftSaleId?: string | null,
+    ) =>
+      getSkuByBarcodeLocal(
+        barcode,
+        warehouseId,
+        balanceSource ?? "stock",
+        excludeDraftSaleId,
+      ),
   );
   ipcMain.handle("localDb:lookupSkuByBarcode", (_event, barcode: string) =>
     lookupSkuByBarcodeLocal(barcode),
@@ -486,6 +979,67 @@ function registerIpc(): void {
   ipcMain.handle("localDb:getInventoryOut", (_event, id: string) =>
     getInventoryOutLocal(id),
   );
+  ipcMain.handle("localDb:getInventoryOutReturn", (_event, id: string) =>
+    getInventoryOutReturnLocal(id),
+  );
+  ipcMain.handle("localDb:getSale", (_event, id: string) => getSaleLocal(id));
+  ipcMain.handle("localDb:listPendingFbrSales", () =>
+    listPendingFbrSalesLocal(),
+  );
+  ipcMain.handle(
+    "localDb:resolveSaleByNumber",
+    (_event, saleNumber: string) => resolveSaleByNumberLocal(saleNumber),
+  );
+  ipcMain.handle(
+    "localDb:listSaleReturns",
+    (_event, query?: SaleReturnListQuery) => listSaleReturnsLocal(query),
+  );
+  ipcMain.handle("localDb:getSaleReturn", (_event, id: string) =>
+    getSaleReturnLocal(id),
+  );
+  ipcMain.handle(
+    "localDb:getReturnableSaleLines",
+    (_event, saleId: string) => getReturnableSaleLinesLocal(saleId),
+  );
+  ipcMain.handle("localDb:upsertSaleReturn", (_event, detail: SaleReturnDetail) => {
+    upsertSaleReturnLocal(detail);
+    return { ok: true as const };
+  });
+  ipcMain.handle(
+    "localDb:lookupSaleReturn",
+    (_event, returnNumber: string) => lookupSaleReturnLocal(returnNumber),
+  );
+  ipcMain.handle(
+    "localDb:resolveSaleReturnByNumber",
+    (_event, returnNumber: string) =>
+      resolveSaleReturnByNumberLocal(returnNumber),
+  );
+  ipcMain.handle(
+    "localDb:getSaleReturnCreditForSale",
+    (_event, saleId: string) => getSaleReturnCreditForSaleLocal(saleId),
+  );
+  ipcMain.handle(
+    "localDb:completeSaleReturnStandalone",
+    (
+      _event,
+      input: { returnId: string; userId: string; userName: string },
+    ) => completeSaleReturnStandaloneLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:completeSaleReturnWithSale",
+    (
+      _event,
+      input: {
+        returnId: string;
+        saleId: string;
+        userId: string;
+        userName: string;
+      },
+    ) => completeSaleReturnWithSaleLocal(input),
+  );
+  ipcMain.handle("localDb:listSaleReturnNumbers", () =>
+    listSaleReturnNumbersLocal(),
+  );
   ipcMain.handle(
     "localDb:listVendorReturns",
     (_event, query?: VendorReturnListQuery) => listVendorReturnsLocal(query),
@@ -519,6 +1073,13 @@ function registerIpc(): void {
   );
 
   ipcMain.handle("identity:getFingerprint", () => getOrCreateFingerprint());
+  ipcMain.handle("identity:getStableFingerprint", () =>
+    getStableMachineFingerprint(),
+  );
+  ipcMain.handle("identity:persistFingerprint", (_event, fingerprint: string) => {
+    persistFingerprint(fingerprint);
+    return { ok: true as const };
+  });
   ipcMain.handle("identity:get", () => readIdentity());
   ipcMain.handle(
     "identity:bind",
@@ -534,6 +1095,11 @@ function registerIpc(): void {
   );
   ipcMain.handle("sync:listOutbox", (_event, limit?: number) =>
     listPendingOutbox(limit ?? 100),
+  );
+  ipcMain.handle(
+    "sync:listOutboxForEntity",
+    (_event, entityType: string, entityId: string) =>
+      listPendingOutboxForEntity(entityType, entityId),
   );
   ipcMain.handle("sync:markPushing", (_event, ids: string[]) => {
     markOutboxPushing(ids);
@@ -592,9 +1158,55 @@ function registerIpc(): void {
       input: Parameters<typeof commitLocalMutation>[0],
     ) => ({ changeId: commitLocalMutation(input) }),
   );
+  ipcMain.handle(
+    "sync:seedEntityVersions",
+    (
+      _event,
+      items: Array<{
+        entityType: string;
+        entityId: string;
+        entityVersion: number;
+      }>,
+    ) => {
+      seedLocalEntityVersions(items);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:resolveCanonicalEntityId",
+    (_event, input: CanonicalEntityLookup) =>
+      resolveCanonicalEntityId(input),
+  );
+
+  ipcMain.handle("totp:verifySupervisorCode", (_event, code: string) =>
+    verifySupervisorTotpCode(code),
+  );
+  ipcMain.handle(
+    "localDb:replaceSupervisorTotp",
+    (
+      _event,
+      entries: Array<{ userId: string; secretBase32: string; displayName: string }>,
+    ) => {
+      replaceSupervisorTotpLocal(entries);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle("localDb:listSupervisorTotpUsers", () =>
+    listSupervisorTotpUsersLocal(),
+  );
+  ipcMain.handle("localDb:hasSupervisorTotp", () => hasSupervisorTotpLocal());
+
+  registerPosHandlers(ipcMain, () => appMainWindow);
 }
 
 app.disableHardwareAcceleration();
+
+function shutdownLocalDbOnSignal(): void {
+  closeLocalDb();
+}
+
+process.once("SIGTERM", shutdownLocalDbOnSignal);
+process.once("SIGINT", shutdownLocalDbOnSignal);
 
 app.whenReady().then(() => {
   try {

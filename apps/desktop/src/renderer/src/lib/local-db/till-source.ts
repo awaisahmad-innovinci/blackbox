@@ -1,0 +1,403 @@
+import { formatMoney } from "@blackbox/shared";
+import type {
+  CollectTillCashByAmountRequest,
+  OpenTillRequest,
+  ReopenTillRequest,
+  TillListItem,
+  TillSessionDetail,
+  TillStatus,
+  WithdrawTillRequest,
+} from "@blackbox/shared";
+import { computeTillDenominationTotal, tillLogoutBlockMessage, tillSessionBlocksLogout } from "@blackbox/shared";
+import { tillsApi } from "@renderer/lib/api/tills";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
+
+export async function getTillLogoutBlockMessage(input: {
+  userId: string;
+  permissions: string[];
+}): Promise<string | null> {
+  if (!input.permissions.includes("till.read")) return null;
+  if (input.permissions.includes("till.manage")) return null;
+  const session = await loadCurrentTill(input.userId);
+  if (!session || !tillSessionBlocksLogout(session)) return null;
+  return tillLogoutBlockMessage(session);
+}
+
+export async function loadCurrentTill(
+  userId: string,
+): Promise<TillSessionDetail | null> {
+  try {
+    const local = await window.blackbox?.localDb?.getCurrentTill?.(userId);
+    if (local !== undefined) return local;
+  } catch {
+    /* fall through */
+  }
+  return tillsApi.getCurrent();
+}
+
+export async function loadLatestTillSession(
+  userId: string,
+): Promise<TillSessionDetail | null> {
+  try {
+    const local = await window.blackbox?.localDb?.getLatestTillSession?.(userId);
+    if (local !== undefined) return local;
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+export async function loadTills(query: {
+  status?: TillStatus;
+  userId?: string;
+} = {}): Promise<TillListItem[]> {
+  try {
+    const local = await window.blackbox?.localDb?.listTills?.(query);
+    if (local) return local;
+  } catch {
+    /* fall through */
+  }
+  return tillsApi.list(query);
+}
+
+function rethrowDrawerError(err: unknown): void {
+  if (err instanceof Error && /drawer|manager must|reopen|active till/i.test(err.message)) {
+    throw new Error(
+      err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ""),
+    );
+  }
+}
+
+export async function openTill(input: {
+  userId: string;
+  userName: string;
+  tillUsername: string;
+  body: OpenTillRequest;
+  requireApproval: boolean;
+  supervisorDisplayName?: string;
+  funderUserId?: string;
+  funderName?: string;
+}): Promise<TillSessionDetail> {
+  try {
+    if (window.blackbox?.localDb?.openTill) {
+      const detail = await window.blackbox.localDb.openTill(input);
+      if (detail.status === "OPEN") {
+        const amount = input.body.openingBalance;
+        const funderName = input.funderName?.trim();
+        const authenticatorName =
+          funderName || input.supervisorDisplayName?.trim() || input.userName;
+        const hasSupervisor = Boolean(input.body.supervisorUserId || funderName);
+        await logActivityEvent(
+          {
+            eventType: "till.opened",
+            actorUserId: input.funderUserId ?? input.body.supervisorUserId ?? input.userId,
+            supervisorUserId: input.body.supervisorUserId ?? input.funderUserId ?? null,
+            subjectUserId: input.userId,
+            summary: funderName
+              ? `${funderName} opened ${input.userName}'s till with Rs ${formatMoney(amount)} from their drawer`
+              : `${authenticatorName} opened ${input.userName}'s till with opening balance Rs ${formatMoney(amount)}`,
+            metadata: {
+              tillSessionId: detail.id,
+              openingBalance: amount,
+              fundedByUserId: input.funderUserId ?? null,
+            },
+          },
+          {
+            actorName: authenticatorName,
+            supervisorName: hasSupervisor ? authenticatorName : null,
+            subjectName: input.userName,
+          },
+        );
+      }
+      return detail;
+    }
+  } catch (err) {
+    rethrowDrawerError(err);
+  }
+  if (input.funderUserId) {
+    return tillsApi.openForCashier({
+      cashierUserId: input.userId,
+      openingBalance: input.body.openingBalance,
+    });
+  }
+  return tillsApi.open(input.body);
+}
+
+export async function approveTill(input: {
+  id: string;
+  managerId: string;
+  managerName: string;
+}): Promise<TillSessionDetail> {
+  try {
+    if (window.blackbox?.localDb?.approveTill) {
+      const detail = await window.blackbox.localDb.approveTill(input);
+      await logActivityEvent(
+        {
+          eventType: "till.opened",
+          actorUserId: input.managerId,
+          supervisorUserId: input.managerId,
+          subjectUserId: detail.userId,
+          summary: `${input.managerName} opened ${detail.userName}'s till with Rs ${formatMoney(detail.openingBalance)} from their drawer`,
+          metadata: { tillSessionId: detail.id, openingBalance: detail.openingBalance },
+        },
+        {
+          actorName: input.managerName,
+          supervisorName: input.managerName,
+          subjectName: detail.userName,
+        },
+      );
+      return detail;
+    }
+  } catch (err) {
+    rethrowDrawerError(err);
+  }
+  return tillsApi.approve(input.id);
+}
+
+export async function collectCashTill(input: {
+  id: string;
+  managerId: string;
+  managerName: string;
+  body: WithdrawTillRequest;
+  supervisorDisplayName?: string;
+}): Promise<TillSessionDetail> {
+  try {
+    if (window.blackbox?.localDb?.collectCashTill) {
+      const detail = await window.blackbox.localDb.collectCashTill(input);
+      const amount = computeTillDenominationTotal(input.body);
+      const supervisorId = input.body.supervisorUserId ?? input.managerId;
+      const authenticatorName =
+        input.supervisorDisplayName?.trim() || input.managerName;
+      await logActivityEvent(
+        {
+          eventType: "till.cash_collected",
+          actorUserId: supervisorId,
+          supervisorUserId: supervisorId,
+          subjectUserId: detail.userId,
+          summary: `${authenticatorName} received Rs ${formatMoney(amount)} cash from ${detail.userName}'s till`,
+          metadata: {
+            tillSessionId: detail.id,
+            amount,
+            remainingBalance: detail.currentCashBalance,
+          },
+        },
+        {
+          actorName: authenticatorName,
+          supervisorName: authenticatorName,
+          subjectName: detail.userName,
+        },
+      );
+      return detail;
+    }
+  } catch {
+    /* fall through */
+  }
+  return tillsApi.collectCash(input.id, input.body);
+}
+
+export async function collectCashByAmountFromTill(input: {
+  cashierUserId: string;
+  cashierName: string;
+  amount: number;
+  supervisorUserId?: string;
+  supervisorDisplayName?: string;
+}): Promise<TillSessionDetail> {
+  const body: CollectTillCashByAmountRequest = {
+    amount: input.amount,
+    supervisorUserId: input.supervisorUserId,
+  };
+  try {
+    if (window.blackbox?.localDb?.collectCashByAmount) {
+      const detail = await window.blackbox.localDb.collectCashByAmount({
+        userId: input.cashierUserId,
+        userName: input.cashierName,
+        amount: input.amount,
+        supervisorUserId: input.supervisorUserId,
+      });
+      const supervisorId = input.supervisorUserId ?? input.cashierUserId;
+      const authenticatorName =
+        input.supervisorDisplayName?.trim() || "Manager";
+      await logActivityEvent(
+        {
+          eventType: "till.cash_collected",
+          actorUserId: supervisorId,
+          supervisorUserId: input.supervisorUserId ?? null,
+          subjectUserId: input.cashierUserId,
+          summary: `${authenticatorName} received Rs ${formatMoney(input.amount)} cash from ${input.cashierName}'s till`,
+          metadata: {
+            tillSessionId: detail.id,
+            amount: input.amount,
+            remainingBalance: detail.currentCashBalance,
+          },
+        },
+        {
+          actorName: authenticatorName,
+          supervisorName: input.supervisorUserId ? authenticatorName : null,
+          subjectName: input.cashierName,
+        },
+      );
+      return detail;
+    }
+  } catch {
+    /* fall through */
+  }
+  return tillsApi.collectCashByAmount(body);
+}
+
+export async function withdrawTill(input: {
+  id: string;
+  managerId: string;
+  managerName: string;
+  body: WithdrawTillRequest;
+}): Promise<TillSessionDetail> {
+  try {
+    if (window.blackbox?.localDb?.withdrawTill) {
+      const detail = await window.blackbox.localDb.withdrawTill(input);
+      const amount = computeTillDenominationTotal(input.body);
+      await logActivityEvent(
+        {
+          eventType: "till.withdrawn_full",
+          actorUserId: input.managerId,
+          supervisorUserId: input.body.supervisorUserId ?? input.managerId,
+          subjectUserId: detail.userId,
+          summary: `Withdrew Rs ${formatMoney(amount)} from ${detail.userName} till`,
+          metadata: { tillSessionId: detail.id, amount },
+        },
+        {
+          actorName: input.managerName,
+          supervisorName: input.managerName,
+          subjectName: detail.userName,
+        },
+      );
+      return detail;
+    }
+  } catch {
+    /* fall through */
+  }
+  return tillsApi.withdraw(input.id, input.body);
+}
+
+export async function reopenTill(input: {
+  id: string;
+  managerId: string;
+  managerName: string;
+  body: ReopenTillRequest;
+  supervisorDisplayName?: string;
+  cashierName?: string;
+}): Promise<TillSessionDetail> {
+  try {
+    if (window.blackbox?.localDb?.reopenTill) {
+      const detail = await window.blackbox.localDb.reopenTill(input);
+      const authenticatorName =
+        input.supervisorDisplayName?.trim() || input.managerName;
+      const cashierName = input.cashierName?.trim() || detail.userName;
+      await logActivityEvent(
+        {
+          eventType: "till.reopened",
+          actorUserId: input.managerId,
+          supervisorUserId: input.body.supervisorUserId ?? input.managerId,
+          subjectUserId: detail.userId,
+          summary: `${input.managerName} reopened ${cashierName}'s till with Rs ${formatMoney(input.body.openingBalance)} from their drawer`,
+          metadata: {
+            tillSessionId: detail.id,
+            openingBalance: input.body.openingBalance,
+          },
+        },
+        {
+          actorName: authenticatorName,
+          supervisorName: authenticatorName,
+          subjectName: cashierName,
+        },
+      );
+      return detail;
+    }
+  } catch (err) {
+    rethrowDrawerError(err);
+  }
+  return tillsApi.reopen(input.id, input.body);
+}
+
+export async function closeTill(input: {
+  userId: string;
+  userName: string;
+}): Promise<TillSessionDetail> {
+  const closedAtLabel = new Date().toLocaleString();
+  try {
+    if (window.blackbox?.localDb?.closeTill) {
+      const detail = await window.blackbox.localDb.closeTill(input);
+      await logActivityEvent(
+        {
+          eventType: "till.closed",
+          actorUserId: input.userId,
+          subjectUserId: input.userId,
+          summary: `${input.userName} closed till on ${closedAtLabel} — current cash Rs ${formatMoney(detail.currentCashBalance)}`,
+          metadata: {
+            tillSessionId: detail.id,
+            currentCashBalance: detail.currentCashBalance,
+            closeReason: detail.closeReason,
+          },
+        },
+        {
+          actorName: input.userName,
+          subjectName: input.userName,
+        },
+      );
+      return detail;
+    }
+  } catch {
+    /* fall through */
+  }
+  return tillsApi.closeCurrent();
+}
+
+export async function assertTillCanPostSale(input: {
+  userId: string;
+  skipForManager?: boolean;
+  cashPaymentTotal: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.assertTillCanPostSale) {
+    await window.blackbox.localDb.assertTillCanPostSale(input);
+    return;
+  }
+}
+
+export async function applyTillCashFromSale(input: {
+  userId: string;
+  skipForManager?: boolean;
+  cashPaymentTotal: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.applyTillCashFromSale) {
+    await window.blackbox.localDb.applyTillCashFromSale(input);
+  }
+}
+
+export async function applyTillCashRefund(input: {
+  userId: string;
+  skipForManager?: boolean;
+  refundAmount: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.applyTillCashRefund) {
+    await window.blackbox.localDb.applyTillCashRefund(input);
+  }
+}
+
+export async function applyTillReturnCreditOnSale(input: {
+  userId: string;
+  skipForManager?: boolean;
+  cashPaymentTotal: number;
+  cashBackFromCredit: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.applyTillReturnCreditOnSale) {
+    await window.blackbox.localDb.applyTillReturnCreditOnSale(input);
+  }
+}
+
+export async function assertTillCanPayRefund(input: {
+  userId: string;
+  skipForManager?: boolean;
+  refundAmount: number;
+}): Promise<void> {
+  if (window.blackbox?.localDb?.assertTillCanPayRefund) {
+    await window.blackbox.localDb.assertTillCanPayRefund(input);
+  }
+}

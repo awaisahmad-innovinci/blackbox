@@ -9,6 +9,8 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { RequirePermission } from "@/components/require-permission";
 import { useAuth } from "@/components/auth-provider";
+import { TotpAuthySection } from "@/components/totp-authy-section";
+import { userHasSupervisorRole } from "@/lib/totp-api";
 import { PageHeader } from "@/components/page-header";
 import { PasswordInput } from "@/components/password-input";
 import { RoleChecklist } from "@/components/role-checklist";
@@ -44,7 +46,7 @@ import {
 
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user: authUser } = useAuth();
   const [user, setUser] = useState<UserDto | null>(null);
   const [roles, setRoles] = useState<RoleDto[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -354,6 +356,14 @@ export default function UserDetailPage() {
                   disabled
                 />
               </SectionCard>
+            ) : null}
+
+            {user && userHasSupervisorRole(user.roleIds, roles) ? (
+              <TotpAuthySection
+                userId={user.id}
+                isSelf={authUser?.id === user.id}
+                canManage={hasPermission("users.write")}
+              />
             ) : null}
 
             {hasPermission("users.deactivate") && !user.isActive ? (

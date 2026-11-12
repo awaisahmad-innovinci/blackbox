@@ -21,5 +21,10 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  stableFingerprint?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
   deviceName?: string;
 }

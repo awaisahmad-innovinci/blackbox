@@ -13,10 +13,17 @@ import {
   fetchCurrentDevice,
   restoreDesktopSession,
 } from "@renderer/lib/api/auth";
+import { writeCachedDeviceCode } from "@renderer/lib/device-code";
+import { getTillLogoutBlockMessage } from "@renderer/lib/local-db/till-source";
 import { setOnSessionCleared } from "@renderer/lib/api/session";
 import { setDeviceRevoked } from "@renderer/lib/local-db/local-write";
 import { startAutoSync, stopAutoSync } from "@renderer/lib/sync/auto-sync";
 import { refreshPendingCount } from "@renderer/lib/sync/sync-status";
+import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
+import {
+  registerSessionUserRefresh,
+  refreshSessionUserFromApi,
+} from "./session-user-refresh";
 import {
   SessionContext,
   type DeviceState,
@@ -51,6 +58,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(false);
   const [deviceState, setDeviceState] = useState<DeviceState>("unknown");
   const mounted = useRef(true);
+  const offlineRef = useRef(false);
+  offlineRef.current = offline;
 
   const applyDeviceState = useCallback((next: DeviceState) => {
     setDeviceRevoked(next === "revoked");
@@ -65,6 +74,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     try {
       const device = await fetchCurrentDevice();
+      writeCachedDeviceCode(device?.code ?? null);
       applyDeviceState(
         device?.status === "trusted"
           ? "trusted"
@@ -86,6 +96,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const applySessionUser = useCallback((next: AuthUser) => {
+    writeCachedUser(next);
+    if (mounted.current) {
+      setUser(next);
+      setOffline(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    registerSessionUserRefresh({
+      applyUser: applySessionUser,
+      isOffline: () => offlineRef.current,
+    });
+    return () => registerSessionUserRefresh(null);
+  }, [applySessionUser]);
+
   useEffect(() => {
     setOnSessionCleared(() => {
       writeCachedUser(null);
@@ -105,6 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setUser(result.user);
         setOffline(false);
         setStatus("signed-in");
+        void refreshSupervisorTotpCache();
       } else if (result.status === "offline") {
         setUser(readCachedUser());
         setOffline(true);
@@ -144,20 +171,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       writeCachedUser(result.user);
       setUser(result.user);
       setOffline(false);
+      window.location.hash = "#/";
       setStatus("signed-in");
       await refreshDeviceState();
+      void refreshSupervisorTotpCache();
     },
     [refreshDeviceState],
   );
 
+  const refreshSessionUser = useCallback(async () => {
+    await refreshSessionUserFromApi();
+  }, []);
+
   const signOut = useCallback(async () => {
+    if (user) {
+      const block = await getTillLogoutBlockMessage({
+        userId: user.id,
+        permissions: user.permissions ?? [],
+      });
+      if (block) throw new Error(block);
+    }
     await desktopLogout();
+    writeCachedDeviceCode(null);
     writeCachedUser(null);
     setUser(null);
     setOffline(false);
     setDeviceState("unknown");
     setStatus("signed-out");
-  }, []);
+  }, [user]);
 
   const value = useMemo<SessionValue>(
     () => ({
@@ -168,8 +209,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       refreshDeviceState,
+      refreshSessionUser,
     }),
-    [status, user, offline, deviceState, signIn, signOut, refreshDeviceState],
+    [
+      status,
+      user,
+      offline,
+      deviceState,
+      signIn,
+      signOut,
+      refreshDeviceState,
+      refreshSessionUser,
+    ],
   );
 
   return (

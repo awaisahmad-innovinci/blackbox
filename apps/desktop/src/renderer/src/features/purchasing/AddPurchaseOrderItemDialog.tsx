@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { VendorSku } from "@blackbox/shared";
+import { formatMoney } from "@blackbox/shared";
+import type { OrderUnit, VendorSku } from "@blackbox/shared";
+import {
+  lineTotalForPurchase,
+  normalizeUnitsPerPurchaseUnit,
+  poAllowsOrderUnitChoice,
+  toDisplayQuantity,
+  toPurchaseQuantity,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -26,7 +34,11 @@ export type DraftPoLine = {
   sku: string;
   purchaseUnitId: string | null;
   purchaseUnitName: string | null;
+  purchaseUnitAbbreviation?: string | null;
+  baseUnitName: string | null;
   unitsPerPurchaseUnit: number;
+  orderUnit: OrderUnit;
+  purchasePrice: number;
   quantityAvailable: number;
   quantity: number;
   unitCost: number;
@@ -34,8 +46,92 @@ export type DraftPoLine = {
   lineTotal: number;
 };
 
-export function toDraftPoLine(row: VendorSku): DraftPoLine {
+export function recomputePoLine(
+  line: DraftPoLine,
+  patch: Partial<DraftPoLine> = {},
+): DraftPoLine {
+  const next = { ...line, ...patch };
+  const pricing = lineTotalForPurchase({
+    displayQuantity: next.quantity,
+    purchasePrice: next.purchasePrice,
+    unitsPerPurchaseUnit: next.unitsPerPurchaseUnit,
+    orderUnit: next.orderUnit,
+  });
   return {
+    ...next,
+    unitCost: pricing.displayUnitCost,
+    lineTotal: pricing.lineTotal,
+  };
+}
+
+export function vendorSkuPoChoiceInput(row: VendorSku): {
+  purchaseUnitName?: string | null;
+  purchaseUnitAbbreviation?: string | null;
+} {
+  return {
+    purchaseUnitName: row.purchaseUnitName,
+    purchaseUnitAbbreviation: row.purchaseUnitAbbreviation ?? null,
+  };
+}
+
+export function defaultOrderUnitForVendorSku(row: VendorSku): OrderUnit {
+  return poAllowsOrderUnitChoice(vendorSkuPoChoiceInput(row)) ? "box" : "pc";
+}
+
+export function refreshPoLinesWithVendorSkus(
+  lines: DraftPoLine[],
+  vendorSkus: VendorSku[],
+): DraftPoLine[] {
+  const bySku = new Map(vendorSkus.map((r) => [r.productSkuId, r]));
+  return lines.map((line) => {
+    const row = bySku.get(line.productSkuId);
+    return row ? mergePoLineWithVendorSku(line, row) : line;
+  });
+}
+
+export function mergePoLineWithVendorSku(
+  line: DraftPoLine,
+  row: VendorSku,
+): DraftPoLine {
+  const choice = vendorSkuPoChoiceInput(row);
+  const newUnits = normalizeUnitsPerPurchaseUnit(row.unitsPerPurchaseUnit, {
+    name: row.purchaseUnitName,
+    abbreviation: row.purchaseUnitAbbreviation,
+  });
+  const purchaseQty = toPurchaseQuantity(
+    line.quantity,
+    line.orderUnit,
+    line.unitsPerPurchaseUnit,
+  );
+  let orderUnit = line.orderUnit;
+  if (!poAllowsOrderUnitChoice(choice)) {
+    orderUnit = "pc";
+  }
+  const quantity = toDisplayQuantity(purchaseQty, orderUnit, newUnits);
+  return recomputePoLine(line, {
+    vendorSkuId: row.id,
+    purchaseUnitId: row.purchaseUnitId,
+    purchaseUnitName: row.purchaseUnitName,
+    purchaseUnitAbbreviation: row.purchaseUnitAbbreviation ?? null,
+    baseUnitName: row.baseUnitName ?? null,
+    unitsPerPurchaseUnit: newUnits,
+    purchasePrice: row.purchasePrice,
+    minimumOrderQuantity: row.minimumOrderQuantity,
+    quantityAvailable: row.quantityAvailable ?? line.quantityAvailable,
+    orderUnit,
+    quantity,
+  });
+}
+
+export function toDraftPoLine(row: VendorSku): DraftPoLine {
+  const unitsPerPurchaseUnit = normalizeUnitsPerPurchaseUnit(
+    row.unitsPerPurchaseUnit,
+    {
+      name: row.purchaseUnitName,
+      abbreviation: row.purchaseUnitAbbreviation,
+    },
+  );
+  return recomputePoLine({
     productSkuId: row.productSkuId,
     vendorSkuId: row.id,
     productName: row.productName,
@@ -43,13 +139,17 @@ export function toDraftPoLine(row: VendorSku): DraftPoLine {
     sku: row.sku,
     purchaseUnitId: row.purchaseUnitId,
     purchaseUnitName: row.purchaseUnitName,
-    unitsPerPurchaseUnit: row.unitsPerPurchaseUnit,
+    purchaseUnitAbbreviation: row.purchaseUnitAbbreviation ?? null,
+    baseUnitName: row.baseUnitName ?? null,
+    unitsPerPurchaseUnit,
+    orderUnit: defaultOrderUnitForVendorSku(row),
+    purchasePrice: row.purchasePrice,
     quantityAvailable: row.quantityAvailable ?? 0,
     quantity: 0,
     unitCost: row.purchasePrice,
     minimumOrderQuantity: row.minimumOrderQuantity,
     lineTotal: 0,
-  };
+  });
 }
 
 function isDisabled(row: VendorSku, existingSkuIds: string[]): boolean {
@@ -238,7 +338,7 @@ export function AddPurchaseOrderItemDialog({
                           {r.barcode ? ` · ${r.barcode}` : ""}
                         </span>
                         <span className="text-muted-foreground block tabular-nums">
-                          Cost {r.purchasePrice.toLocaleString()} ·{" "}
+                          Cost {formatMoney(r.purchasePrice)} ·{" "}
                           {r.purchaseUnitName || "—"} · MOQ{" "}
                           {r.minimumOrderQuantity} · Available{" "}
                           {(r.quantityAvailable ?? 0).toLocaleString()}

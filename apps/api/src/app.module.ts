@@ -13,7 +13,14 @@ import { PermissionsCatalogModule } from "./permissions/permissions-catalog.modu
 import { RbacModule } from "./rbac/rbac.module";
 import { RolesModule } from "./roles/roles.module";
 import { SyncModule } from "./sync/sync.module";
+import { SalesModule } from "./sales/sales.module";
+import { SaleReturnsModule } from "./sales/sale-returns/sale-returns.module";
+import { TillsModule } from "./tills/tills.module";
+import { CashFlowModule } from "./cash-flow/cash-flow.module";
+import { ActivityLogModule } from "./activity-log/activity-log.module";
+import { PlatformModule } from "./platform/platform.module";
 import { TenantsModule } from "./tenants/tenants.module";
+import { TaxReportsModule } from "./tax-reports/tax-reports.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -25,6 +32,7 @@ import { UsersModule } from "./users/users.module";
     DbModule,
     RbacModule,
     AuthModule,
+    PlatformModule,
     TenantsModule,
     UsersModule,
     RolesModule,
@@ -32,6 +40,12 @@ import { UsersModule } from "./users/users.module";
     DevicesModule,
     InventoryModule,
     SyncModule,
+    SalesModule,
+    SaleReturnsModule,
+    TillsModule,
+    CashFlowModule,
+    ActivityLogModule,
+    TaxReportsModule,
   ],
   controllers: [AppController],
   providers: [

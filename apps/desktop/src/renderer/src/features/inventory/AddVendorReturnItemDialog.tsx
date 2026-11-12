@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import type { SellUnit, VendorReturnReason, VendorSku } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import {
@@ -307,7 +308,7 @@ export function AddVendorReturnItemDialog({
                           {r.barcode ? ` · ${r.barcode}` : ""}
                         </span>
                         <span className="text-muted-foreground block tabular-nums">
-                          Cost {r.purchasePrice.toLocaleString()} · Returnable{" "}
+                          Cost {formatMoney(r.purchasePrice)} · Returnable{" "}
                           {(r.quantityAvailable ?? 0).toLocaleString()} pcs
                         </span>
                       </span>

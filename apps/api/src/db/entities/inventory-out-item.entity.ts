@@ -6,15 +6,22 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn,
 } from "typeorm";
-import { InventoryOut } from "./inventory-out.entity";
 import { ProductSku } from "./product-sku.entity";
 import { Tenant } from "./tenant.entity";
+import { Warehouse } from "./warehouse.entity";
 
+/** Net quantity currently out at POS / front store per warehouse + SKU. */
 @Entity({ name: "inventory_out_items" })
+@Unique("inventory_out_items_tenant_wh_sku_key", [
+  "tenantId",
+  "warehouseId",
+  "productSkuId",
+])
 @Index("inventory_out_items_tenant_id_idx", ["tenantId"])
-@Index("inventory_out_items_out_id_idx", ["inventoryOutId"])
+@Index("inventory_out_items_warehouse_id_idx", ["warehouseId"])
 @Index("inventory_out_items_product_sku_id_idx", ["productSkuId"])
 export class InventoryOutItem {
   @PrimaryGeneratedColumn("uuid")
@@ -23,8 +30,8 @@ export class InventoryOutItem {
   @Column({ name: "tenant_id", type: "uuid" })
   tenantId!: string;
 
-  @Column({ name: "inventory_out_id", type: "uuid" })
-  inventoryOutId!: string;
+  @Column({ name: "warehouse_id", type: "uuid" })
+  warehouseId!: string;
 
   @Column({ name: "product_sku_id", type: "uuid" })
   productSkuId!: string;
@@ -51,9 +58,9 @@ export class InventoryOutItem {
   @JoinColumn({ name: "tenant_id" })
   tenant!: Tenant;
 
-  @ManyToOne(() => InventoryOut, (out) => out.items, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "inventory_out_id" })
-  inventoryOut!: InventoryOut;
+  @ManyToOne(() => Warehouse, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "warehouse_id" })
+  warehouse!: Warehouse;
 
   @ManyToOne(() => ProductSku, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "product_sku_id" })

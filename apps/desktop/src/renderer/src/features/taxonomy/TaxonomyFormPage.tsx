@@ -12,6 +12,7 @@ import { Textarea } from "@blackbox/ui/textarea";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
 import {
   KEYBOARD_HINT_ENTER,
   KEYBOARD_HINT_SAVE,
@@ -127,7 +128,14 @@ export function TaxonomyFormPage({
         status,
       };
       if (syncEntityType && (await isDeviceBound())) {
-        const rowId = isEdit && id ? id : crypto.randomUUID();
+        let rowId = isEdit && id ? id : null;
+        if (!rowId) {
+          const existingId = await resolveCanonicalEntityId({
+            entityType: syncEntityType,
+            name: body.name,
+          });
+          rowId = existingId ?? crypto.randomUUID();
+        }
         await commitLocalChange({
           entityType: syncEntityType,
           entityId: rowId,

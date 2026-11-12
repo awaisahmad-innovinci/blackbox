@@ -1,15 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatMoney } from "@blackbox/shared";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import type { ProductDetail, ProductListItem, VendorDetail, VendorSku } from "@blackbox/shared";
-import { PAYMENT_TERMS_LABELS } from "@blackbox/shared";
+import type {
+  ProductDetail,
+  ProductListItem,
+  VendorDetail,
+  VendorLedger,
+  VendorSku,
+} from "@blackbox/shared";
+import { PAYMENT_TERMS_LABELS, roundMoney4 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { Input } from "@blackbox/ui/input";
+import { Label } from "@blackbox/ui/label";
 import { BackButton } from "@renderer/app/BackButton";
 import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
-import { ApiError } from "@renderer/lib/api/client";
-import { loadVendorProfile } from "@renderer/lib/local-db/entity-source";
+import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
+import { vendorsApi } from "@renderer/lib/api/vendors";
+import { loadVendorLedger, loadVendorProfile } from "@renderer/lib/local-db/entity-source";
+import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { canAccessPurchasingModule } from "@renderer/lib/sales-access";
+import { useSession } from "@renderer/lib/session/context";
 import { AddProductDialog } from "@renderer/features/products/AddProductDialog";
 import { AddProductSkuDialog } from "@renderer/features/products/AddProductSkuDialog";
 import { AddVendorSkuDialog } from "./AddVendorSkuDialog";
+import {
+  VendorPaymentReceipt,
+  type VendorPaymentReceiptData,
+} from "./VendorPaymentReceipt";
 
 function contactBlock(
   detail: VendorDetail,
@@ -36,7 +53,15 @@ export function VendorProfilePage() {
   const seeded = (
     location.state as { vendor?: VendorDetail } | null
   )?.vendor;
+  const { user } = useSession();
+  const canRecordPayment = canAccessPurchasingModule(user?.permissions ?? []);
   const [vendor, setVendor] = useState<VendorDetail | null>(seeded ?? null);
+  const [ledger, setLedger] = useState<VendorLedger | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentNote, setPaymentNote] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] =
+    useState<VendorPaymentReceiptData | null>(null);
   const [skus, setSkus] = useState<VendorSku[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(flash ?? null);
@@ -70,6 +95,76 @@ export function VendorProfilePage() {
     }
   }
 
+  async function recordPayment() {
+    if (!id) return;
+    const amount = roundMoney4(Number(paymentAmount));
+    if (!(amount > 0)) {
+      setError("Payment amount must be greater than zero");
+      return;
+    }
+    if (ledger && amount > ledger.credit) {
+      setError(`Payment cannot exceed vendor credit (${ledger.credit})`);
+      return;
+    }
+    const note = paymentNote.trim();
+    const occurredAt = new Date().toISOString();
+    const creditBefore = ledger?.credit;
+    setPaying(true);
+    setError(null);
+    try {
+      if (await isDeviceBound()) {
+        const entryId = crypto.randomUUID();
+        await commitLocalChange({
+          entityType: "vendor_ledger_entry",
+          entityId: entryId,
+          operation: "UPSERT",
+          payload: {
+            id: entryId,
+            vendorId: id,
+            entryType: "PAYMENT",
+            amount,
+            goodsReceiptId: null,
+            receiptNumber: null,
+            note,
+            occurredAt,
+            createdAt: occurredAt,
+            updatedAt: occurredAt,
+          },
+        });
+      } else {
+        await vendorsApi.recordPayment(id, {
+          amount,
+          note: note || undefined,
+        });
+      }
+      setPaymentAmount("");
+      setPaymentNote("");
+      let creditRemaining =
+        creditBefore == null
+          ? undefined
+          : roundMoney4(Math.max(0, creditBefore - amount));
+      try {
+        const next = await loadVendorLedger(id);
+        setLedger(next);
+        creditRemaining = next.credit;
+      } catch {
+        /* payment is saved; the receipt uses the computed remainder */
+      }
+      setPaymentReceipt({
+        vendorName: vendor?.name ?? "Vendor",
+        amount,
+        note,
+        occurredAt,
+        paidBy: user?.fullName || user?.username || "",
+        creditRemaining,
+      });
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to record payment"));
+    } finally {
+      setPaying(false);
+    }
+  }
+
   const load = useCallback(async () => {
     if (!id) return;
     setError(null);
@@ -77,6 +172,7 @@ export function VendorProfilePage() {
       const data = await loadVendorProfile(id);
       setVendor(data.vendor);
       setSkus(data.skus);
+      setLedger(await loadVendorLedger(id));
     } catch (err: unknown) {
       setError(err instanceof ApiError ? err.message : "Failed to load vendor");
     }
@@ -101,8 +197,25 @@ export function VendorProfilePage() {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
 
+  if (paymentReceipt) {
+    return (
+      <VendorPaymentReceipt
+        receipt={paymentReceipt}
+        onDone={() => setPaymentReceipt(null)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {error ? (
+        <div
+          role="alert"
+          className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
+        >
+          {error}
+        </div>
+      ) : null}
       {message ? (
         <div className="border-border bg-muted/40 rounded-lg border px-4 py-3 text-sm">
           {message}
@@ -223,6 +336,93 @@ export function VendorProfilePage() {
       </section>
 
       <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-medium">Ledger</h2>
+            <p className="text-muted-foreground text-sm">
+              Vendor credit:{" "}
+              <span className="text-foreground tabular-nums">
+                {formatMoney((ledger?.credit ?? 0))}
+              </span>
+            </p>
+          </div>
+          {canRecordPayment ? (
+            <form
+              className="flex flex-wrap items-end gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void recordPayment();
+              }}
+            >
+              <div className="space-y-1">
+                <Label htmlFor="vendor-payment-amount">Amount</Label>
+                <Input
+                  id="vendor-payment-amount"
+                  className="h-8 w-28"
+                  inputMode="decimal"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vendor-payment-note">Note</Label>
+                <Input
+                  id="vendor-payment-note"
+                  className="h-8 w-48"
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                />
+              </div>
+              <Button type="submit" size="sm" disabled={paying}>
+                {paying ? "Recording…" : "Record payment"}
+              </Button>
+            </form>
+          ) : null}
+        </div>
+        <div className="border-border overflow-hidden rounded-lg border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">When</th>
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Receipt</th>
+                <th className="px-4 py-3 font-medium">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(ledger?.entries.length ?? 0) === 0 ? (
+                <tr className="border-border border-t">
+                  <td
+                    colSpan={5}
+                    className="text-muted-foreground px-4 py-6 text-center"
+                  >
+                    No ledger entries yet.
+                  </td>
+                </tr>
+              ) : (
+                ledger?.entries.map((entry) => (
+                  <tr key={entry.id} className="border-border border-t">
+                    <td className="px-4 py-3">
+                      {new Date(entry.occurredAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      {entry.entryType === "CHARGE" ? "Charge" : "Payment"}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {formatMoney(entry.amount)}
+                    </td>
+                    <td className="px-4 py-3">{entry.receiptNumber || "—"}</td>
+                    <td className="px-4 py-3">{entry.note || "—"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-medium">Supplied SKUs</h2>
           <Button size="sm" onClick={() => setAddSkuOpen(true)}>
@@ -266,7 +466,7 @@ export function VendorProfilePage() {
                     </td>
                     <td className="px-4 py-3">{row.variantName || "—"}</td>
                     <td className="px-4 py-3">{row.sku}</td>
-                    <td className="px-4 py-3 tabular-nums">{row.purchasePrice}</td>
+                    <td className="px-4 py-3 tabular-nums">{formatMoney(row.purchasePrice)}</td>
                     <td className="px-4 py-3 tabular-nums">
                       {row.minimumOrderQuantity}
                     </td>

@@ -14,13 +14,16 @@ Rules:
 - status: active or inactive.
 - unit type: count, weight, volume, length, or other.
 - product_type: STOCK_ITEM, CONSUMABLE, or RESALABLE.
-- payment_terms: CASH, 7_DAYS, 15_DAYS, 30_DAYS, 45_DAYS, or CUSTOM.
-- booleans: true or false.
+- payment_terms: CASH, 7_DAYS, 15_DAYS, 30_DAYS, 45_DAYS, BILL_TO_BILL, or CUSTOM.
+- booleans: true or false (case insensitive, e.g. TRUE, FALSE).
 - product import_key is a permanent unique identifier for that product; keep using the same value in future uploads and in 07_product_skus.csv.
 - brand_name, category_name, group_name, unit abbreviations, vendor_code, and sku are references and must match exactly.
 - Referenced records must already exist from a previous import (for example, upload units before product SKUs).
 - primary and manager contact names and phones are required for every vendor.
 - Empty optional values are allowed. Do not add extra files or folders to the upload.
+- **Barcode qty per scan:** On `07_product_skus.csv`, optional `barcode_quantity_multiplier` (default 1) sets how many base units one scan adds when using the SKU’s `barcode`. Use `10_product_sku_barcodes.csv` for extra barcodes on the same SKU (upload **after** `07_product_skus.csv`). `quantity_multiplier` must be greater than zero (e.g. 6 = six pieces per scan).
+- **GST on SKU:** Optional `gst_percent` on `07_product_skus.csv` (0–100). Used for GST on inclusive sale line totals; leave empty for 0.
+- **HS code:** Optional `hs_code` on `07_product_skus.csv` (`804.102`, `910.91`, `1704.909`, `2104.1`, or `0101.1212`). Required before FBR can invoice a sale of that SKU. Leave empty to keep an existing code on update.
 
 Uploading the same rows again updates the existing records instead of creating duplicates. The upload is atomic: if any row is invalid, nothing from that file is imported.
 
@@ -55,8 +58,14 @@ import_key,name,brand_name,category_name,product_type,description,status
 shirt-001,Classic Shirt,Acme,Shirts,STOCK_ITEM,Cotton shirt,active
 
 # 07_product_skus.csv
-product_import_key,sku,barcode,variant_name,size_value,size_unit,base_unit_abbreviation,purchase_unit_abbreviation,units_per_purchase_unit,cost_price,selling_price,reorder_level,minimum_stock_level,maximum_stock_level,track_inventory,status
-shirt-001,SHIRT-BLK-M,1234567890123,Black / Medium,M,,PCS,BOX,12,100,150,5,5,100,true,active
+# Header must match exactly. Older 19-column files (without hs_code) and legacy 17-column files are still accepted; a blank hs_code does not clear one already stored.
+product_import_key,sku,barcode,barcode_quantity_multiplier,variant_name,size_value,size_unit,base_unit_abbreviation,purchase_unit_abbreviation,units_per_purchase_unit,cost_price,selling_price,selling_price_per_purchase_unit,gst_percent,hs_code,reorder_level,minimum_stock_level,maximum_stock_level,track_inventory,status
+shirt-001,SHIRT-BLK-M,1234567890123,1,Black / Medium,M,,PCS,BOX,12,100,150,,17,5,5,100,true,active
+coke-330,COKE-330ML,8901030861234,6,Coke 330ml,,,PCS,PCS,1,50,80,,0,10,10,200,true,active
+
+# 10_product_sku_barcodes.csv (extra barcodes; same SKU can have several)
+sku,barcode,quantity_multiplier,status
+COKE-330ML,8901030861234-BOX,6,active
 
 # 08_vendors.csv
 vendor_code,name,group_name,address,city,state,country,postal_code,sales_target,credit_limit,payment_terms,tax_number,notes,status,primary_name,primary_phone,primary_email,manager_name,manager_phone,manager_email,other_name,other_phone,other_email,salesperson_name,salesperson_phone,salesperson_email
