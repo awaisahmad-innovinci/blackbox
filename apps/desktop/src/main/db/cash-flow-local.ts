@@ -81,6 +81,104 @@ export function assertCashExpenseWithinDrawer(input: {
   }
 }
 
+export function getOwnerCashBalanceLocal(
+  ownerUserId: string,
+  exclude?: { expenseId?: string; openingId?: string },
+): number {
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select
+         coalesce((
+           select sum(amount) from manager_drawer_submissions
+           where tenant_id = @tenantId
+         ), 0)
+         + coalesce((
+           select sum(amount) from owner_cash_entries
+           where tenant_id = @tenantId
+         ), 0)
+         - coalesce((
+           select sum(amount) from cash_expenses
+           where tenant_id = @tenantId
+             and recorded_by_user_id = @ownerUserId
+             and id != @excludeExpenseId
+         ), 0)
+         - coalesce((
+           select sum(amount) from manager_drawer_openings
+           where tenant_id = @tenantId
+             and id != @excludeOpeningId
+         ), 0) as balance`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      ownerUserId,
+      excludeExpenseId: exclude?.expenseId ?? "",
+      excludeOpeningId: exclude?.openingId ?? "",
+    }) as { balance: number };
+  return roundMoney(num(row.balance));
+}
+
+export function assertOwnerCashCovers(input: {
+  ownerUserId: string;
+  amount: number;
+  excludeExpenseId?: string;
+  excludeOpeningId?: string;
+}): void {
+  const available = getOwnerCashBalanceLocal(input.ownerUserId, {
+    expenseId: input.excludeExpenseId,
+    openingId: input.excludeOpeningId,
+  });
+  if (expenseExceedsDrawer(input.amount, available)) {
+    throw new Error(expenseOverDrawerMessage(available));
+  }
+}
+
+export function upsertOwnerCashEntryLocal(input: {
+  id: string;
+  recordedByUserId: string;
+  recordedByName: string;
+  amount: number;
+  note: string;
+  recordedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}): void {
+  if (!(input.amount > 0)) {
+    throw new Error("Enter an amount greater than zero");
+  }
+  const db = getLocalDb();
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+    insert into owner_cash_entries (
+      id, tenant_id, recorded_by_user_id, recorded_by_name, amount, note,
+      recorded_at, created_at, updated_at, sync_status
+    ) values (
+      @id, @tenantId, @recordedByUserId, @recordedByName, @amount, @note,
+      @recordedAt, @createdAt, @updatedAt, 'synced'
+    )
+    on conflict(id) do update set
+      recorded_by_user_id = excluded.recorded_by_user_id,
+      recorded_by_name = excluded.recorded_by_name,
+      amount = excluded.amount,
+      note = excluded.note,
+      recorded_at = excluded.recorded_at,
+      updated_at = excluded.updated_at,
+      sync_status = 'synced'
+  `,
+  ).run({
+    id: input.id,
+    tenantId: DEMO_STORE_TENANT_ID,
+    recordedByUserId: input.recordedByUserId,
+    recordedByName: input.recordedByName,
+    amount: input.amount,
+    note: input.note,
+    recordedAt: input.recordedAt || now,
+    createdAt: input.createdAt || now,
+    updatedAt: input.updatedAt || now,
+  });
+}
+
 export function upsertCashExpenseLocal(input: {
   id: string;
   recordedByUserId: string;
@@ -203,6 +301,7 @@ export function listDrawerBalancesLocal(input: {
        from cash_expenses
        where tenant_id = @tenantId
          and (@seeAll = 1 or recorded_by_user_id = @userId)
+         and (@seeAll = 0 or recorded_by_user_id <> @userId)
          ${cashierExcludedWhenSeeAll.replaceAll("manager_user_id", "recorded_by_user_id")}
        group by recorded_by_user_id`,
     )
@@ -516,10 +615,10 @@ export function assertDrawerSubmissionLocal(input: {
       num(row.till_floats) -
       num(row.submitted),
   );
-  if (!(input.amount > 0) || roundMoney(input.amount) !== available) {
+  if (!(input.amount > 0) || expenseExceedsDrawer(input.amount, available)) {
     throw new Error(
       available > 0
-        ? `Submit the full drawer balance of Rs ${formatMoney(available)}`
+        ? `Submit no more than the drawer balance of Rs ${formatMoney(available)}`
         : "There is no cash to submit",
     );
   }
@@ -578,7 +677,8 @@ export function listDrawerSubmissionsTodayLocal(): {
               coalesce(sum(amount), 0) as amount
        from manager_drawer_submissions
        where tenant_id = @tenantId
-         and date(submitted_at) = date('now', 'localtime')
+         and date(replace(substr(submitted_at, 1, 19), 'T', ' '), 'localtime')
+             = date('now', 'localtime')
        group by manager_user_id
        order by managerName`,
     )
@@ -739,6 +839,9 @@ export function getCashFlowLocal(input: {
       };
     }),
     drawers: listDrawerBalancesLocal(input),
+    ownerCashBalance: input.seeAll
+      ? getOwnerCashBalanceLocal(input.userId)
+      : 0,
   };
 }
 

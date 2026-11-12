@@ -82,6 +82,7 @@ export type PurchasingEntityType =
   | "till_session"
   | "till_withdrawal"
   | "cash_expense"
+  | "owner_cash_entry"
   | "manager_drawer_opening"
   | "manager_drawer_submission";
 
@@ -225,6 +226,7 @@ export function streamForEntity(entityType: SyncEntityType): SyncStream {
     entityType === "till_session" ||
     entityType === "till_withdrawal" ||
     entityType === "cash_expense" ||
+    entityType === "owner_cash_entry" ||
     entityType === "manager_drawer_opening" ||
     entityType === "manager_drawer_submission"
   ) {

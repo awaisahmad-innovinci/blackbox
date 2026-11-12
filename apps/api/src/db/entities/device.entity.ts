@@ -47,6 +47,9 @@ export class Device {
   @Column({ name: "revoked_at", type: "timestamptz", nullable: true })
   revokedAt!: Date | null;
 
+  @Column({ name: "deleted_at", type: "timestamptz", nullable: true })
+  deletedAt!: Date | null;
+
   @Column({ name: "last_sync_at", type: "timestamptz", nullable: true })
   lastSyncAt!: Date | null;
 
@@ -55,6 +58,13 @@ export class Device {
 
   @Column({ name: "needs_full_resync", type: "boolean", default: false })
   needsFullResync!: boolean;
+
+  /**
+   * Set when the device is revoked. The desktop must delete its local
+   * database and must not push. Cleared only after that wipe, once trusted.
+   */
+  @Column({ name: "wipe_local_data", type: "boolean", default: false })
+  wipeLocalData!: boolean;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;

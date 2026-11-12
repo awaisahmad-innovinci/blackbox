@@ -73,10 +73,18 @@ export type CurrentDevice = {
   name: string;
   code: string | null;
   status: string;
+  /** True after revoke until this desktop confirms its local database was erased. */
+  wipeLocalData?: boolean;
 } | null;
 
 export function fetchCurrentDevice(): Promise<CurrentDevice> {
   return apiFetch<CurrentDevice>("/devices/me");
+}
+
+export function acknowledgeLocalWipe(): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>("/devices/me/wipe-acknowledged", {
+    method: "POST",
+  });
 }
 
 export type RestoreResult =

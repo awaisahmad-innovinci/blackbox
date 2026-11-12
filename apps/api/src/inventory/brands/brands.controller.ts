@@ -47,4 +47,14 @@ export class BrandsController {
   deactivate(@Param("id", ParseUUIDPipe) id: string): Promise<Brand> {
     return this.brands.deactivate(id);
   }
+
+  @Post(":id/delete")
+  softDelete(@Param("id", ParseUUIDPipe) id: string): Promise<Brand> {
+    return this.brands.softDelete(id);
+  }
+
+  @Post(":id/restore")
+  restore(@Param("id", ParseUUIDPipe) id: string): Promise<Brand> {
+    return this.brands.restore(id);
+  }
 }

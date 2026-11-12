@@ -3,6 +3,9 @@
 export const ENTITY_STATUSES = ["active", "inactive"] as const;
 export type EntityStatus = (typeof ENTITY_STATUSES)[number];
 
+export const ENTITY_STATUS_FILTERS = [...ENTITY_STATUSES, "all", "deleted"] as const;
+export type EntityStatusFilter = (typeof ENTITY_STATUS_FILTERS)[number];
+
 export const UNIT_TYPES = ["count", "weight", "volume", "length", "other"] as const;
 export type UnitType = (typeof UNIT_TYPES)[number];
 
@@ -231,10 +234,11 @@ export interface CashierDashboardSummary {
   cardPaymentsAmount: number;
   heldBillsCount: number;
   refundTotalAmount: number;
-  /** Till opening float for this cashier today. */
+  /** Till opening float for the open till. Zero when no till is open. */
   openingBalanceAmount: number;
-  /** Cash collected from this cashier's till today. */
+  /** Cash collected from this cashier today, across tills. Clears the next local day. */
   cashWithdrawnAmount: number;
+  /** Cash in the open till. Zero when no till is open. */
   cashInHandAmount: number;
 }
 
@@ -303,11 +307,12 @@ export interface VendorGroup {
   name: string;
   description: string;
   status: EntityStatus;
+  deletedAt?: string | null;
 }
 
 export interface TaxonomyListQuery {
   /** Omit or leave unset → active only (dropdowns). Use `"all"` for management lists. */
-  status?: EntityStatus | "all";
+  status?: EntityStatusFilter;
   q?: string;
 }
 
@@ -326,6 +331,7 @@ export interface VendorListItem {
   groupId: string | null;
   groupName: string | null;
   status: EntityStatus;
+  deletedAt?: string | null;
   city: string | null;
   primaryContactName: string | null;
   primaryContactPhone: string | null;
@@ -339,6 +345,7 @@ export interface VendorDetail {
   groupId: string | null;
   groupName: string | null;
   status: EntityStatus;
+  deletedAt?: string | null;
   address: string | null;
   city: string | null;
   state: string | null;
@@ -379,7 +386,7 @@ export type UpdateVendorRequest = CreateVendorRequest;
 
 export interface VendorListQuery {
   search?: string;
-  status?: EntityStatus | "all";
+  status?: EntityStatusFilter;
   groupId?: string;
   page?: number;
   pageSize?: number;
@@ -721,6 +728,7 @@ export interface SkuDetail {
   maximumStockLevel: number | null;
   trackInventory: boolean;
   status: EntityStatus;
+  deletedAt?: string | null;
 }
 
 export interface SkuSupplier {
@@ -749,6 +757,7 @@ export interface Brand {
   name: string;
   description: string;
   status: EntityStatus;
+  deletedAt?: string | null;
 }
 
 export interface CreateBrandRequest {
@@ -764,6 +773,7 @@ export interface Category {
   name: string;
   description: string;
   status: EntityStatus;
+  deletedAt?: string | null;
 }
 
 export interface CreateCategoryRequest {
@@ -784,6 +794,7 @@ export interface ProductListItem {
   categoryName: string | null;
   productType: ProductType;
   status: EntityStatus;
+  deletedAt?: string | null;
   skuCount: number;
   totalAvailable: number;
   supplierCount: number;
@@ -803,6 +814,7 @@ export interface ProductDetail {
   description: string;
   imagePath: string | null;
   status: EntityStatus;
+  deletedAt?: string | null;
   totalOnHand: number;
   totalReserved: number;
   totalAvailable: number;
@@ -825,7 +837,7 @@ export interface ProductListQuery {
   search?: string;
   brandId?: string;
   categoryId?: string;
-  status?: EntityStatus;
+  status?: EntityStatusFilter;
   page?: number;
   pageSize?: number;
 }
@@ -861,6 +873,7 @@ export interface ProductSkuDetail {
   maximumStockLevel: number | null;
   trackInventory: boolean;
   status: EntityStatus;
+  deletedAt?: string | null;
 }
 
 export interface CreateProductSkuRequest {
@@ -908,12 +921,14 @@ export function roundMoney4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
-/** Display money with exactly two decimal places. Does not change stored precision. */
+/** Display money. Whole amounts omit decimals; amounts with cents show two places. */
 export function formatMoney(value: number): string {
   const amount = Number.isFinite(value) ? value : 0;
-  return amount.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  const rounded = Math.round(amount * 100) / 100;
+  const whole = rounded === Math.trunc(rounded);
+  return rounded.toLocaleString(undefined, {
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
   });
 }
 
@@ -1184,6 +1199,7 @@ export interface WarehouseListItem {
   code: string;
   location: string | null;
   status: EntityStatus;
+  deletedAt?: string | null;
 }
 
 export interface CreateWarehouseRequest {

@@ -39,4 +39,10 @@ export const vendorGroupsApi = {
       method: "POST",
     });
   },
+  delete(id: string): Promise<VendorGroup> {
+    return apiFetch<VendorGroup>(`/vendor-groups/${id}/delete`, { method: "POST" });
+  },
+  restore(id: string): Promise<VendorGroup> {
+    return apiFetch<VendorGroup>(`/vendor-groups/${id}/restore`, { method: "POST" });
+  },
 };

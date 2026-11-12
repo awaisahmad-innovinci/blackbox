@@ -96,6 +96,7 @@ export function getProductLocal(id: string): ProductDetail | null {
          coalesce(p.description, '') as description,
          p.image_path as imagePath,
          p.status,
+         p.deleted_at as deletedAt,
          p.created_at as createdAt,
          p.updated_at as updatedAt,
          coalesce((
@@ -134,6 +135,7 @@ export function getProductLocal(id: string): ProductDetail | null {
         description: string;
         imagePath: string | null;
         status: string;
+        deletedAt: string | null;
         createdAt: string;
         updatedAt: string;
         totalOnHand: number;
@@ -154,6 +156,7 @@ export function getProductLocal(id: string): ProductDetail | null {
     description: row.description,
     imagePath: row.imagePath,
     status: row.status as EntityStatus,
+    deletedAt: row.deletedAt,
     totalOnHand: num(row.totalOnHand),
     totalReserved: num(row.totalReserved),
     totalAvailable: num(row.totalAvailable),
@@ -189,12 +192,13 @@ export function listProductSkusLocal(productId: string): ProductSkuDetail[] {
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
          s.track_inventory as trackInventory,
-         s.status
+         s.status,
+         s.deleted_at as deletedAt
        from product_skus s
        left join units bu on bu.id = s.base_unit_id
        left join units pu on pu.id = s.purchase_unit_id
        where s.product_id = ? and s.tenant_id = ?
-       order by s.sku collate nocase`,
+       order by (s.deleted_at is not null), s.sku collate nocase`,
     )
     .all(productId, DEMO_STORE_TENANT_ID) as Array<Record<string, unknown>>;
   return rows.map(mapProductSkuRow);
@@ -233,6 +237,7 @@ function mapProductSkuRow(r: Record<string, unknown>): ProductSkuDetail {
     maximumStockLevel: numOrNull(r.maximumStockLevel),
     trackInventory: Boolean(r.trackInventory),
     status: r.status as EntityStatus,
+    deletedAt: (r.deletedAt as string | null) ?? null,
   };
 }
 
@@ -404,6 +409,7 @@ export function getVendorLocal(id: string): VendorDetail | null {
          v.group_id as groupId,
          g.name as groupName,
          v.status,
+         v.deleted_at as deletedAt,
          v.address,
          v.city,
          v.state,
@@ -428,6 +434,7 @@ export function getVendorLocal(id: string): VendorDetail | null {
         groupId: string | null;
         groupName: string | null;
         status: string;
+        deletedAt: string | null;
         address: string | null;
         city: string | null;
         state: string | null;
@@ -466,6 +473,7 @@ export function getVendorLocal(id: string): VendorDetail | null {
     groupId: row.groupId,
     groupName: row.groupName,
     status: row.status as EntityStatus,
+    deletedAt: row.deletedAt,
     address: row.address,
     city: row.city,
     state: row.state,
@@ -672,7 +680,8 @@ export function getSkuLocal(id: string): SkuDetail | null {
          s.minimum_stock_level as minimumStockLevel,
          s.maximum_stock_level as maximumStockLevel,
          s.track_inventory as trackInventory,
-         s.status
+         s.status,
+         s.deleted_at as deletedAt
        from product_skus s
        inner join products p on p.id = s.product_id
        left join units bu on bu.id = s.base_unit_id
@@ -709,6 +718,7 @@ export function getSkuLocal(id: string): SkuDetail | null {
     maximumStockLevel: numOrNull(row.maximumStockLevel),
     trackInventory: Boolean(row.trackInventory),
     status: row.status as EntityStatus,
+    deletedAt: (row.deletedAt as string | null) ?? null,
   };
 }
 
@@ -849,6 +859,8 @@ export function searchSkusLocal(
         and @warehouseId != ''
        where s.tenant_id = @tenantId
          and s.status = 'active'
+         and s.deleted_at is null
+         and p.deleted_at is null
          and (
            @q = ''
            or lower(p.name) like '%' || @q || '%'
@@ -914,6 +926,8 @@ export function getSkuByBarcodeLocal(
         and st.tenant_id = s.tenant_id
        where s.tenant_id = ?
          and s.status = 'active'
+         and s.deleted_at is null
+         and p.deleted_at is null
          and s.id = ?
        limit 1`,
     )

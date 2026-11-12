@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { Badge } from "@blackbox/ui/badge";
 import { Button } from "@blackbox/ui/button";
 import { RequirePermission } from "@/components/require-permission";
 import { useAuth } from "@/components/auth-provider";
@@ -17,7 +18,9 @@ import {
   SectionCard,
 } from "@/components/section-card";
 import {
+  deleteDevice,
   getDevice,
+  restoreDevice,
   revokeDevice,
   trustDevice,
   type DeviceDto,
@@ -35,6 +38,7 @@ export default function DeviceDetailPage() {
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [trustConfirmOpen, setTrustConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +95,42 @@ export default function DeviceDetailPage() {
     }
   }
 
+  async function onDelete() {
+    if (!device) return;
+    setBusy(true);
+    setSuccess(null);
+    setFormError(null);
+    try {
+      const updated = await deleteDevice(device.id);
+      setDevice(updated);
+      setDeleteConfirmOpen(false);
+      setSuccess("Device deleted. Find it under the Deleted filter to restore.");
+    } catch (err) {
+      setDeleteConfirmOpen(false);
+      setFormError(toUserFacingError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRestore() {
+    if (!device) return;
+    setBusy(true);
+    setSuccess(null);
+    setFormError(null);
+    try {
+      const updated = await restoreDevice(device.id);
+      setDevice(updated);
+      setSuccess("Device restored. Trust it again before it can sync.");
+    } catch (err) {
+      setFormError(toUserFacingError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canManage = hasPermission("devices.manage");
+
   return (
     <RequirePermission permissions={["devices.read"]}>
       <div className="bb-page-narrow">
@@ -105,7 +145,13 @@ export default function DeviceDetailPage() {
           }
           title={device?.name ?? "Device"}
           actions={
-            device ? <DeviceStatusBadge status={device.status} /> : null
+            device ? (
+              device.deletedAt ? (
+                <Badge variant="outline">Deleted</Badge>
+              ) : (
+                <DeviceStatusBadge status={device.status} />
+              )
+            ) : null
           }
         />
 
@@ -158,7 +204,19 @@ export default function DeviceDetailPage() {
               </dl>
             </SectionCard>
 
-            {hasPermission("devices.manage") &&
+            {canManage && device.deletedAt ? (
+              <SectionCard
+                title="Restore device"
+                description="Bring this device back to the list. It stays revoked until you trust it again."
+              >
+                <Button disabled={busy} onClick={() => void onRestore()}>
+                  Restore device
+                </Button>
+              </SectionCard>
+            ) : null}
+
+            {canManage &&
+            !device.deletedAt &&
             (device.status === "pending" || device.status === "revoked") ? (
               <SectionCard
                 title={
@@ -179,10 +237,10 @@ export default function DeviceDetailPage() {
               </SectionCard>
             ) : null}
 
-            {hasPermission("devices.manage") && device.status !== "revoked" ? (
+            {canManage && !device.deletedAt && device.status !== "revoked" ? (
               <SectionCard
                 title="Danger zone"
-                description="Revoking a device immediately ends its trusted access."
+                description="Revoking locks the desktop to a blank dashboard and erases its local data."
               >
                 <Button
                   variant="destructive"
@@ -190,6 +248,21 @@ export default function DeviceDetailPage() {
                   onClick={() => setConfirmOpen(true)}
                 >
                   Revoke device
+                </Button>
+              </SectionCard>
+            ) : null}
+
+            {canManage && !device.deletedAt ? (
+              <SectionCard
+                title="Delete device"
+                description="Deleting revokes the device, erases its local data, and hides it from the devices list."
+              >
+                <Button
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  Delete device
                 </Button>
               </SectionCard>
             ) : null}
@@ -207,7 +280,7 @@ export default function DeviceDetailPage() {
         }
         description={
           device?.status === "revoked"
-            ? "Sync will resume once the desktop user signs in again."
+            ? "The desktop downloads a fresh copy from the cloud. Changes that were only on that device are discarded."
             : "The desktop can push and pull sync for this tenant once trusted."
         }
         confirmLabel={
@@ -221,11 +294,22 @@ export default function DeviceDetailPage() {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Revoke device?"
-        description="This device will lose trusted access. An owner can trust it again from this page."
+        description="The desktop is locked to a blank dashboard and its local data is erased, including anything that has not synced. Trusting it again downloads a fresh copy from the cloud."
         confirmLabel="Revoke device"
         destructive
         loading={busy}
         onConfirm={onRevoke}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete device?"
+        description="This device will be revoked, its local data erased, and it will be hidden from the devices list. You can restore it from the Deleted filter, then trust it again."
+        confirmLabel="Delete device"
+        destructive
+        loading={busy}
+        onConfirm={onDelete}
       />
     </RequirePermission>
   );

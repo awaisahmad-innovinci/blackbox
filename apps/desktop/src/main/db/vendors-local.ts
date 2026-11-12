@@ -14,11 +14,11 @@ export function upsertVendorLocal(detail: VendorDetail): void {
       `insert into vendors (
         id, tenant_id, name, vendor_code, group_id, address, city, state, country,
         postal_code, sales_target, credit_limit, payment_terms, tax_number, notes,
-        status, created_at, updated_at, sync_status, server_updated_at
+        status, deleted_at, created_at, updated_at, sync_status, server_updated_at
       ) values (
         @id, @tenantId, @name, @vendorCode, @groupId, @address, @city, @state, @country,
         @postalCode, @salesTarget, @creditLimit, @paymentTerms, @taxNumber, @notes,
-        @status, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
+        @status, @deletedAt, @createdAt, @updatedAt, 'synced', @serverUpdatedAt
       )
       on conflict(id) do update set
         name = excluded.name,
@@ -35,6 +35,7 @@ export function upsertVendorLocal(detail: VendorDetail): void {
         tax_number = excluded.tax_number,
         notes = excluded.notes,
         status = excluded.status,
+      deleted_at = case when @deletedAtSet = 1 then excluded.deleted_at else deleted_at end,
         updated_at = excluded.updated_at,
         sync_status = 'synced',
         server_updated_at = excluded.server_updated_at`,
@@ -55,6 +56,8 @@ export function upsertVendorLocal(detail: VendorDetail): void {
       taxNumber: detail.taxNumber,
       notes: detail.notes,
       status: detail.status,
+      deletedAt: detail.deletedAt ?? null,
+      deletedAtSet: detail.deletedAt === undefined ? 0 : 1,
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
       serverUpdatedAt: detail.updatedAt,

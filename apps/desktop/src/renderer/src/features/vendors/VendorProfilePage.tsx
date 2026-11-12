@@ -18,6 +18,8 @@ import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { loadVendorLedger, loadVendorProfile } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { syncNow } from "@renderer/lib/sync/sync-status";
+import { useConfirm } from "@renderer/components/confirm-provider";
 import { canAccessPurchasingModule } from "@renderer/lib/sales-access";
 import { useSession } from "@renderer/lib/session/context";
 import { AddProductDialog } from "@renderer/features/products/AddProductDialog";
@@ -47,6 +49,7 @@ function contactBlock(
 export function VendorProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const location = useLocation();
   const flash = (location.state as { flash?: string; vendor?: VendorDetail } | null)
     ?.flash;
@@ -182,6 +185,78 @@ export function VendorProfilePage() {
     void load();
   }, [load]);
 
+  async function onDelete() {
+    if (!id || !vendor) return;
+    const ok = await confirm({
+      title: "Delete vendor?",
+      description: `${vendor.name} will be hidden from lists and pickers. Past purchase orders and payments keep it, and you can restore it from the Deleted filter.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    setError(null);
+    try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        await commitLocalChange({
+          entityType: "vendor",
+          entityId: id,
+          operation: "DELETE",
+          payload: {
+            ...vendor,
+            status: "inactive",
+            deletedAt: now,
+            updatedAt: now,
+          } as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        navigate("/vendors");
+        return;
+      }
+      const updated = await vendorsApi.delete(id);
+      try {
+        await window.blackbox?.localDb?.upsertVendor(updated);
+      } catch {
+        /* optional cache */
+      }
+      navigate("/vendors");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to delete vendor"));
+    }
+  }
+
+  async function onRestore() {
+    if (!id || !vendor) return;
+    setError(null);
+    try {
+      if (await isDeviceBound()) {
+        const updated: VendorDetail = {
+          ...vendor,
+          status: "inactive",
+          deletedAt: null,
+          updatedAt: new Date().toISOString(),
+        };
+        await commitLocalChange({
+          entityType: "vendor",
+          entityId: id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setVendor(updated);
+        return;
+      }
+      const updated = await vendorsApi.restore(id);
+      try {
+        await window.blackbox?.localDb?.upsertVendor(updated);
+      } catch {
+        /* optional cache */
+      }
+      setVendor(updated);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to restore vendor"));
+    }
+  }
+
   if (error && !vendor) {
     return (
       <div
@@ -237,12 +312,29 @@ export function VendorProfilePage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">{vendor.vendorCode}</p>
           <p className="mt-2 text-sm capitalize">
-            Status: <span className="font-medium">{vendor.status}</span>
+            Status:{" "}
+            <span className="font-medium">
+              {vendor.deletedAt ? "deleted" : vendor.status}
+            </span>
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate(`/vendors/${vendor.id}/edit`)}>
-          Edit
-        </Button>
+        {vendor.deletedAt ? (
+          <Button variant="outline" onClick={() => void onRestore()}>
+            Restore
+          </Button>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/vendors/${vendor.id}/edit`)}
+            >
+              Edit
+            </Button>
+            <Button variant="destructive" onClick={() => void onDelete()}>
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
 
       <section className="space-y-3">

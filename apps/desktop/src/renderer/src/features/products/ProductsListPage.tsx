@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type {
   Brand,
   Category,
-  EntityStatus,
+  EntityStatusFilter,
   ProductListItem,
 } from "@blackbox/shared";
 import { PRODUCT_TYPE_LABELS } from "@blackbox/shared";
@@ -44,7 +44,7 @@ export function ProductsListPage() {
   const navigate = useNavigate();
   const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<EntityStatus | "">("");
+  const [status, setStatus] = useState<EntityStatusFilter | "">("");
   const [brandId, setBrandId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -168,11 +168,12 @@ export function ProductsListPage() {
           className={FILTER_SELECT_CLASS}
           {...filterSelectProps()}
           value={status}
-          onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
+          onChange={(e) => setStatus(e.target.value as EntityStatusFilter | "")}
         >
           <option value="">All statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
+          <option value="deleted">Deleted</option>
         </select>
         <select
           className={FILTER_SELECT_CLASS}
@@ -263,7 +264,9 @@ export function ProductsListPage() {
                   <td className="px-4 py-3 tabular-nums">{p.skuCount}</td>
                   <td className="px-4 py-3 tabular-nums">{p.totalAvailable}</td>
                   <td className="px-4 py-3 tabular-nums">{p.supplierCount}</td>
-                  <td className="px-4 py-3 capitalize">{p.status}</td>
+                  <td className="px-4 py-3 capitalize">
+                    {p.deletedAt ? "Deleted" : p.status}
+                  </td>
                 </ListTableRow>
               ))
             )}

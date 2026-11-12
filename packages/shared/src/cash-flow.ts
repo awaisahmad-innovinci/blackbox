@@ -115,6 +115,8 @@ export interface CashFlowReport {
   collections: CashCollectionRow[];
   expenses: CashExpenseRow[];
   drawers: ManagerDrawerBalance[];
+  /** Running owner drawer. Zero unless the viewer is the owner. Not limited to the report dates. */
+  ownerCashBalance: number;
 }
 
 export interface RecordCashExpenseRequest {

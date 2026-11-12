@@ -17,6 +17,10 @@ export type SessionValue = {
   /** True when the session was restored from cache without reaching the API. */
   offline: boolean;
   deviceState: DeviceState;
+  /** Revoked, or trusted again and still downloading a fresh database. */
+  deviceLocked: boolean;
+  /** True while the fresh database is downloading after the device is trusted again. */
+  deviceRestoring: boolean;
   signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshDeviceState: () => Promise<void>;

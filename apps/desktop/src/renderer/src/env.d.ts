@@ -5,7 +5,7 @@ import type {
   CashierDashboardSummary,
   Category,
   DashboardSummary,
-  EntityStatus,
+  EntityStatusFilter,
   ManagerDashboardSummary,
   CashFlowReport,
   ManagerStockOverviewQuery,
@@ -100,6 +100,8 @@ declare global {
       platform: NodeJS.Platform;
       localDb?: {
         getStatus: () => Promise<LocalDbStatus>;
+        wipe: () => Promise<{ ok: true }>;
+        reopen: () => Promise<{ ok: true }>;
         rebuildPosBalanceFromDocuments: () => Promise<{ ok: true }>;
         revealDatabaseInFolder: () => Promise<
           { ok: true } | { ok: false; message: string }
@@ -357,6 +359,7 @@ declare global {
         getCashierDashboardSummary: (
           userId: string,
         ) => Promise<CashierDashboardSummary>;
+        getOwnerCashBalance: (ownerUserId: string) => Promise<number>;
         getManagerDashboardSummary: (
           userId: string,
           seeAll?: boolean,
@@ -372,16 +375,16 @@ declare global {
         listManagerStockOverview: (
           query?: ManagerStockOverviewQuery,
         ) => Promise<PaginatedManagerStockOverview>;
-        listBrands: (status?: EntityStatus | "all") => Promise<Brand[]>;
+        listBrands: (status?: EntityStatusFilter) => Promise<Brand[]>;
         getBrand: (id: string) => Promise<Brand | null>;
-        listCategories: (status?: EntityStatus | "all") => Promise<Category[]>;
+        listCategories: (status?: EntityStatusFilter) => Promise<Category[]>;
         getCategory: (id: string) => Promise<Category | null>;
         listVendorGroups: (
-          status?: EntityStatus | "all",
+          status?: EntityStatusFilter,
         ) => Promise<VendorGroup[]>;
         getVendorGroup: (id: string) => Promise<VendorGroup | null>;
         listWarehouses: (
-          status?: EntityStatus | "all",
+          status?: EntityStatusFilter,
         ) => Promise<WarehouseListItem[]>;
         getWarehouse: (id: string) => Promise<WarehouseListItem | null>;
         listUnits: () => Promise<UnitListItem[]>;

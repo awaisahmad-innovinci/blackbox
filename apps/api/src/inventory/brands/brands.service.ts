@@ -12,6 +12,7 @@ import {
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { Brand } from "../../db/entities";
+import { applyStatusFilter, toDeletedAt } from "../common/soft-delete";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import {
   CreateBrandDto,
@@ -33,10 +34,7 @@ export class BrandsService {
       .createQueryBuilder("b")
       .where("b.tenant_id = :tenantId", { tenantId });
 
-    const status = query.status ?? "active";
-    if (status !== "all") {
-      qb.andWhere("b.status = :status", { status });
-    }
+    applyStatusFilter(qb, "b", query.status);
     if (query.q?.trim()) {
       const term = `%${query.q.trim().toLowerCase()}%`;
       qb.andWhere(
@@ -66,7 +64,7 @@ export class BrandsService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Brand name already exists");
+        throw new ConflictException("Brand name already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -82,7 +80,7 @@ export class BrandsService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Brand name already exists");
+        throw new ConflictException("Brand name already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -91,6 +89,21 @@ export class BrandsService {
   async deactivate(id: string): Promise<BrandDto> {
     const row = await this.require(id);
     row.status = "inactive";
+    await this.brands.save(row);
+    return this.map(row);
+  }
+
+  async softDelete(id: string): Promise<BrandDto> {
+    const row = await this.require(id);
+    row.status = "inactive";
+    row.deletedAt = row.deletedAt ?? new Date();
+    await this.brands.save(row);
+    return this.map(row);
+  }
+
+  async restore(id: string): Promise<BrandDto> {
+    const row = await this.require(id);
+    row.deletedAt = null;
     await this.brands.save(row);
     return this.map(row);
   }
@@ -109,6 +122,7 @@ export class BrandsService {
       name: b.name,
       description: b.description,
       status: b.status as EntityStatus,
+      deletedAt: toDeletedAt(b.deletedAt),
     };
   }
 }

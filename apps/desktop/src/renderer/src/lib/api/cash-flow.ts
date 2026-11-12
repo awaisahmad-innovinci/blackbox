@@ -27,9 +27,19 @@ export const cashFlowApi = {
       body: JSON.stringify(body),
     });
   },
-  submit(): Promise<{ id: string; amount: number }> {
+  recordOwnerCash(
+    amount: number,
+    note?: string,
+  ): Promise<{ id: string; amount: number }> {
+    return apiFetch<{ id: string; amount: number }>("/cash-flow/owner-cash", {
+      method: "POST",
+      body: JSON.stringify({ amount, note }),
+    });
+  },
+  submit(amount: number): Promise<{ id: string; amount: number }> {
     return apiFetch<{ id: string; amount: number }>("/cash-flow/drawer-submissions", {
       method: "POST",
+      body: JSON.stringify({ amount }),
     });
   },
 };

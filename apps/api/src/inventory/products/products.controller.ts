@@ -60,6 +60,20 @@ export class ProductsController {
     return this.products.deactivate(id);
   }
 
+  @Post(":id/delete")
+  softDelete(
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<ProductDetail> {
+    return this.products.softDelete(id);
+  }
+
+  @Post(":id/restore")
+  restore(
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<ProductDetail> {
+    return this.products.restore(id);
+  }
+
   @Get(":id/skus")
   listSkus(
     @Param("id", ParseUUIDPipe) id: string,

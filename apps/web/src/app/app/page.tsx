@@ -120,31 +120,31 @@ export default function DashboardPage() {
     };
   }, [hasPermission]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setOverviewLoading(true);
-      setOverviewError(null);
-      try {
-        const next = await getOwnerOverview();
-        if (!cancelled) setOverview(next);
-      } catch (err) {
-        if (!cancelled) {
-          setOverview(null);
-          setOverviewError(
-            err instanceof Error
-              ? err.message
-              : "Could not load today's overview.",
-          );
-        }
-      } finally {
-        if (!cancelled) setOverviewLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   void (async () => {
+  //     setOverviewLoading(true);
+  //     setOverviewError(null);
+  //     try {
+  //       const next = await getOwnerOverview();
+  //       if (!cancelled) setOverview(next);
+  //     } catch (err) {
+  //       if (!cancelled) {
+  //         setOverview(null);
+  //         setOverviewError(
+  //           err instanceof Error
+  //             ? err.message
+  //             : "Could not load today's overview.",
+  //         );
+  //       }
+  //     } finally {
+  //       if (!cancelled) setOverviewLoading(false);
+  //     }
+  //   })();
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, []);
 
   const actions = QUICK.filter((item) => hasPermission(item.permission));
 
@@ -152,7 +152,7 @@ export default function DashboardPage() {
     <div className="bb-page">
       <PageHeader
         title="Dashboard"
-        description="Today's sales, cash, and stock for this workspace."
+        // description="Today's sales, cash, and stock for this workspace."
       />
 
       {overviewError ? (
@@ -161,14 +161,14 @@ export default function DashboardPage() {
         </p>
       ) : null}
 
-      {overviewLoading ? (
+      {/* {overviewLoading ? (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Loading today&apos;s overview…
         </p>
       ) : overview ? (
         <OwnerOverview overview={overview} />
-      ) : null}
+      ) : null} */}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <SectionCard title="Workspace" className="md:col-span-2 xl:col-span-2">
@@ -337,10 +337,10 @@ function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
         ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard title="Cash still in tills">
+        <SectionCard title="Cash in cashier tills">
           {overview.cashierTills.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No uncollected till cash.
+              No cash in cashier tills.
             </p>
           ) : (
             <ul className="divide-y text-sm">
@@ -362,7 +362,7 @@ function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
                 </li>
               ))}
               <li className="flex items-center justify-between gap-4 py-2 font-medium">
-                <span>Total not collected</span>
+                <span>Current balance</span>
                 <span className="tabular-nums">{money(overview.tillCashTotal)}</span>
               </li>
             </ul>
@@ -370,55 +370,33 @@ function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
         </SectionCard>
         <SectionCard
           title="Cash collected"
-          description="Cash managers handed over today"
+          description="Cash on hand. It stays until the owner spends it on expenses or manager drawers."
         >
           <p className="font-display text-3xl font-semibold tracking-tight tabular-nums">
-            {money(overview.cashSubmittedToday)}
+            {money(overview.ownerCashBalance)}
           </p>
-          {overview.cashSubmissionsToday.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No cash submitted today.
-            </p>
-          ) : (
-            <ul className="divide-y text-sm">
-              {overview.cashSubmissionsToday.map((row) => (
-                <li
-                  key={row.managerUserId}
-                  className="flex items-center justify-between gap-4 py-2"
-                >
-                  <span>{row.managerName}</span>
-                  <span className="tabular-nums">{money(row.amount)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </SectionCard>
       </div>
       <SectionCard title="Cash in manager drawers">
-        {overview.drawers.length === 0 ? (
+        {overview.drawers.filter((drawer) => drawer.balance > 0).length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No cash in manager drawers.
           </p>
         ) : (
-          <ul className="divide-y text-sm">
-            {overview.drawers.map((drawer) => (
-              <li
-                key={drawer.managerUserId}
-                className="flex items-start justify-between gap-4 py-2"
-              >
-                <span>
-                  {drawer.managerName}
-                  <span className="text-muted-foreground block text-xs">
-                    Opening {formatMoney(drawer.openingFloat)} · Collected{" "}
-                    {formatMoney(drawer.collected)} · Till floats{" "}
-                    {formatMoney(drawer.tillFloats)} · Expenses{" "}
-                    {formatMoney(drawer.expenses)} · Submitted{" "}
-                    {formatMoney(drawer.submitted)}
+          <ul className="divide-y text-base">
+            {overview.drawers
+              .filter((drawer) => drawer.balance > 0)
+              .map((drawer) => (
+                <li
+                  key={drawer.managerUserId}
+                  className="flex items-center justify-between gap-4 py-2.5"
+                >
+                  <span className="font-medium">{drawer.managerName}</span>
+                  <span className="text-lg font-bold tabular-nums">
+                    {money(drawer.balance)}
                   </span>
-                </span>
-                <span className="tabular-nums">{money(drawer.balance)}</span>
-              </li>
-            ))}
+                </li>
+              ))}
           </ul>
         )}
       </SectionCard>

@@ -47,6 +47,9 @@ export class User {
   @Column({ name: "deactivated_at", type: "timestamptz", nullable: true })
   deactivatedAt!: Date | null;
 
+  @Column({ name: "deleted_at", type: "timestamptz", nullable: true })
+  deletedAt!: Date | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

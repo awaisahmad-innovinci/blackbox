@@ -16,16 +16,17 @@ export function upsertBrandLocal(row: Brand): void {
   const ts = nowIso();
   db.prepare(
     `insert into brands (
-      id, tenant_id, name, description, status,
+      id, tenant_id, name, description, status, deleted_at,
       created_at, updated_at, sync_status, server_updated_at
     ) values (
-      @id, @tenantId, @name, @description, @status,
+      @id, @tenantId, @name, @description, @status, @deletedAt,
       @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
     on conflict(id) do update set
       name = excluded.name,
       description = excluded.description,
       status = excluded.status,
+      deleted_at = case when @deletedAtSet = 1 then excluded.deleted_at else deleted_at end,
       updated_at = excluded.updated_at,
       sync_status = 'synced',
       server_updated_at = excluded.server_updated_at`,
@@ -35,6 +36,8 @@ export function upsertBrandLocal(row: Brand): void {
     name: row.name,
     description: row.description,
     status: row.status,
+    deletedAt: row.deletedAt ?? null,
+    deletedAtSet: row.deletedAt === undefined ? 0 : 1,
     createdAt: ts,
     updatedAt: ts,
     serverUpdatedAt: ts,
@@ -46,16 +49,17 @@ export function upsertCategoryLocal(row: Category): void {
   const ts = nowIso();
   db.prepare(
     `insert into categories (
-      id, tenant_id, name, description, status,
+      id, tenant_id, name, description, status, deleted_at,
       created_at, updated_at, sync_status, server_updated_at
     ) values (
-      @id, @tenantId, @name, @description, @status,
+      @id, @tenantId, @name, @description, @status, @deletedAt,
       @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
     on conflict(id) do update set
       name = excluded.name,
       description = excluded.description,
       status = excluded.status,
+      deleted_at = case when @deletedAtSet = 1 then excluded.deleted_at else deleted_at end,
       updated_at = excluded.updated_at,
       sync_status = 'synced',
       server_updated_at = excluded.server_updated_at`,
@@ -65,6 +69,8 @@ export function upsertCategoryLocal(row: Category): void {
     name: row.name,
     description: row.description,
     status: row.status,
+    deletedAt: row.deletedAt ?? null,
+    deletedAtSet: row.deletedAt === undefined ? 0 : 1,
     createdAt: ts,
     updatedAt: ts,
     serverUpdatedAt: ts,
@@ -108,16 +114,17 @@ export function upsertVendorGroupLocal(row: VendorGroup): void {
   const ts = nowIso();
   db.prepare(
     `insert into vendor_groups (
-      id, tenant_id, name, description, status,
+      id, tenant_id, name, description, status, deleted_at,
       created_at, updated_at, sync_status, server_updated_at
     ) values (
-      @id, @tenantId, @name, @description, @status,
+      @id, @tenantId, @name, @description, @status, @deletedAt,
       @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
     on conflict(id) do update set
       name = excluded.name,
       description = excluded.description,
       status = excluded.status,
+      deleted_at = case when @deletedAtSet = 1 then excluded.deleted_at else deleted_at end,
       updated_at = excluded.updated_at,
       sync_status = 'synced',
       server_updated_at = excluded.server_updated_at`,
@@ -127,6 +134,8 @@ export function upsertVendorGroupLocal(row: VendorGroup): void {
     name: row.name,
     description: row.description,
     status: row.status,
+    deletedAt: row.deletedAt ?? null,
+    deletedAtSet: row.deletedAt === undefined ? 0 : 1,
     createdAt: ts,
     updatedAt: ts,
     serverUpdatedAt: ts,
