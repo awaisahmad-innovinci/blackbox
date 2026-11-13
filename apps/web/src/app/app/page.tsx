@@ -120,31 +120,31 @@ export default function DashboardPage() {
     };
   }, [hasPermission]);
 
-  // useEffect(() => {
-  //   let cancelled = false;
-  //   void (async () => {
-  //     setOverviewLoading(true);
-  //     setOverviewError(null);
-  //     try {
-  //       const next = await getOwnerOverview();
-  //       if (!cancelled) setOverview(next);
-  //     } catch (err) {
-  //       if (!cancelled) {
-  //         setOverview(null);
-  //         setOverviewError(
-  //           err instanceof Error
-  //             ? err.message
-  //             : "Could not load today's overview.",
-  //         );
-  //       }
-  //     } finally {
-  //       if (!cancelled) setOverviewLoading(false);
-  //     }
-  //   })();
-  //   return () => {
-  //     cancelled = true;
-  //   };
-  // }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setOverviewLoading(true);
+      setOverviewError(null);
+      try {
+        const next = await getOwnerOverview();
+        if (!cancelled) setOverview(next);
+      } catch (err) {
+        if (!cancelled) {
+          setOverview(null);
+          setOverviewError(
+            err instanceof Error
+              ? err.message
+              : "Could not load today's overview.",
+          );
+        }
+      } finally {
+        if (!cancelled) setOverviewLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const actions = QUICK.filter((item) => hasPermission(item.permission));
 
@@ -161,14 +161,14 @@ export default function DashboardPage() {
         </p>
       ) : null}
 
-      {/* {overviewLoading ? (
+      {overviewLoading ? (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Loading today&apos;s overview…
         </p>
       ) : overview ? (
         <OwnerOverview overview={overview} />
-      ) : null} */}
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <SectionCard title="Workspace" className="md:col-span-2 xl:col-span-2">
