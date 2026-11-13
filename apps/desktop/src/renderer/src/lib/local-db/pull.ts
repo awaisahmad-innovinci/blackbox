@@ -12,7 +12,7 @@ import type {
 import { SYNC_CATALOG_PAGE_SIZE } from "@blackbox/shared";
 import { brandsApi } from "@renderer/lib/api/brands";
 import { categoriesApi } from "@renderer/lib/api/categories";
-import { getApiErrorMessage } from "@renderer/lib/api/client";
+import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
 import { inventoryMovementsApi } from "@renderer/lib/api/inventory-movements";
 import { getAccessToken } from "@renderer/lib/api/session";
 import { syncApi } from "@renderer/lib/api/sync";
@@ -431,16 +431,27 @@ export async function runFullPull(
       },
     );
   } catch (err: unknown) {
-    if (err instanceof SyncPullError) throw err;
-    throw new SyncPullError(
-      "movements",
-      getApiErrorMessage(err, "Failed to sync inventory movements"),
-    );
+    if (err instanceof ApiError && err.status === 403) {
+      // #region agent log
+      fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"B",location:"pull.ts:movements",message:"movements 403 skipped",data:{status:err.status},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      report("movements", 1, 1, "Skipping movement history");
+    } else if (err instanceof SyncPullError) {
+      throw err;
+    } else {
+      throw new SyncPullError(
+        "movements",
+        getApiErrorMessage(err, "Failed to sync inventory movements"),
+      );
+    }
   }
 
   try {
     report("movements", 1, 1, "Rebuilding POS balance from synced documents…");
     await localDb.rebuildPosBalanceFromDocuments?.();
+    // #region agent log
+    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"C",location:"pull.ts:rebuild",message:"pos rebuild invoked",data:{},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   } catch (err: unknown) {
     throw new SyncPullError(
       "movements",

@@ -25,6 +25,7 @@ import { allocateOutNumber } from "../common/allocate-document-number";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { getRequestTenant } from "../../common/request-tenant";
 import { ActivityLogService } from "../../activity-log/activity-log.service";
+import { SyncService } from "../../sync/sync.service";
 import { applyInventoryOutBalanceDelta } from "./inventory-out-balance";
 import { CreateInventoryOutDto } from "./dto/inventory-out.dto";
 import { ListInventoryOutQueryDto } from "./dto/list-inventory-out-query.dto";
@@ -50,6 +51,7 @@ export class InventoryOutService {
     @InjectRepository(Warehouse)
     private readonly warehouses: Repository<Warehouse>,
     private readonly activityLog: ActivityLogService,
+    private readonly sync: SyncService,
   ) {}
 
   async list(query: ListInventoryOutQueryDto): Promise<PaginatedInventoryOuts> {
@@ -311,6 +313,12 @@ export class InventoryOutService {
         },
       });
     }
+    await this.sync.publishFromRest({
+      entityType: "inventory_out",
+      entityId: posted.id,
+      operation: "UPSERT",
+      payload: { ...posted } as Record<string, unknown>,
+    });
     return posted;
   }
 

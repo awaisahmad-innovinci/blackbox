@@ -51,6 +51,9 @@ export function startAutoSync(): void {
     }
     maybeStartCatalogSync();
     const ok = await syncNow();
+    // #region agent log
+    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"D",location:"auto-sync.ts:tick",message:"auto sync tick",data:{ok,intervalMs:current.intervalMs},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (ok) await flushPendingFbrSales();
     current.intervalMs = ok
       ? BASE_INTERVAL_MS

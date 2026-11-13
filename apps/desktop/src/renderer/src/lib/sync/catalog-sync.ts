@@ -166,6 +166,9 @@ async function runCatalogSync(): Promise<void> {
     }
   }
 
+  // #region agent log
+  fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"A-B",location:"catalog-sync.ts:runCatalogSync",message:"catalog gate",data:{interrupted,needsFullResync,behind,hasLastPull:Boolean(lastPull),lastPull},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!interrupted && lastPull && !needsFullResync && !behind) return;
 
   setState({ active: true, error: null, message: "Updating catalog…" });
@@ -187,6 +190,9 @@ async function runCatalogSync(): Promise<void> {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Catalog sync failed";
+    // #region agent log
+    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"B",location:"catalog-sync.ts:catch",message:"catalog sync failed",data:{message},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     setState({ active: false, error: message, message: null });
   }
 }

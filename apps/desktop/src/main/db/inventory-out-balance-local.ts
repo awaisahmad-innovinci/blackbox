@@ -150,6 +150,9 @@ export function rebuildInventoryOutBalanceFromDocumentsLocal(): void {
   for (const row of outLines) {
     bump(row.warehouseId, row.productSkuId, row.quantity, row.unitCost);
   }
+  // #region agent log
+  fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"C",location:"inventory-out-balance-local.ts:rebuild",message:"rebuild source lines",data:{postedOutLines:outLines.length,positiveSkus:[...net.values()].filter((row)=>row.qty>0).length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   const outReturnLines = db
     .prepare(

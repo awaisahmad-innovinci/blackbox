@@ -157,7 +157,10 @@ export function listWarehousesLocal(
        from warehouses
        where tenant_id = @tenantId
          and ${statusFilterSql()}
-       order by name collate nocase`,
+       order by (
+         select count(*) from inventory_out_items i
+         where i.warehouse_id = warehouses.id and i.quantity > 0
+       ) desc, name collate nocase`,
     )
     .all({ tenantId: DEMO_STORE_TENANT_ID, status: status ?? "all" }) as WarehouseListItem[];
 }

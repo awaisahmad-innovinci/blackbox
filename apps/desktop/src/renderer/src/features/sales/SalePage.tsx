@@ -284,6 +284,9 @@ export function SalePage() {
         setWarehouses(rows);
         if (rows.length > 0) {
           setWarehouseId((current) => current || rows[0]!.id);
+          // #region agent log
+          fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"post-fix",hypothesisId:"E",location:"SalePage.tsx:warehouses",message:"default warehouse",data:{firstId:rows[0]!.id,firstName:rows[0]!.name,count:rows.length},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
         }
       })
       .catch(() => undefined);

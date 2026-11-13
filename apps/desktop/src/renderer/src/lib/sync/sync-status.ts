@@ -81,9 +81,15 @@ export async function syncNow(): Promise<boolean> {
       dataVersion:
         pushed + pulled > 0 ? state.dataVersion + 1 : state.dataVersion,
     });
+    // #region agent log
+    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"A-D",location:"sync-status.ts:syncNow",message:"incremental sync ok",data:{pushed,pulled},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return true;
   } catch (error: unknown) {
     const offline = error instanceof TypeError;
+    // #region agent log
+    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"D",location:"sync-status.ts:syncNow",message:"incremental sync failed",data:{offline,error:error instanceof Error?error.message:"unknown"},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     setState({
       offline,
       lastError: offline
