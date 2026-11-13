@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,22 +37,45 @@ if (files.length === 0) {
 }
 files.sort((a, b) => Number(a.endsWith(".yml")) - Number(b.endsWith(".yml")));
 
-const supabase = createClient(storageUrl, secretKey);
+const keyKind = secretKey.startsWith("sb_secret_")
+  ? "secret"
+  : secretKey.startsWith("eyJ")
+    ? "jwt"
+    : "other";
+
+// #region agent log
+fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"post-fix",hypothesisId:"A",location:"scripts/upload-desktop-release.mjs:41",message:"upload starting without supabase-js",data:{bucket,fileCount:files.length,keyKind,node:process.version},timestamp:Date.now()})}).catch(()=>{});
+// #endregion
 
 for (const file of files) {
   const filePath = path.join(releaseDir, file);
   const body = readFileSync(filePath);
+  const contentType = file.endsWith(".yml")
+    ? "text/yaml"
+    : "application/octet-stream";
+  const url = `${storageUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeURIComponent(file)}`;
   console.log(`Uploading ${file} to ${bucket}...`);
-  const { error } = await supabase.storage.from(bucket).upload(file, body, {
-    upsert: true,
-    cacheControl: "60",
-    contentType: file.endsWith(".yml")
-      ? "text/yaml"
-      : "application/octet-stream",
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: secretKey,
+      Authorization: `Bearer ${secretKey}`,
+      "Content-Type": contentType,
+      "cache-control": "60",
+      "x-upsert": "true",
+    },
+    body,
   });
-  if (error) {
-    console.error(`Failed to upload ${file}:`, error.message);
+  if (!response.ok) {
+    const detail = await response.text();
+    // #region agent log
+    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"post-fix",hypothesisId:"D",location:"scripts/upload-desktop-release.mjs:68",message:"storage upload rejected",data:{file,status:response.status,detail:detail.slice(0,180),keyKind},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    console.error(`Failed to upload ${file}: ${response.status} ${detail}`);
     process.exit(1);
   }
+  // #region agent log
+  fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"post-fix",hypothesisId:"A",location:"scripts/upload-desktop-release.mjs:76",message:"storage upload accepted",data:{file,status:response.status,keyKind},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   console.log(`Uploaded ${file}`);
 }
