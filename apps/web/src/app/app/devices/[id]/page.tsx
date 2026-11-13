@@ -237,7 +237,10 @@ export default function DeviceDetailPage() {
               </SectionCard>
             ) : null}
 
-            {canManage && !device.deletedAt && device.status !== "revoked" ? (
+            {/* Previous condition (cloud-hub could be revoked): hasPermission("devices.manage") && device.status !== "revoked" */}
+            {hasPermission("devices.manage") &&
+            device.status !== "revoked" &&
+            device.fingerprint !== "cloud-hub" ? (
               <SectionCard
                 title="Danger zone"
                 description="Revoking locks the desktop to a blank dashboard and erases its local data."

@@ -51,6 +51,12 @@ export type RoleDto = {
   updatedAt: string;
 };
 
+export type PermissionDto = {
+  id: string;
+  key: string;
+  description: string;
+};
+
 export type DeviceDto = {
   id: string;
   tenantId: string;
@@ -165,6 +171,35 @@ export function restoreUser(id: string) {
 
 export function listRoles() {
   return apiFetch<RoleDto[]>("/roles");
+}
+
+export function getRole(id: string) {
+  return apiFetch<RoleDto>(`/roles/${id}`);
+}
+
+export function createRole(body: {
+  key: string;
+  name: string;
+  permissionIds?: string[];
+}) {
+  return apiJson<RoleDto>("/roles", "POST", body);
+}
+
+export function updateRole(
+  id: string,
+  body: { key?: string; name?: string },
+) {
+  return apiJson<RoleDto>(`/roles/${id}`, "PATCH", body);
+}
+
+export function replaceRolePermissions(id: string, permissionIds: string[]) {
+  return apiJson<RoleDto>(`/roles/${id}/permissions`, "PUT", {
+    permissionIds,
+  });
+}
+
+export function listPermissions() {
+  return apiFetch<PermissionDto[]>("/permissions");
 }
 
 export function replaceUserRoles(id: string, roleIds: string[]) {

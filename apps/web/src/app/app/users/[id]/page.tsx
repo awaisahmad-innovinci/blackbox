@@ -446,7 +446,10 @@ export default function UserDetailPage() {
               </SectionCard>
             ) : null}
 
-            {hasPermission("users.deactivate") && user.isActive ? (
+            {/* Previous condition (self could deactivate): hasPermission("users.deactivate") && user.isActive */}
+            {hasPermission("users.deactivate") &&
+            user.isActive &&
+            authUser?.id !== user.id ? (
               <SectionCard
                 title="Danger zone"
                 description="Deactivating prevents this user from signing in. An owner can activate them again from this page."
