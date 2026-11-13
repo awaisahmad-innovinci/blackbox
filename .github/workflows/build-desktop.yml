@@ -55,6 +55,8 @@ jobs:
           UNPACKED="apps/desktop/release/linux-unpacked/resources/app.asar.unpacked"
           pnpm exec asar list "$ASAR" | grep -q 'better-sqlite3' || \
             test -d "$UNPACKED/node_modules/better-sqlite3"
+          pnpm exec asar list "$ASAR" | grep -q 'electron-updater' || \
+            test -d "$UNPACKED/node_modules/electron-updater"
 
       - name: Verify packaged app contents (Windows)
         if: runner.os == 'Windows'
@@ -65,6 +67,23 @@ jobs:
           $hasAsar = $asar -match 'better-sqlite3'
           $hasUnpacked = Test-Path $unpacked
           if (-not $hasAsar -and -not $hasUnpacked) { throw 'Missing better-sqlite3 in packaged app' }
+          $hasUpdater = $asar -match 'electron-updater'
+          $updaterUnpacked = Test-Path "apps/desktop/release/win-unpacked/resources/app.asar.unpacked/node_modules/electron-updater"
+          if (-not $hasUpdater -and -not $updaterUnpacked) { throw 'Missing electron-updater in packaged app' }
+
+      - name: Upload release files to Supabase
+        shell: bash
+        env:
+          DESKTOP_UPDATE_STORAGE_URL: ${{ secrets.DESKTOP_UPDATE_STORAGE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          DESKTOP_UPDATE_BUCKET: ${{ vars.DESKTOP_UPDATE_BUCKET || 'releases-staging' }}
+        run: |
+          work="$RUNNER_TEMP/supabase-upload"
+          mkdir -p "$work"
+          cp scripts/upload-desktop-release.mjs "$work/upload.mjs"
+          npm init -y --prefix "$work"
+          npm install --prefix "$work" @supabase/supabase-js
+          RELEASE_DIR="$GITHUB_WORKSPACE/apps/desktop/release" node "$work/upload.mjs"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

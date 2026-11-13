@@ -50,6 +50,7 @@ import {
   reopenLocalDb,
   wipeLocalDb,
 } from "./db";
+import { startSilentUpdates } from "./silent-update";
 import {
   completeSaleReturnStandaloneLocal,
   completeSaleReturnWithSaleLocal,
@@ -1239,6 +1240,7 @@ app.whenReady().then(() => {
 
   registerIpc();
   createWindow();
+  startSilentUpdates();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
