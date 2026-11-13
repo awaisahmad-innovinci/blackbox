@@ -402,6 +402,11 @@ export interface ManagerDashboardSummary {
   /** Cash managers handed to the owner today. */
   cashSubmittedToday: number;
   cashSubmissionsToday: CashSubmissionToday[];
+  /**
+   * Running owner drawer: handovers and manual cash, minus the owner's
+   * expenses and drawer funding. Not limited to today.
+   */
+  ownerCashBalance: number;
 }
 
 /** Owner web dashboard — today's cloud sales, cash, and inventory counts. */
@@ -420,6 +425,8 @@ export interface OwnerBusinessOverview {
   drawers: ManagerDrawerBalance[];
   cashSubmittedToday: number;
   cashSubmissionsToday: CashSubmissionToday[];
+  /** Running owner drawer. Not limited to today. */
+  ownerCashBalance: number;
   productCount: number;
   lowStockCount: number;
   pendingPurchaseOrderCount: number;

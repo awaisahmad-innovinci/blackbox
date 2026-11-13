@@ -27,7 +27,7 @@ import {
   normalizeOptionalStoredText,
   normalizeStoredText,
 } from "@blackbox/shared";
-import { In, Repository } from "typeorm";
+import { In, IsNull, Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import {
   Brand,
@@ -40,6 +40,7 @@ import {
   Unit,
   VendorSku,
 } from "../../db/entities";
+import { applyStatusFilter, toDeletedAt } from "../common/soft-delete";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { SkuBarcodesService } from "../skus/sku-barcodes.service";
 import {
@@ -93,9 +94,7 @@ export class ProductsService {
       .createQueryBuilder("p")
       .where("p.tenant_id = :tenantId", { tenantId });
 
-    if (query.status) {
-      qb.andWhere("p.status = :status", { status: query.status });
-    }
+    applyStatusFilter(qb, "p", query.status, "all");
     if (query.brandId) {
       qb.andWhere("p.brand_id = :brandId", { brandId: query.brandId });
     }
@@ -162,6 +161,9 @@ export class ProductsService {
         .addSelect("COUNT(*)", "cnt")
         .where("s.tenant_id = :tenantId", { tenantId })
         .andWhere("s.product_id IN (:...ids)", { ids })
+        .andWhere(
+          "(s.deleted_at IS NULL OR s.deleted_at = (SELECT p2.deleted_at FROM products p2 WHERE p2.id = s.product_id))",
+        )
         .groupBy("s.product_id")
         .getRawMany<{ productId: string; cnt: string }>();
       for (const row of skuCountRows) {
@@ -208,6 +210,7 @@ export class ProductsService {
         : null,
       productType: p.productType as ProductType,
       status: p.status as EntityStatus,
+      deletedAt: toDeletedAt(p.deletedAt),
       skuCount: skuCounts.get(p.id) ?? 0,
       totalAvailable: availableByProduct.get(p.id) ?? 0,
       supplierCount: supplierCounts.get(p.id) ?? 0,
@@ -253,6 +256,7 @@ export class ProductsService {
       description: product.description,
       imagePath: product.imagePath,
       status: product.status as EntityStatus,
+      deletedAt: toDeletedAt(product.deletedAt),
       totalOnHand: toNum(totals?.onHand),
       totalReserved: toNum(totals?.reserved),
       totalAvailable: toNum(totals?.available),
@@ -313,6 +317,45 @@ export class ProductsService {
     if (!product) throw new NotFoundException("Product not found");
     product.status = "inactive";
     await this.products.save(product);
+    return this.getById(id);
+  }
+
+  async softDelete(id: string): Promise<ProductDetail> {
+    const tenantId = this.fixedTenant.tenantId;
+    const product = await this.requireProduct(id);
+    const deletedAt = product.deletedAt ?? new Date();
+    await this.products.manager.transaction(async (manager) => {
+      product.status = "inactive";
+      product.deletedAt = deletedAt;
+      await manager.save(product);
+      const skus = await manager.find(ProductSku, {
+        where: { tenantId, productId: id, deletedAt: IsNull() },
+      });
+      for (const sku of skus) {
+        sku.status = "inactive";
+        sku.deletedAt = deletedAt;
+        await manager.save(sku);
+      }
+    });
+    return this.getById(id);
+  }
+
+  async restore(id: string): Promise<ProductDetail> {
+    const tenantId = this.fixedTenant.tenantId;
+    const product = await this.requireProduct(id);
+    const deletedAt = product.deletedAt;
+    if (!deletedAt) return this.getById(id);
+    await this.products.manager.transaction(async (manager) => {
+      product.deletedAt = null;
+      await manager.save(product);
+      const skus = await manager.find(ProductSku, {
+        where: { tenantId, productId: id, deletedAt },
+      });
+      for (const sku of skus) {
+        sku.deletedAt = null;
+        await manager.save(sku);
+      }
+    });
     return this.getById(id);
   }
 
@@ -557,6 +600,7 @@ export class ProductsService {
       maximumStockLevel: toNumOrNull(s.maximumStockLevel),
       trackInventory: s.trackInventory,
       status: s.status as EntityStatus,
+      deletedAt: toDeletedAt(s.deletedAt),
     };
   }
 

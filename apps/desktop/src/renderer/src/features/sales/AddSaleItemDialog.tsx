@@ -42,12 +42,15 @@ export function AddSaleItemDialog({
   const isFocMode = mode === "foc";
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SkuSearchResult[]>([]);
+  const [resultsQuery, setResultsQuery] = useState("");
   const [posBalanceBySkuId, setPosBalanceBySkuId] = useState<Map<string, number>>(
     new Map(),
   );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
   const queryRef = useRef<HTMLInputElement>(null);
+  const confirmingRef = useRef(false);
+  const searchEnterRef = useRef(false);
 
   useBarcodeScanTarget({
     kind: "search",
@@ -59,13 +62,35 @@ export function AddSaleItemDialog({
 
   useEffect(() => {
     if (!open || !warehouseId) return;
+    const requested = query;
     const t = setTimeout(() => {
-      void loadSkuSearch(query, warehouseId)
-        .then(setResults)
-        .catch(() => setResults([]));
+      void loadSkuSearch(requested, warehouseId)
+        .then((rows) => {
+          setResults(rows);
+          setResultsQuery(requested);
+        })
+        .catch(() => {
+          setResults([]);
+          setResultsQuery(requested);
+        });
     }, 200);
     return () => clearTimeout(t);
   }, [query, open, warehouseId]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q || resultsQuery !== q || results.length !== 1) return;
+    const row = results[0];
+    if (!row || !posBalanceBySkuId.has(row.id)) return;
+    const qty = posBalanceBySkuId.get(row.id) ?? 0;
+    if (qty <= 0) {
+      setSelectedIds((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    setSelectedIds((prev) =>
+      prev.length === 1 && prev[0] === row.id ? prev : [row.id],
+    );
+  }, [query, resultsQuery, results, posBalanceBySkuId]);
 
   useEffect(() => {
     if (!open || !warehouseId || results.length === 0) {
@@ -96,6 +121,7 @@ export function AddSaleItemDialog({
   function reset() {
     setQuery("");
     setResults([]);
+    setResultsQuery("");
     setPosBalanceBySkuId(new Map());
     setSelectedIds([]);
     setConfirming(false);
@@ -117,17 +143,15 @@ export function AddSaleItemDialog({
     );
   }
 
-  async function onConfirm() {
-    const chosen = results.filter(
-      (r) => selectedIds.includes(r.id) && !isUnavailable(r),
-    );
-    if (chosen.length === 0) return;
-
+  async function commitRows(chosen: SkuSearchResult[]) {
+    if (chosen.length === 0 || confirmingRef.current) return;
+    confirmingRef.current = true;
     setConfirming(true);
     try {
       const rows = await Promise.all(
         chosen.map(async (row) => {
-          const qty = posBalance(row);
+          const qty =
+            posBalanceBySkuId.get(row.id) ?? row.quantityAvailable;
           const profile = await loadSkuProfile(row.id);
           return {
             ...row,
@@ -146,7 +170,49 @@ export function AddSaleItemDialog({
       reset();
       onClose();
     } finally {
+      confirmingRef.current = false;
       setConfirming(false);
+    }
+  }
+
+  async function onConfirm() {
+    const chosen = results.filter(
+      (r) => selectedIds.includes(r.id) && !isUnavailable(r),
+    );
+    await commitRows(chosen);
+  }
+
+  async function addExactSearchHit(searchText: string) {
+    const q = searchText.trim();
+    if (!q || confirmingRef.current || searchEnterRef.current) return;
+    searchEnterRef.current = true;
+    try {
+      let rows = results;
+      if (resultsQuery !== q) {
+        try {
+          rows = await loadSkuSearch(q, warehouseId);
+        } catch {
+          rows = [];
+        }
+        setResults(rows);
+        setResultsQuery(q);
+      }
+      if (rows.length !== 1) return;
+      const row = rows[0];
+      if (!row) return;
+      let qty = posBalanceBySkuId.get(row.id);
+      if (qty == null) {
+        qty = await loadPosAvailableForSale(
+          warehouseId,
+          row.id,
+          excludeDraftSaleId,
+        );
+      }
+      if (qty <= 0) return;
+      setSelectedIds([row.id]);
+      await commitRows([{ ...row, quantityAvailable: qty }]);
+    } finally {
+      searchEnterRef.current = false;
     }
   }
 
@@ -179,6 +245,11 @@ export function AddSaleItemDialog({
               {...barcodeScanInputProps()}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                void addExactSearchHit(event.currentTarget.value);
+              }}
               placeholder="Search…"
               autoFocus
             />

@@ -21,6 +21,8 @@ export function BrandFormPage() {
     (id: string) => brandsApi.deactivate(id),
     [],
   );
+  const remove = useCallback((id: string) => brandsApi.delete(id), []);
+  const restore = useCallback((id: string) => brandsApi.restore(id), []);
 
   return (
     <TaxonomyFormPage
@@ -33,6 +35,8 @@ export function BrandFormPage() {
       create={create}
       update={update}
       deactivate={deactivate}
+      remove={remove}
+      restore={restore}
     />
   );
 }

@@ -57,7 +57,9 @@ import { upsertVendorLedgerEntryLocal } from "./vendor-ledger-local";
 import {
   assertCashExpenseWithinDrawer,
   assertDrawerSubmissionLocal,
+  assertOwnerCashCovers,
   upsertCashExpenseLocal,
+  upsertOwnerCashEntryLocal,
   upsertManagerDrawerOpeningLocal,
   upsertManagerDrawerSubmissionLocal,
 } from "./cash-flow-local";
@@ -171,6 +173,7 @@ export function applyChange(change: SyncChangeDto): void {
       code: str(p.code),
       location: (p.location as string | null) ?? null,
       status: statusOf(p, change.operation),
+      deletedAt: deletedAtOf(p),
     });
     return;
   }
@@ -191,6 +194,7 @@ export function applyChange(change: SyncChangeDto): void {
       description: str(p.description),
       imagePath: (p.imagePath as string | null) ?? null,
       status: statusOf(p, change.operation),
+      deletedAt: deletedAtOf(p),
       totalOnHand: Number(p.totalOnHand ?? 0),
       totalReserved: Number(p.totalReserved ?? 0),
       totalAvailable: Number(p.totalAvailable ?? 0),
@@ -228,6 +232,7 @@ export function applyChange(change: SyncChangeDto): void {
         p.maximumStockLevel == null ? null : Number(p.maximumStockLevel),
       trackInventory: Boolean(p.trackInventory ?? true),
       status: statusOf(p, change.operation),
+      deletedAt: deletedAtOf(p),
     });
     syncVendorSkusPurchaseFromProductSkuLocal({
       productSkuId: change.entityId,
@@ -245,6 +250,7 @@ export function applyChange(change: SyncChangeDto): void {
       groupId: (p.groupId as string | null) ?? null,
       groupName: (p.groupName as string | null) ?? null,
       status: statusOf(p, change.operation),
+      deletedAt: deletedAtOf(p),
       address: (p.address as string | null) ?? null,
       city: (p.city as string | null) ?? null,
       state: (p.state as string | null) ?? null,
@@ -371,14 +377,39 @@ export function applyChange(change: SyncChangeDto): void {
     });
     return;
   }
+  if (change.entityType === "owner_cash_entry") {
+    const nowIso = now;
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("Enter an amount greater than zero");
+    upsertOwnerCashEntryLocal({
+      id: change.entityId,
+      recordedByUserId: str(p.recordedByUserId),
+      recordedByName: str(p.recordedByName),
+      amount,
+      note: str(p.note),
+      recordedAt: str(p.recordedAt, nowIso),
+      createdAt: str(p.createdAt, nowIso),
+      updatedAt: str(p.updatedAt, nowIso),
+    });
+    return;
+  }
   if (change.entityType === "cash_expense") {
     const nowIso = now;
     if (change.changeId === "local") {
-      assertCashExpenseWithinDrawer({
-        id: change.entityId,
-        recordedByUserId: str(p.recordedByUserId),
-        amount: Number(p.amount ?? 0),
-      });
+      const amount = Number(p.amount ?? 0);
+      if (p.ownerCash === true) {
+        assertOwnerCashCovers({
+          ownerUserId: str(p.recordedByUserId),
+          amount,
+          excludeExpenseId: change.entityId,
+        });
+      } else {
+        assertCashExpenseWithinDrawer({
+          id: change.entityId,
+          recordedByUserId: str(p.recordedByUserId),
+          amount,
+        });
+      }
     }
     upsertCashExpenseLocal({
       id: change.entityId,
@@ -397,6 +428,13 @@ export function applyChange(change: SyncChangeDto): void {
     const nowIso = now;
     const amount = Number(p.amount ?? 0);
     if (!(amount > 0)) throw new Error("opening amount must be greater than zero");
+    if (change.changeId === "local") {
+      assertOwnerCashCovers({
+        ownerUserId: str(p.openedByUserId),
+        amount,
+        excludeOpeningId: change.entityId,
+      });
+    }
     upsertManagerDrawerOpeningLocal({
       id: change.entityId,
       managerUserId: str(p.managerUserId),
@@ -770,7 +808,15 @@ function namedTaxonomy(p: Record<string, unknown>, id: string) {
     name: str(p.name),
     description: str(p.description),
     status: statusOf(p, "UPSERT"),
+    deletedAt: deletedAtOf(p),
   };
+}
+
+function deletedAtOf(p: Record<string, unknown>): string | null | undefined {
+  if (!("deletedAt" in p)) return undefined;
+  const value = p.deletedAt;
+  if (value == null || value === "") return null;
+  return String(value);
 }
 
 function statusOf(

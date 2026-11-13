@@ -1,10 +1,11 @@
 import type { EntityStatus } from "@blackbox/shared";
+import type { EntityStatusFilter } from "@blackbox/shared";
 import { resolveDataSourceMode, type DataSourceMode } from "./data-source";
 
 export type TaxonomyKind = "brand" | "category" | "vendor_group";
 
 export type TaxonomyQuery = {
-  status?: EntityStatus | "all";
+  status?: EntityStatusFilter;
   q?: string;
 };
 
@@ -17,7 +18,7 @@ type TaxonomyRow = {
 
 function localReader(
   kind: TaxonomyKind,
-): ((status?: EntityStatus | "all") => Promise<TaxonomyRow[]>) | undefined {
+): ((status?: EntityStatusFilter) => Promise<TaxonomyRow[]>) | undefined {
   const localDb = window.blackbox?.localDb;
   if (kind === "brand") return localDb?.listBrands;
   if (kind === "category") return localDb?.listCategories;

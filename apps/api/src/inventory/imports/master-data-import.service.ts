@@ -2,9 +2,6 @@ import { Injectable, UnprocessableEntityException } from "@nestjs/common";
 import {
   ENTITY_STATUSES,
   formatMasterDataHeaderMismatchMessage,
-  HS_CODE_MESSAGE,
-  HS_CODE_PATTERN,
-  normalizeHsCode,
   LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
@@ -235,6 +232,29 @@ const REQUIRED: Record<ImportFile, readonly CsvColumn[]> = {
     "status",
   ],
 };
+
+const NUMERIC_COLUMNS = new Set<CsvColumn>([
+  "cost_price",
+  "selling_price",
+  "selling_price_per_purchase_unit",
+  "reorder_level",
+  "minimum_stock_level",
+  "maximum_stock_level",
+  "gst_percent",
+  "units_per_purchase_unit",
+  "barcode_quantity_multiplier",
+  "quantity_multiplier",
+  "sales_target",
+  "credit_limit",
+  "purchase_price",
+  "minimum_order_quantity",
+  "lead_time_days",
+]);
+
+const BOOLEAN_COLUMNS = new Set<CsvColumn>([
+  "track_inventory",
+  "is_preferred",
+]);
 
 /** Parses CSV booleans; returns null if raw is non-empty but not true/false (any case). */
 function parseImportBoolean(raw: string): boolean | null {
@@ -489,9 +509,16 @@ export class MasterDataImportService {
     for (const file of MASTER_DATA_IMPORT_FILES) {
       for (const row of files[file]) {
         for (const column of REQUIRED[file]) {
-          if (!row.values[column]) {
-            errors.push(this.rowError(row, column, "Value is required"));
+          if (row.values[column]) continue;
+          if (NUMERIC_COLUMNS.has(column)) {
+            row.values[column] = "0";
+            continue;
           }
+          if (BOOLEAN_COLUMNS.has(column)) {
+            row.values[column] = "false";
+            continue;
+          }
+          errors.push(this.rowError(row, column, "Value is required"));
         }
         this.enumValue(row, "status", ENTITY_STATUSES, errors);
       }
@@ -535,12 +562,6 @@ export class MasterDataImportService {
         min: 0,
         max: 100,
       });
-      const rawHsCode = row.values.hs_code.trim();
-      const hsCode = normalizeHsCode(row.values.hs_code);
-      if (hsCode) row.values.hs_code = hsCode;
-      if (rawHsCode && (!hsCode || !HS_CODE_PATTERN.test(hsCode))) {
-        errors.push(this.rowError(row, "hs_code", HS_CODE_MESSAGE));
-      }
       this.number(row, "units_per_purchase_unit", errors, {
         min: Number.EPSILON,
       });
@@ -1328,6 +1349,10 @@ export class MasterDataImportService {
     const value = row.values[column];
     if ((optional && !value) || !value) return;
     if (!allowed.includes(value)) {
+      if (optional) {
+        row.values[column] = "";
+        return;
+      }
       errors.push(
         this.rowError(row, column, `Must be one of: ${allowed.join(", ")}`),
       );
@@ -1337,7 +1362,7 @@ export class MasterDataImportService {
   private number(
     row: CsvRow,
     column: CsvColumn,
-    errors: MasterDataImportError[],
+    _errors: MasterDataImportError[],
     options: {
       optional?: boolean;
       min: number;
@@ -1346,9 +1371,12 @@ export class MasterDataImportService {
     },
   ): void {
     const value = row.values[column];
-    if (!value) return;
+    if (!value) {
+      row.values[column] = "0";
+      return;
+    }
     if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(value)) {
-      errors.push(this.rowError(row, column, "Must be a valid number"));
+      row.values[column] = "0";
       return;
     }
     const parsed = Number(value);
@@ -1362,39 +1390,29 @@ export class MasterDataImportService {
       (options.integer && !Number.isInteger(parsed)) ||
       (!options.integer && (integerDigits > 10 || fractionPart.length > 4))
     ) {
-      errors.push(
-        this.rowError(
-          row,
-          column,
-          options.integer
-            ? `Must be an integer from ${options.min} to ${options.max}`
-            : "Must fit a non-negative numeric(14,4) value",
-        ),
-      );
+      row.values[column] = "0";
     }
   }
 
   private boolean(
     row: CsvRow,
     column: CsvColumn,
-    errors: MasterDataImportError[],
+    _errors: MasterDataImportError[],
   ): void {
     const value = row.values[column];
     if (value && parseImportBoolean(value) === null) {
-      errors.push(
-        this.rowError(row, column, "Must be true or false (case insensitive)"),
-      );
+      row.values[column] = "false";
     }
   }
 
   private email(
     row: CsvRow,
     column: CsvColumn,
-    errors: MasterDataImportError[],
+    _errors: MasterDataImportError[],
   ): void {
     const value = row.values[column];
     if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      errors.push(this.rowError(row, column, "Must be a valid email address"));
+      row.values[column] = "";
     }
   }
 

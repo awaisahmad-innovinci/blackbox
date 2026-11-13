@@ -23,6 +23,7 @@ import {
   formSelectPickerProps,
 } from "@renderer/components/form-enter-nav";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
+import { useConfirm } from "@renderer/components/confirm-provider";
 import type { Brand, Category, VendorGroup } from "@blackbox/shared";
 import type { TaxonomyRow } from "./TaxonomyListPage";
 
@@ -52,6 +53,8 @@ export function TaxonomyFormPage({
   create,
   update,
   deactivate,
+  remove,
+  restore,
   syncEntityType,
 }: {
   titleNew: string;
@@ -69,6 +72,8 @@ export function TaxonomyFormPage({
     body: { name: string; description?: string; status?: EntityStatus },
   ) => Promise<TaxonomyRow>;
   deactivate: (id: string) => Promise<TaxonomyRow>;
+  remove: (id: string) => Promise<TaxonomyRow>;
+  restore: (id: string) => Promise<TaxonomyRow>;
   syncEntityType?: Extract<
     SyncEntityType,
     "brand" | "category" | "vendor_group"
@@ -77,10 +82,12 @@ export function TaxonomyFormPage({
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<EntityStatus>("active");
+  const [deletedAt, setDeletedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +107,7 @@ export function TaxonomyFormPage({
         setName(row.name);
         setDescription(row.description ?? "");
         setStatus(row.status);
+        setDeletedAt(row.deletedAt ?? null);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -220,6 +228,82 @@ export function TaxonomyFormPage({
     }
   }
 
+  async function onDelete() {
+    if (!id) return;
+    const ok = await confirm({
+      title: `Delete ${entityLabel}?`,
+      description: `${name} will be hidden from lists and pickers. Past records keep it, and you can restore it from the Deleted filter.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    setError(null);
+    setSaving(true);
+    try {
+      if (syncEntityType && (await isDeviceBound())) {
+        await commitLocalChange({
+          entityType: syncEntityType,
+          entityId: id,
+          operation: "DELETE",
+          payload: {
+            id,
+            name: normalizeStoredText(name),
+            description: normalizeOptionalStoredText(description),
+            status: "inactive",
+            deletedAt: new Date().toISOString(),
+          },
+        });
+        void syncNow();
+        navigate(basePath);
+        return;
+      }
+      const saved = await remove(id);
+      if (syncEntityType) {
+        await upsertTaxonomyCache(syncEntityType, saved);
+      }
+      navigate(basePath);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, `Failed to delete ${entityLabel}`));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onRestore() {
+    if (!id) return;
+    setError(null);
+    setSaving(true);
+    try {
+      if (syncEntityType && (await isDeviceBound())) {
+        await commitLocalChange({
+          entityType: syncEntityType,
+          entityId: id,
+          operation: "UPSERT",
+          payload: {
+            id,
+            name: normalizeStoredText(name),
+            description: normalizeOptionalStoredText(description),
+            status: "inactive",
+            deletedAt: null,
+          },
+        });
+        void syncNow();
+        setStatus("inactive");
+        setDeletedAt(null);
+        return;
+      }
+      const saved = await restore(id);
+      if (syncEntityType) {
+        await upsertTaxonomyCache(syncEntityType, saved);
+      }
+      setStatus(saved.status);
+      setDeletedAt(saved.deletedAt ?? null);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, `Failed to restore ${entityLabel}`));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
@@ -233,7 +317,7 @@ export function TaxonomyFormPage({
           </h1>
           {isEdit ? (
             <p className="text-muted-foreground mt-1 text-sm capitalize">
-              Status: {status}
+              Status: {deletedAt ? "deleted" : status}
             </p>
           ) : null}
         </div>
@@ -302,7 +386,7 @@ export function TaxonomyFormPage({
         >
           Cancel
         </Button>
-        {isEdit && status === "active" ? (
+        {isEdit && !deletedAt && status === "active" ? (
           <Button
             type="button"
             variant="ghost"
@@ -312,7 +396,7 @@ export function TaxonomyFormPage({
             Deactivate
           </Button>
         ) : null}
-        {isEdit && status === "inactive" ? (
+        {isEdit && !deletedAt && status === "inactive" ? (
           <Button
             type="button"
             variant="ghost"
@@ -320,6 +404,26 @@ export function TaxonomyFormPage({
             onClick={() => void onActivate()}
           >
             Activate
+          </Button>
+        ) : null}
+        {isEdit && !deletedAt ? (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={saving}
+            onClick={() => void onDelete()}
+          >
+            Delete
+          </Button>
+        ) : null}
+        {isEdit && deletedAt ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving}
+            onClick={() => void onRestore()}
+          >
+            Restore
           </Button>
         ) : null}
       </div>

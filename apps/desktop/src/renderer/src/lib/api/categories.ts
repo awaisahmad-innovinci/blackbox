@@ -39,4 +39,10 @@ export const categoriesApi = {
       method: "POST",
     });
   },
+  delete(id: string): Promise<Category> {
+    return apiFetch<Category>(`/categories/${id}/delete`, { method: "POST" });
+  },
+  restore(id: string): Promise<Category> {
+    return apiFetch<Category>(`/categories/${id}/restore`, { method: "POST" });
+  },
 };

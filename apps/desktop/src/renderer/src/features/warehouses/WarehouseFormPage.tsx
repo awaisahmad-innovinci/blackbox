@@ -15,6 +15,7 @@ import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonic
 import { loadWarehouse } from "@renderer/lib/local-db/entity-source";
 import { useSession } from "@renderer/lib/session/context";
 import { syncNow } from "@renderer/lib/sync/sync-status";
+import { useConfirm } from "@renderer/components/confirm-provider";
 import {
   FormEnterNav,
   formSelectPickerProps,
@@ -25,12 +26,14 @@ export function WarehouseFormPage() {
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const { user } = useSession();
+  const confirm = useConfirm();
   const canWrite = Boolean(user?.permissions.includes("warehouses.write"));
 
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [location, setLocation] = useState("");
   const [status, setStatus] = useState<EntityStatus>("active");
+  const [deletedAt, setDeletedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,7 @@ export function WarehouseFormPage() {
         setCode(row.code);
         setLocation(row.location ?? "");
         setStatus(row.status);
+        setDeletedAt(row.deletedAt ?? null);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -187,6 +191,88 @@ export function WarehouseFormPage() {
     }
   }
 
+  async function onDelete() {
+    if (!id || !canWrite) return;
+    const ok = await confirm({
+      title: "Delete warehouse?",
+      description: `${name} will be hidden from lists and pickers. Past documents keep it, and you can restore it from the Deleted filter.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    setError(null);
+    setSaving(true);
+    try {
+      if (await isDeviceBound()) {
+        await commitLocalChange({
+          entityType: "warehouse",
+          entityId: id,
+          operation: "DELETE",
+          payload: {
+            id,
+            name: normalizeStoredText(name),
+            code,
+            location: location.trim() || null,
+            status: "inactive",
+            deletedAt: new Date().toISOString(),
+          },
+        });
+        void syncNow();
+        navigate("/warehouses");
+        return;
+      }
+      const saved = await warehousesApi.delete(id);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
+      }
+      navigate("/warehouses");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to delete warehouse"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onRestore() {
+    if (!id || !canWrite) return;
+    setError(null);
+    setSaving(true);
+    try {
+      if (await isDeviceBound()) {
+        await commitLocalChange({
+          entityType: "warehouse",
+          entityId: id,
+          operation: "UPSERT",
+          payload: {
+            id,
+            name: normalizeStoredText(name),
+            code,
+            location: location.trim() || null,
+            status: "inactive",
+            deletedAt: null,
+          },
+        });
+        void syncNow();
+        setStatus("inactive");
+        setDeletedAt(null);
+        return;
+      }
+      const saved = await warehousesApi.restore(id);
+      try {
+        await window.blackbox?.localDb?.upsertWarehouses?.([saved]);
+      } catch {
+        /* optional cache */
+      }
+      setStatus(saved.status);
+      setDeletedAt(saved.deletedAt ?? null);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to restore warehouse"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
@@ -218,7 +304,7 @@ export function WarehouseFormPage() {
           </h1>
           {isEdit ? (
             <p className="text-muted-foreground mt-1 text-sm capitalize">
-              Status: {status}
+              Status: {deletedAt ? "deleted" : status}
             </p>
           ) : null}
         </div>
@@ -297,7 +383,7 @@ export function WarehouseFormPage() {
         >
           {canWrite ? "Cancel" : "Back"}
         </Button>
-        {canWrite && isEdit && status === "active" ? (
+        {canWrite && isEdit && !deletedAt && status === "active" ? (
           <Button
             type="button"
             variant="ghost"
@@ -307,7 +393,7 @@ export function WarehouseFormPage() {
             Deactivate
           </Button>
         ) : null}
-        {canWrite && isEdit && status === "inactive" ? (
+        {canWrite && isEdit && !deletedAt && status === "inactive" ? (
           <Button
             type="button"
             variant="ghost"
@@ -315,6 +401,26 @@ export function WarehouseFormPage() {
             onClick={() => void onActivate()}
           >
             Activate
+          </Button>
+        ) : null}
+        {canWrite && isEdit && !deletedAt ? (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={saving}
+            onClick={() => void onDelete()}
+          >
+            Delete
+          </Button>
+        ) : null}
+        {canWrite && isEdit && deletedAt ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving}
+            onClick={() => void onRestore()}
+          >
+            Restore
           </Button>
         ) : null}
       </div>

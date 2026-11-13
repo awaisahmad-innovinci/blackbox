@@ -25,6 +25,7 @@ import {
   VendorSku,
 } from "../../db/entities";
 import { isUniqueViolation } from "../../common/db-errors";
+import { applyStatusFilter, toDeletedAt } from "../common/soft-delete";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { allocateVendorCode } from "../common/allocate-document-number";
 import {
@@ -68,10 +69,7 @@ export class VendorsService {
       .leftJoin("v.group", "g")
       .where("v.tenant_id = :tenantId", { tenantId });
 
-    const status = query.status ?? "active";
-    if (status !== "all") {
-      qb.andWhere("v.status = :status", { status });
-    }
+    applyStatusFilter(qb, "v", query.status);
     if (query.groupId) {
       qb.andWhere("v.group_id = :groupId", { groupId: query.groupId });
     }
@@ -143,6 +141,7 @@ export class VendorsService {
         groupId: v.groupId,
         groupName: v.groupId ? (groupNames.get(v.groupId) ?? null) : null,
         status: v.status as EntityStatus,
+        deletedAt: toDeletedAt(v.deletedAt),
         city: v.city,
         primaryContactName: primary?.name ?? null,
         primaryContactPhone: primary?.phone ?? null,
@@ -251,6 +250,29 @@ export class VendorsService {
     return this.getById(id);
   }
 
+  async softDelete(id: string): Promise<VendorDetail> {
+    const row = await this.requireVendor(id);
+    row.status = "inactive";
+    row.deletedAt = row.deletedAt ?? new Date();
+    await this.vendors.save(row);
+    return this.getById(id);
+  }
+
+  async restore(id: string): Promise<VendorDetail> {
+    const row = await this.requireVendor(id);
+    row.deletedAt = null;
+    await this.vendors.save(row);
+    return this.getById(id);
+  }
+
+  private async requireVendor(id: string): Promise<Vendor> {
+    const row = await this.vendors.findOne({
+      where: { id, tenantId: this.fixedTenant.tenantId },
+    });
+    if (!row) throw new NotFoundException("Vendor not found");
+    return row;
+  }
+
   private async assertUniqueCode(
     tenantId: string,
     code: string,
@@ -344,6 +366,7 @@ export class VendorsService {
       groupId: vendor.groupId,
       groupName: vendor.group?.name ?? null,
       status: vendor.status as EntityStatus,
+      deletedAt: toDeletedAt(vendor.deletedAt),
       address: vendor.address,
       city: vendor.city,
       state: vendor.state,

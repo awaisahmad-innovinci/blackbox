@@ -11,6 +11,24 @@ import { Tenant } from "../db/entities/tenant.entity";
 import { User } from "../db/entities/user.entity";
 import { PermissionsService } from "../rbac/permissions.service";
 
+type JwtRequest = {
+  method?: string;
+  originalUrl?: string;
+  url?: string;
+};
+
+/** Routes a revoked device may still call so the desktop can see the lock and wait. */
+function revokedDeviceMayCall(req: JwtRequest): boolean {
+  const raw = req.originalUrl || req.url || "";
+  let path = raw.split("?")[0] ?? "";
+  if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+  const method = (req.method ?? "GET").toUpperCase();
+  if (method === "GET" && (path === "/devices/me" || path === "/auth/me")) {
+    return true;
+  }
+  return method === "POST" && path === "/devices/me/wipe-acknowledged";
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   constructor(
@@ -24,10 +42,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: config.getOrThrow<string>("JWT_ACCESS_SECRET"),
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: JwtPayload): Promise<TenantContext> {
+  async validate(req: JwtRequest, payload: JwtPayload): Promise<TenantContext> {
     // Tenant context always from validated JWT claims — never from request body.
     const user = await this.users.findOne({ where: { id: payload.sub } });
 
@@ -45,7 +64,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       const device = await this.devices.findOne({
         where: { id: deviceId, tenantId: user.tenantId },
       });
-      if (!device || device.status === "revoked") {
+      if (!device) {
+        throw new UnauthorizedException("Device revoked or unknown");
+      }
+      if (device.status === "revoked" && !revokedDeviceMayCall(req)) {
         throw new UnauthorizedException("Device revoked or unknown");
       }
     }

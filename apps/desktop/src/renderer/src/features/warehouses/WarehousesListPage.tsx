@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { EntityStatus, WarehouseListItem } from "@blackbox/shared";
+import type { EntityStatusFilter, WarehouseListItem } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Skeleton } from "@blackbox/ui/skeleton";
@@ -36,7 +36,7 @@ export function WarehousesListPage() {
   const canWrite = Boolean(user?.permissions.includes("warehouses.write"));
   const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<EntityStatus | "all">("all");
+  const [status, setStatus] = useState<EntityStatusFilter>("all");
   const [items, setItems] = useState<WarehouseListItem[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_LIST_PAGE_SIZE);
@@ -133,11 +133,12 @@ export function WarehousesListPage() {
           className={FILTER_SELECT_CLASS}
           {...filterSelectProps()}
           value={status}
-          onChange={(e) => setStatus(e.target.value as EntityStatus | "all")}
+          onChange={(e) => setStatus(e.target.value as EntityStatusFilter)}
         >
           <option value="all">All statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
+          <option value="deleted">Deleted</option>
         </select>
       </ListFilterNav>
 
@@ -204,7 +205,9 @@ export function WarehousesListPage() {
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">{row.code}</td>
                     <td className="px-4 py-3">{row.location?.trim() || "—"}</td>
-                    <td className="px-4 py-3 capitalize">{row.status}</td>
+                    <td className="px-4 py-3 capitalize">
+                    {row.deletedAt ? "Deleted" : row.status}
+                  </td>
                   </ListTableRow>
                 ))
               : null}

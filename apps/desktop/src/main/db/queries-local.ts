@@ -44,13 +44,22 @@ import type {
   SaleStatus,
   WarehouseListItem,
 } from "@blackbox/shared";
+import type { EntityStatusFilter } from "@blackbox/shared";
 import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import {
+  getOwnerCashBalanceLocal,
   listDrawerBalancesLocal,
   listDrawerSubmissionsTodayLocal,
 } from "./cash-flow-local";
 import { getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
+
+/** Expects a named `@status` param: active, inactive, all (or empty), or deleted. */
+function statusFilterSql(alias = ""): string {
+  const col = alias ? `${alias}.` : "";
+  return `(case when @status = 'deleted' then ${col}deleted_at is not null
+    else ${col}deleted_at is null and (@status in ('all', '') or ${col}status = @status) end)`;
+}
 
 function pageParams(page?: number, pageSize?: number) {
   const p = page ?? 1;
@@ -58,21 +67,17 @@ function pageParams(page?: number, pageSize?: number) {
   return { page: p, pageSize: ps, offset: (p - 1) * ps };
 }
 
-export function listBrandsLocal(status?: EntityStatus | "all"): Brand[] {
+export function listBrandsLocal(status?: EntityStatusFilter): Brand[] {
   const db = getLocalDb();
   const rows = db
     .prepare(
-      `select id, name, description, status
+      `select id, name, description, status, deleted_at as deletedAt
        from brands
-       where tenant_id = ?
-         and (? = 'all' or status = ?)
+       where tenant_id = @tenantId
+         and ${statusFilterSql()}
        order by name collate nocase`,
     )
-    .all(
-      DEMO_STORE_TENANT_ID,
-      status ?? "active",
-      status === "all" ? "" : (status ?? "active"),
-    ) as Brand[];
+    .all({ tenantId: DEMO_STORE_TENANT_ID, status: status ?? "active" }) as Brand[];
   return rows;
 }
 
@@ -81,7 +86,7 @@ export function getBrandLocal(id: string): Brand | null {
   return (
     (db
       .prepare(
-        `select id, name, description, status
+        `select id, name, description, status, deleted_at as deletedAt
          from brands where id = ? and tenant_id = ?`,
       )
       .get(id, DEMO_STORE_TENANT_ID) as Brand | undefined) ?? null
@@ -89,22 +94,18 @@ export function getBrandLocal(id: string): Brand | null {
 }
 
 export function listCategoriesLocal(
-  status?: EntityStatus | "all",
+  status?: EntityStatusFilter,
 ): Category[] {
   const db = getLocalDb();
   return db
     .prepare(
-      `select id, name, description, status
+      `select id, name, description, status, deleted_at as deletedAt
        from categories
-       where tenant_id = ?
-         and (? = 'all' or status = ?)
+       where tenant_id = @tenantId
+         and ${statusFilterSql()}
        order by name collate nocase`,
     )
-    .all(
-      DEMO_STORE_TENANT_ID,
-      status ?? "active",
-      status === "all" ? "" : (status ?? "active"),
-    ) as Category[];
+    .all({ tenantId: DEMO_STORE_TENANT_ID, status: status ?? "active" }) as Category[];
 }
 
 export function getCategoryLocal(id: string): Category | null {
@@ -112,7 +113,7 @@ export function getCategoryLocal(id: string): Category | null {
   return (
     (db
       .prepare(
-        `select id, name, description, status
+        `select id, name, description, status, deleted_at as deletedAt
          from categories where id = ? and tenant_id = ?`,
       )
       .get(id, DEMO_STORE_TENANT_ID) as Category | undefined) ?? null
@@ -120,22 +121,18 @@ export function getCategoryLocal(id: string): Category | null {
 }
 
 export function listVendorGroupsLocal(
-  status?: EntityStatus | "all",
+  status?: EntityStatusFilter,
 ): VendorGroup[] {
   const db = getLocalDb();
   return db
     .prepare(
-      `select id, name, description, status
+      `select id, name, description, status, deleted_at as deletedAt
        from vendor_groups
-       where tenant_id = ?
-         and (? = 'all' or status = ?)
+       where tenant_id = @tenantId
+         and ${statusFilterSql()}
        order by name collate nocase`,
     )
-    .all(
-      DEMO_STORE_TENANT_ID,
-      status ?? "active",
-      status === "all" ? "" : (status ?? "active"),
-    ) as VendorGroup[];
+    .all({ tenantId: DEMO_STORE_TENANT_ID, status: status ?? "active" }) as VendorGroup[];
 }
 
 export function getVendorGroupLocal(id: string): VendorGroup | null {
@@ -143,7 +140,7 @@ export function getVendorGroupLocal(id: string): VendorGroup | null {
   return (
     (db
       .prepare(
-        `select id, name, description, status
+        `select id, name, description, status, deleted_at as deletedAt
          from vendor_groups where id = ? and tenant_id = ?`,
       )
       .get(id, DEMO_STORE_TENANT_ID) as VendorGroup | undefined) ?? null
@@ -151,22 +148,18 @@ export function getVendorGroupLocal(id: string): VendorGroup | null {
 }
 
 export function listWarehousesLocal(
-  status?: EntityStatus | "all",
+  status?: EntityStatusFilter,
 ): WarehouseListItem[] {
   const db = getLocalDb();
   return db
     .prepare(
-      `select id, name, code, location, status
+      `select id, name, code, location, status, deleted_at as deletedAt
        from warehouses
-       where tenant_id = ?
-         and (? = 'all' or status = ?)
+       where tenant_id = @tenantId
+         and ${statusFilterSql()}
        order by name collate nocase`,
     )
-    .all(
-      DEMO_STORE_TENANT_ID,
-      status ?? "all",
-      status === "all" || status === undefined ? "" : status,
-    ) as WarehouseListItem[];
+    .all({ tenantId: DEMO_STORE_TENANT_ID, status: status ?? "all" }) as WarehouseListItem[];
 }
 
 export function getWarehouseLocal(id: string): WarehouseListItem | null {
@@ -174,7 +167,7 @@ export function getWarehouseLocal(id: string): WarehouseListItem | null {
   return (
     (db
       .prepare(
-        `select id, name, code, location, status
+        `select id, name, code, location, status, deleted_at as deletedAt
          from warehouses
          where id = ? and tenant_id = ?`,
       )
@@ -207,7 +200,7 @@ export function listProductsLocal(
 
   const where = `
     p.tenant_id = @tenantId
-    and (@status = '' or p.status = @status)
+    and ${statusFilterSql("p")}
     and (@brandId = '' or p.brand_id = @brandId)
     and (@categoryId = '' or p.category_id = @categoryId)
     and (
@@ -269,9 +262,11 @@ export function listProductsLocal(
          c.name as categoryName,
          p.product_type as productType,
          p.status,
+         p.deleted_at as deletedAt,
          (
            select count(*) from product_skus s
            where s.product_id = p.id and s.tenant_id = p.tenant_id
+             and (s.deleted_at is null or s.deleted_at = p.deleted_at)
          ) as skuCount,
          coalesce((
            select sum(st.quantity_available)
@@ -303,6 +298,7 @@ export function listProductsLocal(
     categoryName: string | null;
     productType: string;
     status: string;
+    deletedAt: string | null;
     skuCount: number;
     totalAvailable: number;
     supplierCount: number;
@@ -318,6 +314,7 @@ export function listProductsLocal(
     categoryName: r.categoryName,
     productType: r.productType as ProductType,
     status: r.status as EntityStatus,
+    deletedAt: r.deletedAt,
     skuCount: Number(r.skuCount) || 0,
     totalAvailable: Number(r.totalAvailable) || 0,
     supplierCount: Number(r.supplierCount) || 0,
@@ -333,12 +330,11 @@ export function listVendorsLocal(
   const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
   const search = query.search?.trim().toLowerCase() ?? "";
   const status = query.status ?? "active";
-  const statusBind = status === "all" ? "" : status;
   const groupId = query.groupId ?? "";
 
   const where = `
     v.tenant_id = @tenantId
-    and (@status = 'all' or v.status = @statusBind)
+    and ${statusFilterSql("v")}
     and (@groupId = '' or v.group_id = @groupId)
     and (
       @search = ''
@@ -351,7 +347,6 @@ export function listVendorsLocal(
   const params = {
     tenantId: DEMO_STORE_TENANT_ID,
     status,
-    statusBind,
     groupId,
     search,
     limit: pageSize,
@@ -373,6 +368,7 @@ export function listVendorsLocal(
          v.group_id as groupId,
          g.name as groupName,
          v.status,
+         v.deleted_at as deletedAt,
          v.city,
          (
            select c.name from vendor_contacts c
@@ -402,6 +398,7 @@ export function listVendorsLocal(
     groupId: string | null;
     groupName: string | null;
     status: string;
+    deletedAt: string | null;
     city: string | null;
     primaryContactName: string | null;
     primaryContactPhone: string | null;
@@ -415,6 +412,7 @@ export function listVendorsLocal(
     groupId: r.groupId,
     groupName: r.groupName,
     status: r.status as EntityStatus,
+    deletedAt: r.deletedAt,
     city: r.city,
     primaryContactName: r.primaryContactName,
     primaryContactPhone: r.primaryContactPhone,
@@ -602,51 +600,6 @@ export function getCashierDashboardSummaryLocal(
     .prepare(`select date('now', 'localtime') as d`)
     .get() as { d: string };
 
-  const saleFilters = `
-    s.tenant_id = @tenantId
-    and s.status = 'POSTED'
-    and s.posted_by = @userId
-    and s.posted_at is not null
-    and date(s.posted_at, 'localtime') = date('now', 'localtime')
-  `;
-
-  const totalSalesRow = db
-    .prepare(
-      `select coalesce(sum(s.total), 0) as amount
-       from sales s
-       where ${saleFilters}`,
-    )
-    .get({ tenantId, userId }) as { amount: number };
-
-  const nonFbrSalesRow = db
-    .prepare(
-      `select coalesce(sum(s.total), 0) as amount
-       from sales s
-       where ${saleFilters}
-         and s.fbr_status = 'excluded'`,
-    )
-    .get({ tenantId, userId }) as { amount: number };
-
-  const cashRow = db
-    .prepare(
-      `select coalesce(sum(sp.amount), 0) as amount
-       from sale_payments sp
-       inner join sales s on s.id = sp.sale_id and s.tenant_id = sp.tenant_id
-       where ${saleFilters}
-         and sp.method = 'CASH'`,
-    )
-    .get({ tenantId, userId }) as { amount: number };
-
-  const cardRow = db
-    .prepare(
-      `select coalesce(sum(sp.amount), 0) as amount
-       from sale_payments sp
-       inner join sales s on s.id = sp.sale_id and s.tenant_id = sp.tenant_id
-       where ${saleFilters}
-         and sp.method = 'CARD'`,
-    )
-    .get({ tenantId, userId }) as { amount: number };
-
   const heldRow = db
     .prepare(
       `select count(*) as cnt
@@ -657,17 +610,6 @@ export function getCashierDashboardSummaryLocal(
          and posted_by = @userId`,
     )
     .get({ tenantId, userId }) as { cnt: number };
-
-  const refundRow = db
-    .prepare(
-      `select coalesce(sum(refund_total), 0) as amount
-       from sale_returns
-       where tenant_id = @tenantId
-         and status = 'COMPLETED'
-         and refunded_by = @userId
-         and date(refunded_at, 'localtime') = date('now', 'localtime')`,
-    )
-    .get({ tenantId, userId }) as { amount: number };
 
   const withdrawnRow = db
     .prepare(
@@ -681,34 +623,111 @@ export function getCashierDashboardSummaryLocal(
     )
     .get({ tenantId, userId }) as { amount: number };
 
-  const openingRow = db
+  const session = db
     .prepare(
-      `select coalesce(sum(t.opening_balance), 0) as amount
-       from till_sessions t
-       where t.tenant_id = @tenantId
-         and t.user_id = @userId
-         and date(t.opened_at, 'localtime') = date('now', 'localtime')`,
+      `select opening_balance, current_cash_balance, opened_at
+       from till_sessions
+       where tenant_id = @tenantId
+         and user_id = @userId
+         and status in ('PENDING_APPROVAL', 'OPEN', 'CLOSED_LIMIT')
+         and opened_at is not null
+       order by opened_at desc, created_at desc
+       limit 1`,
     )
-    .get({ tenantId, userId }) as { amount: number };
+    .get({ tenantId, userId }) as
+    | {
+        opening_balance: number;
+        current_cash_balance: number;
+        opened_at: string;
+      }
+    | undefined;
 
-  const openingFloat = Number(openingRow.amount);
-  const cashReceived = Number(cashRow.amount);
-  const refunds = Number(refundRow.amount);
-  const withdrawn = Number(withdrawnRow.amount);
+  const heldBillsCount = Number(heldRow.cnt);
+  const cashWithdrawnAmount = roundMoney(Number(withdrawnRow.amount));
+  if (!session) {
+    return {
+      date: todayRow.d,
+      totalSalesAmount: 0,
+      nonFbrSalesAmount: 0,
+      cashReceivedAmount: 0,
+      cardPaymentsAmount: 0,
+      heldBillsCount,
+      refundTotalAmount: 0,
+      openingBalanceAmount: 0,
+      cashWithdrawnAmount,
+      cashInHandAmount: 0,
+    };
+  }
+
+  const saleFilters = `
+    s.tenant_id = @tenantId
+    and s.status = 'POSTED'
+    and s.posted_by = @userId
+    and s.posted_at is not null
+    and s.posted_at >= @openedAt
+  `;
+  const params = { tenantId, userId, openedAt: session.opened_at };
+
+  const totalSalesRow = db
+    .prepare(
+      `select coalesce(sum(s.total), 0) as amount
+       from sales s
+       where ${saleFilters}`,
+    )
+    .get(params) as { amount: number };
+
+  const nonFbrSalesRow = db
+    .prepare(
+      `select coalesce(sum(s.total), 0) as amount
+       from sales s
+       where ${saleFilters}
+         and s.fbr_status = 'excluded'`,
+    )
+    .get(params) as { amount: number };
+
+  const cashRow = db
+    .prepare(
+      `select coalesce(sum(sp.amount), 0) as amount
+       from sale_payments sp
+       inner join sales s on s.id = sp.sale_id and s.tenant_id = sp.tenant_id
+       where ${saleFilters}
+         and sp.method = 'CASH'`,
+    )
+    .get(params) as { amount: number };
+
+  const cardRow = db
+    .prepare(
+      `select coalesce(sum(sp.amount), 0) as amount
+       from sale_payments sp
+       inner join sales s on s.id = sp.sale_id and s.tenant_id = sp.tenant_id
+       where ${saleFilters}
+         and sp.method = 'CARD'`,
+    )
+    .get(params) as { amount: number };
+
+  const refundRow = db
+    .prepare(
+      `select coalesce(sum(refund_total), 0) as amount
+       from sale_returns
+       where tenant_id = @tenantId
+         and status = 'COMPLETED'
+         and refunded_by = @userId
+         and refunded_at is not null
+         and refunded_at >= @openedAt`,
+    )
+    .get(params) as { amount: number };
 
   return {
     date: todayRow.d,
     totalSalesAmount: roundMoney(Number(totalSalesRow.amount)),
     nonFbrSalesAmount: roundMoney(Number(nonFbrSalesRow.amount)),
-    cashReceivedAmount: roundMoney(cashReceived),
+    cashReceivedAmount: roundMoney(Number(cashRow.amount)),
     cardPaymentsAmount: roundMoney(Number(cardRow.amount)),
-    heldBillsCount: Number(heldRow.cnt),
-    refundTotalAmount: roundMoney(refunds),
-    openingBalanceAmount: roundMoney(openingFloat),
-    cashWithdrawnAmount: roundMoney(withdrawn),
-    cashInHandAmount: roundMoney(
-      openingFloat + cashReceived - refunds - withdrawn,
-    ),
+    heldBillsCount,
+    refundTotalAmount: roundMoney(Number(refundRow.amount)),
+    openingBalanceAmount: roundMoney(Number(session.opening_balance)),
+    cashWithdrawnAmount,
+    cashInHandAmount: roundMoney(Number(session.current_cash_balance)),
   };
 }
 
@@ -783,6 +802,7 @@ export function getManagerDashboardSummaryLocal(
     drawers,
     cashSubmittedToday,
     cashSubmissionsToday,
+    ownerCashBalance: seeAll ? getOwnerCashBalanceLocal(userId) : 0,
     cashierTills: cashierTillRows.map((row) => ({
       userId: row.userId,
       userName: row.userName?.trim() || "Cashier",

@@ -23,6 +23,8 @@ export function VendorGroupFormPage() {
     (id: string) => vendorGroupsApi.deactivate(id),
     [],
   );
+  const remove = useCallback((id: string) => vendorGroupsApi.delete(id), []);
+  const restore = useCallback((id: string) => vendorGroupsApi.restore(id), []);
 
   return (
     <TaxonomyFormPage
@@ -35,6 +37,8 @@ export function VendorGroupFormPage() {
       create={create}
       update={update}
       deactivate={deactivate}
+      remove={remove}
+      restore={restore}
     />
   );
 }

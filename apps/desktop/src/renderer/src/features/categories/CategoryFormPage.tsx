@@ -23,6 +23,8 @@ export function CategoryFormPage() {
     (id: string) => categoriesApi.deactivate(id),
     [],
   );
+  const remove = useCallback((id: string) => categoriesApi.delete(id), []);
+  const restore = useCallback((id: string) => categoriesApi.restore(id), []);
 
   return (
     <TaxonomyFormPage
@@ -35,6 +37,8 @@ export function CategoryFormPage() {
       create={create}
       update={update}
       deactivate={deactivate}
+      remove={remove}
+      restore={restore}
     />
   );
 }

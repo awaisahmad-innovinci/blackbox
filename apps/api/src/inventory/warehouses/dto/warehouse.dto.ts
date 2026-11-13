@@ -5,12 +5,16 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
-import { ENTITY_STATUSES } from "@blackbox/shared";
+import {
+  ENTITY_STATUSES,
+  ENTITY_STATUS_FILTERS,
+  type EntityStatusFilter,
+} from "@blackbox/shared";
 
 export class ListWarehousesQueryDto {
   @IsOptional()
-  @IsIn([...ENTITY_STATUSES, "all"])
-  status?: "active" | "inactive" | "all";
+  @IsIn([...ENTITY_STATUS_FILTERS])
+  status?: EntityStatusFilter;
 
   @IsOptional()
   @IsString()

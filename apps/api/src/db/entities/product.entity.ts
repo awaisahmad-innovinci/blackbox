@@ -56,6 +56,9 @@ export class Product {
   @Column({ type: "text", default: "active" })
   status!: string;
 
+  @Column({ name: "deleted_at", type: "timestamptz", nullable: true })
+  deletedAt!: Date | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

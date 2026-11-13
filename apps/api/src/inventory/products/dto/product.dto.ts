@@ -14,6 +14,8 @@ import {
 } from "class-validator";
 import {
   ENTITY_STATUSES,
+  ENTITY_STATUS_FILTERS,
+  type EntityStatusFilter,
   HS_CODE_MESSAGE,
   HS_CODE_PATTERN,
   PRODUCT_TYPES,
@@ -36,8 +38,8 @@ export class ListProductsQueryDto {
   categoryId?: string;
 
   @IsOptional()
-  @IsIn(ENTITY_STATUSES)
-  status?: (typeof ENTITY_STATUSES)[number];
+  @IsIn([...ENTITY_STATUS_FILTERS])
+  status?: EntityStatusFilter;
 
   @IsOptional()
   @Type(() => Number)

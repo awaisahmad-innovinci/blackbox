@@ -73,6 +73,9 @@ export default function UsersPage() {
   const [createAttempted, setCreateAttempted] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<
+    "all" | "active" | "inactive" | "deleted"
+  >("all");
   const [success, setSuccess] = useState<string | null>(null);
   const createButtonRef = useRef<HTMLButtonElement>(null);
   const fullNameRef = useRef<HTMLInputElement>(null);
@@ -91,7 +94,7 @@ export default function UsersPage() {
     setError(null);
     try {
       const [u, r] = await Promise.all([
-        listUsers(),
+        listUsers(status),
         listRoles().catch(() => [] as RoleDto[]),
       ]);
       setUsers(u);
@@ -101,7 +104,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [status]);
 
   useEffect(() => {
     void load();
@@ -235,7 +238,7 @@ export default function UsersPage() {
         {loading ? <TableSkeleton /> : null}
         {error ? <PageError error={error} onRetry={() => void load()} /> : null}
 
-        {!loading && !error && users.length === 0 ? (
+        {!loading && !error && users.length === 0 && status === "all" ? (
           <EmptyState
             title="No users yet"
             message="Create your first user to start managing access to this workspace."
@@ -250,22 +253,39 @@ export default function UsersPage() {
           />
         ) : null}
 
-        {!loading && !error && users.length > 0 ? (
+        {!loading && !error && (users.length > 0 || status !== "all") ? (
           <div className="space-y-4">
-            <div className="relative max-w-sm">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name, email, username"
-                className="pl-9"
-                aria-label="Search users"
-              />
+            <div className="flex flex-wrap gap-3">
+              <div className="relative max-w-sm flex-1">
+                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name, email, username"
+                  className="pl-9"
+                  aria-label="Search users"
+                />
+              </div>
+              <select
+                className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                value={status}
+                onChange={(e) =>
+                  setStatus(
+                    e.target.value as "all" | "active" | "inactive" | "deleted",
+                  )
+                }
+                aria-label="Filter by status"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="deleted">Deleted</option>
+              </select>
             </div>
             {filtered.length === 0 ? (
               <EmptyState
                 title="No matches"
-                message="Try a different search term."
+                message="Try a different search term or status."
               />
             ) : (
               <DataTable>
@@ -317,7 +337,11 @@ export default function UsersPage() {
                             </div>
                           </Td>
                           <Td>
-                            <ActiveBadge active={u.isActive} />
+                            {u.deletedAt ? (
+                              <Badge variant="outline">Deleted</Badge>
+                            ) : (
+                              <ActiveBadge active={u.isActive} />
+                            )}
                           </Td>
                           <Td className="text-right">
                             <Button asChild variant="ghost" size="sm">

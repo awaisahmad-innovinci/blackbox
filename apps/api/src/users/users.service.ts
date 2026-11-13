@@ -6,7 +6,15 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import * as argon2 from "argon2";
-import { DataSource, In, IsNull, Repository } from "typeorm";
+import type { EntityStatusFilter } from "@blackbox/shared";
+import {
+  DataSource,
+  type FindOptionsWhere,
+  In,
+  IsNull,
+  Not,
+  Repository,
+} from "typeorm";
 import {
   toUserResponse,
   type UserResponse,
@@ -30,9 +38,18 @@ export class UsersService {
     private readonly userRoles: Repository<UserRole>,
   ) {}
 
-  async list(tenantId: string): Promise<UserResponse[]> {
+  async list(
+    tenantId: string,
+    status: EntityStatusFilter = "all",
+  ): Promise<UserResponse[]> {
+    const where: FindOptionsWhere<User> = {
+      tenantId,
+      deletedAt: status === "deleted" ? Not(IsNull()) : IsNull(),
+    };
+    if (status === "active") where.isActive = true;
+    if (status === "inactive") where.isActive = false;
     const users = await this.users.find({
-      where: { tenantId },
+      where,
       order: { createdAt: "ASC" },
     });
     const roleMap = await this.roleIdsByUserIds(
@@ -158,8 +175,45 @@ export class UsersService {
     return toUserResponse(user, roleIds);
   }
 
+  async softDelete(
+    tenantId: string,
+    actorId: string,
+    userId: string,
+  ): Promise<UserResponse> {
+    if (actorId === userId) {
+      throw new BadRequestException("You cannot delete your own account");
+    }
+    const owner = await this.userRoles
+      .createQueryBuilder("ur")
+      .innerJoin("ur.role", "role")
+      .where("ur.tenant_id = :tenantId", { tenantId })
+      .andWhere("ur.user_id = :userId", { userId })
+      .andWhere("role.key = :key", { key: "OWNER" })
+      .getExists();
+    if (owner) {
+      throw new BadRequestException("The business owner cannot be deleted");
+    }
+    await this.deactivate(tenantId, userId);
+    const user = await this.findTenantUser(tenantId, userId);
+    user.deletedAt = user.deletedAt ?? new Date();
+    await this.users.save(user);
+    const roleIds = await this.roleIdsForUser(tenantId, user.id);
+    return toUserResponse(user, roleIds);
+  }
+
+  async restore(tenantId: string, userId: string): Promise<UserResponse> {
+    const user = await this.findTenantUser(tenantId, userId);
+    user.deletedAt = null;
+    await this.users.save(user);
+    const roleIds = await this.roleIdsForUser(tenantId, user.id);
+    return toUserResponse(user, roleIds);
+  }
+
   async activate(tenantId: string, userId: string): Promise<UserResponse> {
     const user = await this.findTenantUser(tenantId, userId);
+    if (user.deletedAt) {
+      throw new BadRequestException("Restore the user before activating");
+    }
     if (user.isActive) {
       const roleIds = await this.roleIdsForUser(tenantId, user.id);
       return toUserResponse(user, roleIds);

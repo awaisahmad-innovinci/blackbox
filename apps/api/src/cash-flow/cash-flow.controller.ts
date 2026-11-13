@@ -18,6 +18,8 @@ import {
   CashFlowQueryDto,
   RecordCashExpenseDto,
   RecordManagerDrawerOpeningDto,
+  RecordManagerDrawerSubmissionDto,
+  RecordOwnerCashDto,
 } from "./dto/cash-flow.dto";
 
 @Controller("cash-flow")
@@ -46,7 +48,16 @@ export class CashFlowController {
   @Get("managers")
   @RequirePermissions("web.access")
   managers(@CurrentUser() user: TenantContext): Promise<DrawerPerson[]> {
-    return this.cashFlow.listPeople(user.tenantId, "till.manage");
+    return this.cashFlow.listPeople(user.tenantId, "till.manage", "web.access");
+  }
+
+  @Post("owner-cash")
+  @RequirePermissions("web.access")
+  recordOwnerCash(
+    @CurrentUser() user: TenantContext,
+    @Body() body: RecordOwnerCashDto,
+  ): Promise<{ id: string; amount: number }> {
+    return this.cashFlow.recordOwnerCash(user, body.amount, body.note);
   }
 
   @Post("drawer-openings")
@@ -62,8 +73,9 @@ export class CashFlowController {
   @RequirePermissions("till.manage")
   recordSubmission(
     @CurrentUser() user: TenantContext,
+    @Body() body: RecordManagerDrawerSubmissionDto,
   ): Promise<{ id: string; amount: number }> {
-    return this.cashFlow.recordSubmission(user);
+    return this.cashFlow.recordSubmission(user, body.amount);
   }
 
   private assertCanView(user: TenantContext): void {

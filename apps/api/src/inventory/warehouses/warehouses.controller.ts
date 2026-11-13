@@ -61,4 +61,22 @@ export class WarehousesController {
   ): Promise<WarehouseListItem> {
     return this.warehouses.deactivate(id);
   }
+
+  @Post(":id/delete")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("warehouses.write")
+  softDelete(
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<WarehouseListItem> {
+    return this.warehouses.softDelete(id);
+  }
+
+  @Post(":id/restore")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("warehouses.write")
+  restore(
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<WarehouseListItem> {
+    return this.warehouses.restore(id);
+  }
 }

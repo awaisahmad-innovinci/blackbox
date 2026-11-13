@@ -52,6 +52,12 @@ export const skusApi = {
       method: "POST",
     });
   },
+  delete(id: string): Promise<SkuDetail> {
+    return apiFetch<SkuDetail>(`/skus/${id}/delete`, { method: "POST" });
+  },
+  restore(id: string): Promise<SkuDetail> {
+    return apiFetch<SkuDetail>(`/skus/${id}/restore`, { method: "POST" });
+  },
   listInventory(id: string): Promise<WarehouseStockRow[]> {
     return apiFetch<WarehouseStockRow[]>(`/skus/${id}/inventory`);
   },

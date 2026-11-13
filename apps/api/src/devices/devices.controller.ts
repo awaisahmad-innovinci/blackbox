@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -12,6 +13,7 @@ import { CurrentUser } from "../common/current-user.decorator";
 import type { TenantContext } from "../common/tenant-context";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
+import { ListDevicesQueryDto } from "./dto/list-devices-query.dto";
 import { RegisterDeviceDto } from "./dto/register-device.dto";
 import { DevicesService } from "./devices.service";
 
@@ -22,8 +24,11 @@ export class DevicesController {
 
   @Get()
   @RequirePermissions("devices.read")
-  list(@CurrentUser() user: TenantContext) {
-    return this.devicesService.list(user.tenantId);
+  list(
+    @CurrentUser() user: TenantContext,
+    @Query() query: ListDevicesQueryDto,
+  ) {
+    return this.devicesService.list(user.tenantId, query.status);
   }
 
   /** Declared before `:id` so the literal segment wins route matching. */
@@ -31,6 +36,15 @@ export class DevicesController {
   @RequirePermissions("desktop.access")
   current(@CurrentUser() user: TenantContext) {
     return this.devicesService.current(user.tenantId, user.deviceId);
+  }
+
+  @Post("me/wipe-acknowledged")
+  @RequirePermissions("desktop.access")
+  acknowledgeWipe(@CurrentUser() user: TenantContext) {
+    return this.devicesService.acknowledgeLocalWipe(
+      user.tenantId,
+      user.deviceId,
+    );
   }
 
   @Post("register")
@@ -72,5 +86,23 @@ export class DevicesController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.devicesService.revoke(user.tenantId, id);
+  }
+
+  @Post(":id/delete")
+  @RequirePermissions("devices.manage")
+  softDelete(
+    @CurrentUser() user: TenantContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.devicesService.softDelete(user.tenantId, id);
+  }
+
+  @Post(":id/restore")
+  @RequirePermissions("devices.manage")
+  restore(
+    @CurrentUser() user: TenantContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.devicesService.restore(user.tenantId, id);
   }
 }

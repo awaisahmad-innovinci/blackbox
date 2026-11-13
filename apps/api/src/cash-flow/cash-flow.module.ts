@@ -4,6 +4,7 @@ import {
   CashExpense,
   ManagerDrawerOpening,
   ManagerDrawerSubmission,
+  OwnerCashEntry,
   User,
 } from "../db/entities";
 import { RbacModule } from "../rbac/rbac.module";
@@ -16,6 +17,7 @@ import { CashFlowService } from "./cash-flow.service";
       CashExpense,
       ManagerDrawerOpening,
       ManagerDrawerSubmission,
+      OwnerCashEntry,
       User,
     ])],
   controllers: [CashFlowController],

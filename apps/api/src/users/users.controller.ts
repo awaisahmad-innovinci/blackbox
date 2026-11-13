@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -15,6 +16,7 @@ import type { TenantContext } from "../common/tenant-context";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
 import { CreateUserDto } from "./dto/create-user.dto";
+import { ListUsersQueryDto } from "./dto/list-users-query.dto";
 import { ReplaceUserRolesDto } from "./dto/replace-user-roles.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UsersService } from "./users.service";
@@ -26,8 +28,11 @@ export class UsersController {
 
   @Get()
   @RequirePermissions("users.read")
-  list(@CurrentUser() user: TenantContext) {
-    return this.usersService.list(user.tenantId);
+  list(
+    @CurrentUser() user: TenantContext,
+    @Query() query: ListUsersQueryDto,
+  ) {
+    return this.usersService.list(user.tenantId, query.status);
   }
 
   @Get(":id")
@@ -62,6 +67,24 @@ export class UsersController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.usersService.deactivate(user.tenantId, id);
+  }
+
+  @Post(":id/delete")
+  @RequirePermissions("users.deactivate")
+  softDelete(
+    @CurrentUser() user: TenantContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.softDelete(user.tenantId, user.userId, id);
+  }
+
+  @Post(":id/restore")
+  @RequirePermissions("users.deactivate")
+  restore(
+    @CurrentUser() user: TenantContext,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.restore(user.tenantId, id);
   }
 
   @Post(":id/activate")

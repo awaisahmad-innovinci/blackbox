@@ -558,10 +558,6 @@ export class AuthService {
       });
     }
 
-    if (device?.status === "revoked") {
-      throw new UnauthorizedException("Device revoked");
-    }
-
     if (!device) {
       device = await this.devices.save(
         this.devices.create({

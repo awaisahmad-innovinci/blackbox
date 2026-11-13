@@ -59,6 +59,7 @@ import {
 
 import {
   ENTITY_STATUSES as entityStatusesList,
+  ENTITY_STATUS_FILTERS as entityStatusFiltersList,
   UNIT_TYPES as unitTypesList,
   INVENTORY_MOVEMENT_TYPES as inventoryMovementTypesList,
   PURCHASE_ORDER_STATUSES as purchaseOrderStatusesList,
@@ -160,6 +161,7 @@ export type {
 } from "./onboarding";
 export type {
   EntityStatus,
+  EntityStatusFilter,
   UnitType,
   InventoryMovementType,
   PurchaseOrderStatus,
@@ -322,6 +324,7 @@ export const isCurrencyCode = checkIsCurrencyCode;
 export const DEFAULT_CURRENCY_BY_COUNTRY = defaultCurrencyByCountry;
 
 export const ENTITY_STATUSES = entityStatusesList;
+export const ENTITY_STATUS_FILTERS = entityStatusFiltersList;
 export const UNIT_TYPES = unitTypesList;
 export const INVENTORY_MOVEMENT_TYPES = inventoryMovementTypesList;
 export const PURCHASE_ORDER_STATUSES = purchaseOrderStatusesList;
