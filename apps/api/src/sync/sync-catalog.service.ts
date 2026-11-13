@@ -220,18 +220,21 @@ export class SyncCatalogService {
         name: row.name,
         description: row.description,
         status: asStatus(row.status),
+        deletedAt: row.deletedAt?.toISOString() ?? null,
       })),
       categories: categories.map((row) => ({
         id: row.id,
         name: row.name,
         description: row.description,
         status: asStatus(row.status),
+        deletedAt: row.deletedAt?.toISOString() ?? null,
       })),
       vendorGroups: vendorGroups.map((row) => ({
         id: row.id,
         name: row.name,
         description: row.description,
         status: asStatus(row.status),
+        deletedAt: row.deletedAt?.toISOString() ?? null,
       })),
       warehouses: warehouses.map(
         (row): WarehouseListItem => ({
@@ -240,6 +243,7 @@ export class SyncCatalogService {
           code: row.code,
           location: row.location,
           status: asStatus(row.status),
+          deletedAt: row.deletedAt?.toISOString() ?? null,
         }),
       ),
     };
@@ -316,6 +320,7 @@ export class SyncCatalogService {
         description: product.description,
         imagePath: product.imagePath,
         status: product.status as EntityStatus,
+        deletedAt: product.deletedAt?.toISOString() ?? null,
         totalOnHand: num(stockTotals?.onHand),
         totalReserved: num(stockTotals?.reserved),
         totalAvailable: num(stockTotals?.available),
@@ -346,6 +351,7 @@ export class SyncCatalogService {
         maximumStockLevel: numOrNull(sku.maximumStockLevel),
         trackInventory: sku.trackInventory,
         status: sku.status as EntityStatus,
+        deletedAt: sku.deletedAt?.toISOString() ?? null,
       }));
       const barcodes: SkuBarcode[] = productSkus.flatMap((sku) =>
         (barcodesBySku.get(sku.id) ?? []).map((barcode) => ({
@@ -772,6 +778,7 @@ export class SyncCatalogService {
       groupId: vendor.groupId,
       groupName: vendor.group?.name ?? null,
       status: vendor.status as EntityStatus,
+      deletedAt: vendor.deletedAt?.toISOString() ?? null,
       address: vendor.address,
       city: vendor.city,
       state: vendor.state,

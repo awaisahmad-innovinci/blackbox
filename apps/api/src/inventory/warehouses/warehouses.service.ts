@@ -9,6 +9,7 @@ import { normalizeStoredText } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { Warehouse } from "../../db/entities";
+import { applyStatusFilter, toDeletedAt } from "../common/soft-delete";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import {
   CreateWarehouseDto,
@@ -30,10 +31,7 @@ export class WarehousesService {
       .createQueryBuilder("w")
       .where("w.tenant_id = :tenantId", { tenantId });
 
-    const status = query.status ?? "active";
-    if (status !== "all") {
-      qb.andWhere("w.status = :status", { status });
-    }
+    applyStatusFilter(qb, "w", query.status);
     if (query.q?.trim()) {
       const term = `%${query.q.trim().toLowerCase()}%`;
       qb.andWhere(
@@ -64,7 +62,7 @@ export class WarehousesService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Warehouse code already exists");
+        throw new ConflictException("Warehouse code already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -84,7 +82,7 @@ export class WarehousesService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Warehouse code already exists");
+        throw new ConflictException("Warehouse code already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -93,6 +91,21 @@ export class WarehousesService {
   async deactivate(id: string): Promise<WarehouseListItem> {
     const row = await this.require(id);
     row.status = "inactive";
+    await this.warehouses.save(row);
+    return this.map(row);
+  }
+
+  async softDelete(id: string): Promise<WarehouseListItem> {
+    const row = await this.require(id);
+    row.status = "inactive";
+    row.deletedAt = row.deletedAt ?? new Date();
+    await this.warehouses.save(row);
+    return this.map(row);
+  }
+
+  async restore(id: string): Promise<WarehouseListItem> {
+    const row = await this.require(id);
+    row.deletedAt = null;
     await this.warehouses.save(row);
     return this.map(row);
   }
@@ -112,6 +125,7 @@ export class WarehousesService {
       code: w.code,
       location: w.location,
       status: w.status as EntityStatus,
+      deletedAt: toDeletedAt(w.deletedAt),
     };
   }
 }

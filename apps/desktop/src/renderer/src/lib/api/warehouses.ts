@@ -42,4 +42,10 @@ export const warehousesApi = {
       method: "POST",
     });
   },
+  delete(id: string): Promise<WarehouseListItem> {
+    return apiFetch<WarehouseListItem>(`/warehouses/${id}/delete`, { method: "POST" });
+  },
+  restore(id: string): Promise<WarehouseListItem> {
+    return apiFetch<WarehouseListItem>(`/warehouses/${id}/restore`, { method: "POST" });
+  },
 };

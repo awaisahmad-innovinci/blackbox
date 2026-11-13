@@ -79,6 +79,7 @@ export function CashFlowPage() {
   const [floatSaving, setFloatSaving] = useState(false);
   const [floatError, setFloatError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitAmount, setSubmitAmount] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { from, to } = periodFor(preset, day);
@@ -136,10 +137,20 @@ export function CashFlowPage() {
       setFormError("Enter an amount greater than zero");
       return;
     }
-    const drawerBalance =
-      report?.drawers.find((row) => row.managerUserId === user.id)?.balance ??
-      0;
-    if (expenseExceedsDrawer(parsed, drawerBalance)) {
+    const owner = user.permissions.includes("web.access");
+    const boundForCheck = await isDeviceBound();
+    const drawerBalance = owner
+      ? (report?.ownerCashBalance ??
+        (boundForCheck
+          ? ((await window.blackbox?.localDb?.getOwnerCashBalance?.(user.id)) ??
+            0)
+          : 0))
+      : (report?.drawers.find((row) => row.managerUserId === user.id)?.balance ??
+        0);
+    if (
+      (!owner || boundForCheck || report != null) &&
+      expenseExceedsDrawer(parsed, drawerBalance)
+    ) {
       setFormError(expenseOverDrawerMessage(drawerBalance));
       return;
     }
@@ -161,6 +172,9 @@ export function CashFlowPage() {
             amount: parsed,
             note: note.trim(),
             occurredAt: now,
+            ...(user.permissions.includes("web.access")
+              ? { ownerCash: true }
+              : {}),
             createdAt: now,
             updatedAt: now,
           },
@@ -209,6 +223,15 @@ export function CashFlowPage() {
     if (!(parsed > 0)) {
       setFloatError("Enter an amount greater than zero");
       return;
+    }
+    const boundForFund = await isDeviceBound();
+    if (boundForFund) {
+      const ownerCash =
+        (await window.blackbox?.localDb?.getOwnerCashBalance?.(user.id)) ?? 0;
+      if (expenseExceedsDrawer(parsed, ownerCash)) {
+        setFloatError(expenseOverDrawerMessage(ownerCash));
+        return;
+      }
     }
     setFloatSaving(true);
     setFloatError(null);
@@ -268,12 +291,22 @@ export function CashFlowPage() {
     }
   }
 
-  async function onSubmitCash() {
+  async function onSubmitCash(event: FormEvent) {
+    event.preventDefault();
     if (!user || !canManageTill) return;
     const balance =
       report?.drawers.find((row) => row.managerUserId === user.id)?.balance ?? 0;
-    if (!(balance > 0)) {
-      setSubmitError("There is no cash to submit");
+    const parsed = Number(submitAmount);
+    if (!(parsed > 0)) {
+      setSubmitError("Enter an amount greater than zero");
+      return;
+    }
+    if (!(balance > 0) || expenseExceedsDrawer(parsed, balance)) {
+      setSubmitError(
+        balance > 0
+          ? `Submit no more than the drawer balance of Rs ${formatMoney(balance)}`
+          : "There is no cash to submit",
+      );
       return;
     }
     setSubmitting(true);
@@ -291,7 +324,7 @@ export function CashFlowPage() {
           payload: {
             managerUserId: user.id,
             managerName,
-            amount: balance,
+            amount: parsed,
             submittedAt: now,
             createdAt: now,
             updatedAt: now,
@@ -301,14 +334,15 @@ export function CashFlowPage() {
           {
             eventType: "drawer.submitted",
             actorUserId: user.id,
-            summary: `${managerName} submitted Rs ${formatMoney(balance)} cash to the owner`,
-            metadata: { submissionId: id, amount: balance },
+            summary: `${managerName} submitted Rs ${formatMoney(parsed)} cash to the owner`,
+            metadata: { submissionId: id, amount: parsed },
           },
           { actorName: managerName },
         );
       } else {
-        await cashFlowApi.submit();
+        await cashFlowApi.submit(parsed);
       }
+      setSubmitAmount("");
       await load();
     } catch (err: unknown) {
       setSubmitError(
@@ -381,6 +415,24 @@ export function CashFlowPage() {
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {seeAll ? (
+            <Card className="gap-3 py-5">
+              <CardHeader className="px-5 pb-0">
+                <CardTitle className="text-muted-foreground text-sm font-medium">
+                  Owner
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 px-5">
+                <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                  {money(report?.ownerCashBalance ?? 0)}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Cash collected. It stays until you spend it on expenses or
+                  manager drawers.
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
           {(report?.drawers ?? []).map((drawer) => (
             <Card key={drawer.managerUserId} className="gap-3 py-5">
               <CardHeader className="px-5 pb-0">
@@ -388,38 +440,46 @@ export function CashFlowPage() {
                   {drawer.managerName}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1 px-5">
+              <CardContent className="px-5">
                 <p className="text-3xl font-semibold tracking-tight tabular-nums">
                   {money(drawer.balance)}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  Opening float {money(drawer.openingFloat)} · Collected{" "}
-                  {money(drawer.collected)} · Till floats {money(drawer.tillFloats)} ·
-                  Expenses {money(drawer.expenses)} · Submitted {money(drawer.submitted)}
                 </p>
               </CardContent>
             </Card>
           ))}
-          {!loading && (report?.drawers.length ?? 0) === 0 ? (
+          {!loading && !seeAll && (report?.drawers.length ?? 0) === 0 ? (
             <p className="text-muted-foreground text-sm">No drawer activity yet.</p>
           ) : null}
         </div>
         {canManageTill && ownBalance > 0 ? (
-          <div className="space-y-2">
-            <Button
-              type="button"
-              disabled={submitting}
-              onClick={() => void onSubmitCash()}
-            >
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(event) => void onSubmitCash(event)}
+          >
+            <label className="grid gap-1 text-sm">
+              Amount to pay the owner
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                className="w-40"
+                value={submitAmount}
+                aria-invalid={Boolean(submitError)}
+                onChange={(event) => setSubmitAmount(event.target.value)}
+              />
+            </label>
+            <Button type="submit" disabled={submitting}>
               {submitting ? "Submitting…" : "Submit cash to owner"}
             </Button>
-            <p className="text-muted-foreground text-xs">
-              Hands your whole drawer, {money(ownBalance)}, to the owner and sets the balance to zero.
+            <p className="text-muted-foreground basis-full text-xs">
+              The amount leaves your drawer, {money(ownBalance)}, and is added to the owner&apos;s collected cash.
             </p>
             {submitError ? (
-              <p className="text-destructive text-sm">{submitError}</p>
+              <p className="text-destructive basis-full text-sm" role="alert">
+                {submitError}
+              </p>
             ) : null}
-          </div>
+          </form>
         ) : null}
       </section>
 
@@ -553,10 +613,15 @@ export function CashFlowPage() {
               <p className="text-destructive w-full text-sm">{formError}</p>
             ) : (
               <p className="text-muted-foreground w-full text-xs">
-                This expense is deducted from your drawer. Maximum{" "}
+                {seeAll
+                  ? "This expense is deducted from the owner drawer. Maximum "
+                  : "This expense is deducted from your drawer. Maximum "}
                 {money(
-                  report?.drawers.find((row) => row.managerUserId === user?.id)
-                    ?.balance ?? 0,
+                  seeAll
+                    ? (report?.ownerCashBalance ?? 0)
+                    : (report?.drawers.find(
+                        (row) => row.managerUserId === user?.id,
+                      )?.balance ?? 0),
                 )}
                 .
               </p>

@@ -149,6 +149,9 @@ export class DashboardService {
       cashSubmissionsToday.reduce((sum, row) => sum + row.amount, 0),
     );
     const cashierTills = await this.listCashierTills(tenantId);
+    const ownerCashBalance = seeAll
+      ? await this.cashFlow.ownerCashBalance(tenantId, userId)
+      : 0;
 
     return {
       date: today,
@@ -158,6 +161,7 @@ export class DashboardService {
       drawers,
       cashSubmittedToday,
       cashSubmissionsToday,
+      ownerCashBalance,
       cashierTills,
     };
   }
@@ -207,7 +211,7 @@ export class DashboardService {
         .getRawOne<{ count: string; total: string }>(),
       this.listCashierTills(tenantId),
       this.cashFlow.drawerBalances(tenantId, userId, "", true),
-      this.cashFlow.submissionsToday(tenantId, today),
+      this.cashFlow.submissionsByManager(tenantId),
       this.products.count({ where: { tenantId } }),
       this.stock
         .createQueryBuilder("s")
@@ -247,6 +251,7 @@ export class DashboardService {
         cashSubmissionsToday.reduce((sum, row) => sum + row.amount, 0),
       ),
       cashSubmissionsToday,
+      ownerCashBalance: await this.cashFlow.ownerCashBalance(tenantId, userId),
       productCount,
       lowStockCount,
       pendingPurchaseOrderCount,

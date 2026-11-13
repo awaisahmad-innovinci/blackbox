@@ -30,6 +30,7 @@ import {
   VendorSku,
   Warehouse,
 } from "../../db/entities";
+import { toDeletedAt } from "../common/soft-delete";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { getInventoryOutBalanceQty } from "../inventory-out/inventory-out-balance";
 import { UpdateProductSkuDto } from "../products/dto/product.dto";
@@ -76,6 +77,8 @@ export class SkusService {
       .innerJoinAndSelect("sku.product", "product")
       .where("sku.tenant_id = :tenantId", { tenantId })
       .andWhere("sku.status = :status", { status: "active" })
+      .andWhere("sku.deleted_at IS NULL")
+      .andWhere("product.deleted_at IS NULL")
       .orderBy("product.name", "ASC")
       .addOrderBy("sku.variant_name", "ASC")
       .take(50);
@@ -322,6 +325,31 @@ export class SkusService {
     return this.getById(id);
   }
 
+  async softDelete(id: string): Promise<SkuDetail> {
+    const tenantId = this.fixedTenant.tenantId;
+    const sku = await this.skus.findOne({ where: { id, tenantId } });
+    if (!sku) throw new NotFoundException("SKU not found");
+    sku.status = "inactive";
+    sku.deletedAt = sku.deletedAt ?? new Date();
+    await this.skus.save(sku);
+    return this.getById(id);
+  }
+
+  async restore(id: string): Promise<SkuDetail> {
+    const tenantId = this.fixedTenant.tenantId;
+    const sku = await this.skus.findOne({
+      where: { id, tenantId },
+      relations: { product: true },
+    });
+    if (!sku) throw new NotFoundException("SKU not found");
+    if (sku.product?.deletedAt) {
+      throw new BadRequestException("Restore the product first");
+    }
+    sku.deletedAt = null;
+    await this.skus.save(sku);
+    return this.getById(id);
+  }
+
   async listInventory(id: string): Promise<WarehouseStockRow[]> {
     const tenantId = this.fixedTenant.tenantId;
     const sku = await this.skus.findOne({ where: { id, tenantId } });
@@ -456,6 +484,7 @@ export class SkusService {
       maximumStockLevel: toNumOrNull(sku.maximumStockLevel),
       trackInventory: sku.trackInventory,
       status: sku.status as EntityStatus,
+      deletedAt: toDeletedAt(sku.deletedAt),
     };
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { EntityStatus, VendorGroup, VendorListItem, VendorListQuery } from "@blackbox/shared";
+import type { EntityStatusFilter, VendorGroup, VendorListItem, VendorListQuery } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Skeleton } from "@blackbox/ui/skeleton";
@@ -35,7 +35,7 @@ export function VendorsListPage() {
   const navigate = useNavigate();
   const dataVersion = useSyncDataVersion();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<EntityStatus | "">("");
+  const [status, setStatus] = useState<EntityStatusFilter | "">("");
   const [groupId, setGroupId] = useState("");
   const [groups, setGroups] = useState<VendorGroup[]>([]);
   const [items, setItems] = useState<VendorListItem[]>([]);
@@ -156,11 +156,12 @@ export function VendorsListPage() {
           className={FILTER_SELECT_CLASS}
           {...filterSelectProps()}
           value={status}
-          onChange={(e) => setStatus(e.target.value as EntityStatus | "")}
+          onChange={(e) => setStatus(e.target.value as EntityStatusFilter | "")}
         >
           <option value="">All statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
+          <option value="deleted">Deleted</option>
         </select>
         <select
           className={FILTER_SELECT_CLASS}
@@ -240,7 +241,9 @@ export function VendorsListPage() {
                     <td className="px-4 py-3">{v.primaryContactPhone ?? "—"}</td>
                     <td className="px-4 py-3">{v.city ?? "—"}</td>
                     <td className="px-4 py-3 tabular-nums">{v.suppliedSkuCount}</td>
-                    <td className="px-4 py-3 capitalize">{v.status}</td>
+                    <td className="px-4 py-3 capitalize">
+                    {v.deletedAt ? "Deleted" : v.status}
+                  </td>
                   </ListTableRow>
                 ))
               : null}

@@ -62,6 +62,39 @@ export function maybeStartCatalogSync(): void {
   });
 }
 
+/** Rebuilds the local database from the cloud after a revoke wiped it. */
+export function startForcedFullSync(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    enqueue(async () => {
+      setState({
+        active: true,
+        error: null,
+        message: "Restoring this device…",
+      });
+      try {
+        const localDb = window.blackbox?.localDb;
+        await localDb?.setSyncMeta?.(CATALOG_PULL_ACTIVE_KEY, "1");
+        await runFullPull((progress) => {
+          setState({ active: true, error: null, message: progress.message });
+        });
+        await localDb?.setSyncMeta?.(CATALOG_PULL_ACTIVE_KEY, "0");
+        bumpDataVersion();
+        setState({
+          active: false,
+          error: null,
+          message: null,
+          finishedAt: Date.now(),
+        });
+        resolve();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Restore failed";
+        setState({ active: false, error: message, message: null });
+        reject(err instanceof Error ? err : new Error(message));
+      }
+    });
+  });
+}
+
 /** Pull the imported files into SQLite after the current catalog or import sync. */
 export function enqueueMasterDataLocalSync(files: string[]): void {
   if (files.length === 0) return;

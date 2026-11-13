@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@blackbox/ui/alert";
+import { Badge } from "@blackbox/ui/badge";
 import { Button } from "@blackbox/ui/button";
 import {
   Dialog,
@@ -32,6 +33,8 @@ import { FormError } from "@/components/section-card";
 import {
   createWarehouse,
   deactivateWarehouse,
+  deleteWarehouse,
+  restoreWarehouse,
   listWarehouses,
   updateWarehouse,
   type WarehouseDto,
@@ -58,7 +61,10 @@ export default function WarehousesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  const [status, setStatus] = useState<
+    "all" | "active" | "inactive" | "deleted"
+  >("all");
+  const showDeleted = status === "deleted";
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<WarehouseDto | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
@@ -68,6 +74,7 @@ export default function WarehousesPage() {
   const [deactivateTarget, setDeactivateTarget] = useState<WarehouseDto | null>(
     null,
   );
+  const [deleteTarget, setDeleteTarget] = useState<WarehouseDto | null>(null);
   const createButtonRef = useRef<HTMLButtonElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -75,13 +82,13 @@ export default function WarehousesPage() {
     setLoading(true);
     setError(null);
     try {
-      setItems(await listWarehouses({ status: "all" }));
+      setItems(await listWarehouses({ status: showDeleted ? "deleted" : "all" }));
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showDeleted]);
 
   useEffect(() => {
     void load();
@@ -96,7 +103,9 @@ export default function WarehousesPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((row) => {
-      if (status !== "all" && row.status !== status) return false;
+      if (status !== "all" && status !== "deleted" && row.status !== status) {
+        return false;
+      }
       if (!q) return true;
       return (
         row.name.toLowerCase().includes(q) ||
@@ -192,6 +201,37 @@ export default function WarehousesPage() {
     }
   }
 
+  async function onDelete() {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await deleteWarehouse(deleteTarget.id);
+      setSuccess(
+        "Warehouse deleted. Find it under the Deleted filter to restore it.",
+      );
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setError(err);
+      setDeleteTarget(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onRestore(row: WarehouseDto) {
+    setSaving(true);
+    try {
+      await restoreWarehouse(row.id);
+      setSuccess("Warehouse restored as inactive. Activate it when it is ready.");
+      await load();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <RequirePermission permissions={["warehouses.write"]}>
       <div className="bb-page">
@@ -216,7 +256,7 @@ export default function WarehousesPage() {
         {loading ? <TableSkeleton /> : null}
         {error ? <PageError error={error} onRetry={() => void load()} /> : null}
 
-        {!loading && !error && items.length === 0 ? (
+        {!loading && !error && items.length === 0 && !showDeleted ? (
           <EmptyState
             title="No warehouses yet"
             message="Create a warehouse so purchase orders and stock movements have a destination."
@@ -229,7 +269,7 @@ export default function WarehousesPage() {
           />
         ) : null}
 
-        {!loading && !error && items.length > 0 ? (
+        {!loading && !error && (items.length > 0 || showDeleted) ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
               <div className="relative max-w-sm flex-1">
@@ -246,13 +286,16 @@ export default function WarehousesPage() {
                 className="border-input bg-background h-9 rounded-md border px-3 text-sm"
                 value={status}
                 onChange={(e) =>
-                  setStatus(e.target.value as "all" | "active" | "inactive")
+                  setStatus(
+                    e.target.value as "all" | "active" | "inactive" | "deleted",
+                  )
                 }
                 aria-label="Filter by status"
               >
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
+                <option value="deleted">Deleted</option>
               </select>
             </div>
             {filtered.length === 0 ? (
@@ -279,9 +322,25 @@ export default function WarehousesPage() {
                         <Td className="font-mono text-xs">{row.code}</Td>
                         <Td>{row.location?.trim() || "—"}</Td>
                         <Td>
-                          <ActiveBadge active={row.status === "active"} />
+                          {row.deletedAt ? (
+                            <Badge variant="outline">Deleted</Badge>
+                          ) : (
+                            <ActiveBadge active={row.status === "active"} />
+                          )}
                         </Td>
                         <Td className="text-right">
+                          {row.deletedAt ? (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={saving}
+                                onClick={() => void onRestore(row)}
+                              >
+                                Restore
+                              </Button>
+                            </div>
+                          ) : (
                           <div className="flex justify-end gap-1">
                             <Button
                               variant="ghost"
@@ -299,7 +358,16 @@ export default function WarehousesPage() {
                                 Deactivate
                               </Button>
                             ) : null}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => setDeleteTarget(row)}
+                            >
+                              Delete
+                            </Button>
                           </div>
+                          )}
                         </Td>
                       </Tr>
                     ))}
@@ -416,6 +484,19 @@ export default function WarehousesPage() {
         destructive
         loading={saving}
         onConfirm={() => void onDeactivate()}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(next) => {
+          if (!next && !saving) setDeleteTarget(null);
+        }}
+        title="Delete warehouse?"
+        description="It will be hidden from every list and picker. Existing documents keep the warehouse name, and you can restore it from the Deleted filter."
+        confirmLabel="Delete"
+        destructive
+        loading={saving}
+        onConfirm={() => void onDelete()}
       />
     </RequirePermission>
   );

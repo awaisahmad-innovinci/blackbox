@@ -67,7 +67,14 @@ function navItemClass(active: boolean): string {
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, offline, deviceState } = useSession();
+  const {
+    user,
+    offline,
+    deviceState,
+    deviceLocked,
+    deviceRestoring,
+    signOut,
+  } = useSession();
   const sync = useSyncStatus();
   const catalog = useCatalogSync();
   const [lastFullSync, setLastFullSync] = useState<string | null>(null);
@@ -98,6 +105,12 @@ export function AppShell() {
   useEffect(() => {
     releaseStuckModalState({ retry: true });
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (deviceLocked && location.pathname !== "/") {
+      navigate("/", { replace: true });
+    }
+  }, [deviceLocked, location.pathname, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,6 +183,41 @@ export function AppShell() {
     location.pathname.startsWith("/purchasing") ||
     location.pathname.startsWith("/goods-receipts");
   const salesActive = location.pathname.startsWith("/sales");
+
+  if (deviceLocked) {
+    return (
+      <div className="bg-background text-foreground flex min-h-screen flex-col">
+        <header className="border-border flex items-center justify-between border-b px-8 py-4">
+          <span className="text-sm font-semibold">Blackbox</span>
+          <button
+            type="button"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-3 py-1.5 text-sm font-medium"
+            onClick={() => void signOut()}
+          >
+            Sign out
+          </button>
+        </header>
+        <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-16">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {deviceRestoring ? "Restoring this device" : "Device not trusted"}
+          </h1>
+          <p className="text-muted-foreground mt-3 text-sm leading-6">
+            {deviceRestoring
+              ? "This device is trusted again. Its previous local data was erased, and a fresh copy is downloading from the cloud."
+              : deviceState === "trusted"
+                ? "This device is trusted again. The download did not finish, and it will try again shortly."
+                : "This device was marked untrusted. Its local data has been erased, and sales or other work stay unavailable until an owner trusts it again."}
+          </p>
+          {deviceRestoring && catalog.message ? (
+            <p className="mt-4 text-sm">{catalog.message}</p>
+          ) : null}
+          {catalog.error ? (
+            <p className="text-destructive mt-4 text-sm">{catalog.error}</p>
+          ) : null}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
@@ -333,19 +381,13 @@ export function AppShell() {
           </div>
         </div>
       </header>
-      {deviceState === "pending" || deviceState === "revoked" ? (
+      {deviceState === "pending" ? (
         <div
           role="status"
-          className={cn(
-            "border-b px-6 py-2 text-center text-xs",
-            deviceState === "revoked"
-              ? "border-destructive/40 bg-destructive/5 text-destructive"
-              : "border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200",
-          )}
+          className="border-b border-amber-500/40 bg-amber-500/5 px-6 py-2 text-center text-xs text-amber-900 dark:text-amber-200"
         >
-          {deviceState === "revoked"
-            ? "This device was revoked. Local changes will not sync — contact an owner."
-            : "This device is awaiting owner approval. Changes are saved locally and sync once it is trusted."}
+          This device is awaiting owner approval. Changes are saved locally and
+          sync once it is trusted.
         </div>
       ) : null}
       <main

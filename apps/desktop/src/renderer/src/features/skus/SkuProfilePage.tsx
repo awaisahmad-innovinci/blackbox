@@ -519,6 +519,77 @@ export function SkuProfilePage() {
     }
   }
 
+  async function onDelete() {
+    if (!id || !sku) return;
+    const ok = await confirm({
+      title: "Delete SKU?",
+      description: `SKU ${sku.sku} will be hidden from lists, pickers, and the sale screen. Past sales and documents keep it, and you can restore it later.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    try {
+      if (await isDeviceBound()) {
+        const deletedAt = new Date().toISOString();
+        await commitLocalChange({
+          entityType: "product_sku",
+          entityId: id,
+          operation: "DELETE",
+          payload: {
+            ...toProductSkuRow(sku, "inactive"),
+            deletedAt,
+          } as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        navigate(`/products/${sku.productId}`);
+        return;
+      }
+      const updated = await skusApi.delete(id);
+      try {
+        await window.blackbox?.localDb?.upsertProductSku({
+          ...toProductSkuRow(updated, "inactive"),
+          deletedAt: updated.deletedAt ?? null,
+        });
+      } catch {
+        /* optional cache */
+      }
+      navigate(`/products/${sku.productId}`);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to delete"));
+    }
+  }
+
+  async function onRestore() {
+    if (!id || !sku) return;
+    try {
+      if (await isDeviceBound()) {
+        await commitLocalChange({
+          entityType: "product_sku",
+          entityId: id,
+          operation: "UPSERT",
+          payload: {
+            ...toProductSkuRow(sku, "inactive"),
+            deletedAt: null,
+          } as unknown as Record<string, unknown>,
+        });
+        void syncNow();
+        setSku({ ...sku, status: "inactive", deletedAt: null });
+        return;
+      }
+      const updated = await skusApi.restore(id);
+      try {
+        await window.blackbox?.localDb?.upsertProductSku({
+          ...toProductSkuRow(updated, updated.status),
+          deletedAt: null,
+        });
+      } catch {
+        /* optional cache */
+      }
+      setSku(updated);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to restore"));
+    }
+  }
+
   if (error && !sku) {
     return (
       <div
@@ -553,21 +624,34 @@ export function SkuProfilePage() {
           <p className="text-muted-foreground mt-1 text-sm">
             {sku.sku}
             {barcodeSubtitle ? ` · ${barcodeSubtitle}` : ""} ·{" "}
-            <span className="capitalize">{sku.status}</span>
+            <span className="capitalize">
+              {sku.deletedAt ? "Deleted" : sku.status}
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={openEdit}>
-            Edit
-          </Button>
-          {sku.status === "active" ? (
-            <Button variant="outline" onClick={() => void onDeactivate()}>
-              Deactivate
+          {sku.deletedAt ? (
+            <Button variant="outline" onClick={() => void onRestore()}>
+              Restore
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => void onActivate()}>
-              Activate
-            </Button>
+            <>
+              <Button variant="outline" onClick={openEdit}>
+                Edit
+              </Button>
+              {sku.status === "active" ? (
+                <Button variant="outline" onClick={() => void onDeactivate()}>
+                  Deactivate
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => void onActivate()}>
+                  Activate
+                </Button>
+              )}
+              <Button variant="destructive" onClick={() => void onDelete()}>
+                Delete
+              </Button>
+            </>
           )}
           <BackButton to="/products" />
         </div>

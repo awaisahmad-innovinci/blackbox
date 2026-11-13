@@ -37,4 +37,10 @@ export const brandsApi = {
   deactivate(id: string): Promise<Brand> {
     return apiFetch<Brand>(`/brands/${id}/deactivate`, { method: "POST" });
   },
+  delete(id: string): Promise<Brand> {
+    return apiFetch<Brand>(`/brands/${id}/delete`, { method: "POST" });
+  },
+  restore(id: string): Promise<Brand> {
+    return apiFetch<Brand>(`/brands/${id}/restore`, { method: "POST" });
+  },
 };

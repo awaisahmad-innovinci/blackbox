@@ -1,7 +1,11 @@
 import Database from "better-sqlite3";
+import { rmSync } from "node:fs";
 import { sqlitePathFor, readIdentity } from "./identity";
 import { runLocalMigrations } from "./migrations";
 import { resetStalePushing } from "./outbox-local";
+
+const WIPED_DB_MESSAGE =
+  "Local data was erased because this device is not trusted";
 
 export type LocalDbStatus =
   | {
@@ -23,6 +27,8 @@ let db: Database.Database | null = null;
 let dbPath: string | null = null;
 let initError: string | null = null;
 let lazyRecoveryAttempted = false;
+/** While set, the database stays closed so a revoked device cannot read or write it. */
+let holdClosed = false;
 
 function isSqliteBusy(err: unknown): boolean {
   if (err && typeof err === "object" && "code" in err) {
@@ -49,6 +55,9 @@ function openLocalDbConnection(path: string): Database.Database {
 }
 
 export function getLocalDb(): Database.Database {
+  if (holdClosed) {
+    throw new Error(WIPED_DB_MESSAGE);
+  }
   if (db) return db;
 
   if (!lazyRecoveryAttempted && readIdentity()) {
@@ -65,6 +74,9 @@ export function getLocalDb(): Database.Database {
 
 /** Open (or create) the local warehouse DB and apply migrations. */
 export function initLocalDb(): Database.Database {
+  if (holdClosed) {
+    throw new Error(WIPED_DB_MESSAGE);
+  }
   if (db) return db;
 
   const path = sqlitePathFor(readIdentity());
@@ -140,9 +152,27 @@ export function getLocalDbStatus(): LocalDbStatus {
 }
 
 export function reopenLocalDb(): Database.Database {
+  holdClosed = false;
   closeLocalDb();
   lazyRecoveryAttempted = false;
   return initLocalDb();
+}
+
+/** Close the database and delete its files. Nothing local remains to sync. */
+export function wipeLocalDb(): void {
+  const path = dbPath ?? sqlitePathFor(readIdentity());
+  holdClosed = true;
+  lazyRecoveryAttempted = true;
+  closeLocalDb();
+  dbPath = path;
+  initError = WIPED_DB_MESSAGE;
+  for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+    try {
+      rmSync(file, { force: true });
+    } catch {
+      /* already gone */
+    }
+  }
 }
 
 export function closeLocalDb(): void {

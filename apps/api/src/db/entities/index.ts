@@ -43,6 +43,7 @@ import { TillWithdrawal } from "./till-withdrawal.entity";
 import { ActivityLog } from "./activity-log.entity";
 import { VendorLedgerEntry } from "./vendor-ledger-entry.entity";
 import { CashExpense } from "./cash-expense.entity";
+import { OwnerCashEntry } from "./owner-cash-entry.entity";
 import { ManagerDrawerOpening } from "./manager-drawer-opening.entity";
 import { ManagerDrawerSubmission } from "./manager-drawer-submission.entity";
 import { VendorReturn } from "./vendor-return.entity";
@@ -94,6 +95,7 @@ export const entities = [
   TillSession,
   TillWithdrawal,
   CashExpense,
+  OwnerCashEntry,
   ManagerDrawerOpening,
   ManagerDrawerSubmission,
   ActivityLog,
@@ -148,6 +150,7 @@ export {
   TillSession,
   TillWithdrawal,
   CashExpense,
+  OwnerCashEntry,
   ManagerDrawerOpening,
   ManagerDrawerSubmission,
   ActivityLog,

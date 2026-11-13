@@ -1505,6 +1505,50 @@ where units_per_purchase_unit > 0;
         on manager_drawer_submissions (tenant_id, submitted_at);
     `,
   },
+  {
+    id: "046_soft_delete",
+    sql: `select 1;`,
+    after: (db) => {
+      for (const table of [
+        "brands",
+        "categories",
+        "vendor_groups",
+        "warehouses",
+        "products",
+        "product_skus",
+        "vendors",
+      ]) {
+        const cols = (
+          db.prepare(`pragma table_info(${table})`).all() as { name: string }[]
+        ).map((c) => c.name);
+        if (!cols.includes("deleted_at")) {
+          db.exec(`alter table ${table} add column deleted_at text`);
+        }
+      }
+    },
+  },
+  {
+    id: "047_owner_cash_entries",
+    sql: `
+      create table if not exists owner_cash_entries (
+        id text primary key,
+        tenant_id text not null,
+        recorded_by_user_id text not null,
+        recorded_by_name text not null default '',
+        amount real not null,
+        note text not null default '',
+        recorded_at text not null,
+        created_at text not null,
+        updated_at text not null,
+        sync_status text not null default 'synced',
+        server_updated_at text
+      );
+      create index if not exists owner_cash_entries_tenant_id_idx
+        on owner_cash_entries (tenant_id);
+      create index if not exists owner_cash_entries_recorded_by_idx
+        on owner_cash_entries (tenant_id, recorded_by_user_id);
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

@@ -167,6 +167,111 @@ export function ProductProfilePage() {
     }
   }
 
+  async function onDelete() {
+    if (!id || !product) return;
+    const ok = await confirm({
+      title: "Delete product?",
+      description: `${product.name} and its SKUs will be hidden from lists, pickers, and the sale screen. Past sales and documents keep them, and you can restore the product from the Deleted filter.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        await commitLocalChange({
+          entityType: "product",
+          entityId: id,
+          operation: "DELETE",
+          payload: {
+            ...product,
+            status: "inactive",
+            deletedAt: now,
+            updatedAt: now,
+          } as unknown as Record<string, unknown>,
+        });
+        for (const sku of skus.filter((row) => !row.deletedAt)) {
+          await commitLocalChange({
+            entityType: "product_sku",
+            entityId: sku.id,
+            operation: "DELETE",
+            payload: {
+              ...sku,
+              status: "inactive",
+              deletedAt: now,
+            } as unknown as Record<string, unknown>,
+          });
+        }
+        void syncNow();
+        navigate("/products");
+        return;
+      }
+      const updated = await productsApi.delete(id);
+      try {
+        await window.blackbox?.localDb?.upsertProduct(updated);
+      } catch {
+        /* optional cache */
+      }
+      navigate("/products");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to delete"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRestore() {
+    if (!id || !product) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (await isDeviceBound()) {
+        const now = new Date().toISOString();
+        const updated: ProductDetail = {
+          ...product,
+          status: "inactive",
+          deletedAt: null,
+          updatedAt: now,
+        };
+        await commitLocalChange({
+          entityType: "product",
+          entityId: id,
+          operation: "UPSERT",
+          payload: updated as unknown as Record<string, unknown>,
+        });
+        for (const sku of skus.filter(
+          (row) => row.deletedAt && row.deletedAt === product.deletedAt,
+        )) {
+          await commitLocalChange({
+            entityType: "product_sku",
+            entityId: sku.id,
+            operation: "UPSERT",
+            payload: { ...sku, deletedAt: null } as unknown as Record<
+              string,
+              unknown
+            >,
+          });
+        }
+        void syncNow();
+        await reload();
+        return;
+      }
+      const updated = await productsApi.restore(id);
+      setProduct(updated);
+      try {
+        await window.blackbox?.localDb?.upsertProduct(updated);
+      } catch {
+        setNotice("Saved on server; local cache update failed.");
+      }
+      await reload();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to restore"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (error && !product) {
     return (
       <div
@@ -203,9 +308,22 @@ export function ProductProfilePage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {PRODUCT_TYPE_LABELS[product.productType]} ·{" "}
-            <span className="capitalize">{product.status}</span>
+            <span className="capitalize">
+              {product.deletedAt ? "Deleted" : product.status}
+            </span>
           </p>
         </div>
+        {product.deletedAt ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => void onRestore()}
+            >
+              Restore
+            </Button>
+          </div>
+        ) : (
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
@@ -231,7 +349,15 @@ export function ProductProfilePage() {
               Activate
             </Button>
           )}
+          <Button
+            variant="destructive"
+            disabled={busy}
+            onClick={() => void onDelete()}
+          >
+            Delete
+          </Button>
         </div>
+        )}
       </div>
 
       {notice ? (
@@ -327,7 +453,9 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3">{s.barcode || "—"}</td>
                     <td className="px-4 py-3 tabular-nums">{formatMoney(s.costPrice)}</td>
                     <td className="px-4 py-3 tabular-nums">{formatMoney(s.sellingPrice)}</td>
-                    <td className="px-4 py-3 capitalize">{s.status}</td>
+                    <td className="px-4 py-3 capitalize">
+                      {s.deletedAt ? "Deleted" : s.status}
+                    </td>
                   </ListTableRow>
                 ))
               )}

@@ -12,6 +12,7 @@ import {
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { Category } from "../../db/entities";
+import { applyStatusFilter, toDeletedAt } from "../common/soft-delete";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import {
   CreateCategoryDto,
@@ -33,10 +34,7 @@ export class CategoriesService {
       .createQueryBuilder("c")
       .where("c.tenant_id = :tenantId", { tenantId });
 
-    const status = query.status ?? "active";
-    if (status !== "all") {
-      qb.andWhere("c.status = :status", { status });
-    }
+    applyStatusFilter(qb, "c", query.status);
     if (query.q?.trim()) {
       const term = `%${query.q.trim().toLowerCase()}%`;
       qb.andWhere(
@@ -66,7 +64,7 @@ export class CategoriesService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Category name already exists");
+        throw new ConflictException("Category name already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -82,7 +80,7 @@ export class CategoriesService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Category name already exists");
+        throw new ConflictException("Category name already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -91,6 +89,21 @@ export class CategoriesService {
   async deactivate(id: string): Promise<CategoryDto> {
     const row = await this.require(id);
     row.status = "inactive";
+    await this.categories.save(row);
+    return this.map(row);
+  }
+
+  async softDelete(id: string): Promise<CategoryDto> {
+    const row = await this.require(id);
+    row.status = "inactive";
+    row.deletedAt = row.deletedAt ?? new Date();
+    await this.categories.save(row);
+    return this.map(row);
+  }
+
+  async restore(id: string): Promise<CategoryDto> {
+    const row = await this.require(id);
+    row.deletedAt = null;
     await this.categories.save(row);
     return this.map(row);
   }
@@ -109,6 +122,7 @@ export class CategoriesService {
       name: c.name,
       description: c.description,
       status: c.status as EntityStatus,
+      deletedAt: toDeletedAt(c.deletedAt),
     };
   }
 }

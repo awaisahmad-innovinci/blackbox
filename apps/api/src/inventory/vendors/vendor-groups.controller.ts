@@ -47,4 +47,14 @@ export class VendorGroupsController {
   deactivate(@Param("id", ParseUUIDPipe) id: string): Promise<VendorGroup> {
     return this.service.deactivate(id);
   }
+
+  @Post(":id/delete")
+  softDelete(@Param("id", ParseUUIDPipe) id: string): Promise<VendorGroup> {
+    return this.service.softDelete(id);
+  }
+
+  @Post(":id/restore")
+  restore(@Param("id", ParseUUIDPipe) id: string): Promise<VendorGroup> {
+    return this.service.restore(id);
+  }
 }

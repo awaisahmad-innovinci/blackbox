@@ -140,6 +140,16 @@ export class SkusController {
     return this.skus.deactivate(id);
   }
 
+  @Post(":id/delete")
+  softDelete(@Param("id", ParseUUIDPipe) id: string): Promise<SkuDetail> {
+    return this.skus.softDelete(id);
+  }
+
+  @Post(":id/restore")
+  restore(@Param("id", ParseUUIDPipe) id: string): Promise<SkuDetail> {
+    return this.skus.restore(id);
+  }
+
   @Post(":id/opening-stock")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("inventory.opening.write")

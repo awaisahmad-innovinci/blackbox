@@ -40,3 +40,20 @@ export class RecordManagerDrawerOpeningDto {
   @Min(0.0001)
   amount!: number;
 }
+
+export class RecordOwnerCashDto {
+  @IsNumber()
+  @Min(0.0001)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
+
+export class RecordManagerDrawerSubmissionDto {
+  @IsNumber()
+  @Min(0.0001)
+  amount!: number;
+}

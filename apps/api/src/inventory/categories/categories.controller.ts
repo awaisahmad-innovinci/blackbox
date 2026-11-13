@@ -47,4 +47,14 @@ export class CategoriesController {
   deactivate(@Param("id", ParseUUIDPipe) id: string): Promise<Category> {
     return this.categories.deactivate(id);
   }
+
+  @Post(":id/delete")
+  softDelete(@Param("id", ParseUUIDPipe) id: string): Promise<Category> {
+    return this.categories.softDelete(id);
+  }
+
+  @Post(":id/restore")
+  restore(@Param("id", ParseUUIDPipe) id: string): Promise<Category> {
+    return this.categories.restore(id);
+  }
 }

@@ -4,7 +4,7 @@ import type {
   CashierDashboardSummary,
   Category,
   DashboardSummary,
-  EntityStatus,
+  EntityStatusFilter,
   ManagerDashboardSummary,
   CashFlowReport,
   ManagerStockOverviewQuery,
@@ -93,6 +93,8 @@ contextBridge.exposeInMainWorld("blackbox", {
   localDb: {
     getStatus: () =>
       ipcRenderer.invoke("localDb:getStatus") as Promise<LocalDbStatus>,
+    wipe: () => ipcRenderer.invoke("localDb:wipe") as Promise<Ok>,
+    reopen: () => ipcRenderer.invoke("localDb:reopen") as Promise<Ok>,
     rebuildPosBalanceFromDocuments: () =>
       ipcRenderer.invoke(
         "localDb:rebuildPosBalanceFromDocuments",
@@ -417,6 +419,11 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:getCashierDashboardSummary",
         userId,
       ) as Promise<CashierDashboardSummary>,
+    getOwnerCashBalance: (ownerUserId: string) =>
+      ipcRenderer.invoke(
+        "localDb:getOwnerCashBalance",
+        ownerUserId,
+      ) as Promise<number>,
     getManagerDashboardSummary: (
       userId: string,
       seeAll?: boolean,
@@ -441,15 +448,15 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listManagerStockOverview",
         query ?? {},
       ) as Promise<PaginatedManagerStockOverview>,
-    listBrands: (status?: EntityStatus | "all") =>
+    listBrands: (status?: EntityStatusFilter) =>
       ipcRenderer.invoke("localDb:listBrands", status) as Promise<Brand[]>,
     getBrand: (id: string) =>
       ipcRenderer.invoke("localDb:getBrand", id) as Promise<Brand | null>,
-    listCategories: (status?: EntityStatus | "all") =>
+    listCategories: (status?: EntityStatusFilter) =>
       ipcRenderer.invoke("localDb:listCategories", status) as Promise<Category[]>,
     getCategory: (id: string) =>
       ipcRenderer.invoke("localDb:getCategory", id) as Promise<Category | null>,
-    listVendorGroups: (status?: EntityStatus | "all") =>
+    listVendorGroups: (status?: EntityStatusFilter) =>
       ipcRenderer.invoke(
         "localDb:listVendorGroups",
         status,
@@ -458,7 +465,7 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:getVendorGroup", id) as Promise<
         VendorGroup | null
       >,
-    listWarehouses: (status?: EntityStatus | "all") =>
+    listWarehouses: (status?: EntityStatusFilter) =>
       ipcRenderer.invoke(
         "localDb:listWarehouses",
         status,

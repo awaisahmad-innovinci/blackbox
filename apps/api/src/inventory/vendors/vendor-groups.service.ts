@@ -15,6 +15,7 @@ import {
 import { Repository } from "typeorm";
 import { isUniqueViolation } from "../../common/db-errors";
 import { VendorGroup } from "../../db/entities";
+import { applyStatusFilter, toDeletedAt } from "../common/soft-delete";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import {
   CreateVendorGroupDto,
@@ -36,10 +37,7 @@ export class VendorGroupsService {
       .createQueryBuilder("g")
       .where("g.tenant_id = :tenantId", { tenantId });
 
-    const status = query.status ?? "active";
-    if (status !== "all") {
-      qb.andWhere("g.status = :status", { status });
-    }
+    applyStatusFilter(qb, "g", query.status);
     if (query.q?.trim()) {
       const term = `%${query.q.trim().toLowerCase()}%`;
       qb.andWhere(
@@ -69,7 +67,7 @@ export class VendorGroupsService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Vendor group name already exists");
+        throw new ConflictException("Vendor group name already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -85,7 +83,7 @@ export class VendorGroupsService {
       return this.map(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("Vendor group name already exists");
+        throw new ConflictException("Vendor group name already exists. Check the Deleted filter to restore it.");
       }
       throw error;
     }
@@ -94,6 +92,21 @@ export class VendorGroupsService {
   async deactivate(id: string): Promise<VendorGroupDto> {
     const row = await this.require(id);
     row.status = "inactive";
+    await this.groups.save(row);
+    return this.map(row);
+  }
+
+  async softDelete(id: string): Promise<VendorGroupDto> {
+    const row = await this.require(id);
+    row.status = "inactive";
+    row.deletedAt = row.deletedAt ?? new Date();
+    await this.groups.save(row);
+    return this.map(row);
+  }
+
+  async restore(id: string): Promise<VendorGroupDto> {
+    const row = await this.require(id);
+    row.deletedAt = null;
     await this.groups.save(row);
     return this.map(row);
   }
@@ -112,6 +125,7 @@ export class VendorGroupsService {
       name: g.name,
       description: g.description,
       status: g.status as EntityStatus,
+      deletedAt: toDeletedAt(g.deletedAt),
     };
   }
 }

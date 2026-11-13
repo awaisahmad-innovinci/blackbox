@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type {
   Brand,
   Category,
-  EntityStatus,
+  EntityStatusFilter,
   GoodsReceiptDetail,
   GoodsReceiptListQuery,
   InventoryMovementListItem,
@@ -48,6 +48,7 @@ import {
   initLocalDb,
   recordLocalDbInitError,
   reopenLocalDb,
+  wipeLocalDb,
 } from "./db";
 import {
   completeSaleReturnStandaloneLocal,
@@ -186,7 +187,7 @@ import {
   listSkuBarcodesLocal,
   upsertSkuBarcodeLocal,
 } from "./db/sku-barcodes-local";
-import { getCashFlowLocal } from "./db/cash-flow-local";
+import { getCashFlowLocal, getOwnerCashBalanceLocal } from "./db/cash-flow-local";
 import {
   getCashierDashboardSummaryLocal,
   getDashboardSummaryLocal,
@@ -296,6 +297,14 @@ function createWindow(): void {
 
 function registerIpc(): void {
   ipcMain.handle("localDb:getStatus", () => getLocalDbStatus());
+  ipcMain.handle("localDb:wipe", () => {
+    wipeLocalDb();
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:reopen", () => {
+    reopenLocalDb();
+    return { ok: true as const };
+  });
   ipcMain.handle("localDb:rebuildPosBalanceFromDocuments", () => {
     rebuildInventoryOutBalanceFromDocumentsLocal();
     return { ok: true as const };
@@ -822,6 +831,9 @@ function registerIpc(): void {
     "localDb:getCashierDashboardSummary",
     (_event, userId: string) => getCashierDashboardSummaryLocal(userId),
   );
+  ipcMain.handle("localDb:getOwnerCashBalance", (_event, ownerUserId: string) =>
+    getOwnerCashBalanceLocal(ownerUserId),
+  );
   ipcMain.handle(
     "localDb:getManagerDashboardSummary",
     (_event, userId: string, seeAll?: boolean, managerName?: string) =>
@@ -851,26 +863,26 @@ function registerIpc(): void {
   );
   ipcMain.handle(
     "localDb:listBrands",
-    (_event, status?: EntityStatus | "all") => listBrandsLocal(status),
+    (_event, status?: EntityStatusFilter) => listBrandsLocal(status),
   );
   ipcMain.handle("localDb:getBrand", (_event, id: string) => getBrandLocal(id));
   ipcMain.handle(
     "localDb:listCategories",
-    (_event, status?: EntityStatus | "all") => listCategoriesLocal(status),
+    (_event, status?: EntityStatusFilter) => listCategoriesLocal(status),
   );
   ipcMain.handle("localDb:getCategory", (_event, id: string) =>
     getCategoryLocal(id),
   );
   ipcMain.handle(
     "localDb:listVendorGroups",
-    (_event, status?: EntityStatus | "all") => listVendorGroupsLocal(status),
+    (_event, status?: EntityStatusFilter) => listVendorGroupsLocal(status),
   );
   ipcMain.handle("localDb:getVendorGroup", (_event, id: string) =>
     getVendorGroupLocal(id),
   );
   ipcMain.handle(
     "localDb:listWarehouses",
-    (_event, status?: EntityStatus | "all") => listWarehousesLocal(status),
+    (_event, status?: EntityStatusFilter) => listWarehousesLocal(status),
   );
   ipcMain.handle("localDb:getWarehouse", (_event, id: string) =>
     getWarehouseLocal(id),

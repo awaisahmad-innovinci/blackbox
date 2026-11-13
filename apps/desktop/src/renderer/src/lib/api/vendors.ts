@@ -43,6 +43,12 @@ export const vendorsApi = {
       body: JSON.stringify(body),
     });
   },
+  delete(id: string): Promise<VendorDetail> {
+    return apiFetch<VendorDetail>(`/vendors/${id}/delete`, { method: "POST" });
+  },
+  restore(id: string): Promise<VendorDetail> {
+    return apiFetch<VendorDetail>(`/vendors/${id}/restore`, { method: "POST" });
+  },
   listCredits(params: VendorCreditQuery = {}): Promise<VendorCreditLedger> {
     const sp = new URLSearchParams();
     if (params.vendorId) sp.set("vendorId", params.vendorId);

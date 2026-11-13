@@ -48,6 +48,12 @@ export const productsApi = {
       method: "POST",
     });
   },
+  delete(id: string): Promise<ProductDetail> {
+    return apiFetch<ProductDetail>(`/products/${id}/delete`, { method: "POST" });
+  },
+  restore(id: string): Promise<ProductDetail> {
+    return apiFetch<ProductDetail>(`/products/${id}/restore`, { method: "POST" });
+  },
   listSkus(id: string): Promise<ProductSkuDetail[]> {
     return apiFetch<ProductSkuDetail[]>(`/products/${id}/skus`);
   },

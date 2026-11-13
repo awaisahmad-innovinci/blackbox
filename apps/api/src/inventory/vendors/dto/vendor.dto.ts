@@ -15,6 +15,8 @@ import {
 } from "class-validator";
 import {
   ENTITY_STATUSES,
+  ENTITY_STATUS_FILTERS,
+  type EntityStatusFilter,
   PAYMENT_TERMS,
   PERSON_NAME_MESSAGE,
   PERSON_NAME_PATTERN,
@@ -177,8 +179,8 @@ export class ListVendorsQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsIn([...ENTITY_STATUSES, "all"])
-  status?: (typeof ENTITY_STATUSES)[number] | "all";
+  @IsIn([...ENTITY_STATUS_FILTERS])
+  status?: EntityStatusFilter;
 
   @IsOptional()
   @IsUUID()

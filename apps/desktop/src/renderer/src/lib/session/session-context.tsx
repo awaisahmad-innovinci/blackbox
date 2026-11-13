@@ -8,11 +8,18 @@ import {
 } from "react";
 import type { AuthUser } from "@blackbox/shared";
 import {
+  acknowledgeLocalWipe,
   desktopLogin,
   desktopLogout,
   fetchCurrentDevice,
   restoreDesktopSession,
+  type CurrentDevice,
 } from "@renderer/lib/api/auth";
+import { startForcedFullSync } from "@renderer/lib/sync/catalog-sync";
+import {
+  isDeviceRevokedMessage,
+  setOnDeviceRevoked,
+} from "./device-lock";
 import { writeCachedDeviceCode } from "@renderer/lib/device-code";
 import { getTillLogoutBlockMessage } from "@renderer/lib/local-db/till-source";
 import { setOnSessionCleared } from "@renderer/lib/api/session";
@@ -32,7 +39,7 @@ import {
 } from "./context";
 
 const CACHED_USER_KEY = "blackbox.user";
-const DEVICE_POLL_MS = 60_000;
+const DEVICE_POLL_MS = 15_000;
 
 function readCachedUser(): AuthUser | null {
   try {
@@ -57,37 +64,115 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [offline, setOffline] = useState(false);
   const [deviceState, setDeviceState] = useState<DeviceState>("unknown");
+  const [deviceLocked, setDeviceLocked] = useState(false);
+  const [deviceRestoring, setDeviceRestoring] = useState(false);
   const mounted = useRef(true);
   const offlineRef = useRef(false);
+  const holdingRef = useRef(false);
+  const wipedRef = useRef(false);
+  const restoreRef = useRef<Promise<void> | null>(null);
+  const deviceEpoch = useRef(0);
+  const refreshInFlight = useRef(false);
   offlineRef.current = offline;
 
   const applyDeviceState = useCallback((next: DeviceState) => {
-    setDeviceRevoked(next === "revoked");
+    setDeviceRevoked(next === "revoked" || holdingRef.current);
     if (mounted.current) setDeviceState(next);
   }, []);
 
+  const wipeLocalData = useCallback(async () => {
+    if (wipedRef.current) return;
+    wipedRef.current = true;
+    holdingRef.current = true;
+    setDeviceLocked(true);
+    setDeviceRevoked(true);
+    stopAutoSync();
+    await window.blackbox?.localDb?.wipe?.();
+  }, []);
+
+  const restoreAfterTrust = useCallback(async () => {
+    if (restoreRef.current) return restoreRef.current;
+    const run = (async () => {
+      setDeviceRestoring(true);
+      setDeviceLocked(true);
+      try {
+        await window.blackbox?.localDb?.reopen?.();
+        await startForcedFullSync();
+        await acknowledgeLocalWipe();
+        wipedRef.current = false;
+        holdingRef.current = false;
+        setDeviceRevoked(false);
+        setDeviceLocked(false);
+        setDeviceRestoring(false);
+        if (mounted.current) applyDeviceState("trusted");
+      } catch (error: unknown) {
+        setDeviceRestoring(false);
+        if (mounted.current) applyDeviceState("trusted");
+        throw error;
+      }
+    })();
+    restoreRef.current = run.finally(() => {
+      restoreRef.current = null;
+    });
+    return restoreRef.current;
+  }, [applyDeviceState]);
+
+  const applyRemoteDevice = useCallback(
+    async (device: CurrentDevice) => {
+      writeCachedDeviceCode(device?.code ?? null);
+      const revoked = device?.status === "revoked";
+      const mustWipe = revoked || device?.wipeLocalData === true;
+      if (!device) {
+        holdingRef.current = false;
+        wipedRef.current = false;
+        setDeviceLocked(false);
+        setDeviceRestoring(false);
+        applyDeviceState("unbound");
+        return;
+      }
+      if (!mustWipe) {
+        holdingRef.current = false;
+        wipedRef.current = false;
+        setDeviceLocked(false);
+        setDeviceRestoring(false);
+        applyDeviceState(device.status === "trusted" ? "trusted" : "pending");
+        return;
+      }
+      await wipeLocalData();
+      if (revoked) {
+        if (mounted.current) applyDeviceState("revoked");
+        return;
+      }
+      if (mounted.current) applyDeviceState("trusted");
+      await restoreAfterTrust();
+    },
+    [applyDeviceState, restoreAfterTrust, wipeLocalData],
+  );
+
   const refreshDeviceState = useCallback(async () => {
+    const epoch = ++deviceEpoch.current;
     const identity = await window.blackbox?.identity?.get();
+    if (epoch !== deviceEpoch.current) return;
     if (!identity) {
+      holdingRef.current = false;
+      setDeviceLocked(false);
       applyDeviceState("unbound");
       return;
     }
     try {
       const device = await fetchCurrentDevice();
-      writeCachedDeviceCode(device?.code ?? null);
-      applyDeviceState(
-        device?.status === "trusted"
-          ? "trusted"
-          : device?.status === "revoked"
-            ? "revoked"
-            : device
-              ? "pending"
-              : "unbound",
-      );
-    } catch {
-      applyDeviceState("unknown");
+      if (epoch !== deviceEpoch.current) return;
+      await applyRemoteDevice(device);
+    } catch (error: unknown) {
+      if (epoch !== deviceEpoch.current) return;
+      if (isDeviceRevokedMessage(error)) {
+        await wipeLocalData();
+        if (mounted.current) applyDeviceState("revoked");
+        return;
+      }
+      if (!holdingRef.current && mounted.current) applyDeviceState("unknown");
     }
-  }, [applyDeviceState]);
+  }, [applyDeviceState, applyRemoteDevice, wipeLocalData]);
 
   useEffect(() => {
     mounted.current = true;
@@ -115,12 +200,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setOnSessionCleared(() => {
       writeCachedUser(null);
+      holdingRef.current = false;
+      wipedRef.current = false;
+      setDeviceLocked(false);
+      setDeviceRestoring(false);
       setUser(null);
       setStatus("signed-out");
       setDeviceState("unknown");
     });
     return () => setOnSessionCleared(null);
   }, []);
+
+  useEffect(() => {
+    setOnDeviceRevoked(() => {
+      if (refreshInFlight.current) return;
+      refreshInFlight.current = true;
+      void refreshDeviceState().finally(() => {
+        refreshInFlight.current = false;
+      });
+    });
+    return () => setOnDeviceRevoked(null);
+  }, [refreshDeviceState]);
 
   useEffect(() => {
     void (async () => {
@@ -147,23 +247,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refreshDeviceState]);
 
   useEffect(() => {
-    if (status !== "signed-in" || deviceState !== "trusted") {
+    if (status !== "signed-in" || deviceState !== "trusted" || deviceLocked) {
       stopAutoSync();
       return;
     }
     startAutoSync();
     return () => stopAutoSync();
-  }, [status, deviceState]);
+  }, [status, deviceState, deviceLocked]);
 
-  // A device is trusted from the web admin, so poll until that lands.
+  // Trust and revoke happen in the web admin, so keep checking while signed in.
   useEffect(() => {
-    if (status !== "signed-in") return;
-    if (deviceState !== "pending" && deviceState !== "unknown") return;
+    if (status !== "signed-in" || offline) return;
     const timer = setInterval(() => {
       void refreshDeviceState();
     }, DEVICE_POLL_MS);
-    return () => clearInterval(timer);
-  }, [status, deviceState, refreshDeviceState]);
+    const onFocus = () => {
+      void refreshDeviceState();
+    };
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onFocus);
+    };
+  }, [status, offline, refreshDeviceState]);
 
   const signIn = useCallback(
     async (identifier: string, password: string) => {
@@ -184,16 +292,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    if (user) {
+    if (user && !holdingRef.current) {
       const block = await getTillLogoutBlockMessage({
         userId: user.id,
         permissions: user.permissions ?? [],
-      });
+      }).catch(() => null);
       if (block) throw new Error(block);
     }
     await desktopLogout();
     writeCachedDeviceCode(null);
     writeCachedUser(null);
+    holdingRef.current = false;
+    wipedRef.current = false;
+    setDeviceLocked(false);
+    setDeviceRestoring(false);
     setUser(null);
     setOffline(false);
     setDeviceState("unknown");
@@ -206,6 +318,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       user,
       offline,
       deviceState,
+      deviceLocked,
+      deviceRestoring,
       signIn,
       signOut,
       refreshDeviceState,
@@ -216,6 +330,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       user,
       offline,
       deviceState,
+      deviceLocked,
+      deviceRestoring,
       signIn,
       signOut,
       refreshDeviceState,

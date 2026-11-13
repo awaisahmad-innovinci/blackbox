@@ -11,10 +11,10 @@ export function upsertWarehouseLocal(row: WarehouseListItem): void {
   const ts = nowIso();
   db.prepare(
     `insert into warehouses (
-      id, tenant_id, name, code, location, status,
+      id, tenant_id, name, code, location, status, deleted_at,
       created_at, updated_at, sync_status, server_updated_at
     ) values (
-      @id, @tenantId, @name, @code, @location, @status,
+      @id, @tenantId, @name, @code, @location, @status, @deletedAt,
       @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
     on conflict(id) do update set
@@ -22,6 +22,7 @@ export function upsertWarehouseLocal(row: WarehouseListItem): void {
       code = excluded.code,
       location = excluded.location,
       status = excluded.status,
+      deleted_at = case when @deletedAtSet = 1 then excluded.deleted_at else deleted_at end,
       updated_at = excluded.updated_at,
       sync_status = 'synced',
       server_updated_at = excluded.server_updated_at`,
@@ -32,6 +33,8 @@ export function upsertWarehouseLocal(row: WarehouseListItem): void {
     code: row.code,
     location: row.location,
     status: row.status,
+    deletedAt: row.deletedAt ?? null,
+    deletedAtSet: row.deletedAt === undefined ? 0 : 1,
     createdAt: ts,
     updatedAt: ts,
     serverUpdatedAt: ts,

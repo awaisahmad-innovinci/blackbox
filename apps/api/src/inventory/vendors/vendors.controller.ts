@@ -74,6 +74,20 @@ export class VendorsController {
     return this.vendors.update(id, dto);
   }
 
+  @Post(":id/delete")
+  softDelete(
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<VendorDetail> {
+    return this.vendors.softDelete(id);
+  }
+
+  @Post(":id/restore")
+  restore(
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<VendorDetail> {
+    return this.vendors.restore(id);
+  }
+
   @Get(":id/ledger")
   ledgerFor(
     @Param("id", ParseUUIDPipe) id: string,

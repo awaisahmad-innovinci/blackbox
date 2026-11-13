@@ -1,14 +1,17 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { OFFLINE_AUTHORIZATION_DAYS_DEFAULT, nextSequentialCode } from "@blackbox/shared";
-import { DataSource, IsNull, Repository } from "typeorm";
+import { DataSource, IsNull, Not, Repository } from "typeorm";
 import {
   toDeviceResponse,
   type DeviceResponse,
 } from "../common/admin-responses";
 import { DeviceUser } from "../db/entities/device-user.entity";
 import { Device } from "../db/entities/device.entity";
-import { RefreshToken } from "../db/entities/refresh-token.entity";
 
 @Injectable()
 export class DevicesService {
@@ -17,9 +20,15 @@ export class DevicesService {
     @InjectRepository(Device) private readonly devices: Repository<Device>,
   ) {}
 
-  async list(tenantId: string): Promise<DeviceResponse[]> {
+  async list(
+    tenantId: string,
+    status: "all" | "deleted" = "all",
+  ): Promise<DeviceResponse[]> {
     const devices = await this.devices.find({
-      where: { tenantId },
+      where: {
+        tenantId,
+        deletedAt: status === "deleted" ? Not(IsNull()) : IsNull(),
+      },
       order: { createdAt: "ASC" },
     });
     return devices.map(toDeviceResponse);
@@ -61,8 +70,14 @@ export class DevicesService {
           code: await this.allocateDeviceCode(tenantId),
         }),
       );
-    } else if (!device.code && device.fingerprint !== "cloud-hub") {
-      device.code = await this.allocateDeviceCode(tenantId);
+    } else {
+      if (!device.code && device.fingerprint !== "cloud-hub") {
+        device.code = await this.allocateDeviceCode(tenantId);
+      }
+      if (device.deletedAt) {
+        device.deletedAt = null;
+        device.status = "revoked";
+      }
       device = await this.devices.save(device);
     }
     const expires = new Date();
@@ -89,6 +104,9 @@ export class DevicesService {
 
   async trust(tenantId: string, deviceId: string): Promise<DeviceResponse> {
     const device = await this.findTenantDevice(tenantId, deviceId);
+    if (device.deletedAt) {
+      throw new BadRequestException("Restore the device before trusting it");
+    }
     if (device.fingerprint === "cloud-hub") {
       return toDeviceResponse(device);
     }
@@ -98,7 +116,9 @@ export class DevicesService {
     device.status = "trusted";
     device.trustedAt = new Date();
     device.revokedAt = null;
-    device.needsFullResync = false;
+    // A device that was revoked must rebuild from the cloud. Leave the wipe
+    // flag set until the desktop confirms the local database is gone.
+    device.needsFullResync = device.wipeLocalData === true;
     await this.devices.save(device);
     return toDeviceResponse(device);
   }
@@ -114,17 +134,53 @@ export class DevicesService {
 
       found.status = "revoked";
       found.revokedAt = new Date();
+      found.wipeLocalData = true;
+      found.needsFullResync = true;
       await manager.save(found);
-
-      await manager.update(
-        RefreshToken,
-        { deviceId: found.id, tenantId, revokedAt: IsNull() },
-        { revokedAt: new Date() },
-      );
-
       return found;
     });
 
+    return toDeviceResponse(device);
+  }
+
+  async softDelete(tenantId: string, deviceId: string): Promise<DeviceResponse> {
+    const existing = await this.findTenantDevice(tenantId, deviceId);
+    if (existing.fingerprint === "cloud-hub") {
+      throw new BadRequestException("The cloud hub device cannot be deleted");
+    }
+    await this.revoke(tenantId, deviceId);
+    const device = await this.findTenantDevice(tenantId, deviceId);
+    device.deletedAt = device.deletedAt ?? new Date();
+    await this.devices.save(device);
+    return toDeviceResponse(device);
+  }
+
+  /**
+   * The desktop calls this after it has deleted the local database and
+   * downloaded a fresh copy. Push stays rejected until then.
+   */
+  async acknowledgeLocalWipe(
+    tenantId: string,
+    deviceId: string | null,
+  ): Promise<DeviceResponse> {
+    if (!deviceId) {
+      throw new BadRequestException("Device-bound session required");
+    }
+    const device = await this.findTenantDevice(tenantId, deviceId);
+    if (device.status !== "trusted") {
+      throw new BadRequestException(
+        "Trust the device before it can download data again",
+      );
+    }
+    device.wipeLocalData = false;
+    await this.devices.save(device);
+    return toDeviceResponse(device);
+  }
+
+  async restore(tenantId: string, deviceId: string): Promise<DeviceResponse> {
+    const device = await this.findTenantDevice(tenantId, deviceId);
+    device.deletedAt = null;
+    await this.devices.save(device);
     return toDeviceResponse(device);
   }
 

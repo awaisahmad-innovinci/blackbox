@@ -1,4 +1,8 @@
 import type { AuthResponse } from "@blackbox/shared";
+import {
+  isDeviceRevokedMessage,
+  notifyDeviceRevoked,
+} from "@renderer/lib/session/device-lock";
 import { applySessionUserFromRefresh } from "@renderer/lib/session/session-user-refresh";
 import {
   clearSessionAndNotify,
@@ -119,14 +123,6 @@ export async function apiFetch<T>(
     },
   });
 
-  if (res.status === 401 && !skipAuth && !isRetry && getRefreshToken()) {
-    if (await refreshAccessToken()) {
-      return apiFetch<T>(path, { ...init, isRetry: true });
-    }
-    clearSessionAndNotify();
-    throw new ApiError("Session expired", 401);
-  }
-
   if (!res.ok) {
     let message = res.statusText || `HTTP ${res.status}`;
     let details: unknown;
@@ -140,6 +136,17 @@ export async function apiFetch<T>(
       details = body.errors;
     } catch {
       /* ignore */
+    }
+    if (res.status === 401 && !skipAuth && isDeviceRevokedMessage(message)) {
+      notifyDeviceRevoked();
+      throw new ApiError(message, 401, details);
+    }
+    if (res.status === 401 && !skipAuth && !isRetry && getRefreshToken()) {
+      if (await refreshAccessToken()) {
+        return apiFetch<T>(path, { ...init, isRetry: true });
+      }
+      clearSessionAndNotify();
+      throw new ApiError("Session expired", 401);
     }
     if (res.status === 401 && !skipAuth) {
       clearSessionAndNotify();

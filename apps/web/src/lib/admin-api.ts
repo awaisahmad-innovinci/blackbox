@@ -35,6 +35,7 @@ export type UserDto = {
   fullName: string;
   isActive: boolean;
   deactivatedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
   roleIds: string[];
@@ -65,6 +66,7 @@ export type DeviceDto = {
   status: string;
   trustedAt: string | null;
   revokedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -121,8 +123,8 @@ export function completeOnboardingLocation(body: {
   );
 }
 
-export function listUsers() {
-  return apiFetch<UserDto[]>("/users");
+export function listUsers(status?: "active" | "inactive" | "all" | "deleted") {
+  return apiFetch<UserDto[]>(`/users${status ? `?status=${status}` : ""}`);
 }
 
 export function getUser(id: string) {
@@ -157,6 +159,14 @@ export function deactivateUser(id: string) {
 
 export function activateUser(id: string) {
   return apiJson<UserDto>(`/users/${id}/activate`, "POST");
+}
+
+export function deleteUser(id: string) {
+  return apiJson<UserDto>(`/users/${id}/delete`, "POST");
+}
+
+export function restoreUser(id: string) {
+  return apiJson<UserDto>(`/users/${id}/restore`, "POST");
 }
 
 export function listRoles() {
@@ -196,8 +206,8 @@ export function replaceUserRoles(id: string, roleIds: string[]) {
   return apiJson<UserDto>(`/users/${id}/roles`, "PUT", { roleIds });
 }
 
-export function listDevices() {
-  return apiFetch<DeviceDto[]>("/devices");
+export function listDevices(status?: "all" | "deleted") {
+  return apiFetch<DeviceDto[]>(`/devices${status ? `?status=${status}` : ""}`);
 }
 
 export function getDevice(id: string) {
@@ -212,12 +222,21 @@ export function revokeDevice(id: string) {
   return apiJson<DeviceDto>(`/devices/${id}/revoke`, "POST");
 }
 
+export function deleteDevice(id: string) {
+  return apiJson<DeviceDto>(`/devices/${id}/delete`, "POST");
+}
+
+export function restoreDevice(id: string) {
+  return apiJson<DeviceDto>(`/devices/${id}/restore`, "POST");
+}
+
 export type WarehouseDto = {
   id: string;
   name: string;
   code: string;
   location: string | null;
   status: "active" | "inactive";
+  deletedAt?: string | null;
 };
 
 export type VendorListItemDto = {
@@ -243,7 +262,7 @@ export function listVendors(query?: {
 }
 
 export function listWarehouses(query?: {
-  status?: "active" | "inactive" | "all";
+  status?: "active" | "inactive" | "all" | "deleted";
   q?: string;
 }) {
   const params = new URLSearchParams();
@@ -280,4 +299,12 @@ export function updateWarehouse(
 
 export function deactivateWarehouse(id: string) {
   return apiJson<WarehouseDto>(`/warehouses/${id}/deactivate`, "POST");
+}
+
+export function deleteWarehouse(id: string) {
+  return apiJson<WarehouseDto>(`/warehouses/${id}/delete`, "POST");
+}
+
+export function restoreWarehouse(id: string) {
+  return apiJson<WarehouseDto>(`/warehouses/${id}/restore`, "POST");
 }

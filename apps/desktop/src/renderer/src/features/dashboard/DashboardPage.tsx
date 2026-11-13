@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import type {
   CashierDashboardSummary,
@@ -9,8 +9,14 @@ import type {
 import { formatMoney } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
+import { Input } from "@blackbox/ui/input";
 import { Skeleton } from "@blackbox/ui/skeleton";
+import { cashFlowApi } from "@renderer/lib/api/cash-flow";
 import { dashboardApi } from "@renderer/lib/api/dashboard";
+import {
+  commitLocalChange,
+  isDeviceBound,
+} from "@renderer/lib/local-db/local-write";
 import { ApiError } from "@renderer/lib/api/client";
 import {
   enqueueMasterDataLocalSync,
@@ -54,7 +60,7 @@ const MANAGER_CARDS: {
   {
     key: "drawerBalance",
     label: "Drawer balance",
-    hint: "Opening float plus collections, minus till floats, expenses, and cash submitted to the owner",
+    hint: "Cash in hand",
     format: "money",
   },
 ];
@@ -88,26 +94,26 @@ const CASHIER_CARDS: {
 }[] = [
   {
     key: "openingBalanceAmount",
-    label: "Opening balance (today)",
-    hint: "Till float you opened with today",
+    label: "Opening balance",
+    hint: "Float for the open till. Zero after the till is closed.",
     format: "money",
   },
   {
     key: "totalSalesAmount",
-    label: "Total sales (today)",
-    hint: "Posted sales total for today",
+    label: "Total sales",
+    hint: "Posted sales on the open till",
     format: "money",
   },
   {
     key: "cashReceivedAmount",
-    label: "Cash received (today)",
-    hint: "Cash payments posted today",
+    label: "Cash received",
+    hint: "Cash payments on the open till",
     format: "money",
   },
   {
     key: "cardPaymentsAmount",
-    label: "Card payments (today)",
-    hint: "Card payments posted today",
+    label: "Card payments",
+    hint: "Card payments on the open till",
     format: "money",
   },
   {
@@ -118,20 +124,20 @@ const CASHIER_CARDS: {
   },
   {
     key: "refundTotalAmount",
-    label: "Refunds paid (today)",
-    hint: "Cash refunds you completed today",
+    label: "Refunds paid",
+    hint: "Cash refunds on the open till",
     format: "money",
   },
   {
     key: "cashWithdrawnAmount",
     label: "Cash withdrawn (today)",
-    hint: "Cash collected from your till today",
+    hint: "Cash collected from your tills today. It stays until the day ends.",
     format: "money",
   },
   {
     key: "cashInHandAmount",
-    label: "Cash in hand (today)",
-    hint: "Opening float plus cash received minus refunds and withdrawals today",
+    label: "Cash in hand",
+    hint: "Cash in the open till",
     format: "money",
   },
 ];
@@ -160,6 +166,9 @@ export function DashboardPage() {
   const [localDbLoading, setLocalDbLoading] = useState(true);
   const catalog = useCatalogSync();
   const [importOpen, setImportOpen] = useState(false);
+  const [ownerCashAmount, setOwnerCashAmount] = useState("");
+  const [ownerCashSaving, setOwnerCashSaving] = useState(false);
+  const [ownerCashError, setOwnerCashError] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -226,6 +235,7 @@ export function DashboardPage() {
                 cashierTills: [],
                 cashSubmittedToday: 0,
                 cashSubmissionsToday: [],
+                ownerCashBalance: 0,
               });
             }
           }
@@ -255,6 +265,49 @@ export function DashboardPage() {
       setLoading(false);
     }
   }, [cashierOnly, showInventoryDashboard, showManagerDashboard, user?.id]);
+
+  async function onAddOwnerCash(event: FormEvent) {
+    event.preventDefault();
+    if (!user) return;
+    const parsed = Number(ownerCashAmount);
+    if (!(parsed > 0)) {
+      setOwnerCashError("Enter an amount greater than zero");
+      return;
+    }
+    setOwnerCashSaving(true);
+    setOwnerCashError(null);
+    const name = user.fullName?.trim() || user.username;
+    try {
+      const bound = await isDeviceBound();
+      if (bound) {
+        const now = new Date().toISOString();
+        await commitLocalChange({
+          entityType: "owner_cash_entry",
+          entityId: crypto.randomUUID(),
+          operation: "UPSERT",
+          payload: {
+            recordedByUserId: user.id,
+            recordedByName: name,
+            amount: parsed,
+            note: "",
+            recordedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+      } else {
+        await cashFlowApi.recordOwnerCash(parsed);
+      }
+      setOwnerCashAmount("");
+      await loadSummary();
+    } catch (err: unknown) {
+      setOwnerCashError(
+        err instanceof Error ? err.message : "Could not add the cash",
+      );
+    } finally {
+      setOwnerCashSaving(false);
+    }
+  }
 
   useEffect(() => {
     void loadSummary();
@@ -328,7 +381,7 @@ export function DashboardPage() {
                   ? "Today's till and refund summary."
                   : "Inventory overview."}
           </p>
-          {cashierOnly ? (
+          {/* {cashierOnly ? (
             <p className="text-muted-foreground mt-1 text-xs">
               {cashierSummary
                 ? new Date(`${cashierSummary.date}T12:00:00`).toLocaleDateString()
@@ -346,7 +399,7 @@ export function DashboardPage() {
             <p className="text-muted-foreground mt-1 text-xs">
               {dataSource === "local" ? "Showing local data" : "Showing API data"}
             </p>
-          ) : null}
+          ) : null} */}
         </div>
         {showInventoryDashboard && !cashierOnly ? (
           <Button
@@ -457,15 +510,7 @@ export function DashboardPage() {
                         </p>
                       )}
                       <p className="text-muted-foreground mt-1 text-xs">
-                        {card.key === "drawerBalance"
-                          ? (() => {
-                              const own = managerSummary?.drawers.find(
-                                (drawer) => drawer.managerUserId === user?.id,
-                              );
-                              if (!own) return card.hint;
-                              return `Opening ${formatMoney(own.openingFloat)} · Collected ${formatMoney(own.collected)} · Till floats ${formatMoney(own.tillFloats)} · Expenses ${formatMoney(own.expenses)} · Submitted ${formatMoney(own.submitted)}`;
-                            })()
-                          : card.hint}
+                        {card.hint}
                       </p>
                     </CardContent>
                   </Card>
@@ -530,30 +575,33 @@ export function DashboardPage() {
                     ) : (
                       <>
                         <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                          Rs {formatMoney(managerSummary?.cashSubmittedToday ?? 0)}
+                          Rs {formatMoney(managerSummary?.ownerCashBalance ?? 0)}
                         </p>
                         <p className="text-muted-foreground mt-1 text-xs">
-                          Cash managers handed over today
+                          Cash on hand. It stays until you spend it.
                         </p>
-                        {(managerSummary?.cashSubmissionsToday.length ?? 0) > 0 ? (
-                          <ul className="mt-3 divide-y text-sm">
-                            {managerSummary?.cashSubmissionsToday.map((row) => (
-                              <li
-                                key={row.managerUserId}
-                                className="flex items-center justify-between gap-4 py-2"
-                              >
-                                <span>{row.managerName}</span>
-                                <span className="tabular-nums">
-                                  Rs {formatMoney(row.amount)}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-muted-foreground mt-3 text-sm">
-                            No cash submitted today.
+                        <form
+                          className="mt-4 flex items-center gap-2"
+                          onSubmit={(event) => void onAddOwnerCash(event)}
+                        >
+                          <Input
+                            inputMode="decimal"
+                            placeholder="Amount"
+                            value={ownerCashAmount}
+                            onChange={(event) =>
+                              setOwnerCashAmount(event.target.value)
+                            }
+                            aria-label="Cash to add"
+                          />
+                          <Button type="submit" disabled={ownerCashSaving}>
+                            {ownerCashSaving ? "Adding…" : "Add"}
+                          </Button>
+                        </form>
+                        {ownerCashError ? (
+                          <p className="text-destructive mt-2 text-sm">
+                            {ownerCashError}
                           </p>
-                        )}
+                        ) : null}
                       </>
                     )}
                   </CardContent>
@@ -572,24 +620,51 @@ export function DashboardPage() {
                         No cash in manager drawers.
                       </p>
                     ) : (
-                      <ul className="divide-y text-sm">
+                      <ul className="divide-y text-base">
                         {managerSummary?.drawers.map((drawer) => (
                           <li
                             key={drawer.managerUserId}
-                            className="flex items-start justify-between gap-4 py-2"
+                            className="flex items-center justify-between gap-4 py-2.5"
+                          >
+                            <span className="font-medium">{drawer.managerName}</span>
+                            <span className="text-lg font-bold tabular-nums">
+                              Rs {formatMoney(drawer.balance)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-sm font-medium">
+                      Cash in cashier tills
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-8 w-full" />
+                    ) : cashierTills.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">
+                        No cash in cashier tills.
+                      </p>
+                    ) : (
+                      <ul className="divide-y text-sm">
+                        {cashierTills.map((till) => (
+                          <li
+                            key={`${till.userId}-${till.tillName}-${till.status}`}
+                            className="flex items-center justify-between gap-4 py-2"
                           >
                             <span>
-                              {drawer.managerName}
-                              <span className="text-muted-foreground block text-xs">
-                                Opening {formatMoney(drawer.openingFloat)} · Collected{" "}
-                                {formatMoney(drawer.collected)} · Till floats{" "}
-                                {formatMoney(drawer.tillFloats)} · Expenses{" "}
-                                {formatMoney(drawer.expenses)} · Submitted{" "}
-                                {formatMoney(drawer.submitted)}
+                              {till.userName}
+                              <span className="text-muted-foreground">
+                                {" "}
+                                · {till.tillName}
                               </span>
                             </span>
                             <span className="tabular-nums">
-                              Rs {formatMoney(drawer.balance)}
+                              Rs {formatMoney(till.currentCashBalance)}
                             </span>
                           </li>
                         ))}

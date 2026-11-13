@@ -38,6 +38,7 @@ export type UserResponse = {
   fullName: string;
   isActive: boolean;
   deactivatedAt: Date | null;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   roleIds: string[];
@@ -68,9 +69,11 @@ export type DeviceResponse = {
   status: string;
   trustedAt: Date | null;
   revokedAt: Date | null;
+  deletedAt: Date | null;
   lastSyncAt: Date | null;
   lastSyncError: string | null;
   needsFullResync: boolean;
+  wipeLocalData: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -113,6 +116,7 @@ export function toUserResponse(user: User, roleIds: string[]): UserResponse {
     fullName: user.fullName,
     isActive: user.isActive,
     deactivatedAt: user.deactivatedAt,
+    deletedAt: user.deletedAt ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     roleIds,
@@ -154,9 +158,11 @@ export function toDeviceResponse(device: Device): DeviceResponse {
     status: device.status,
     trustedAt: device.trustedAt,
     revokedAt: device.revokedAt,
+    deletedAt: device.deletedAt ?? null,
     lastSyncAt: device.lastSyncAt,
     lastSyncError: device.lastSyncError,
     needsFullResync: device.needsFullResync,
+    wipeLocalData: device.wipeLocalData === true,
     createdAt: device.createdAt,
     updatedAt: device.updatedAt,
   };

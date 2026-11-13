@@ -28,6 +28,7 @@ import {
   CashExpense,
   ManagerDrawerOpening,
   ManagerDrawerSubmission,
+  OwnerCashEntry,
   User,
 } from "../db/entities";
 import { ActivityLogService } from "../activity-log/activity-log.service";
@@ -51,6 +52,8 @@ export class CashFlowService {
     private readonly openings: Repository<ManagerDrawerOpening>,
     @InjectRepository(ManagerDrawerSubmission)
     private readonly submissions: Repository<ManagerDrawerSubmission>,
+    @InjectRepository(OwnerCashEntry)
+    private readonly ownerCashEntries: Repository<OwnerCashEntry>,
     @InjectRepository(User)
     private readonly users: Repository<User>,
     private readonly activityLog: ActivityLogService,
@@ -58,6 +61,59 @@ export class CashFlowService {
 
   seesEveryDrawer(permissions: readonly string[]): boolean {
     return permissions.includes("web.access");
+  }
+
+  async ownerCashBalance(
+    tenantId: string,
+    ownerUserId: string,
+    exclude?: { expenseId?: string; openingId?: string },
+  ): Promise<number> {
+    const rows = await this.dataSource.query<{ balance: string }[]>(
+      `select
+         coalesce((select sum(amount) from manager_drawer_submissions where tenant_id = $1), 0)
+         + coalesce((select sum(amount) from owner_cash_entries where tenant_id = $1), 0)
+         - coalesce((
+             select sum(amount) from cash_expenses
+             where tenant_id = $1
+               and recorded_by_user_id = $2
+               and ($3::uuid is null or id <> $3::uuid)
+           ), 0)
+         - coalesce((
+             select sum(amount) from manager_drawer_openings
+             where tenant_id = $1
+               and ($4::uuid is null or id <> $4::uuid)
+           ), 0) as balance`,
+      [
+        tenantId,
+        ownerUserId,
+        exclude?.expenseId ?? null,
+        exclude?.openingId ?? null,
+      ],
+    );
+    return roundMoney(num(rows[0]?.balance));
+  }
+
+  async recordOwnerCash(
+    user: TenantContext,
+    amount: number,
+    note?: string,
+  ): Promise<{ id: string; amount: number }> {
+    if (!(amount > 0)) {
+      throw new BadRequestException("Enter an amount greater than zero");
+    }
+    const name = await this.managerName(user.tenantId, user.userId);
+    const now = new Date();
+    const saved = await this.ownerCashEntries.save(
+      this.ownerCashEntries.create({
+        tenantId: user.tenantId,
+        recordedByUserId: user.userId,
+        recordedByName: name,
+        amount: String(roundMoney(amount)),
+        note: note?.trim() ?? "",
+        recordedAt: now,
+      }),
+    );
+    return { id: saved.id, amount: roundMoney(num(saved.amount)) };
   }
 
   async report(
@@ -86,6 +142,9 @@ export class CashFlowService {
       collections,
       expenses,
       drawers,
+      ownerCashBalance: seeAll
+        ? await this.ownerCashBalance(user.tenantId, user.userId)
+        : 0,
     };
   }
 
@@ -100,14 +159,17 @@ export class CashFlowService {
       throw new BadRequestException("Enter an amount greater than zero");
     }
     const managerName = await this.managerName(user.tenantId, user.userId);
-    const drawers = await this.drawerBalances(
-      user.tenantId,
-      user.userId,
-      managerName,
-      false,
-    );
-    const available =
-      drawers.find((row) => row.managerUserId === user.userId)?.balance ?? 0;
+    const owner = this.seesEveryDrawer(user.permissions);
+    const available = owner
+      ? await this.ownerCashBalance(user.tenantId, user.userId)
+      : (
+          await this.drawerBalances(
+            user.tenantId,
+            user.userId,
+            managerName,
+            false,
+          )
+        ).find((row) => row.managerUserId === user.userId)?.balance ?? 0;
     if (expenseExceedsDrawer(body.amount, available)) {
       throw new BadRequestException(expenseOverDrawerMessage(available));
     }
@@ -152,7 +214,15 @@ export class CashFlowService {
     if (!(body.amount > 0)) {
       throw new BadRequestException("Enter an amount greater than zero");
     }
-    const managers = await this.listPeople(user.tenantId, "till.manage");
+    const ownerCash = await this.ownerCashBalance(user.tenantId, user.userId);
+    if (expenseExceedsDrawer(body.amount, ownerCash)) {
+      throw new BadRequestException(expenseOverDrawerMessage(ownerCash));
+    }
+    const managers = await this.listPeople(
+      user.tenantId,
+      "till.manage",
+      "web.access",
+    );
     const manager = managers.find((row) => row.id === body.managerUserId);
     if (!manager) {
       throw new BadRequestException("Choose a manager");
@@ -187,7 +257,10 @@ export class CashFlowService {
     return { id: saved.id };
   }
 
-  async recordSubmission(user: TenantContext): Promise<{ id: string; amount: number }> {
+  async recordSubmission(
+    user: TenantContext,
+    requestedAmount: number,
+  ): Promise<{ id: string; amount: number }> {
     const managerName = await this.managerName(user.tenantId, user.userId);
     const drawers = await this.drawerBalances(
       user.tenantId,
@@ -197,10 +270,18 @@ export class CashFlowService {
     );
     const balance =
       drawers.find((row) => row.managerUserId === user.userId)?.balance ?? 0;
-    if (!(balance > 0)) {
-      throw new BadRequestException("There is no cash to submit");
+    if (
+      !(requestedAmount > 0) ||
+      !(balance > 0) ||
+      expenseExceedsDrawer(requestedAmount, balance)
+    ) {
+      throw new BadRequestException(
+        balance > 0
+          ? `Submit no more than the drawer balance of Rs ${formatMoney(balance)}`
+          : "There is no cash to submit",
+      );
     }
-    const amount = roundMoney(balance);
+    const amount = roundMoney(requestedAmount);
     const now = new Date();
     const saved = await this.submissions.save(
       this.submissions.create({
@@ -248,7 +329,31 @@ export class CashFlowService {
     }));
   }
 
-  async listPeople(tenantId: string, permissionKey: string): Promise<DrawerPerson[]> {
+  async submissionsByManager(tenantId: string): Promise<CashSubmissionToday[]> {
+    const rows = await this.dataSource.query<
+      { manager_user_id: string; manager_name: string; amount: string }[]
+    >(
+      `select s.manager_user_id,
+              max(s.manager_name) as manager_name,
+              coalesce(sum(s.amount), 0) as amount
+       from manager_drawer_submissions s
+       where s.tenant_id = $1
+       group by s.manager_user_id
+       order by max(s.manager_name)`,
+      [tenantId],
+    );
+    return rows.map((row) => ({
+      managerUserId: row.manager_user_id,
+      managerName: row.manager_name?.trim() || "Manager",
+      amount: roundMoney(num(row.amount)),
+    }));
+  }
+
+  async listPeople(
+    tenantId: string,
+    permissionKey: string,
+    excludePermissionKey?: string,
+  ): Promise<DrawerPerson[]> {
     const rows = await this.dataSource.query<
       { id: string; full_name: string; username: string }[]
     >(
@@ -260,8 +365,20 @@ export class CashFlowService {
        where u.tenant_id = $1
          and u.is_active = true
          and p.key = $2
+         and (
+           $3::text is null
+           or not exists (
+             select 1
+             from user_roles ur2
+             join role_permissions rp2 on rp2.role_id = ur2.role_id
+             join permissions p2 on p2.id = rp2.permission_id
+             where ur2.user_id = u.id
+               and ur2.tenant_id = u.tenant_id
+               and p2.key = $3
+           )
+         )
        order by u.full_name`,
-      [tenantId, permissionKey],
+      [tenantId, permissionKey, excludePermissionKey ?? null],
     );
     return rows.map((row) => ({
       id: row.id,
@@ -335,6 +452,7 @@ export class CashFlowService {
         and u.tenant_id = e.tenant_id
        where e.tenant_id = $1
          and ($2::boolean or e.recorded_by_user_id = $3)
+         and (not $2::boolean or e.recorded_by_user_id <> $3)
          and (
            $2::boolean = false
            or not exists (

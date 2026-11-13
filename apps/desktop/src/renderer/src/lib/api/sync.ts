@@ -14,8 +14,13 @@ import type {
   WarehouseStockRow,
 } from "@blackbox/shared";
 import { SYNC_CATALOG_PAGE_SIZE, SYNC_STREAMS } from "@blackbox/shared";
+import { fetchCurrentDevice } from "./auth";
 import { apiFetch } from "./client";
 import { flushPendingActivityLogs } from "./activity-logs";
+import {
+  isDeviceRevokedMessage,
+  notifyDeviceRevoked,
+} from "@renderer/lib/session/device-lock";
 
 export const syncApi = {
   push(stream: SyncStream, changes: SyncChangeInput[]) {
@@ -184,15 +189,25 @@ async function pushOutboxBatch(
     }
     return pushed;
   } catch (error: unknown) {
+    if (isDeviceRevokedMessage(error)) throw error;
     const message = error instanceof Error ? error.message : "push failed";
     for (const row of batch) {
-      await bridge.markPending(row.changeId, message);
+      await bridge.markPending(row.changeId, message).catch(() => undefined);
     }
     throw error;
   }
 }
 
 export async function runIncrementalSync(): Promise<IncrementalSyncResult> {
+  const device = await fetchCurrentDevice();
+  if (device?.status === "revoked" || device?.wipeLocalData) {
+    notifyDeviceRevoked();
+    throw new Error("This device cannot sync until it is trusted");
+  }
+  if (!device || device.status !== "trusted") {
+    throw new Error("This device cannot sync until it is trusted");
+  }
+
   await flushPendingActivityLogs().catch(() => undefined);
 
   const bridge = window.blackbox?.sync;

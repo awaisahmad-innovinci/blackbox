@@ -70,6 +70,7 @@ import {
   VendorContact,
   VendorLedgerEntry,
   CashExpense,
+  OwnerCashEntry,
   ManagerDrawerOpening,
   ManagerDrawerSubmission,
   VendorGroup,
@@ -84,6 +85,12 @@ import type { SyncChangeInputDto, SyncPushDto } from "./dto/sync.dto";
 const RETENTION_DAYS = 90;
 const STALE_DEVICE_DAYS = 30;
 const HUB_FINGERPRINT = "cloud-hub";
+
+function toDeletedAtDate(value: unknown): Date | null {
+  if (value == null || value === "") return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 @Injectable()
 export class SyncService {
@@ -105,6 +112,11 @@ export class SyncService {
     dto: SyncPushDto,
   ): Promise<SyncPushResponse> {
     const device = await this.requireTrustedDevice(user);
+    if (device.wipeLocalData) {
+      throw new ForbiddenException(
+        "This device must erase local data before it can sync",
+      );
+    }
     const results: SyncPushItemResult[] = [];
 
     for (const item of dto.changes) {
@@ -755,6 +767,8 @@ export class SyncService {
           ),
           imagePath: (p.imagePath as string | null | undefined) ?? row.imagePath ?? null,
           status: inactive ? "inactive" : String(p.status ?? row.status ?? "active"),
+          deletedAt:
+            "deletedAt" in p ? toDeletedAtDate(p.deletedAt) : (row.deletedAt ?? null),
         });
         await manager.save(row);
         break;
@@ -802,6 +816,8 @@ export class SyncService {
               : String(p.maximumStockLevel),
           trackInventory: Boolean(p.trackInventory ?? row.trackInventory ?? true),
           status: inactive ? "inactive" : String(p.status ?? row.status ?? "active"),
+          deletedAt:
+            "deletedAt" in p ? toDeletedAtDate(p.deletedAt) : (row.deletedAt ?? null),
         });
         await manager.save(row);
         break;
@@ -868,6 +884,8 @@ export class SyncService {
           taxNumber: (p.taxNumber as string | null | undefined) ?? row.taxNumber ?? null,
           notes: String(p.notes ?? row.notes ?? ""),
           status: inactive ? "inactive" : String(p.status ?? row.status ?? "active"),
+          deletedAt:
+            "deletedAt" in p ? toDeletedAtDate(p.deletedAt) : (row.deletedAt ?? null),
         });
         await manager.save(row);
         if (Array.isArray(p.contacts)) {
@@ -939,6 +957,10 @@ export class SyncService {
       }
       case "cash_expense": {
         await this.upsertCashExpense(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "owner_cash_entry": {
+        await this.upsertOwnerCashEntry(manager, tenantId, change.entityId, p);
         break;
       }
       case "manager_drawer_opening": {
@@ -1104,6 +1126,64 @@ export class SyncService {
     }
   }
 
+  private async ownerCashAvailable(
+    manager: EntityManager,
+    tenantId: string,
+    ownerUserId: string,
+    exclude?: { excludeExpenseId?: string; excludeOpeningId?: string },
+  ): Promise<number> {
+    const rows = await manager.query<{ balance: string }[]>(
+      `select
+         coalesce((select sum(amount) from manager_drawer_submissions where tenant_id = $1), 0)
+         + coalesce((select sum(amount) from owner_cash_entries where tenant_id = $1), 0)
+         - coalesce((
+             select sum(amount) from cash_expenses
+             where tenant_id = $1
+               and recorded_by_user_id = $2
+               and ($3::uuid is null or id <> $3::uuid)
+           ), 0)
+         - coalesce((
+             select sum(amount) from manager_drawer_openings
+             where tenant_id = $1
+               and ($4::uuid is null or id <> $4::uuid)
+           ), 0) as balance`,
+      [
+        tenantId,
+        ownerUserId,
+        exclude?.excludeExpenseId ?? null,
+        exclude?.excludeOpeningId ?? null,
+      ],
+    );
+    return roundMoney4(Number(rows[0]?.balance ?? 0));
+  }
+
+  private async upsertOwnerCashEntry(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const recordedByUserId = String(p.recordedByUserId ?? "");
+    if (!recordedByUserId) throw new Error("owner not found");
+    const amount = Number(p.amount ?? 0);
+    if (!(amount > 0)) throw new Error("Enter an amount greater than zero");
+    const existing = await manager.findOne(OwnerCashEntry, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ?? manager.create(OwnerCashEntry, { id: entityId, tenantId });
+    Object.assign(row, {
+      recordedByUserId,
+      recordedByName: String(p.recordedByName ?? row.recordedByName ?? ""),
+      amount: String(amount),
+      note: String(p.note ?? row.note ?? ""),
+      recordedAt: p.recordedAt
+        ? new Date(String(p.recordedAt))
+        : (row.recordedAt ?? new Date()),
+    });
+    await manager.save(row);
+  }
+
   private async upsertCashExpense(
     manager: EntityManager,
     tenantId: string,
@@ -1118,6 +1198,31 @@ export class SyncService {
     }
     const amount = Number(p.amount ?? 0);
     if (!(amount > 0)) throw new Error("expense amount must be greater than zero");
+    if (p.ownerCash === true) {
+      const available = await this.ownerCashAvailable(manager, tenantId, recordedByUserId, {
+        excludeExpenseId: entityId,
+      });
+      if (expenseExceedsDrawer(amount, available)) {
+        throw new Error(expenseOverDrawerMessage(available));
+      }
+      const existingOwner = await manager.findOne(CashExpense, {
+        where: { id: entityId, tenantId },
+      });
+      const ownerRow =
+        existingOwner ?? manager.create(CashExpense, { id: entityId, tenantId });
+      Object.assign(ownerRow, {
+        recordedByUserId,
+        recordedByName: String(p.recordedByName ?? ownerRow.recordedByName ?? ""),
+        category,
+        amount: String(amount),
+        note: String(p.note ?? ownerRow.note ?? ""),
+        occurredAt: p.occurredAt
+          ? new Date(String(p.occurredAt))
+          : (ownerRow.occurredAt ?? new Date()),
+      });
+      await manager.save(ownerRow);
+      return;
+    }
     const totals = await manager.query<
       {
         opening_float: string;
@@ -1192,6 +1297,12 @@ export class SyncService {
     }
     const amount = Number(p.amount ?? 0);
     if (!(amount > 0)) throw new Error("opening amount must be greater than zero");
+    const available = await this.ownerCashAvailable(manager, tenantId, openedByUserId, {
+      excludeOpeningId: entityId,
+    });
+    if (expenseExceedsDrawer(amount, available)) {
+      throw new Error(expenseOverDrawerMessage(available));
+    }
     const existing = await manager.findOne(ManagerDrawerOpening, {
       where: { id: entityId, tenantId },
     });
@@ -2110,6 +2221,9 @@ export class SyncService {
     const existing = await manager.findOne(entity, {
       where: { id, tenantId },
     });
+    if ("deletedAt" in normalized) {
+      normalized.deletedAt = toDeletedAtDate(normalized.deletedAt);
+    }
     const row = existing ?? manager.create(entity, { id, tenantId });
     Object.assign(row, normalized);
     if (inactive && "status" in row) {

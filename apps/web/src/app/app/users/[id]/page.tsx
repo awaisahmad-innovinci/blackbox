@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { Badge } from "@blackbox/ui/badge";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -26,9 +27,11 @@ import {
 import {
   activateUser,
   deactivateUser,
+  deleteUser,
   getUser,
   listRoles,
   replaceUserRoles,
+  restoreUser,
   updateUser,
   type RoleDto,
   type UserDto,
@@ -57,6 +60,7 @@ export default function UserDetailPage() {
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [activateConfirmOpen, setActivateConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [profile, setProfile] = useState({
     fullName: "",
     email: "",
@@ -199,6 +203,52 @@ export default function UserDetailPage() {
     }
   }
 
+  async function onDelete() {
+    if (!user) return;
+    setBusy(true);
+    setSuccess(null);
+    setFormError(null);
+    try {
+      const updated = await deleteUser(user.id);
+      setUser(updated);
+      setDeleteConfirmOpen(false);
+      setSuccess("User deleted. Find them under the Deleted filter to restore.");
+    } catch (err) {
+      setDeleteConfirmOpen(false);
+      setFormError(toUserFacingError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRestore() {
+    if (!user) return;
+    setBusy(true);
+    setSuccess(null);
+    setFormError(null);
+    try {
+      const updated = await restoreUser(user.id);
+      setUser(updated);
+      setSuccess("User restored as inactive. Activate them to allow sign-in.");
+    } catch (err) {
+      setFormError(toUserFacingError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const isOwner = Boolean(
+    user?.roleIds.some(
+      (roleId) => roles.find((role) => role.id === roleId)?.key === "OWNER",
+    ),
+  );
+  const canDelete =
+    hasPermission("users.deactivate") &&
+    Boolean(user) &&
+    !user?.deletedAt &&
+    authUser?.id !== user?.id &&
+    !isOwner;
+
   return (
     <RequirePermission permissions={["users.read"]}>
       <div className="bb-page-narrow">
@@ -213,7 +263,15 @@ export default function UserDetailPage() {
           }
           title={user?.fullName ?? "User"}
           description={user ? `@${user.username} · ${user.email}` : undefined}
-          actions={user ? <ActiveBadge active={user.isActive} /> : null}
+          actions={
+            user ? (
+              user.deletedAt ? (
+                <Badge variant="outline">Deleted</Badge>
+              ) : (
+                <ActiveBadge active={user.isActive} />
+              )
+            ) : null
+          }
         />
 
         {loading ? <LoadingState /> : null}
@@ -366,7 +424,18 @@ export default function UserDetailPage() {
               />
             ) : null}
 
-            {hasPermission("users.deactivate") && !user.isActive ? (
+            {hasPermission("users.deactivate") && user.deletedAt ? (
+              <SectionCard
+                title="Restore user"
+                description="Bring this user back to the list. They stay inactive until you activate them."
+              >
+                <Button disabled={busy} onClick={() => void onRestore()}>
+                  Restore user
+                </Button>
+              </SectionCard>
+            ) : null}
+
+            {hasPermission("users.deactivate") && !user.isActive && !user.deletedAt ? (
               <SectionCard
                 title="Activate user"
                 description="Restore sign-in access for this workspace member."
@@ -394,6 +463,21 @@ export default function UserDetailPage() {
                 </Button>
               </SectionCard>
             ) : null}
+
+            {canDelete ? (
+              <SectionCard
+                title="Delete user"
+                description="Deleting signs this user out, blocks sign-in, and hides them from the users list. Past sales and records keep their name."
+              >
+                <Button
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  Delete user
+                </Button>
+              </SectionCard>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -417,6 +501,17 @@ export default function UserDetailPage() {
         destructive
         loading={busy}
         onConfirm={onDeactivate}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete user?"
+        description="This user will be signed out and hidden from the users list. You can restore them from the Deleted filter."
+        confirmLabel="Delete user"
+        destructive
+        loading={busy}
+        onConfirm={onDelete}
       />
     </RequirePermission>
   );

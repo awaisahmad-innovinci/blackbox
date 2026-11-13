@@ -30,7 +30,7 @@ import type {
   StockMovementRow,
   Brand,
   Category,
-  EntityStatus,
+  EntityStatusFilter,
   UnitListItem,
   VendorDetail,
   PaginatedVendorPayments,
@@ -519,7 +519,7 @@ export async function loadVendors(
 }
 
 export async function loadWarehouses(
-  status: EntityStatus | "all" = "active",
+  status: EntityStatusFilter = "active",
 ): Promise<WarehouseListItem[]> {
   try {
     const local = await window.blackbox?.localDb?.listWarehouses?.(status);
@@ -549,7 +549,7 @@ export async function loadWarehouse(id: string): Promise<WarehouseListItem> {
 }
 
 export async function loadBrands(
-  status: EntityStatus | "all" = "active",
+  status: EntityStatusFilter = "active",
 ): Promise<Brand[]> {
   try {
     const local = await window.blackbox?.localDb?.listBrands?.(status);
@@ -561,7 +561,7 @@ export async function loadBrands(
 }
 
 export async function loadCategories(
-  status: EntityStatus | "all" = "active",
+  status: EntityStatusFilter = "active",
 ): Promise<Category[]> {
   try {
     const local = await window.blackbox?.localDb?.listCategories?.(status);
