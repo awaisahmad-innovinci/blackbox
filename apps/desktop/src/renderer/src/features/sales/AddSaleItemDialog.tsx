@@ -111,6 +111,10 @@ export function AddSaleItemDialog({
       );
       if (!cancelled) {
         setPosBalanceBySkuId(new Map(entries));
+        // #region agent log
+        const withQty = entries.filter(([, qty]) => qty > 0).length;
+        fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"E",location:"AddSaleItemDialog.tsx:balances",message:"pos lookup",data:{warehouseId,checked:entries.length,withQty},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       }
     })();
     return () => {

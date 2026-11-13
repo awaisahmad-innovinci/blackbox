@@ -11,10 +11,12 @@ import {
 import { InventoryOutController } from "./inventory-out.controller";
 import { InventoryOutService } from "./inventory-out.service";
 import { ActivityLogModule } from "../../activity-log/activity-log.module";
+import { SyncModule } from "../../sync/sync.module";
 
 @Module({
   imports: [
     ActivityLogModule,
+    SyncModule,
     TypeOrmModule.forFeature([
       InventoryOut,
       InventoryOutLine,

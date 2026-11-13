@@ -206,15 +206,7 @@ const REQUIRED: Record<ImportFile, readonly CsvColumn[]> = {
     "track_inventory",
     "status",
   ],
-  "08_vendors.csv": [
-    "vendor_code",
-    "name",
-    "status",
-    "primary_name",
-    "primary_phone",
-    "manager_name",
-    "manager_phone",
-  ],
+  "08_vendors.csv": ["vendor_code"],
   "09_vendor_skus.csv": [
     "vendor_code",
     "sku",

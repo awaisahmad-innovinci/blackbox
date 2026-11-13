@@ -372,9 +372,11 @@ export function AppShell() {
               <p className="text-muted-foreground px-3 text-xs">
                 {catalog.message}
               </p>
-            ) : lastFullSync ? (
+            ) : sync.lastSyncedAt || lastFullSync ? (
               <p className="text-muted-foreground px-3 text-xs">
-                Last full sync {formatFullSyncAt(lastFullSync)}
+                {sync.lastSyncedAt
+                  ? `Last sync ${formatFullSyncAt(sync.lastSyncedAt)}`
+                  : `Last full sync ${formatFullSyncAt(lastFullSync!)}`}
               </p>
             ) : null}
             </div>

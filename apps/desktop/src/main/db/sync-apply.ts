@@ -64,7 +64,10 @@ import {
   upsertManagerDrawerSubmissionLocal,
 } from "./cash-flow-local";
 import { upsertInventoryOutLocal } from "./inventory-out-local";
-import { applyInventoryOutBalanceDeltaLocal } from "./inventory-out-balance-local";
+import {
+  applyInventoryOutBalanceDeltaLocal,
+  rebuildInventoryOutBalanceFromDocumentsLocal,
+} from "./inventory-out-balance-local";
 import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
 import { upsertSaleLocal } from "./sales-local";
 import { upsertSaleReturnLocal } from "./sale-returns-local";
@@ -487,13 +490,10 @@ export function applyChange(change: SyncChangeDto): void {
     return;
   }
   if (change.entityType === "inventory_out") {
-    const db = getLocalDb();
-    const existed = db
-      .prepare(`select 1 from inventory_outs where id = ? limit 1`)
-      .get(change.entityId);
     const items = Array.isArray(p.items)
       ? (p.items as InventoryOutDetail["items"])
       : [];
+    if (items.length === 0) return;
     upsertInventoryOutLocal({
       id: change.entityId,
       outNumber: str(p.outNumber, `LOCAL-${change.entityId.slice(0, 8)}`),
@@ -509,17 +509,7 @@ export function applyChange(change: SyncChangeDto): void {
       createdAt: str(p.createdAt, now),
       updatedAt: str(p.updatedAt, now),
     });
-    if (!existed) {
-      const warehouseId = str(p.warehouseId);
-      for (const item of items) {
-        applyInventoryOutBalanceDeltaLocal(
-          warehouseId,
-          item.productSkuId,
-          item.quantity,
-          item.unitCost,
-        );
-      }
-    }
+    rebuildInventoryOutBalanceFromDocumentsLocal();
     return;
   }
   if (change.entityType === "inventory_out_return") {
