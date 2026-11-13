@@ -40,7 +40,7 @@ function apiBase(): string {
 
 async function platformFetch<T>(
   path: string,
-  method: "GET" | "POST" | "PATCH",
+  method: "GET" | "POST" | "PATCH" | "PUT",
   body?: unknown,
   token?: string | null,
 ): Promise<T> {
@@ -132,6 +132,82 @@ export function setTenantActive(
     `/platform/tenants/${id}`,
     "PATCH",
     { isActive },
+    token,
+  );
+}
+
+export type PlatformRole = {
+  id: string;
+  key: string;
+  name: string;
+  isSystem: boolean;
+  permissionIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlatformPermission = {
+  id: string;
+  key: string;
+  description: string;
+};
+
+export function listRoles(token: string): Promise<PlatformRole[]> {
+  return platformFetch<PlatformRole[]>(
+    "/platform/roles",
+    "GET",
+    undefined,
+    token,
+  );
+}
+
+export function createRole(
+  token: string,
+  body: { key: string; name: string },
+): Promise<PlatformRole> {
+  return platformFetch<PlatformRole>("/platform/roles", "POST", body, token);
+}
+
+export function getRole(token: string, id: string): Promise<PlatformRole> {
+  return platformFetch<PlatformRole>(
+    `/platform/roles/${id}`,
+    "GET",
+    undefined,
+    token,
+  );
+}
+
+export function updateRole(
+  token: string,
+  id: string,
+  body: { key?: string; name?: string },
+): Promise<PlatformRole> {
+  return platformFetch<PlatformRole>(
+    `/platform/roles/${id}`,
+    "PATCH",
+    body,
+    token,
+  );
+}
+
+export function replaceRolePermissions(
+  token: string,
+  id: string,
+  permissionIds: string[],
+): Promise<PlatformRole> {
+  return platformFetch<PlatformRole>(
+    `/platform/roles/${id}/permissions`,
+    "PUT",
+    { permissionIds },
+    token,
+  );
+}
+
+export function listPermissions(token: string): Promise<PlatformPermission[]> {
+  return platformFetch<PlatformPermission[]>(
+    "/platform/permissions",
+    "GET",
+    undefined,
     token,
   );
 }

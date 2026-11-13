@@ -42,6 +42,7 @@ export default defineConfig({
         "@renderer": resolve("src/renderer/src"),
         ...sharedAlias,
       },
+
     },
     build: {
       rollupOptions: {
@@ -51,5 +52,12 @@ export default defineConfig({
       },
     },
     plugins: [react(), tailwindcss()],
+    server: {
+      host: true, // Exposes the server to all local network interfaces (0.0.0.0),
+      allowedHosts: [
+        'a1cf-119-63-138-49.ngrok-free.app',
+        '.ngrok-free.app' // Optional: allows any ngrok-free.app subdomain if your URL changes
+      ]
+    }
   },
 });
