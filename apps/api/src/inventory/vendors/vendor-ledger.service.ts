@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -11,16 +13,34 @@ import type {
   VendorLedger,
   VendorLedgerEntry,
   VendorPaymentListItem,
+  VendorPaymentMethod,
 } from "@blackbox/shared";
-import { roundMoney4 } from "@blackbox/shared";
-import { Repository } from "typeorm";
-import { Vendor, VendorLedgerEntry as VendorLedgerEntryEntity } from "../../db/entities";
+import {
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
+  formatMoney,
+  roundMoney4,
+} from "@blackbox/shared";
+import { DataSource, Repository } from "typeorm";
+import { ActivityLogService } from "../../activity-log/activity-log.service";
+import type { TenantContext } from "../../common/tenant-context";
+import { CashFlowService } from "../../cash-flow/cash-flow.service";
+import {
+  CashExpense,
+  User,
+  Vendor,
+  VendorLedgerEntry as VendorLedgerEntryEntity,
+} from "../../db/entities";
 import { FixedTenantContext } from "../common/fixed-tenant.context";
 import { RecordVendorPaymentDto } from "./dto/record-vendor-payment.dto";
 import {
   ListVendorCreditsQueryDto,
   ListVendorPaymentsQueryDto,
 } from "./dto/vendor.dto";
+
+function paymentMethodOf(value: string | null | undefined): VendorPaymentMethod | null {
+  return value === "CASH" || value === "BANK" ? value : null;
+}
 
 function toNum(value: string | null | undefined): number {
   if (value == null || value === "") return 0;
@@ -30,11 +50,16 @@ function toNum(value: string | null | undefined): number {
 @Injectable()
 export class VendorLedgerService {
   constructor(
+    private readonly dataSource: DataSource,
     private readonly fixedTenant: FixedTenantContext,
+    private readonly cashFlow: CashFlowService,
+    private readonly activityLog: ActivityLogService,
     @InjectRepository(Vendor)
     private readonly vendors: Repository<Vendor>,
     @InjectRepository(VendorLedgerEntryEntity)
     private readonly entries: Repository<VendorLedgerEntryEntity>,
+    @InjectRepository(User)
+    private readonly users: Repository<User>,
   ) {}
 
   async listCredits(
@@ -75,7 +100,7 @@ export class VendorLedgerService {
           vendorName: row.vendorName,
           charges,
           payments,
-          credit: roundMoney4(charges - payments),
+          credit: roundMoney4(Math.max(0, charges - payments)),
         };
       })
       .sort((a, b) => b.credit - a.credit || a.vendorName.localeCompare(b.vendorName));
@@ -101,7 +126,7 @@ export class VendorLedgerService {
     const search = query.search?.trim();
     if (search) {
       qb.andWhere(
-        "(v.name ILIKE :search OR e.note ILIKE :search OR coalesce(e.receipt_number, '') ILIKE :search)",
+        "(v.name ILIKE :search OR e.note ILIKE :search OR coalesce(e.receipt_number, '') ILIKE :search OR coalesce(e.reference_number, '') ILIKE :search)",
         { search: `%${search}%` },
       );
     }
@@ -112,6 +137,8 @@ export class VendorLedgerService {
       .addSelect("v.name", "vendorName")
       .addSelect("e.amount", "amount")
       .addSelect("e.receipt_number", "receiptNumber")
+      .addSelect("e.payment_method", "paymentMethod")
+      .addSelect("e.reference_number", "referenceNumber")
       .addSelect("e.note", "note")
       .addSelect("e.occurred_at", "occurredAt")
       .orderBy("e.occurred_at", "DESC")
@@ -124,6 +151,8 @@ export class VendorLedgerService {
         vendorName: string;
         amount: string;
         receiptNumber: string | null;
+        paymentMethod: string | null;
+        referenceNumber: string | null;
         note: string | null;
         occurredAt: Date | string;
       }>();
@@ -133,6 +162,8 @@ export class VendorLedgerService {
       vendorName: row.vendorName,
       amount: toNum(row.amount),
       receiptNumber: row.receiptNumber,
+      paymentMethod: paymentMethodOf(row.paymentMethod),
+      referenceNumber: row.referenceNumber,
       note: row.note ?? "",
       occurredAt:
         row.occurredAt instanceof Date
@@ -148,10 +179,28 @@ export class VendorLedgerService {
   }
 
   async recordPayment(
+    user: TenantContext,
     vendorId: string,
     dto: RecordVendorPaymentDto,
   ): Promise<VendorLedger> {
-    await this.requireVendor(vendorId);
+    if (
+      !user.permissions.includes("web.access") &&
+      !user.permissions.includes("till.manage")
+    ) {
+      throw new ForbiddenException(
+        "Only an owner or a manager can record a vendor payment",
+      );
+    }
+    const vendor = await this.requireVendor(vendorId);
+    const method = dto.method;
+    if (method !== "CASH" && method !== "BANK") {
+      throw new BadRequestException("Choose cash or bank transfer");
+    }
+    const referenceNumber =
+      method === "BANK" ? dto.referenceNumber?.trim() ?? "" : "";
+    if (method === "BANK" && !referenceNumber) {
+      throw new BadRequestException("Enter the transaction id");
+    }
     const amount = roundMoney4(Number(dto.amount));
     if (!(amount > 0)) {
       throw new BadRequestException("Payment amount must be greater than zero");
@@ -162,27 +211,91 @@ export class VendorLedgerService {
         `Payment cannot exceed vendor credit (${current.credit})`,
       );
     }
+    const owner = user.permissions.includes("web.access");
+    if (method === "CASH") {
+      const available = owner
+        ? await this.cashFlow.ownerCashBalance(user.tenantId, user.userId)
+        : (
+            await this.cashFlow.drawerBalances(
+              user.tenantId,
+              user.userId,
+              "",
+              false,
+            )
+          ).find((row) => row.managerUserId === user.userId)?.balance ?? 0;
+      if (expenseExceedsDrawer(amount, available)) {
+        throw new BadRequestException(expenseOverDrawerMessage(available));
+      }
+    }
+    const payer = await this.users.findOne({
+      where: { id: user.userId, tenantId: user.tenantId },
+    });
+    const payerName = payer?.fullName?.trim() || payer?.username || "User";
     const now = new Date();
-    await this.entries.save(
-      this.entries.create({
-        tenantId: this.fixedTenant.tenantId,
-        vendorId,
-        entryType: "PAYMENT",
-        amount: String(amount),
-        goodsReceiptId: null,
-        receiptNumber: null,
-        note: dto.note?.trim() ?? "",
-        occurredAt: now,
-      }),
-    );
+    const entryId = randomUUID();
+    const expenseId = method === "CASH" ? randomUUID() : null;
+    const note = dto.note?.trim() ?? "";
+    await this.dataSource.transaction(async (manager) => {
+      await manager.save(
+        manager.create(VendorLedgerEntryEntity, {
+          id: entryId,
+          tenantId: user.tenantId,
+          vendorId,
+          entryType: "PAYMENT",
+          amount: String(amount),
+          goodsReceiptId: null,
+          receiptNumber: null,
+          paymentMethod: method,
+          referenceNumber: referenceNumber || null,
+          note,
+          occurredAt: now,
+        }),
+      );
+      if (expenseId) {
+        await manager.save(
+          manager.create(CashExpense, {
+            id: expenseId,
+            tenantId: user.tenantId,
+            recordedByUserId: user.userId,
+            recordedByName: payerName,
+            category: "Vendor payment",
+            amount: String(amount),
+            note: note || `Vendor payment to ${vendor.name}`,
+            occurredAt: now,
+          }),
+        );
+      }
+    });
+    const methodLabel = method === "BANK" ? "bank transfer" : "cash";
+    const reference =
+      method === "BANK" ? ` (ref ${referenceNumber})` : "";
+    try {
+      await this.activityLog.logFromContext({
+        tenantId: user.tenantId,
+        eventType: "vendor.paid",
+        actorUserId: user.userId,
+        summary: `${payerName} paid Rs ${formatMoney(amount)} by ${methodLabel} to ${vendor.name}${reference}`,
+        metadata: {
+          vendorId,
+          entryId,
+          expenseId,
+          amount,
+          method,
+          referenceNumber: referenceNumber || null,
+        },
+      });
+    } catch {
+      /* the payment is already saved */
+    }
     return this.load(vendorId);
   }
 
-  private async requireVendor(vendorId: string): Promise<void> {
+  private async requireVendor(vendorId: string): Promise<Vendor> {
     const vendor = await this.vendors.findOne({
       where: { id: vendorId, tenantId: this.fixedTenant.tenantId },
     });
     if (!vendor) throw new NotFoundException("Vendor not found");
+    return vendor;
   }
 
   private async load(vendorId: string): Promise<VendorLedger> {
@@ -197,16 +310,21 @@ export class VendorLedgerService {
       amount: toNum(row.amount),
       goodsReceiptId: row.goodsReceiptId,
       receiptNumber: row.receiptNumber,
+      paymentMethod: paymentMethodOf(row.paymentMethod),
+      referenceNumber: row.referenceNumber,
       note: row.note ?? "",
       occurredAt: row.occurredAt.toISOString(),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));
     const credit = roundMoney4(
-      entries.reduce(
-        (sum, entry) =>
-          sum + (entry.entryType === "CHARGE" ? entry.amount : -entry.amount),
+      Math.max(
         0,
+        entries.reduce(
+          (sum, entry) =>
+            sum + (entry.entryType === "CHARGE" ? entry.amount : -entry.amount),
+          0,
+        ),
       ),
     );
     return { credit, entries };

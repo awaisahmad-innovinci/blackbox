@@ -213,6 +213,7 @@ export async function collectCashByAmountFromTill(input: {
         userName: input.cashierName,
         amount: input.amount,
         supervisorUserId: input.supervisorUserId,
+        collectedByName: input.supervisorDisplayName,
       });
       const supervisorId = input.supervisorUserId ?? input.cashierUserId;
       const authenticatorName =

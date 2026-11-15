@@ -37,6 +37,12 @@ export class VendorLedgerEntry {
   @Column({ name: "receipt_number", type: "text", nullable: true })
   receiptNumber!: string | null;
 
+  @Column({ name: "payment_method", type: "text", nullable: true })
+  paymentMethod!: string | null;
+
+  @Column({ name: "reference_number", type: "text", nullable: true })
+  referenceNumber!: string | null;
+
   @Column({ type: "text", default: "" })
   note!: string;
 

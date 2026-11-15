@@ -582,7 +582,9 @@ export function CashFlowPage() {
                   setCategory(event.target.value as CashExpenseCategory)
                 }
               >
-                {CASH_EXPENSE_CATEGORIES.map((item) => (
+                {CASH_EXPENSE_CATEGORIES.filter(
+                  (item) => item !== "Vendor payment",
+                ).map((item) => (
                   <option key={item} value={item}>
                     {item}
                   </option>

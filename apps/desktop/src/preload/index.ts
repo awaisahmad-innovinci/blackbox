@@ -695,6 +695,8 @@ contextBridge.exposeInMainWorld("blackbox", {
       ) as Promise<InventoryInOutReport>,
   },
   identity: {
+    getComputerName: () =>
+      ipcRenderer.invoke("identity:getComputerName") as Promise<string>,
     getFingerprint: () =>
       ipcRenderer.invoke("identity:getFingerprint") as Promise<string>,
     getStableFingerprint: () =>

@@ -1,8 +1,11 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { ActivityLogModule } from "../../activity-log/activity-log.module";
+import { CashFlowModule } from "../../cash-flow/cash-flow.module";
 import {
   ProductSku,
   Unit,
+  User,
   Vendor,
   VendorContact,
   VendorGroup,
@@ -20,6 +23,8 @@ import { VendorsService } from "./vendors.service";
 
 @Module({
   imports: [
+    ActivityLogModule,
+    CashFlowModule,
     TypeOrmModule.forFeature([
       Vendor,
       VendorContact,
@@ -28,6 +33,7 @@ import { VendorsService } from "./vendors.service";
       VendorSku,
       ProductSku,
       Unit,
+      User,
       InventoryStock,
     ]),
   ],

@@ -20,6 +20,9 @@ export const ACTIVITY_LOG_EVENT_TYPES = [
   "cash_expense.recorded",
   "drawer.opened",
   "drawer.submitted",
+  "vendor.paid",
+  "auth.login",
+  "auth.logout",
 ] as const;
 
 export type ActivityLogEventType = (typeof ACTIVITY_LOG_EVENT_TYPES)[number];
@@ -85,4 +88,7 @@ export const ACTIVITY_LOG_EVENT_LABELS: Record<ActivityLogEventType, string> = {
   "cash_expense.recorded": "Expense recorded",
   "drawer.opened": "Manager drawer opened",
   "drawer.submitted": "Cash submitted to owner",
+  "vendor.paid": "Vendor payment",
+  "auth.login": "Signed in",
+  "auth.logout": "Signed out",
 };

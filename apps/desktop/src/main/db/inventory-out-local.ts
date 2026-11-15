@@ -2,6 +2,19 @@ import type { InventoryOutDetail } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 
+/** A missing timestamp loses. Equal timestamps keep the row already stored. */
+function storedOutIsLatest(
+  storedUpdatedAt: string | null | undefined,
+  incomingUpdatedAt: string | null | undefined,
+): boolean {
+  const stored = storedUpdatedAt?.trim() ?? "";
+  const incoming = incomingUpdatedAt?.trim() ?? "";
+  if (!stored && !incoming) return true;
+  if (!stored) return false;
+  if (!incoming) return true;
+  return stored >= incoming;
+}
+
 export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
   const db = getLocalDb();
   // #region agent log
@@ -64,6 +77,31 @@ export function upsertInventoryOutLocal(detail: InventoryOutDetail): void {
   }
   // #endregion
   const tx = db.transaction(() => {
+    const existing = db
+      .prepare(
+        `select id, updated_at as updatedAt
+         from inventory_outs
+         where tenant_id = @tenantId
+           and out_number = @outNumber
+           and id != @id`,
+      )
+      .get({
+        tenantId: DEMO_STORE_TENANT_ID,
+        outNumber: detail.outNumber,
+        id: detail.id,
+      }) as { id: string; updatedAt: string | null } | undefined;
+    if (existing) {
+      if (storedOutIsLatest(existing.updatedAt, detail.updatedAt)) return;
+      db.prepare(
+        "delete from inventory_out_lines where inventory_out_id = ?",
+      ).run(existing.id);
+      db.prepare(
+        `delete from local_sync_outbox
+         where entity_type = 'inventory_out' and entity_id = ?`,
+      ).run(existing.id);
+      db.prepare("delete from inventory_outs where id = ?").run(existing.id);
+    }
+
     db.prepare(
       `insert into inventory_outs (
         id, tenant_id, out_number, warehouse_id, out_date, reference, notes,

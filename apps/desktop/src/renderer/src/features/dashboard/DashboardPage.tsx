@@ -361,6 +361,9 @@ export function DashboardPage() {
   }
 
   const cashierTills = managerSummary?.cashierTills ?? [];
+  const openCashierTills = cashierTills.filter(
+    (till) => till.currentCashBalance > 0,
+  );
   const isOwner = user?.permissions.includes("web.access") ?? false;
   const uncollectedTillTotal = cashierTills.reduce(
     (sum, till) => sum + till.currentCashBalance,
@@ -527,13 +530,13 @@ export function DashboardPage() {
                 <CardContent className="px-5">
                   {loading ? (
                     <Skeleton className="h-8 w-full" />
-                  ) : cashierTills.length === 0 ? (
+                  ) : openCashierTills.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
                       No uncollected till cash.
                     </p>
                   ) : (
                     <ul className="divide-y text-sm">
-                      {cashierTills.map((till) => (
+                      {openCashierTills.map((till) => (
                         <li
                           key={`${till.userId}-${till.tillName}-${till.status}`}
                           className="flex items-center justify-between gap-4 py-2"

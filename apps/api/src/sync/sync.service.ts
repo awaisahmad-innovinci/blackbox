@@ -11,9 +11,6 @@ import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   landedUnitByQuantity,
-  expenseExceedsDrawer,
-  expenseOverDrawerMessage,
-  formatMoney,
   isCashExpenseCategory,
   roundMoney4,
   streamForEntity,
@@ -73,6 +70,8 @@ import {
   OwnerCashEntry,
   ManagerDrawerOpening,
   ManagerDrawerSubmission,
+  TillSession,
+  TillWithdrawal,
   VendorGroup,
   VendorReturn,
   VendorReturnItem,
@@ -601,11 +600,27 @@ export class SyncService {
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Apply failed";
+      const code =
+        typeof error === "object" && error && "code" in error
+          ? String((error as { code?: unknown }).code ?? "")
+          : "";
+      const driverCode =
+        typeof error === "object" && error && "driverError" in error
+          ? String(
+              (error as { driverError?: { code?: unknown } }).driverError
+                ?.code ?? "",
+            )
+          : "";
       return {
         changeId: item.changeId,
         status: "rejected",
         message,
-        retryable: /not found|missing/i.test(message),
+        retryable:
+          code === "23503" ||
+          driverCode === "23503" ||
+          /not found|missing|foreign key|till_sessions_active_user_idx/i.test(
+            message,
+          ),
       };
     }
   }
@@ -981,6 +996,14 @@ export class SyncService {
         );
         break;
       }
+      case "till_session": {
+        await this.upsertTillSession(manager, tenantId, change.entityId, p);
+        break;
+      }
+      case "till_withdrawal": {
+        await this.upsertTillWithdrawal(manager, tenantId, change.entityId, p);
+        break;
+      }
       case "inventory_out": {
         await this.upsertInventoryOut(manager, tenantId, change.entityId, p);
         break;
@@ -1003,6 +1026,111 @@ export class SyncService {
       }
       default:
         break;
+    }
+  }
+
+  private async upsertTillSession(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const userId = String(p.userId ?? "").trim();
+    if (!userId) throw new Error("till cashier is missing");
+    const existing = await manager.findOne(TillSession, {
+      where: { id: entityId, tenantId },
+    });
+    const row = existing ?? manager.create(TillSession, { id: entityId, tenantId });
+    const optionalId = (value: unknown): string | null => {
+      const text = String(value ?? "").trim();
+      return text ? text : null;
+    };
+    const optionalDate = (value: unknown): Date | null => {
+      if (value == null || value === "") return null;
+      const date = new Date(String(value));
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const status = String(p.status ?? "PENDING_APPROVAL");
+    if (
+      status === "PENDING_APPROVAL" ||
+      status === "OPEN" ||
+      status === "CLOSED_LIMIT"
+    ) {
+      await manager.query(
+        `update till_sessions
+         set status = 'CLOSED',
+             closed_at = coalesce(closed_at, now()),
+             close_reason = coalesce(nullif(close_reason, ''), 'REPLACED'),
+             updated_at = now()
+         where tenant_id = $1
+           and user_id = $2
+           and id <> $3
+           and status in ('PENDING_APPROVAL', 'OPEN', 'CLOSED_LIMIT')`,
+        [tenantId, userId, entityId],
+      );
+    }
+    Object.assign(row, {
+      userId,
+      tillName: String(p.tillName ?? ""),
+      status,
+      note10: Number(p.note10 ?? 0),
+      note20: Number(p.note20 ?? 0),
+      note50: Number(p.note50 ?? 0),
+      note100: Number(p.note100 ?? 0),
+      note500: Number(p.note500 ?? 0),
+      note1000: Number(p.note1000 ?? 0),
+      note5000: Number(p.note5000 ?? 0),
+      openingTotal: String(p.openingTotal ?? 0),
+      openingBalance: String(p.openingBalance ?? 0),
+      currentCashBalance: String(p.currentCashBalance ?? 0),
+      maxCashLimit: String(p.maxCashLimit ?? 0),
+      openedAt: optionalDate(p.openedAt),
+      closedAt: optionalDate(p.closedAt),
+      approvedByUserId: optionalId(p.approvedByUserId),
+      approvedAt: optionalDate(p.approvedAt),
+      reopenedByUserId: optionalId(p.reopenedByUserId),
+      closeReason: optionalId(p.closeReason),
+      fundedByUserId: optionalId(p.fundedByUserId),
+    });
+    await manager.save(row);
+  }
+
+  private async upsertTillWithdrawal(
+    manager: EntityManager,
+    tenantId: string,
+    entityId: string,
+    p: Record<string, unknown>,
+  ): Promise<void> {
+    const tillSessionId = String(p.tillSessionId ?? "").trim();
+    const withdrawnByUserId = String(p.withdrawnByUserId ?? "").trim();
+    if (!tillSessionId || !withdrawnByUserId) {
+      throw new Error("till withdrawal is missing its session or cashier");
+    }
+    const existing = await manager.findOne(TillWithdrawal, {
+      where: { id: entityId, tenantId },
+    });
+    const row =
+      existing ?? manager.create(TillWithdrawal, { id: entityId, tenantId });
+    Object.assign(row, {
+      tillSessionId,
+      withdrawnByUserId,
+      note10: Number(p.note10 ?? 0),
+      note20: Number(p.note20 ?? 0),
+      note50: Number(p.note50 ?? 0),
+      note100: Number(p.note100 ?? 0),
+      note500: Number(p.note500 ?? 0),
+      note1000: Number(p.note1000 ?? 0),
+      note5000: Number(p.note5000 ?? 0),
+      withdrawalTotal: String(p.withdrawalTotal ?? 0),
+      kind: String(p.kind ?? "full"),
+    });
+    await manager.save(row);
+    const createdAt = p.createdAt ? new Date(String(p.createdAt)) : null;
+    if (createdAt && !Number.isNaN(createdAt.getTime())) {
+      await manager.query(
+        `update till_withdrawals set created_at = $1 where id = $2 and tenant_id = $3`,
+        [createdAt.toISOString(), entityId, tenantId],
+      );
     }
   }
 
@@ -1126,37 +1254,6 @@ export class SyncService {
     }
   }
 
-  private async ownerCashAvailable(
-    manager: EntityManager,
-    tenantId: string,
-    ownerUserId: string,
-    exclude?: { excludeExpenseId?: string; excludeOpeningId?: string },
-  ): Promise<number> {
-    const rows = await manager.query<{ balance: string }[]>(
-      `select
-         coalesce((select sum(amount) from manager_drawer_submissions where tenant_id = $1), 0)
-         + coalesce((select sum(amount) from owner_cash_entries where tenant_id = $1), 0)
-         - coalesce((
-             select sum(amount) from cash_expenses
-             where tenant_id = $1
-               and recorded_by_user_id = $2
-               and ($3::uuid is null or id <> $3::uuid)
-           ), 0)
-         - coalesce((
-             select sum(amount) from manager_drawer_openings
-             where tenant_id = $1
-               and ($4::uuid is null or id <> $4::uuid)
-           ), 0) as balance`,
-      [
-        tenantId,
-        ownerUserId,
-        exclude?.excludeExpenseId ?? null,
-        exclude?.excludeOpeningId ?? null,
-      ],
-    );
-    return roundMoney4(Number(rows[0]?.balance ?? 0));
-  }
-
   private async upsertOwnerCashEntry(
     manager: EntityManager,
     tenantId: string,
@@ -1198,74 +1295,6 @@ export class SyncService {
     }
     const amount = Number(p.amount ?? 0);
     if (!(amount > 0)) throw new Error("expense amount must be greater than zero");
-    if (p.ownerCash === true) {
-      const available = await this.ownerCashAvailable(manager, tenantId, recordedByUserId, {
-        excludeExpenseId: entityId,
-      });
-      if (expenseExceedsDrawer(amount, available)) {
-        throw new Error(expenseOverDrawerMessage(available));
-      }
-      const existingOwner = await manager.findOne(CashExpense, {
-        where: { id: entityId, tenantId },
-      });
-      const ownerRow =
-        existingOwner ?? manager.create(CashExpense, { id: entityId, tenantId });
-      Object.assign(ownerRow, {
-        recordedByUserId,
-        recordedByName: String(p.recordedByName ?? ownerRow.recordedByName ?? ""),
-        category,
-        amount: String(amount),
-        note: String(p.note ?? ownerRow.note ?? ""),
-        occurredAt: p.occurredAt
-          ? new Date(String(p.occurredAt))
-          : (ownerRow.occurredAt ?? new Date()),
-      });
-      await manager.save(ownerRow);
-      return;
-    }
-    const totals = await manager.query<
-      {
-        opening_float: string;
-        collected: string;
-        expenses: string;
-        till_floats: string;
-        submitted: string;
-      }[]
-    >(
-      `select
-         coalesce((
-           select sum(amount) from manager_drawer_openings
-           where tenant_id = $1 and manager_user_id = $2
-         ), 0) as opening_float,
-         coalesce((
-           select sum(withdrawal_total) from till_withdrawals
-           where tenant_id = $1 and withdrawn_by_user_id = $2
-         ), 0) as collected,
-         coalesce((
-           select sum(amount) from cash_expenses
-           where tenant_id = $1 and recorded_by_user_id = $2 and id <> $3
-         ), 0) as expenses,
-         coalesce((
-           select sum(opening_balance) from till_sessions
-           where tenant_id = $1 and funded_by_user_id = $2
-         ), 0) as till_floats,
-         coalesce((
-           select sum(amount) from manager_drawer_submissions
-           where tenant_id = $1 and manager_user_id = $2
-         ), 0) as submitted`,
-      [tenantId, recordedByUserId, entityId],
-    );
-    const totalsRow = totals[0];
-    const available = roundMoney4(
-      Number(totalsRow?.opening_float ?? 0) +
-        Number(totalsRow?.collected ?? 0) -
-        Number(totalsRow?.expenses ?? 0) -
-        Number(totalsRow?.till_floats ?? 0) -
-        Number(totalsRow?.submitted ?? 0),
-    );
-    if (expenseExceedsDrawer(amount, available)) {
-      throw new Error(expenseOverDrawerMessage(available));
-    }
     const existing = await manager.findOne(CashExpense, {
       where: { id: entityId, tenantId },
     });
@@ -1297,12 +1326,6 @@ export class SyncService {
     }
     const amount = Number(p.amount ?? 0);
     if (!(amount > 0)) throw new Error("opening amount must be greater than zero");
-    const available = await this.ownerCashAvailable(manager, tenantId, openedByUserId, {
-      excludeOpeningId: entityId,
-    });
-    if (expenseExceedsDrawer(amount, available)) {
-      throw new Error(expenseOverDrawerMessage(available));
-    }
     const existing = await manager.findOne(ManagerDrawerOpening, {
       where: { id: entityId, tenantId },
     });
@@ -1332,53 +1355,6 @@ export class SyncService {
     if (!managerUserId) throw new Error("manager not found");
     const amount = Number(p.amount ?? 0);
     if (!(amount > 0)) throw new Error("There is no cash to submit");
-    const totals = await manager.query<
-      {
-        opening_float: string;
-        collected: string;
-        expenses: string;
-        till_floats: string;
-        submitted: string;
-      }[]
-    >(
-      `select
-         coalesce((
-           select sum(amount) from manager_drawer_openings
-           where tenant_id = $1 and manager_user_id = $2
-         ), 0) as opening_float,
-         coalesce((
-           select sum(withdrawal_total) from till_withdrawals
-           where tenant_id = $1 and withdrawn_by_user_id = $2
-         ), 0) as collected,
-         coalesce((
-           select sum(amount) from cash_expenses
-           where tenant_id = $1 and recorded_by_user_id = $2
-         ), 0) as expenses,
-         coalesce((
-           select sum(opening_balance) from till_sessions
-           where tenant_id = $1 and funded_by_user_id = $2
-         ), 0) as till_floats,
-         coalesce((
-           select sum(amount) from manager_drawer_submissions
-           where tenant_id = $1 and manager_user_id = $2 and id <> $3
-         ), 0) as submitted`,
-      [tenantId, managerUserId, entityId],
-    );
-    const totalsRow = totals[0];
-    const available = roundMoney4(
-      Number(totalsRow?.opening_float ?? 0) +
-        Number(totalsRow?.collected ?? 0) -
-        Number(totalsRow?.expenses ?? 0) -
-        Number(totalsRow?.till_floats ?? 0) -
-        Number(totalsRow?.submitted ?? 0),
-    );
-    if (!(available > 0) || expenseExceedsDrawer(amount, available)) {
-      throw new Error(
-        available > 0
-          ? `Submit no more than the drawer balance of Rs ${formatMoney(available)}`
-          : "There is no cash to submit",
-      );
-    }
     const existing = await manager.findOne(ManagerDrawerSubmission, {
       where: { id: entityId, tenantId },
     });
@@ -1428,6 +1404,14 @@ export class SyncService {
         (p.receiptNumber as string | null | undefined) ??
         row.receiptNumber ??
         null,
+      paymentMethod:
+        p.paymentMethod === "CASH" || p.paymentMethod === "BANK"
+          ? p.paymentMethod
+          : (row.paymentMethod ?? null),
+      referenceNumber:
+        typeof p.referenceNumber === "string"
+          ? p.referenceNumber.trim() || null
+          : (row.referenceNumber ?? null),
       note: String(p.note ?? row.note ?? ""),
       occurredAt: p.occurredAt
         ? new Date(String(p.occurredAt))
@@ -2002,6 +1986,49 @@ export class SyncService {
     });
   }
 
+  private async deductPostedSaleBalance(
+    manager: EntityManager,
+    tenantId: string,
+    warehouseId: string,
+    productSkuId: string,
+    inventoryQty: number,
+    unitCost: number,
+  ): Promise<void> {
+    try {
+      await applyInventoryOutBalanceDelta(
+        manager,
+        tenantId,
+        warehouseId,
+        productSkuId,
+        -inventoryQty,
+        unitCost,
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "";
+      const response =
+        typeof error === "object" &&
+        error &&
+        "getResponse" in error &&
+        typeof (error as { getResponse: () => unknown }).getResponse ===
+          "function"
+          ? (error as { getResponse: () => unknown }).getResponse()
+          : "";
+      const detail =
+        typeof response === "string"
+          ? response
+          : response && typeof response === "object" && "message" in response
+            ? String((response as { message: unknown }).message)
+            : "";
+      if (
+        message.includes("No inventory out balance") ||
+        detail.includes("No inventory out balance")
+      ) {
+        return;
+      }
+      throw error;
+    }
+  }
+
   private async upsertSale(
     manager: EntityManager,
     tenantId: string,
@@ -2153,12 +2180,12 @@ export class SyncService {
           const unitCost = balance
             ? Number(balance.unitCost ?? 0)
             : unitPrice;
-          await applyInventoryOutBalanceDelta(
+          await this.deductPostedSaleBalance(
             manager,
             tenantId,
             row.warehouseId,
             productSkuId,
-            -inventoryQty,
+            inventoryQty,
             unitCost,
           );
         }

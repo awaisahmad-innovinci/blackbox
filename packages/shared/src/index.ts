@@ -269,6 +269,8 @@ export type {
   PendingVendorReturnLine,
   GoodsReceiptReturnAdjustment,
   VendorLedgerEntryType,
+  VENDOR_PAYMENT_METHODS,
+  VendorPaymentMethod,
   VendorLedgerEntry,
   VendorLedger,
   RecordVendorPaymentRequest,

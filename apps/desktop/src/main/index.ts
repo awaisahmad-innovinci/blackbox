@@ -111,6 +111,7 @@ import {
   getCurrentTillLocal,
   getLatestTillSessionLocal,
   listTillsLocal,
+  enqueueExistingTillsOnce,
   openTillLocal,
   reopenTillLocal,
   upsertTillSessionLocal,
@@ -226,6 +227,7 @@ import {
 } from "./db/queries-local";
 import { allocateDocumentNumberLocal } from "./db/document-counters-local";
 import {
+  getComputerName,
   getOrCreateFingerprint,
   getStableMachineFingerprint,
   persistFingerprint,
@@ -242,6 +244,10 @@ import {
   markOutboxPushing,
   markOutboxRejected,
   pendingOutboxCount,
+  requeueRejectedCashOnce,
+  requeueRejectedSalesAndTillsOnce,
+  requeueRejectedVendorExpensesOnce,
+  requeueRejectedVendorLedgerOnce,
   getPullCursor,
   resetStalePushing,
 } from "./db/outbox-local";
@@ -1085,6 +1091,7 @@ function registerIpc(): void {
       listInventoryInOutReportLocal(dateFrom, dateTo),
   );
 
+  ipcMain.handle("identity:getComputerName", () => getComputerName());
   ipcMain.handle("identity:getFingerprint", () => getOrCreateFingerprint());
   ipcMain.handle("identity:getStableFingerprint", () =>
     getStableMachineFingerprint(),
@@ -1106,9 +1113,18 @@ function registerIpc(): void {
       return { ok: true as const, path: getLocalDbStatus().connected ? getLocalDbStatus() : null };
     },
   );
-  ipcMain.handle("sync:listOutbox", (_event, limit?: number) =>
-    listPendingOutbox(limit ?? 100),
-  );
+  ipcMain.handle("sync:listOutbox", (_event, limit?: number) => {
+    try {
+      requeueRejectedCashOnce();
+      requeueRejectedSalesAndTillsOnce();
+      requeueRejectedVendorExpensesOnce();
+      requeueRejectedVendorLedgerOnce();
+      enqueueExistingTillsOnce();
+    } catch {
+      // The next sync retries until the local database is open.
+    }
+    return listPendingOutbox(limit ?? 100);
+  });
   ipcMain.handle(
     "sync:listOutboxForEntity",
     (_event, entityType: string, entityId: string) =>

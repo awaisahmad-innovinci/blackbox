@@ -47,6 +47,14 @@ import {
   usernameError,
 } from "@blackbox/shared";
 
+function firstSystemRole(roleList: RoleDto[], roleIds: string[]): string[] {
+  const systemIds = new Set(
+    roleList.filter((role) => role.isSystem).map((role) => role.id),
+  );
+  const match = roleIds.find((id) => systemIds.has(id));
+  return match ? [match] : [];
+}
+
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
   const { hasPermission, user: authUser } = useAuth();
@@ -90,7 +98,7 @@ export default function UserDetailPage() {
       ]);
       setUser(u);
       setRoles(r);
-      setSelectedRoles(u.roleIds);
+      setSelectedRoles(firstSystemRole(r, u.roleIds));
       setProfile({
         fullName: u.fullName,
         email: u.email,
@@ -154,13 +162,20 @@ export default function UserDetailPage() {
 
   async function onSaveRoles() {
     if (!user) return;
+    if (
+      selectedRoles.length !== 1 ||
+      !roles.some((role) => role.isSystem && role.id === selectedRoles[0])
+    ) {
+      setFormError("Choose one role.");
+      return;
+    }
     setBusy(true);
     setSuccess(null);
     setFormError(null);
     try {
       const updated = await replaceUserRoles(user.id, selectedRoles);
       setUser(updated);
-      setSelectedRoles(updated.roleIds);
+      setSelectedRoles(firstSystemRole(roles, updated.roleIds));
       setSuccess("Roles updated.");
     } catch (err) {
       setFormError(toUserFacingError(err));
@@ -386,7 +401,15 @@ export default function UserDetailPage() {
                 title="Roles"
                 description="Roles grant permission keys. Authorization uses permissions, not role names."
                 footer={
-                  <Button disabled={busy} onClick={() => void onSaveRoles()}>
+                  <Button
+                    disabled={
+                      busy ||
+                      !roles.some(
+                        (role) => role.isSystem && role.id === selectedRoles[0],
+                      )
+                    }
+                    onClick={() => void onSaveRoles()}
+                  >
                     {busy ? (
                       <>
                         <Loader2 className="size-4 animate-spin" />
@@ -399,16 +422,20 @@ export default function UserDetailPage() {
                 }
               >
                 <RoleChecklist
-                  roles={roles}
+                  roles={roles.filter((role) => role.isSystem)}
                   selectedIds={selectedRoles}
                   onChange={setSelectedRoles}
+                  selection="single"
                   disabled={busy}
                 />
+                <p className="text-muted-foreground text-xs">Choose one role.</p>
               </SectionCard>
             ) : user.roleIds.length > 0 ? (
               <SectionCard title="Roles" description="Assigned roles (read-only).">
                 <RoleChecklist
-                  roles={roles.filter((r) => user.roleIds.includes(r.id))}
+                  roles={roles.filter(
+                    (role) => role.isSystem && user.roleIds.includes(role.id),
+                  )}
                   selectedIds={user.roleIds}
                   onChange={() => undefined}
                   disabled

@@ -4,6 +4,7 @@ import type { SyncEntityType, SyncOperation, SyncStream } from "@blackbox/shared
 import { getLocalDb } from "./index";
 import { readIdentity } from "./identity";
 import { bumpLocalEntityVersion, getLocalEntityVersion } from "./entity-versions-local";
+import { getSyncMeta, setSyncMeta } from "./sync-meta";
 
 export type OutboxRow = {
   changeId: string;
@@ -211,6 +212,93 @@ export function wasApplied(changeId: string): boolean {
     .prepare(`select 1 as ok from local_applied_changes where change_id = @changeId`)
     .get({ changeId }) as { ok: number } | undefined;
   return Boolean(row);
+}
+
+const CASH_REJECT_RETRY_KEY = "cash_reject_retry_v1";
+
+export function requeueRejectedCashOnce(): void {
+  if (!readIdentity()) return;
+  if (getSyncMeta(CASH_REJECT_RETRY_KEY)) return;
+  getLocalDb()
+    .prepare(
+      `update local_sync_outbox
+       set status = 'pending', last_error = null
+       where status = 'rejected'
+         and entity_type in (
+           'cash_expense',
+           'manager_drawer_opening',
+           'manager_drawer_submission',
+           'till_withdrawal'
+         )`,
+    )
+    .run();
+  setSyncMeta(CASH_REJECT_RETRY_KEY, new Date().toISOString());
+}
+
+const SALES_TILL_RETRY_KEY = "sales_till_reject_retry_v1";
+
+export function requeueRejectedSalesAndTillsOnce(): void {
+  if (!readIdentity()) return;
+  if (getSyncMeta(SALES_TILL_RETRY_KEY)) return;
+  const db = getLocalDb();
+  db.prepare(
+    `update local_sync_outbox
+     set status = 'pending', last_error = null
+     where status = 'rejected'
+       and entity_type = 'sale'
+       and last_error like '%No inventory out balance%'`,
+  ).run();
+  db.prepare(
+    `update local_sync_outbox
+     set status = 'pending', last_error = null
+     where status = 'rejected'
+       and entity_type = 'till_session'
+       and last_error like '%till_sessions_active_user_idx%'
+       and not exists (
+         select 1 from local_sync_outbox newer
+         where newer.entity_type = local_sync_outbox.entity_type
+           and newer.entity_id = local_sync_outbox.entity_id
+           and newer.status = 'acked'
+           and newer.created_at > local_sync_outbox.created_at
+       )`,
+  ).run();
+  setSyncMeta(SALES_TILL_RETRY_KEY, new Date().toISOString());
+}
+
+const VENDOR_EXPENSE_RETRY_KEY = "vendor_expense_category_retry_v1";
+
+/** Resends vendor payment expenses the cloud refused before it allowed that category. */
+export function requeueRejectedVendorExpensesOnce(): void {
+  if (!readIdentity()) return;
+  if (getSyncMeta(VENDOR_EXPENSE_RETRY_KEY)) return;
+  getLocalDb()
+    .prepare(
+      `update local_sync_outbox
+       set status = 'pending', last_error = null
+       where status = 'rejected'
+         and entity_type = 'cash_expense'
+         and last_error like '%cash_expenses_category_check%'`,
+    )
+    .run();
+  setSyncMeta(VENDOR_EXPENSE_RETRY_KEY, new Date().toISOString());
+}
+
+const VENDOR_LEDGER_FK_RETRY_KEY = "vendor_ledger_receipt_fk_retry_v1";
+
+/** Resends ledger rows rejected before their purchase voucher existed on the cloud. */
+export function requeueRejectedVendorLedgerOnce(): void {
+  if (!readIdentity()) return;
+  if (getSyncMeta(VENDOR_LEDGER_FK_RETRY_KEY)) return;
+  getLocalDb()
+    .prepare(
+      `update local_sync_outbox
+       set status = 'pending', last_error = null
+       where status = 'rejected'
+         and entity_type = 'vendor_ledger_entry'
+         and last_error like '%vendor_ledger_entries_goods_receipt%'`,
+    )
+    .run();
+  setSyncMeta(VENDOR_LEDGER_FK_RETRY_KEY, new Date().toISOString());
 }
 
 export function pendingOutboxCount(): number {
