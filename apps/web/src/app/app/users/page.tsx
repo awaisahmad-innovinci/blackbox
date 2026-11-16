@@ -142,6 +142,18 @@ export default function UsersPage() {
       : null
     : livePasswordError(createDraft.password);
 
+  const systemRoles = useMemo(
+    () => roles.filter((role) => role.isSystem),
+    [roles],
+  );
+  const canCreateUser =
+    !personNameError(createDraft.fullName) &&
+    !usernameError(createDraft.username) &&
+    !emailError(createDraft.email) &&
+    createDraft.password.length >= 8 &&
+    selectedRoles.length === 1 &&
+    systemRoles.some((role) => role.id === selectedRoles[0]);
+
   function openCreateDialog() {
     setSuccess(null);
     setFormError(null);
@@ -192,6 +204,13 @@ export default function UsersPage() {
     if (nameErr || mailErr || userErr || password.length < 8) {
       return;
     }
+    if (
+      selectedRoles.length !== 1 ||
+      !roles.some((role) => role.isSystem && role.id === selectedRoles[0])
+    ) {
+      setFormError("Choose one role");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -200,7 +219,7 @@ export default function UsersPage() {
         username,
         fullName,
         password,
-        ...(selectedRoles.length > 0 ? { roleIds: selectedRoles } : {}),
+        roleIds: selectedRoles,
       });
       closeCreateDialog(true);
       setSuccess("User created successfully.");
@@ -466,16 +485,14 @@ export default function UsersPage() {
               <div className="space-y-2">
                 <Label>Roles</Label>
                 <RoleChecklist
-                  roles={roles}
+                  roles={systemRoles}
                   selectedIds={selectedRoles}
                   onChange={setSelectedRoles}
+                  selection="single"
                   disabled={saving}
                   loading={rolesLoading}
                 />
-                <FieldHint>
-                  Optional. Assign one or more roles, or leave empty and edit
-                  later.
-                </FieldHint>
+                <FieldHint>Choose one role.</FieldHint>
               </div>
             </fieldset>
             <FormError>{formError}</FormError>
@@ -488,7 +505,7 @@ export default function UsersPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving || !canCreateUser}>
                 {saving ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />

@@ -1549,6 +1549,27 @@ where units_per_purchase_unit > 0;
         on owner_cash_entries (tenant_id, recorded_by_user_id);
     `,
   },
+  {
+    id: "048_vendor_payment_method",
+    sql: `-- columns added in after()`,
+    after: (db) => {
+      const cols = (
+        db.prepare("pragma table_info(vendor_ledger_entries)").all() as {
+          name: string;
+        }[]
+      ).map((column) => column.name);
+      if (!cols.includes("payment_method")) {
+        db.exec(
+          `alter table vendor_ledger_entries add column payment_method text`,
+        );
+      }
+      if (!cols.includes("reference_number")) {
+        db.exec(
+          `alter table vendor_ledger_entries add column reference_number text`,
+        );
+      }
+    },
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {

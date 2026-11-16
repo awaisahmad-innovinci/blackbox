@@ -278,6 +278,9 @@ export function SalePage() {
       .catch(() => undefined);
   }, [user?.id, canManageTill, location.pathname]);
 
+  const tillBlocked =
+    !canManageTill && !loadingDraft && tillSession?.status !== "OPEN";
+
   useEffect(() => {
     void loadWarehouses("active")
       .then((rows) => {
@@ -767,6 +770,7 @@ export function SalePage() {
   }
 
   function onAddManyFromDialog(rows: SkuSearchResult[]) {
+    if (tillBlocked) return;
     if (!warehouseId) {
       setError(NO_WAREHOUSE_ERROR);
       return;
@@ -839,6 +843,7 @@ export function SalePage() {
   }
 
   function onAddManyFocFromDialog(rows: SkuSearchResult[]) {
+    if (tillBlocked) return;
     if (!warehouseId) {
       setError(NO_WAREHOUSE_ERROR);
       return;
@@ -860,6 +865,7 @@ export function SalePage() {
     try {
       while (scanQueueRef.current.length > 0) {
         const code = scanQueueRef.current.shift()!;
+        if (tillBlocked) continue;
         if (!warehouseId) {
           setError(NO_WAREHOUSE_ERROR);
           continue;
@@ -884,6 +890,7 @@ export function SalePage() {
   }
 
   function onBarcodeEnter(scannedCode: string) {
+    if (tillBlocked) return;
     setError(null);
     const code = scannedCode.trim();
     if (!warehouseId) {
@@ -901,6 +908,7 @@ export function SalePage() {
     layer: "main",
     enabled:
       !loadingDraft &&
+      !tillBlocked &&
       !itemOpen &&
       !focItemOpen &&
       !removeScanOpen &&
@@ -1212,9 +1220,6 @@ export function SalePage() {
       holdInFlightRef.current = false;
     }
   }
-
-  const tillBlocked =
-    !canManageTill && !loadingDraft && tillSession?.status !== "OPEN";
 
   const tillNearLimit =
     tillSession != null &&
@@ -1586,6 +1591,7 @@ export function SalePage() {
     },
     onScan: focusScanInput,
     onAddItem: () => {
+      if (tillBlocked) return;
       if (warehouseId && !itemOpen && !scanBusy) setItemOpen(true);
     },
   });
@@ -1619,7 +1625,13 @@ export function SalePage() {
       }
       if (event.key === "F10") {
         event.preventDefault();
-        if (warehouseId && !itemOpen && !focItemOpen && !scanBusy) {
+        if (
+          !tillBlocked &&
+          warehouseId &&
+          !itemOpen &&
+          !focItemOpen &&
+          !scanBusy
+        ) {
           setFocItemOpen(true);
         }
         return;
@@ -1653,7 +1665,7 @@ export function SalePage() {
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [loadingDraft, canHold, holding, navigate, payment, billTotal, lines.length, amountDue, isSplitPayment, warehouseId, itemOpen, focItemOpen, scanBusy]);
+  }, [loadingDraft, canHold, holding, navigate, payment, billTotal, lines.length, amountDue, isSplitPayment, warehouseId, itemOpen, focItemOpen, scanBusy, tillBlocked]);
 
   if (loadingDraft) {
     return <p className="text-muted-foreground text-sm">Loading held bill…</p>;
@@ -1748,7 +1760,7 @@ export function SalePage() {
             ? `Till cash limit reached — sales are paused. ${tillLimitWithdrawHint}`
             : tillSession?.status === "PENDING_APPROVAL"
               ? "Till is pending manager approval."
-              : "Open your till before posting sales."}{" "}
+              : "Open your till before adding items."}{" "}
           {tillSession?.status === "CLOSED_LIMIT" ? (
             <Button
               type="button"
@@ -1801,11 +1813,13 @@ export function SalePage() {
               id="saleScanInput"
               {...barcodeScanInputProps()}
               autoComplete="off"
-              disabled={!warehouseId || scanBusy}
+              disabled={!warehouseId || scanBusy || tillBlocked}
               placeholder={
-                scanBusy
-                  ? "Looking up barcode…"
-                  : "Scan barcode or search product / SKU…"
+                tillBlocked
+                  ? "Open your till first"
+                  : scanBusy
+                    ? "Looking up barcode…"
+                    : "Scan barcode or search product / SKU…"
               }
               value={scanDraft}
               onChange={(event) => setScanDraft(event.target.value)}
@@ -1827,7 +1841,7 @@ export function SalePage() {
               type="button"
               variant="outline"
               size="sm"
-              disabled={!warehouseId || itemOpen || scanBusy}
+              disabled={!warehouseId || itemOpen || scanBusy || tillBlocked}
               onClick={() => setItemOpen(true)}
             >
               Add item (F3)
@@ -1836,7 +1850,9 @@ export function SalePage() {
               type="button"
               variant="outline"
               size="sm"
-              disabled={!warehouseId || itemOpen || focItemOpen || scanBusy}
+              disabled={
+                !warehouseId || itemOpen || focItemOpen || scanBusy || tillBlocked
+              }
               onClick={() => setFocItemOpen(true)}
             >
               Add FOC (F10)

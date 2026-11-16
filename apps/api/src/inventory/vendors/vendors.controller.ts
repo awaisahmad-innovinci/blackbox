@@ -8,6 +8,8 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import type { TenantContext } from "../../common/tenant-context";
+import { CurrentUser } from "../../common/current-user.decorator";
 import type {
   PaginatedVendorPayments,
   PaginatedVendors,
@@ -97,10 +99,11 @@ export class VendorsController {
 
   @Post(":id/ledger-payments")
   recordPayment(
+    @CurrentUser() user: TenantContext,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: RecordVendorPaymentDto,
   ): Promise<VendorLedger> {
-    return this.ledger.recordPayment(id, dto);
+    return this.ledger.recordPayment(user, id, dto);
   }
 
   @Get(":id/skus")

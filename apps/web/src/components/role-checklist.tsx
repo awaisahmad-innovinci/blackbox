@@ -1,6 +1,7 @@
 "use client";
 
 import { Checkbox } from "@blackbox/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@blackbox/ui/radio-group";
 import { Skeleton } from "@blackbox/ui/skeleton";
 import { cn } from "@blackbox/ui/lib/utils";
 import { RoleTypeBadge } from "@/components/status-badges";
@@ -12,6 +13,7 @@ export function RoleChecklist({
   onChange,
   disabled = false,
   loading = false,
+  selection = "multiple",
   className,
 }: {
   roles: RoleDto[];
@@ -19,6 +21,8 @@ export function RoleChecklist({
   onChange: (next: string[]) => void;
   disabled?: boolean;
   loading?: boolean;
+  /** `single` is a radio list: one role replaces the previous choice. */
+  selection?: "multiple" | "single";
   className?: string;
 }) {
   if (loading) {
@@ -49,6 +53,46 @@ export function RoleChecklist({
     );
   }
 
+  const roleRows = roles.map((role) => (
+    <span key={role.id} className="min-w-0 flex-1 space-y-1">
+      <span className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{role.name}</span>
+        <RoleTypeBadge isSystem={role.isSystem} />
+      </span>
+      <span className="text-muted-foreground block font-mono text-xs">
+        {role.key}
+      </span>
+    </span>
+  ));
+
+  if (selection === "single") {
+    return (
+      <RadioGroup
+        className={cn(
+          "max-h-56 gap-1 overflow-y-auto rounded-md border p-2",
+          className,
+        )}
+        value={selectedIds[0] ?? ""}
+        disabled={disabled}
+        aria-label="Roles"
+        onValueChange={(roleId) => onChange([roleId])}
+      >
+        {roles.map((role, index) => (
+          <label
+            key={role.id}
+            className={cn(
+              "hover:bg-muted/50 flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 text-sm",
+              disabled && "pointer-events-none opacity-60",
+            )}
+          >
+            <RadioGroupItem className="mt-0.5" value={role.id} />
+            {roleRows[index]}
+          </label>
+        ))}
+      </RadioGroup>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -58,7 +102,7 @@ export function RoleChecklist({
       role="group"
       aria-label="Roles"
     >
-      {roles.map((role) => {
+      {roles.map((role, index) => {
         const checked = selectedIds.includes(role.id);
         return (
           <label
@@ -80,15 +124,7 @@ export function RoleChecklist({
                 );
               }}
             />
-            <span className="min-w-0 flex-1 space-y-1">
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{role.name}</span>
-                <RoleTypeBadge isSystem={role.isSystem} />
-              </span>
-              <span className="text-muted-foreground block font-mono text-xs">
-                {role.key}
-              </span>
-            </span>
+            {roleRows[index]}
           </label>
         );
       })}

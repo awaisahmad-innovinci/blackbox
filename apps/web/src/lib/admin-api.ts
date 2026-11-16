@@ -1,4 +1,12 @@
-import type { OwnerBusinessOverview } from "@blackbox/shared";
+import type {
+  CashExpenseCategory,
+  CashExpenseRow,
+  OwnerBusinessOverview,
+  PaginatedVendorPayments,
+  RecordVendorPaymentRequest,
+  VendorCreditLedger,
+  VendorLedger,
+} from "@blackbox/shared";
 import { apiFetch, apiJson } from "./api-client";
 
 export type TenantDto = {
@@ -77,6 +85,58 @@ export function getCurrentTenant() {
 
 export function getOwnerOverview() {
   return apiFetch<OwnerBusinessOverview>("/dashboard/owner-overview");
+}
+
+export type DrawerManager = {
+  id: string;
+  fullName: string;
+  username: string;
+};
+
+export function listDrawerManagers() {
+  return apiFetch<DrawerManager[]>("/cash-flow/managers");
+}
+
+export function recordOwnerCash(amount: number) {
+  return apiJson<{ id: string; amount: number }>("/cash-flow/owner-cash", "POST", {
+    amount,
+  });
+}
+
+export function fundManagerDrawer(managerUserId: string, amount: number) {
+  return apiJson<{ id: string }>("/cash-flow/drawer-openings", "POST", {
+    managerUserId,
+    amount,
+  });
+}
+
+export function recordCashExpense(body: {
+  category: CashExpenseCategory;
+  amount: number;
+  note?: string;
+}) {
+  return apiJson<CashExpenseRow>("/cash-flow/expenses", "POST", body);
+}
+
+export function listVendorCredits() {
+  return apiFetch<VendorCreditLedger>("/vendors/credits");
+}
+
+export function listVendorPayments(page = 1, pageSize = 20) {
+  return apiFetch<PaginatedVendorPayments>(
+    `/vendors/payments?page=${page}&pageSize=${pageSize}`,
+  );
+}
+
+export function recordVendorPayment(
+  vendorId: string,
+  body: RecordVendorPaymentRequest,
+) {
+  return apiJson<VendorLedger>(
+    `/vendors/${vendorId}/ledger-payments`,
+    "POST",
+    body,
+  );
 }
 
 export function updateCurrentTenant(body: {

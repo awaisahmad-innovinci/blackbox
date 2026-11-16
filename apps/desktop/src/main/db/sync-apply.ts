@@ -71,7 +71,7 @@ import {
 import { upsertInventoryOutReturnLocal } from "./inventory-out-returns-local";
 import { upsertSaleLocal } from "./sales-local";
 import { upsertSaleReturnLocal } from "./sale-returns-local";
-import { upsertTillSessionLocal } from "./till-local";
+import { upsertTillSessionLocal, upsertTillWithdrawalLocal } from "./till-local";
 import { upsertVendorReturnLocal } from "./vendor-returns-local";
 import { getPurchaseOrderLocal, getSaleLocal } from "./entity-get-local";
 import {
@@ -482,6 +482,14 @@ export function applyChange(change: SyncChangeDto): void {
       amount: Number(p.amount ?? 0),
       goodsReceiptId: (p.goodsReceiptId as string | null) ?? null,
       receiptNumber: (p.receiptNumber as string | null) ?? null,
+      paymentMethod:
+        p.paymentMethod === "CASH" || p.paymentMethod === "BANK"
+          ? p.paymentMethod
+          : null,
+      referenceNumber:
+        typeof p.referenceNumber === "string" && p.referenceNumber.trim()
+          ? p.referenceNumber.trim()
+          : null,
       note: str(p.note),
       occurredAt: str(p.occurredAt, nowIso),
       createdAt: str(p.createdAt, nowIso),
@@ -737,6 +745,25 @@ export function applyChange(change: SyncChangeDto): void {
       fundedByUserId: (p.fundedByUserId as string | null | undefined) ?? null,
       createdAt: str(p.createdAt, now),
       updatedAt: str(p.updatedAt, now),
+    });
+    return;
+  }
+  if (change.entityType === "till_withdrawal") {
+    upsertTillWithdrawalLocal({
+      id: change.entityId,
+      tillSessionId: str(p.tillSessionId),
+      withdrawnByUserId: str(p.withdrawnByUserId),
+      withdrawnByName: str(p.withdrawnByName),
+      note10: Number(p.note10 ?? 0),
+      note20: Number(p.note20 ?? 0),
+      note50: Number(p.note50 ?? 0),
+      note100: Number(p.note100 ?? 0),
+      note500: Number(p.note500 ?? 0),
+      note1000: Number(p.note1000 ?? 0),
+      note5000: Number(p.note5000 ?? 0),
+      withdrawalTotal: Number(p.withdrawalTotal ?? 0),
+      kind: str(p.kind, "full"),
+      createdAt: str(p.createdAt, now),
     });
     return;
   }

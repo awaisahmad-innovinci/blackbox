@@ -9,8 +9,10 @@ import type {
 } from "@blackbox/shared";
 import {
   computeTillDenominationTotal,
+  DEMO_STORE_TENANT_ID,
   emptyTillNotes,
   formatTillName,
+  streamForEntity,
   TILL_CLOSE_REASON_CASHIER_CLOSED,
   tillMaxLimit,
   tillOpeningExceedsDrawer,
@@ -22,7 +24,9 @@ import {
 import { randomUUID } from "node:crypto";
 import { getLocalDb } from "./index";
 import { getManagerDrawerBalanceLocal } from "./cash-flow-local";
-import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import { readIdentity } from "./identity";
+import { enqueueOutbox } from "./outbox-local";
+import { getSyncMeta, setSyncMeta } from "./sync-meta";
 
 const ACTIVE_STATUSES: TillStatus[] = [
   "PENDING_APPROVAL",
@@ -144,6 +148,109 @@ function getSession(id: string): TillRow | undefined {
       `select * from till_sessions where tenant_id = @tenantId and id = @id`,
     )
     .get({ tenantId: DEMO_STORE_TENANT_ID, id }) as TillRow | undefined;
+}
+
+const TILL_BACKFILL_KEY = "till_sync_backfill_v1";
+
+type WithdrawalSyncRow = {
+  id: string;
+  tillSessionId: string;
+  withdrawnByUserId: string;
+  withdrawnByName: string;
+  note10: number;
+  note20: number;
+  note50: number;
+  note100: number;
+  note500: number;
+  note1000: number;
+  note5000: number;
+  withdrawalTotal: number;
+  kind: string;
+  createdAt: string;
+};
+
+function publishOutbox(
+  entityType: "till_session" | "till_withdrawal",
+  entityId: string,
+  payload: Record<string, unknown>,
+): void {
+  try {
+    enqueueOutbox({
+      stream: streamForEntity(entityType),
+      entityType,
+      entityId,
+      operation: "UPSERT",
+      payload,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Device identity is not bound"
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function sessionPayload(row: TillRow): Record<string, unknown> {
+  return {
+    userId: row.user_id,
+    userName: row.user_name,
+    tillName: tillNameFromRow(row),
+    status: row.status,
+    note10: row.note_10,
+    note20: row.note_20,
+    note50: row.note_50,
+    note100: row.note_100,
+    note500: row.note_500,
+    note1000: row.note_1000,
+    note5000: row.note_5000,
+    openingTotal: row.opening_total,
+    openingBalance: row.opening_balance,
+    currentCashBalance: row.current_cash_balance,
+    maxCashLimit: row.max_cash_limit,
+    openedAt: row.opened_at,
+    closedAt: row.closed_at,
+    approvedByUserId: row.approved_by_user_id,
+    approvedByName: row.approved_by_name,
+    approvedAt: row.approved_at,
+    reopenedByUserId: row.reopened_by_user_id,
+    reopenedByName: row.reopened_by_name,
+    closeReason: row.close_reason,
+    fundedByUserId: row.funded_by_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function publishTillSession(row: TillRow): void {
+  publishOutbox("till_session", row.id, sessionPayload(row));
+}
+
+function publishSavedSession(id: string): TillSessionDetail {
+  const row = getSession(id);
+  if (!row) throw new Error("Till session not found");
+  publishTillSession(row);
+  return rowToDetail(row);
+}
+
+function publishWithdrawal(row: WithdrawalSyncRow): void {
+  publishOutbox("till_withdrawal", row.id, {
+    tillSessionId: row.tillSessionId,
+    withdrawnByUserId: row.withdrawnByUserId,
+    withdrawnByName: row.withdrawnByName,
+    note10: row.note10,
+    note20: row.note20,
+    note50: row.note50,
+    note100: row.note100,
+    note500: row.note500,
+    note1000: row.note1000,
+    note5000: row.note5000,
+    withdrawalTotal: row.withdrawalTotal,
+    kind: row.kind,
+    createdAt: row.createdAt,
+  });
 }
 
 export function getCurrentTillLocal(userId: string): TillSessionDetail | null {
@@ -292,6 +399,7 @@ export function openTillLocal(input: {
   `,
   ).run(row);
 
+  publishTillSession(row);
   return rowToDetail(row);
 }
 
@@ -345,7 +453,7 @@ export function approveTillLocal(input: {
     now,
   });
 
-  return rowToDetail(getSession(input.id)!);
+  return publishSavedSession(input.id);
 }
 
 export function withdrawTillLocal(input: {
@@ -370,6 +478,7 @@ export function withdrawTillLocal(input: {
 
   const db = getLocalDb();
   const now = new Date().toISOString();
+  const withdrawalId = randomUUID();
   db.prepare(
     `
     insert into till_withdrawals (
@@ -383,7 +492,7 @@ export function withdrawTillLocal(input: {
     )
   `,
   ).run({
-    id: randomUUID(),
+    id: withdrawalId,
     tenantId: DEMO_STORE_TENANT_ID,
     tillSessionId: input.id,
     withdrawnByUserId: input.managerId,
@@ -411,7 +520,24 @@ export function withdrawTillLocal(input: {
   `,
   ).run({ id: input.id, tenantId: DEMO_STORE_TENANT_ID, now });
 
-  return rowToDetail(getSession(input.id)!);
+  const detail = publishSavedSession(input.id);
+  publishWithdrawal({
+    id: withdrawalId,
+    tillSessionId: input.id,
+    withdrawnByUserId: input.managerId,
+    withdrawnByName: input.managerName,
+    note10: input.body.note10,
+    note20: input.body.note20,
+    note50: input.body.note50,
+    note100: input.body.note100,
+    note500: input.body.note500,
+    note1000: input.body.note1000,
+    note5000: input.body.note5000,
+    withdrawalTotal,
+    kind: "full",
+    createdAt: now,
+  });
+  return detail;
 }
 
 export function collectCashLocal(input: {
@@ -436,6 +562,7 @@ export function collectCashLocal(input: {
 
   const db = getLocalDb();
   const now = new Date().toISOString();
+  const withdrawalId = randomUUID();
   db.prepare(
     `
     insert into till_withdrawals (
@@ -449,7 +576,7 @@ export function collectCashLocal(input: {
     )
   `,
   ).run({
-    id: randomUUID(),
+    id: withdrawalId,
     tenantId: DEMO_STORE_TENANT_ID,
     tillSessionId: input.id,
     withdrawnByUserId: input.managerId,
@@ -491,7 +618,24 @@ export function collectCashLocal(input: {
     now,
   });
 
-  return rowToDetail(getSession(input.id)!);
+  const detail = publishSavedSession(input.id);
+  publishWithdrawal({
+    id: withdrawalId,
+    tillSessionId: input.id,
+    withdrawnByUserId: input.managerId,
+    withdrawnByName: input.managerName,
+    note10: input.body.note10,
+    note20: input.body.note20,
+    note50: input.body.note50,
+    note100: input.body.note100,
+    note500: input.body.note500,
+    note1000: input.body.note1000,
+    note5000: input.body.note5000,
+    withdrawalTotal,
+    kind: "partial",
+    createdAt: now,
+  });
+  return detail;
 }
 
 export function collectCashByAmountLocal(input: {
@@ -520,6 +664,7 @@ export function collectCashByAmountLocal(input: {
   const now = new Date().toISOString();
   const withdrawnByUserId = input.supervisorUserId ?? input.userId;
   const withdrawnByName = input.collectedByName?.trim() || "Manager";
+  const withdrawalId = randomUUID();
   db.prepare(
     `
     insert into till_withdrawals (
@@ -533,11 +678,11 @@ export function collectCashByAmountLocal(input: {
     )
   `,
   ).run({
-    id: randomUUID(),
+    id: withdrawalId,
     tenantId: DEMO_STORE_TENANT_ID,
     tillSessionId: row.id,
     withdrawnByUserId,
-    withdrawnByName: input.userName,
+    withdrawnByName,
     withdrawalTotal,
     kind: "partial",
     createdAt: now,
@@ -568,7 +713,24 @@ export function collectCashByAmountLocal(input: {
     now,
   });
 
-  return rowToDetail(getSession(row.id)!);
+  const detail = publishSavedSession(row.id);
+  publishWithdrawal({
+    id: withdrawalId,
+    tillSessionId: row.id,
+    withdrawnByUserId,
+    withdrawnByName,
+    note10: 0,
+    note20: 0,
+    note50: 0,
+    note100: 0,
+    note500: 0,
+    note1000: 0,
+    note5000: 0,
+    withdrawalTotal,
+    kind: "partial",
+    createdAt: now,
+  });
+  return detail;
 }
 
 export function closeTillLocal(input: {
@@ -603,7 +765,7 @@ export function closeTillLocal(input: {
     now,
   });
 
-  return rowToDetail(getSession(row.id)!);
+  return publishSavedSession(row.id);
 }
 
 export function reopenTillLocal(input: {
@@ -689,6 +851,7 @@ export function reopenTillLocal(input: {
   `,
   ).run(row);
 
+  publishTillSession(row);
   return rowToDetail(row);
 }
 
@@ -798,6 +961,7 @@ export function applyTillCashFromSaleLocal(input: {
       where id = @id
     `,
     ).run({ id: row.id, nextBalance, now });
+    publishSavedSession(row.id);
     return;
   }
 
@@ -808,6 +972,7 @@ export function applyTillCashFromSaleLocal(input: {
     where id = @id
   `,
   ).run({ id: row.id, nextBalance, now });
+  publishSavedSession(row.id);
 }
 
 export function assertTillCanPostSaleLocal(input: {
@@ -862,6 +1027,7 @@ export function applyTillCashRefundLocal(input: {
     where id = @id
   `,
   ).run({ id: row.id, nextBalance, now });
+  publishSavedSession(row.id);
 }
 
 export function applyTillReturnCreditOnSaleLocal(input: {
@@ -902,6 +1068,7 @@ export function applyTillReturnCreditOnSaleLocal(input: {
       where id = @id
     `,
     ).run({ id: row.id, nextBalance, now });
+    publishSavedSession(row.id);
     return;
   }
 
@@ -912,6 +1079,7 @@ export function applyTillReturnCreditOnSaleLocal(input: {
     where id = @id
   `,
   ).run({ id: row.id, nextBalance, now });
+  publishSavedSession(row.id);
 }
 
 export function assertTillCanPayRefundLocal(input: {
@@ -928,4 +1096,105 @@ export function assertTillCanPayRefundLocal(input: {
   if (input.refundAmount > row.current_cash_balance) {
     throw new Error("Till does not have enough cash for this refund");
   }
+}
+
+export function upsertTillWithdrawalLocal(row: WithdrawalSyncRow): void {
+  getLocalDb()
+    .prepare(
+      `
+      insert into till_withdrawals (
+        id, tenant_id, till_session_id, withdrawn_by_user_id, withdrawn_by_name,
+        note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
+        withdrawal_total, kind, created_at
+      ) values (
+        @id, @tenantId, @tillSessionId, @withdrawnByUserId, @withdrawnByName,
+        @note10, @note20, @note50, @note100, @note500, @note1000, @note5000,
+        @withdrawalTotal, @kind, @createdAt
+      )
+      on conflict(id) do update set
+        till_session_id = excluded.till_session_id,
+        withdrawn_by_user_id = excluded.withdrawn_by_user_id,
+        withdrawn_by_name = excluded.withdrawn_by_name,
+        note_10 = excluded.note_10,
+        note_20 = excluded.note_20,
+        note_50 = excluded.note_50,
+        note_100 = excluded.note_100,
+        note_500 = excluded.note_500,
+        note_1000 = excluded.note_1000,
+        note_5000 = excluded.note_5000,
+        withdrawal_total = excluded.withdrawal_total,
+        kind = excluded.kind
+    `,
+    )
+    .run({
+      id: row.id,
+      tenantId: DEMO_STORE_TENANT_ID,
+      tillSessionId: row.tillSessionId,
+      withdrawnByUserId: row.withdrawnByUserId,
+      withdrawnByName: row.withdrawnByName,
+      note10: row.note10,
+      note20: row.note20,
+      note50: row.note50,
+      note100: row.note100,
+      note500: row.note500,
+      note1000: row.note1000,
+      note5000: row.note5000,
+      withdrawalTotal: row.withdrawalTotal,
+      kind: row.kind || "full",
+      createdAt: row.createdAt,
+    });
+}
+
+export function enqueueExistingTillsOnce(): void {
+  if (!readIdentity()) return;
+  if (getSyncMeta(TILL_BACKFILL_KEY)) return;
+
+  const db = getLocalDb();
+  const pending = new Set(
+    (
+      db
+        .prepare(
+          `select entity_type || ':' || entity_id as key
+           from local_sync_outbox
+           where status in ('pending', 'pushing')
+             and entity_type in ('till_session', 'till_withdrawal')`,
+        )
+        .all() as { key: string }[]
+    ).map((row) => row.key),
+  );
+
+  const sessions = db
+    .prepare(`select * from till_sessions where tenant_id = ?`)
+    .all(DEMO_STORE_TENANT_ID) as TillRow[];
+  for (const row of sessions) {
+    if (pending.has(`till_session:${row.id}`)) continue;
+    publishTillSession(row);
+  }
+
+  const withdrawals = db
+    .prepare(
+      `select id,
+              till_session_id as tillSessionId,
+              withdrawn_by_user_id as withdrawnByUserId,
+              withdrawn_by_name as withdrawnByName,
+              note_10 as note10,
+              note_20 as note20,
+              note_50 as note50,
+              note_100 as note100,
+              note_500 as note500,
+              note_1000 as note1000,
+              note_5000 as note5000,
+              withdrawal_total as withdrawalTotal,
+              kind,
+              created_at as createdAt
+       from till_withdrawals
+       where tenant_id = ?`,
+    )
+    .all(DEMO_STORE_TENANT_ID) as WithdrawalSyncRow[];
+  for (const row of withdrawals) {
+    if (pending.has(`till_withdrawal:${row.id}`)) continue;
+    publishWithdrawal(row);
+  }
+
+  setSyncMeta(TILL_BACKFILL_KEY, new Date().toISOString());
 }

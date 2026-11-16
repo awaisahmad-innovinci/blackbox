@@ -53,11 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const ok = await refreshAccessToken();
-      if (!ok) {
-        if (!cancelled) {
-          becomeAnonymous();
-        }
+      const outcome = await refreshAccessToken();
+      if (cancelled) return;
+      if (outcome === "offline") {
+        window.setTimeout(() => {
+          if (!cancelled) void boot();
+        }, 5000);
+        return;
+      }
+      if (outcome !== "ok") {
+        becomeAnonymous();
         return;
       }
 
@@ -67,10 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(me);
           setStatus("authenticated");
         }
-      } catch {
-        if (!cancelled) {
-          becomeAnonymous();
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof TypeError) {
+          window.setTimeout(() => {
+            if (!cancelled) void boot();
+          }, 5000);
+          return;
         }
+        becomeAnonymous();
       }
     }
 

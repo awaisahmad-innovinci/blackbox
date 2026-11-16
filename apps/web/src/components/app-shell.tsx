@@ -16,6 +16,7 @@ import {
   Warehouse,
   ScrollText,
   Receipt,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@blackbox/ui/button";
 import { Separator } from "@blackbox/ui/separator";
@@ -62,6 +63,12 @@ const NAV: {
     label: "Tax report",
     permission: "tax.reports.read",
     icon: Receipt,
+  },
+  {
+    href: "/app/vendors/payments",
+    label: "Vendor payments",
+    permission: "vendors.access",
+    icon: Wallet,
   },
   {
     href: "/app/activity",

@@ -39,7 +39,7 @@ export class AuthController {
   @Post("logout")
   @HttpCode(200)
   logout(@Body() dto: LogoutDto): Promise<{ success: true }> {
-    return this.authService.logout(dto.refreshToken);
+    return this.authService.logout(dto.refreshToken, dto.computerName);
   }
 
   @Post("forgot-password")

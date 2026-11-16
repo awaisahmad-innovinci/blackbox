@@ -175,6 +175,8 @@ async function pushOutboxBatch(
       if (item.status === "acked" || item.status === "duplicate") {
         await bridge.markAcked(item.changeId, item.seq);
         pushed += 1;
+      } else if (item.status === "rejected" && item.retryable) {
+        await bridge.markPending(item.changeId, item.message ?? item.status);
       } else if (item.status === "conflict" || item.status === "rejected") {
         await bridge.markRejected(item.changeId, item.message ?? item.status);
         const row = batch.find((entry) => entry.changeId === item.changeId);

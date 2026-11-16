@@ -9,6 +9,7 @@ export const CASH_EXPENSE_CATEGORIES = [
   "Internet",
   "Other",
   "Bank deposit",
+  "Vendor payment",
 ] as const;
 
 export type CashExpenseCategory = (typeof CASH_EXPENSE_CATEGORIES)[number];

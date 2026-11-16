@@ -22,6 +22,7 @@ import {
   type RecordCashExpenseRequest,
   type RecordManagerDrawerOpeningRequest,
 } from "@blackbox/shared";
+import { randomUUID } from "node:crypto";
 import { DataSource, Repository } from "typeorm";
 import type { TenantContext } from "../common/tenant-context";
 import {
@@ -232,6 +233,7 @@ export class CashFlowService {
     const now = new Date();
     const saved = await this.openings.save(
       this.openings.create({
+        id: randomUUID(),
         tenantId: user.tenantId,
         managerUserId: manager.id,
         managerName,
@@ -285,6 +287,7 @@ export class CashFlowService {
     const now = new Date();
     const saved = await this.submissions.save(
       this.submissions.create({
+        id: randomUUID(),
         tenantId: user.tenantId,
         managerUserId: user.userId,
         managerName,

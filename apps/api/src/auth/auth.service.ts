@@ -34,6 +34,7 @@ import { Location } from "../db/entities/location.entity";
 import { Tenant } from "../db/entities/tenant.entity";
 import { UserRole } from "../db/entities/user-role.entity";
 import { User } from "../db/entities/user.entity";
+import { ActivityLogService } from "../activity-log/activity-log.service";
 import { PermissionsService } from "../rbac/permissions.service";
 import type { LoginDto } from "./dto/login.dto";
 import type { SignupTenantDto } from "./dto/signup-tenant.dto";
@@ -65,6 +66,7 @@ export class AuthService {
     @InjectRepository(Device) private readonly devices: Repository<Device>,
     @InjectRepository(DeviceUser)
     private readonly deviceUsers: Repository<DeviceUser>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   private accessTtlSeconds(): number {
@@ -198,25 +200,11 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
-    const user = await this.findUserByIdentifier(dto.identifier);
-    if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
-    }
-
-    const valid = await argon2.verify(user.passwordHash, dto.password);
-    if (!valid) {
-      throw new UnauthorizedException("Invalid credentials");
-    }
-
+    const user = await this.resolveLoginUser(dto.identifier, dto.password);
     if (!user.isActive) {
       throw new ForbiddenException(
         "This account has been deactivated by an administrator.",
       );
-    }
-
-    const tenant = await this.tenants.findOne({ where: { id: user.tenantId } });
-    if (!tenant?.isActive) {
-      throw new UnauthorizedException("Invalid credentials");
     }
 
     let deviceId: string | null = null;
@@ -253,7 +241,23 @@ export class AuthService {
       );
     }
 
-    return this.issueAuthResponse(user, deviceId);
+    const response = await this.issueAuthResponse(user, deviceId);
+    const computerName =
+      dto.client === "desktop"
+        ? dto.deviceName?.trim() || "Desktop"
+        : dto.deviceName?.trim() || "Web";
+    try {
+      await this.activityLog.logFromContext({
+        tenantId: user.tenantId,
+        eventType: "auth.login",
+        actorUserId: user.id,
+        summary: `${user.fullName?.trim() || user.username} signed in on ${computerName}`,
+        metadata: { computerName, client: dto.client },
+      });
+    } catch {
+      /* sign-in still succeeds when the activity log cannot be written */
+    }
+    return response;
   }
 
   async refresh(rawRefreshToken: string): Promise<AuthResponse> {
@@ -345,7 +349,10 @@ export class AuthService {
     });
   }
 
-  async logout(refreshToken: string): Promise<{ success: true }> {
+  async logout(
+    refreshToken: string,
+    computerName?: string,
+  ): Promise<{ success: true }> {
     const tokenHash = this.hashToken(refreshToken);
     const stored = await this.refreshTokens.findOne({
       where: { tokenHash, revokedAt: IsNull() },
@@ -353,6 +360,21 @@ export class AuthService {
     if (stored) {
       stored.revokedAt = new Date();
       await this.refreshTokens.save(stored);
+      const user = await this.users.findOne({ where: { id: stored.userId } });
+      if (user) {
+        const computer = computerName?.trim() || "Web";
+        try {
+          await this.activityLog.logFromContext({
+            tenantId: user.tenantId,
+            eventType: "auth.logout",
+            actorUserId: user.id,
+            summary: `${user.fullName?.trim() || user.username} signed out on ${computer}`,
+            metadata: { computerName: computer },
+          });
+        } catch {
+          /* sign-out still succeeds when the activity log cannot be written */
+        }
+      }
     }
     return { success: true };
   }
@@ -389,25 +411,52 @@ export class AuthService {
   }
 
   /**
-   * Resolve login identifier without tenant_id.
-   * Email/username are tenant-scoped, so multiple matches across tenants are
-   * possible — treat 0 or >1 active rows as "not found" (generic 401 at call site).
-   * Inactive rows are ignored so a deactivated duplicate does not block sign-in.
+   * Email and username are unique only inside one business. When several
+   * active accounts share the typed name, the password picks the account.
+   * Email is case-insensitive. Username must match the stored capitalization.
    */
-  private async findUserByIdentifier(identifier: string): Promise<User | null> {
-    const trimmed = identifier.trim();
-    const isEmail = trimmed.includes("@");
-    const value = isEmail ? trimmed.toLowerCase() : trimmed;
-
-    const rows = await this.users.find({
-      where: isEmail ? { email: value } : { username: value },
-    });
-
-    const active = rows.filter((user) => user.isActive);
-    if (active.length !== 1) {
-      return null;
+  private async resolveLoginUser(
+    identifier: string,
+    password: string,
+  ): Promise<User> {
+    const username = identifier.trim();
+    const email = username.toLowerCase();
+    if (!username) {
+      throw new UnauthorizedException("Invalid credentials");
     }
-    return active[0] ?? null;
+
+    const candidates = await this.users
+      .createQueryBuilder("u")
+      .where("u.is_active = true")
+      .andWhere("u.deleted_at IS NULL")
+      .andWhere("(LOWER(u.email) = :email OR u.username = :username)", {
+        email,
+        username,
+      })
+      .getMany();
+
+    const matched: User[] = [];
+    for (const candidate of candidates) {
+      let valid = false;
+      try {
+        valid = await argon2.verify(candidate.passwordHash, password);
+      } catch {
+        valid = false;
+      }
+      if (!valid) continue;
+      const tenant = await this.tenants.findOne({
+        where: { id: candidate.tenantId },
+      });
+      if (tenant?.isActive) matched.push(candidate);
+    }
+
+    if (matched.length === 1) return matched[0]!;
+    if (matched.length > 1) {
+      throw new UnauthorizedException(
+        "This sign-in is used by more than one business. Use the email for the business you want.",
+      );
+    }
+    throw new UnauthorizedException("Invalid credentials");
   }
 
   private async issueAuthResponse(

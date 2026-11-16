@@ -8,7 +8,7 @@ import type {
   OwnerBusinessOverview,
   PaginatedManagerStockOverview,
 } from "@blackbox/shared";
-import { formatTillName } from "@blackbox/shared";
+import { businessPeriodBounds, formatTillName } from "@blackbox/shared";
 import { Repository } from "typeorm";
 import {
   GoodsReceipt,
@@ -35,6 +35,11 @@ function toNum(value: string | number | null | undefined): number {
 
 function roundMoney(value: number): number {
   return Math.round(value * 10000) / 10000;
+}
+
+function businessToday(): string {
+  const shifted = new Date(Date.now() + 5 * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
 }
 
 @Injectable()
@@ -115,13 +120,15 @@ export class DashboardService {
     seeAll: boolean,
   ): Promise<ManagerDashboardSummary> {
     const today = new Date().toISOString().slice(0, 10);
+    const bounds = businessPeriodBounds(businessToday(), businessToday());
 
     const tillRow = await this.tillWithdrawals
       .createQueryBuilder("w")
       .select("COALESCE(SUM(w.withdrawal_total), 0)", "amount")
       .where("w.tenant_id = :tenantId", { tenantId })
       .andWhere("w.withdrawn_by_user_id = :userId", { userId })
-      .andWhere("DATE(w.created_at) = :today", { today })
+      .andWhere("w.created_at >= :start", { start: bounds.startIso })
+      .andWhere("w.created_at < :end", { end: bounds.endIso })
       .getRawOne<{ amount: string }>();
 
     const returnCount = await this.saleReturns
@@ -170,7 +177,8 @@ export class DashboardService {
     tenantId: string,
     userId: string,
   ): Promise<OwnerBusinessOverview> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
+    const bounds = businessPeriodBounds(today, today);
 
     const [
       salesRow,
@@ -189,7 +197,8 @@ export class DashboardService {
         .addSelect("COALESCE(SUM(s.total), 0)", "total")
         .where("s.tenant_id = :tenantId", { tenantId })
         .andWhere("s.status = :status", { status: "POSTED" })
-        .andWhere("DATE(s.posted_at) = :today", { today })
+        .andWhere("s.posted_at >= :start", { start: bounds.startIso })
+        .andWhere("s.posted_at < :end", { end: bounds.endIso })
         .getRawOne<{ count: string; total: string }>(),
       this.salePayments
         .createQueryBuilder("p")
@@ -198,7 +207,8 @@ export class DashboardService {
         .addSelect("COALESCE(SUM(p.amount), 0)", "amount")
         .where("p.tenant_id = :tenantId", { tenantId })
         .andWhere("s.status = :status", { status: "POSTED" })
-        .andWhere("DATE(s.posted_at) = :today", { today })
+        .andWhere("s.posted_at >= :start", { start: bounds.startIso })
+        .andWhere("s.posted_at < :end", { end: bounds.endIso })
         .groupBy("p.method")
         .getRawMany<{ method: string; amount: string }>(),
       this.saleReturns
@@ -261,44 +271,80 @@ export class DashboardService {
   private async listCashierTills(
     tenantId: string,
   ): Promise<CashierTillBalance[]> {
-    const tillRows = await this.tillSessions
-      .createQueryBuilder("t")
-      .leftJoin("t.user", "u")
-      .select("t.user_id", "user_id")
-      .addSelect(
-        "coalesce(nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Cashier')",
-        "user_name",
-      )
-      .addSelect("t.till_name", "till_name")
-      .addSelect("u.username", "username")
-      .addSelect("t.status", "status")
-      .addSelect("t.current_cash_balance", "current_cash_balance")
-      .where("t.tenant_id = :tenantId", { tenantId })
-      .andWhere("t.status IN (:...statuses)", {
-        statuses: ["OPEN", "CLOSED_LIMIT", "PENDING_APPROVAL"],
-      })
-      .getRawMany<{
+    const tillRows = await this.tillSessions.manager.query<
+      {
         user_id: string;
         user_name: string;
-        till_name: string;
+        till_name: string | null;
         username: string | null;
-        status: CashierTillBalance["status"];
-        current_cash_balance: string;
-      }>();
+        status: CashierTillBalance["status"] | null;
+        current_cash_balance: string | null;
+      }[]
+    >(
+      `select u.id as user_id,
+              coalesce(nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Cashier') as user_name,
+              u.username as username,
+              t.till_name as till_name,
+              t.status as status,
+              t.current_cash_balance as current_cash_balance
+       from users u
+       left join lateral (
+         select till_name, status, current_cash_balance
+         from till_sessions t
+         where t.tenant_id = u.tenant_id
+           and t.user_id = u.id
+         order by coalesce(t.opened_at, t.created_at) desc
+         limit 1
+       ) t on true
+       where u.tenant_id = $1
+         and u.is_active = true
+         and u.deleted_at is null
+         and exists (
+           select 1
+           from user_roles ur
+           join role_permissions rp on rp.role_id = ur.role_id
+           join permissions p on p.id = rp.permission_id
+           where ur.user_id = u.id
+             and ur.tenant_id = u.tenant_id
+             and p.key = 'sales.write'
+         )
+         and not exists (
+           select 1
+           from user_roles ur
+           join role_permissions rp on rp.role_id = ur.role_id
+           join permissions p on p.id = rp.permission_id
+           where ur.user_id = u.id
+             and ur.tenant_id = u.tenant_id
+             and p.key = 'till.manage'
+         )
+         and not exists (
+           select 1
+           from user_roles ur
+           join role_permissions rp on rp.role_id = ur.role_id
+           join permissions p on p.id = rp.permission_id
+           where ur.user_id = u.id
+             and ur.tenant_id = u.tenant_id
+             and p.key = 'web.access'
+         )
+       order by user_name`,
+      [tenantId],
+    );
 
-    return tillRows
-      .map((row) => ({
+    return tillRows.map((row) => {
+      const open =
+        row.status === "OPEN" ||
+        row.status === "CLOSED_LIMIT" ||
+        row.status === "PENDING_APPROVAL";
+      return {
         userId: row.user_id,
         userName: row.user_name?.trim() || "Cashier",
         tillName: row.till_name?.trim() || formatTillName(row.username ?? ""),
-        status: row.status,
-        currentCashBalance: roundMoney(toNum(row.current_cash_balance)),
-      }))
-      .sort(
-        (a, b) =>
-          a.userName.localeCompare(b.userName) ||
-          a.tillName.localeCompare(b.tillName),
-      );
+        status: row.status ?? "CLOSED",
+        currentCashBalance: open
+          ? roundMoney(toNum(row.current_cash_balance))
+          : 0,
+      };
+    });
   }
 
   async listManagerStockOverview(

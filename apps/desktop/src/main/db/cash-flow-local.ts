@@ -256,14 +256,35 @@ export function listDrawerBalancesLocal(input: {
   const collected = db
     .prepare(
       `select withdrawn_by_user_id as manager_user_id,
-              (
-                select w2.withdrawn_by_name
-                from till_withdrawals w2
-                where w2.tenant_id = @tenantId
-                  and w2.withdrawn_by_user_id = till_withdrawals.withdrawn_by_user_id
-                  and trim(coalesce(w2.withdrawn_by_name, '')) != ''
-                order by w2.created_at desc
-                limit 1
+              coalesce(
+                (
+                  select o.manager_name
+                  from manager_drawer_openings o
+                  where o.tenant_id = @tenantId
+                    and o.manager_user_id = till_withdrawals.withdrawn_by_user_id
+                    and trim(coalesce(o.manager_name, '')) != ''
+                  order by o.opened_at desc
+                  limit 1
+                ),
+                (
+                  select s.manager_name
+                  from manager_drawer_submissions s
+                  where s.tenant_id = @tenantId
+                    and s.manager_user_id = till_withdrawals.withdrawn_by_user_id
+                    and trim(coalesce(s.manager_name, '')) != ''
+                  order by s.submitted_at desc
+                  limit 1
+                ),
+                (
+                  select e.recorded_by_name
+                  from cash_expenses e
+                  where e.tenant_id = @tenantId
+                    and e.recorded_by_user_id = till_withdrawals.withdrawn_by_user_id
+                    and trim(coalesce(e.recorded_by_name, '')) != ''
+                  order by e.created_at desc
+                  limit 1
+                ),
+                ''
               ) as manager_name,
               max(created_at) as named_at,
               coalesce(sum(withdrawal_total), 0) as collected

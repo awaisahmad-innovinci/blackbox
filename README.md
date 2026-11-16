@@ -39,7 +39,7 @@ Pushes to `staging` (synced from Bitbucket via `bitbucket-pipelines.yml`) trigge
 
 Download from GitHub → **Actions** → latest **Build Electron App** run → **Artifacts** (`electron-build-ubuntu-latest`, `electron-build-windows-latest`).
 
-**One-time setup:** add repo secret `VITE_API_URL` (Railway API base URL, no trailing slash). Also add that URL to API `CORS_ORIGINS` on Railway.
+**One-time setup:** add repo secrets `VITE_API_URL` (Railway API base URL, no trailing slash), `DESKTOP_UPDATE_STORAGE_URL` (`https://cqmngjtvsukpihywbmtt.supabase.co`), and `SUPABASE_SECRET_KEY` (Supabase secret key). The staging workflow uploads to `releases-staging` unless the repository variable `DESKTOP_UPDATE_BUCKET` is set. Also add the API URL to `CORS_ORIGINS` on Railway.
 
 Local packaging (same output as CI, under `apps/desktop/release/`):
 

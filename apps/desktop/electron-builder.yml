@@ -31,3 +31,7 @@ linux:
     - deb
 deb:
   packageName: blackbox
+# Runtime feed URL comes from the API. This entry only makes the build emit latest.yml.
+publish:
+  provider: generic
+  url: https://example.invalid/releases
