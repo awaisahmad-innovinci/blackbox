@@ -6,6 +6,8 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
 import { useSession } from "@renderer/lib/session/context";
+import { BrandLogo } from "@blackbox/ui/brand-logo";
+import { BRAND_LOGO } from "@renderer/lib/brand";
 
 const REINSTALL_HINT =
   " If you reinstalled the app, ask your admin to revoke the old device in web admin → Devices, then try again.";
@@ -41,15 +43,7 @@ export function SignInPage() {
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col items-center justify-center gap-6 px-6">
-      <div className="flex items-center gap-2.5">
-        <span
-          aria-hidden
-          className="bg-shelf-tag text-shelf-tag-foreground flex size-9 items-center justify-center rounded-md text-base font-bold"
-        >
-          B
-        </span>
-        <span className="text-xl font-semibold tracking-tight">Blackbox</span>
-      </div>
+      <BrandLogo {...BRAND_LOGO} className="h-14" />
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">Sign in</CardTitle>

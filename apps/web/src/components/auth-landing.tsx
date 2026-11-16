@@ -23,6 +23,8 @@ import {
 } from "@/lib/auth-api";
 import { resolvePostAuthPath } from "@/lib/onboarding";
 import { emailError, liveEmailError, livePasswordError } from "@blackbox/shared";
+import { BrandLogo } from "@blackbox/ui/brand-logo";
+import { BRAND_LOGO } from "@/lib/brand";
 
 export function AuthLanding() {
   const { login, status, hasPermission } = useAuth();
@@ -169,15 +171,7 @@ export function AuthLanding() {
   return (
     <div className="bb-auth-canvas relative flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-6 py-5 md:px-10">
-        <div className="flex items-center gap-2.5">
-          <div
-            aria-hidden
-            className="bg-shelf-tag text-shelf-tag-foreground flex size-8 items-center justify-center rounded-md text-sm font-bold"
-          >
-            B
-          </div>
-          <p className="font-display text-lg font-semibold tracking-tight">Blackbox</p>
-        </div>
+        <BrandLogo {...BRAND_LOGO} className="h-14" />
       </header>
 
       <main className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-12 px-6 pb-16 lg:grid-cols-[1fr_minmax(0,26rem)]">

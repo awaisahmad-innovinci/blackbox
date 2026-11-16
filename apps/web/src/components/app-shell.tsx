@@ -32,6 +32,8 @@ import { ThemeToggle } from "@blackbox/ui/theme-toggle";
 import { cn } from "@blackbox/ui/lib/utils";
 import { useAuth } from "@/components/auth-provider";
 import { getCurrentTenant } from "@/lib/admin-api";
+import { BrandLogo } from "@blackbox/ui/brand-logo";
+import { BRAND_LOGO } from "@/lib/brand";
 
 type NavItem = {
   href: string;
@@ -124,17 +126,9 @@ function NavItems({
 
 function BrandMark() {
   return (
-    <div className="flex items-center gap-2.5 px-2">
-      <div
-        className="bg-shelf-tag text-shelf-tag-foreground flex size-8 items-center justify-center rounded-md text-sm font-bold"
-        aria-hidden
-      >
-        B
-      </div>
-      <div className="min-w-0">
-        <p className="font-display truncate text-base font-semibold tracking-tight">Blackbox</p>
-        <p className="text-muted-foreground text-xs">Back office</p>
-      </div>
+    <div className="flex items-center gap-3 px-2">
+      <BrandLogo {...BRAND_LOGO} className="h-9" />
+      <p className="text-muted-foreground border-border border-l pl-3 text-xs">Back office</p>
     </div>
   );
 }

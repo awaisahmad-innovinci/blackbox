@@ -8,9 +8,10 @@ import {
   ThermalReceiptHeader,
   ThermalRule,
   ThermalSaleLineItems,
+  ThermalTitle,
   ThermalTotalsRow,
-  formatMoney,
   formatReceiptDateTime,
+  receiptMoney,
 } from "./thermal-receipt-shared";
 
 function FbrInvoiceQr({ value }: { value: string }) {
@@ -37,7 +38,7 @@ function FbrInvoiceQr({ value }: { value: string }) {
     <img
       src={src}
       alt="FBR invoice QR"
-      className="mx-auto h-[1in] w-[1in]"
+      className="block h-[22mm] w-[22mm]"
     />
   );
 }
@@ -111,25 +112,26 @@ export function SaleThermalReceipt({
     detail.fbrStatus === "failed" &&
     Boolean(detail.fbrError);
 
+  const money = receiptMoney;
+  const paymentRows = showAllPayments ? detail.payments : nonCashPayments;
+
   return (
     <article data-thermal-receipt className={THERMAL_RECEIPT_CLASS}>
       <ThermalReceiptHeader
         businessName={businessName}
         businessAddress={businessAddress}
         businessPhone={businessPhone}
+        ntn={detail.fbrSellerNtn}
       />
 
-      <ThermalRule />
+      <ThermalTitle>SALES INVOICE</ThermalTitle>
 
       <section className="space-y-0.5 text-left">
         <ThermalMetaRow label="Bill #" value={detail.saleNumber} />
         <ThermalMetaRow label="Date" value={date} />
-        <ThermalMetaRow label="At" value={time} />
+        <ThermalMetaRow label="Time" value={time} />
         <ThermalMetaRow label="Cashier" value={cashierName} />
         <ThermalMetaRow label="Customer" value={detail.customerName} />
-        {detail.fbrSellerNtn ? (
-          <ThermalMetaRow label="NTN" value={detail.fbrSellerNtn} />
-        ) : null}
         {detail.status === "VOID" ? (
           <p className="pt-0.5 text-center text-sm font-bold">*** VOID ***</p>
         ) : null}
@@ -140,116 +142,111 @@ export function SaleThermalReceipt({
 
       <ThermalReceiptBarcode value={detail.saleNumber} />
 
+      <ThermalRule />
+
       <ThermalSaleLineItems items={detail.items} />
 
+      <ThermalRule />
+
       <section className="space-y-0.5">
-        <ThermalTotalsRow label="Total Items" value={totalItems} />
-        <ThermalTotalsRow label="Total Qty" value={totalQty} />
+        <ThermalTotalsRow label="Total items" value={totalItems} />
+        <ThermalTotalsRow label="Total qty" value={totalQty} />
         {hasFoc ? (
           <>
             <ThermalTotalsRow label="Total FOC" value={totalFoc} />
             <ThermalTotalsRow label="Qty incl. FOC" value={totalQtyInclFoc} />
           </>
         ) : null}
-        <ThermalTotalsRow
-          label="Subtotal"
-          value={formatMoney(detail.subtotal)}
-        />
+        <ThermalTotalsRow label="Subtotal" value={money(detail.subtotal)} />
         {detail.gstAmount > 0 ? (
-          <ThermalTotalsRow label="GST" value={formatMoney(detail.gstAmount)} />
+          <ThermalTotalsRow label="GST" value={money(detail.gstAmount)} />
         ) : null}
         {detail.salesTaxAmount > 0 ? (
           <ThermalTotalsRow
             label={`Sales tax (${detail.salesTaxRate}%)`}
-            value={formatMoney(detail.salesTaxAmount)}
+            value={money(detail.salesTaxAmount)}
           />
         ) : null}
-        <ThermalTotalsRow
-          label="Bill total"
-          value={formatMoney(detail.total)}
-        />
+      </section>
+
+      <ThermalRule variant="thick" />
+
+      <section className="space-y-0.5">
+        <ThermalTotalsRow label="BILL TOTAL" value={money(detail.total)} grand />
         {returnCredit ? (
           <ThermalTotalsRow
             label={`Return credit (${returnCredit.returnNumber})`}
-            value={`−${formatMoney(returnCredit.amount)}`}
+            value={`−${money(returnCredit.amount)}`}
           />
         ) : null}
         {returnCredit && cashBackFromCredit > 0 ? (
-          <ThermalTotalsRow
-            label="Cash back"
-            value={formatMoney(cashBackFromCredit)}
-          />
+          <ThermalTotalsRow label="Cash back" value={money(cashBackFromCredit)} />
         ) : null}
-        {hasCashOverpay ? (
-          <>
-            <ThermalTotalsRow
-              label="Paid"
-              value={formatMoney(detail.cashTendered!)}
-            />
-            <ThermalTotalsRow label="Change" value={formatMoney(cashChange)} />
-          </>
-        ) : null}
-        <ThermalTotalsRow
-          label="Net Amount"
-          value={formatMoney(netAmount)}
-          bold
-        />
-        {showAllPayments
-          ? detail.payments.map((payment) => (
+        <ThermalTotalsRow label="Net amount" value={money(netAmount)} />
+      </section>
+
+      {paymentRows.length > 0 || hasCashOverpay ? (
+        <>
+          <ThermalRule />
+          <section className="space-y-0.5">
+            {paymentRows.map((payment) => (
               <ThermalTotalsRow
                 key={payment.id}
                 label={paymentMethodLabel(payment.method)}
-                value={formatMoney(payment.amount)}
-              />
-            ))
-          : nonCashPayments.map((payment) => (
-              <ThermalTotalsRow
-                key={payment.id}
-                label={paymentMethodLabel(payment.method)}
-                value={formatMoney(payment.amount)}
+                value={money(payment.amount)}
               />
             ))}
-      </section>
+            {hasCashOverpay ? (
+              <>
+                <ThermalTotalsRow label="Paid" value={money(detail.cashTendered!)} />
+                <ThermalTotalsRow label="Change" value={money(cashChange)} bold />
+              </>
+            ) : null}
+          </section>
+        </>
+      ) : null}
 
       {showFbrNumber || showFbrError ? (
         <>
           <ThermalRule />
-          <section className="space-y-1 text-center">
-            {showFbrNumber && detail.fbrInvoiceNumber ? (
-              <>
-                <p className="text-sm font-bold">FBR Invoice No</p>
-                <p className="font-mono text-xs break-all">{detail.fbrInvoiceNumber}</p>
+          {showFbrNumber && detail.fbrInvoiceNumber ? (
+            <section className="flex items-center gap-3 text-left">
+              <div className="thermal-fbr-qr shrink-0 border border-dashed border-black p-1">
                 <FbrInvoiceQr value={detail.fbrInvoiceNumber} />
-              </>
-            ) : (
-              <p className="text-xs font-bold">{detail.fbrError}</p>
-            )}
-          </section>
+              </div>
+              <div className="min-w-0 space-y-0.5">
+                <p className="font-bold">FBR Invoice #</p>
+                <p className="break-all">{detail.fbrInvoiceNumber}</p>
+                <p>Scan to verify with FBR</p>
+              </div>
+            </section>
+          ) : (
+            <p className="text-center text-xs font-bold">{detail.fbrError}</p>
+          )}
         </>
       ) : null}
 
       <ThermalRule />
 
-      <section className="pt-0.5 text-left text-[9px] leading-tight">
-        <p className="mb-0.5 text-center font-bold">RETURN &amp; EXCHANGE POLICY</p>
-        <ol className="list-decimal pl-4 text-left">
-          <li>Items can only be exchanged within 7 days of purchase.</li>
-          <li>Original receipt must be presented for exchange.</li>
-          <li>Products sold under offer/discount/promotion cannot be exchanged.</li>
+      <section className="pt-0.5 text-left text-[10px] leading-snug">
+        <p className="mb-1 text-center text-[11px] font-bold">RETURN &amp; EXCHANGE POLICY</p>
+        <ol className="space-y-0.5">
+          <li>1. Items can only be exchanged within 7 days of purchase.</li>
+          <li>2. Original receipt must be presented for exchange.</li>
+          <li>3. Products sold under offer/discount/promotion cannot be exchanged.</li>
         </ol>
-      </section>
-
-      <section className="pt-1 text-center text-[10px] leading-tight">
-        <p className="font-bold">Thanks for visiting us</p>
-        <p className="mt-0.5 font-bold">No Bill No Return</p>
       </section>
 
       <ThermalRule />
 
-      <footer className="text-center text-[9px] leading-tight font-semibold">
+      <section className="pt-0.5 text-center leading-tight">
+        <p className="text-sm font-bold">Thanks for visiting us</p>
+        <p className="mt-0.5 text-[11px] font-bold">No Bill No Return</p>
+      </section>
+
+      <footer className="pt-2 text-center text-[9px] leading-snug">
         <p>This software design &amp; developed by</p>
-        <p>Innovinci Technologies</p>
-        <p>www.innovinci.com</p>
+        <p>Innovinci Technologies · www.innovinci.com</p>
       </footer>
 
       <div className="thermal-receipt-feed" aria-hidden="true" />

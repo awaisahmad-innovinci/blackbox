@@ -62,9 +62,10 @@
   [data-thermal-receipt] {
     box-sizing: border-box !important;
     color: #000 !important;
-    font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
+    /* Receipt design: monospace, so columns line up on 80 mm paper. */
+    font-family: ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     line-height: 1.35 !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -80,9 +81,22 @@
 
   [data-thermal-receipt] .thermal-rule {
     border: none !important;
+    border-top: 1px dashed #000 !important;
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+  }
+
+  [data-thermal-receipt] .thermal-rule--solid {
     border-top: 1px solid #000 !important;
-    margin-top: 4px !important;
-    margin-bottom: 4px !important;
+  }
+
+  [data-thermal-receipt] .thermal-rule--thick {
+    border-top: 2px solid #000 !important;
+  }
+
+  [data-thermal-receipt] .thermal-receipt-logo img {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   [data-thermal-receipt] .thermal-receipt-barcode {
@@ -92,10 +106,9 @@
     print-color-adjust: exact;
   }
 
+  /* Bars are fills; no stroke, or the white background rect gets a black box around it. */
   [data-thermal-receipt] .thermal-receipt-barcode svg {
     color: #000 !important;
-    fill: #000 !important;
-    stroke: #000 !important;
   }
 
   [data-thermal-receipt] .thermal-receipt-feed {

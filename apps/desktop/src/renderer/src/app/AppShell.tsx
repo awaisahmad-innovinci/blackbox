@@ -40,6 +40,8 @@ import {
 } from "@renderer/lib/api/totp";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
 import { useTillGuardedLogout } from "@renderer/lib/use-till-guarded-logout";
+import { BrandLogo } from "@blackbox/ui/brand-logo";
+import { BRAND_LOGO } from "@renderer/lib/brand";
 
 const DEVICE_LABEL: Record<string, string> = {
   unknown: "Device status unknown",
@@ -57,18 +59,10 @@ function formatFullSyncAt(iso: string): string {
   }
 }
 
-/** Wordmark with the shelf-tag square: the one bit of yellow outside prices. */
+/** Black Box logo (black in light mode, white in dark). */
 function BrandMark() {
   return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        aria-hidden
-        className="bg-shelf-tag text-shelf-tag-foreground inline-flex size-7 items-center justify-center rounded-[5px] text-sm font-bold"
-      >
-        B
-      </span>
-      <span className="text-base font-semibold tracking-tight">Blackbox</span>
-    </span>
+    <BrandLogo {...BRAND_LOGO} className="h-8" />
   );
 }
 

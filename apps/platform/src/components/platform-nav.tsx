@@ -6,6 +6,8 @@ import { Button } from "@blackbox/ui/button";
 import { ThemeToggle } from "@blackbox/ui/theme-toggle";
 import { cn } from "@blackbox/ui/lib/utils";
 import { clearPlatformToken } from "@/lib/api";
+import { BrandLogo } from "@blackbox/ui/brand-logo";
+import { BRAND_LOGO } from "@/lib/brand";
 
 /** Top bar shared by every signed-in platform page (review PL1). */
 export function PlatformNav({ onSignOut }: { onSignOut?: () => void }) {
@@ -19,13 +21,8 @@ export function PlatformNav({ onSignOut }: { onSignOut?: () => void }) {
     <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b pb-4">
       <div className="flex items-center gap-5">
         <Link href="/" className="flex items-center gap-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-          <span
-            aria-hidden
-            className="bg-shelf-tag text-shelf-tag-foreground flex size-7 items-center justify-center rounded-[5px] text-sm font-bold"
-          >
-            B
-          </span>
-          <span className="font-semibold tracking-tight">Blackbox platform</span>
+          <BrandLogo {...BRAND_LOGO} className="h-8" />
+          <span className="text-muted-foreground border-border border-l pl-2 text-sm">Platform</span>
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1">
           {links.map((link) => (

@@ -1,9 +1,19 @@
 import type { SaleLineRow } from "@blackbox/shared";
 import { formatMoney, splitInclusiveGst } from "@blackbox/shared";
 import JsBarcode from "jsbarcode";
-import { Fragment, useEffect, useRef, type ReactNode } from "react";
+import { RECEIPT_LOGO_SRC } from "@renderer/lib/brand";
+import { useEffect, useRef, type ReactNode } from "react";
 
 export { formatMoney };
+
+/** Receipt money: always two decimals, thousands separators (e.g. 1,000.00). Display only. */
+export function receiptMoney(value: number): string {
+  const amount = Number.isFinite(value) ? value : 0;
+  return (Math.round(amount * 100) / 100).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
 export function formatDiscountPercent(value: number): string {
   if (value <= 0) return "0";
@@ -57,118 +67,119 @@ function round4(value: number): number {
   return Math.round(value * 10000) / 10000;
 }
 
-const THERMAL_SALE_COL_CLASS = {
-  qty: "w-6 py-0.5 text-right tabular-nums align-top font-semibold",
-  disc: "w-6 py-0.5 text-right tabular-nums align-top font-semibold",
-  foc: "w-5 py-0.5 text-right tabular-nums align-top font-semibold",
-  price: "w-9 py-0.5 text-right tabular-nums align-top font-semibold",
-  gst: "w-8 py-0.5 text-right tabular-nums align-top font-semibold",
-  total: "w-9 py-0.5 text-right tabular-nums align-top font-semibold",
-} as const;
-
+/** Sale lines: "ITEM / QTY x PRICE | GST | TOTAL". Disc / FOC shown only when used. */
 export function ThermalSaleLineItems({ items }: { items: SaleLineRow[] }) {
   return (
-    <>
-      <table className="w-full border-collapse text-left text-[11px]">
-        <thead>
-          <tr>
-            <th className={`${THERMAL_SALE_COL_CLASS.qty} font-bold`}>Qty</th>
-            <th className={`${THERMAL_SALE_COL_CLASS.disc} font-bold`}>Disc</th>
-            <th className={`${THERMAL_SALE_COL_CLASS.foc} font-bold`}>FOC</th>
-            <th className={`${THERMAL_SALE_COL_CLASS.price} font-bold`}>Price</th>
-            <th className={`${THERMAL_SALE_COL_CLASS.gst} font-bold`}>GST</th>
-            <th className={`${THERMAL_SALE_COL_CLASS.total} font-bold`}>Total</th>
-          </tr>
-        </thead>
-      </table>
+    <section className="text-left">
+      <div className="grid grid-cols-[1fr_auto_auto] gap-x-1 font-bold">
+        <span className="whitespace-nowrap">ITEM / QTY x PRICE</span>
+        <span className="w-[8ch] text-right">GST</span>
+        <span className="w-[9ch] text-right">TOTAL</span>
+      </div>
+      <ThermalRule variant="solid" />
+      <div className="space-y-1.5">
+        {items.map((item) => {
+          const { exGst, gstAmount } = splitInclusiveGst(
+            item.lineTotal,
+            item.gstPercent ?? 0,
+          );
+          const exGstUnit =
+            item.quantity > 0 ? round4(exGst / item.quantity) : exGst;
+          const disc = item.discountPercent ?? 0;
+          const foc = item.focQuantity ?? 0;
 
-      <ThermalRule />
-
-      <table className="w-full border-collapse text-left text-[11px]">
-        <tbody>
-          {items.map((item) => {
-            const { exGst, gstAmount } = splitInclusiveGst(
-              item.lineTotal,
-              item.gstPercent ?? 0,
-            );
-            const exGstUnit =
-              item.quantity > 0 ? round4(exGst / item.quantity) : exGst;
-
-            return (
-              <Fragment key={item.id}>
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="py-0.5 text-left align-top break-words font-bold"
-                  >
-                    {saleReceiptProductLabel(item.productName, item.variantName)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={THERMAL_SALE_COL_CLASS.qty}>{item.quantity}</td>
-                  <td className={THERMAL_SALE_COL_CLASS.disc}>
-                    {formatDiscountPercent(item.discountPercent ?? 0)}%
-                  </td>
-                  <td className={THERMAL_SALE_COL_CLASS.foc}>
-                    {formatFocQuantity(item.focQuantity ?? 0)}
-                  </td>
-                  <td className={THERMAL_SALE_COL_CLASS.price}>
-                    {formatMoney(exGstUnit)}
-                  </td>
-                  <td className={THERMAL_SALE_COL_CLASS.gst}>
-                    {formatMoney(gstAmount)}
-                  </td>
-                  <td className={THERMAL_SALE_COL_CLASS.total}>
-                    {formatMoney(item.lineTotal)}
-                  </td>
-                </tr>
-                <tr>
-                  <td colSpan={6} className="p-0">
-                    <ThermalRule />
-                  </td>
-                </tr>
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </>
+          return (
+            <div key={item.id} className="break-inside-avoid">
+              <p className="font-bold break-words uppercase">
+                {saleReceiptProductLabel(item.productName, item.variantName)}
+              </p>
+              <div className="grid grid-cols-[1fr_auto_auto] gap-x-1 tabular-nums">
+                <span>
+                  {item.quantity} x {receiptMoney(exGstUnit)}
+                </span>
+                <span className="w-[8ch] text-right">{receiptMoney(gstAmount)}</span>
+                <span className="w-[9ch] text-right">{receiptMoney(item.lineTotal)}</span>
+              </div>
+              {disc > 0 || foc > 0 ? (
+                <p className="text-[10px]">
+                  {disc > 0 ? `Disc ${formatDiscountPercent(disc)}%` : null}
+                  {disc > 0 && foc > 0 ? " · " : null}
+                  {foc > 0 ? `FOC ${formatFocQuantity(foc)}` : null}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
 export const THERMAL_RECEIPT_CLASS =
-  "thermal-receipt mx-auto w-full max-w-[62mm] px-3 pt-2 pb-8 font-mono text-[11px] font-semibold leading-snug text-center text-black";
+  "thermal-receipt mx-auto w-full max-w-[72mm] bg-white px-3 pt-3 pb-8 font-mono text-[11px] leading-snug text-center text-black";
+
+/** Logo slot, 53 x 19 mm, black and white. */
+export function ThermalReceiptLogo() {
+  return (
+    <div className="thermal-receipt-logo mx-auto flex h-[19mm] w-[53mm] max-w-full items-center justify-center">
+      <img src={RECEIPT_LOGO_SRC} alt="" className="h-full w-auto object-contain" />
+    </div>
+  );
+}
 
 export function ThermalReceiptHeader({
   businessName,
   businessAddress,
   businessPhone,
+  ntn,
 }: {
   businessName: string;
   businessAddress?: string;
   businessPhone?: string;
+  /** Seller NTN / STRN, printed on the phone line (sales invoices). */
+  ntn?: string | null;
 }) {
   const phone = businessPhone?.trim();
+  const ntnText = ntn?.trim();
+  const contact = [phone ? `Tel: ${phone}` : null, ntnText ? `NTN: ${ntnText}` : null]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <header className="space-y-1">
+    // A <div>, not <header>: the print CSS hides every <header> (the app top bar).
+    <div className="space-y-1">
+      <ThermalReceiptLogo />
       {businessName ? (
-        <p className="text-lg font-bold leading-tight">{businessName}</p>
+        <p className="pt-1 text-lg leading-tight font-bold uppercase">{businessName}</p>
       ) : null}
       {businessAddress ? (
-        <p className="text-xs font-semibold leading-snug whitespace-pre-wrap">
-          {businessAddress}
-        </p>
+        <p className="text-[11px] leading-snug whitespace-pre-wrap">{businessAddress}</p>
       ) : null}
-      {phone ? (
-        <p className="text-xs font-semibold leading-snug">Tel: {phone}</p>
-      ) : null}
-    </header>
+      {contact ? <p className="text-[11px] leading-snug">{contact}</p> : null}
+    </div>
   );
 }
 
-export function ThermalRule() {
-  return <hr className="thermal-rule my-1 border-0 border-t border-solid border-black" />;
+/** Dashed by default; "solid" under column headers; "thick" above the grand total. */
+export function ThermalRule({ variant = "dashed" }: { variant?: "dashed" | "solid" | "thick" }) {
+  return (
+    <hr
+      className={`thermal-rule thermal-rule--${variant} my-1.5 border-0 border-t border-black ${
+        variant === "dashed" ? "border-dashed" : variant === "thick" ? "border-t-2" : "border-solid"
+      }`}
+    />
+  );
+}
+
+/** Spaced section title between dashed rules, e.g. SALES INVOICE. */
+export function ThermalTitle({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <ThermalRule />
+      <p className="py-0.5 text-sm font-bold tracking-[0.2em]">{children}</p>
+      <ThermalRule />
+    </>
+  );
 }
 
 export function ThermalMetaRow({
@@ -179,7 +190,7 @@ export function ThermalMetaRow({
   value: ReactNode;
 }) {
   return (
-    <div className="flex justify-between gap-2 text-left text-[11px] font-semibold">
+    <div className="flex justify-between gap-2 text-left text-[11px]">
       <span>{label}</span>
       <span className="text-right tabular-nums">{value}</span>
     </div>
@@ -199,9 +210,11 @@ export function ThermalReceiptBarcode({ value }: { value: string }) {
       JsBarcode(svg, trimmed, {
         format: "CODE128",
         width: 1,
-        height: 50,
+        height: 44,
         displayValue: true,
-        fontSize: 10,
+        font: "monospace",
+        fontOptions: "bold",
+        fontSize: 11,
         margin: 10,
         textMargin: 2,
       });
@@ -223,17 +236,22 @@ export function ThermalTotalsRow({
   label,
   value,
   bold,
+  grand,
 }: {
   label: string;
   value: ReactNode;
   bold?: boolean;
+  /** Grand total line (BILL TOTAL / REFUND TOTAL). */
+  grand?: boolean;
 }) {
   return (
     <div
-      className={`flex justify-between gap-2 text-left text-[11px] font-semibold ${bold ? "text-sm font-bold" : ""}`}
+      className={`flex items-baseline justify-between gap-2 text-left tabular-nums ${
+        grand ? "py-0.5 text-base font-bold" : bold ? "text-[12px] font-bold" : "text-[11px]"
+      }`}
     >
       <span>{label}</span>
-      <span className="tabular-nums">{value}</span>
+      <span>{value}</span>
     </div>
   );
 }
