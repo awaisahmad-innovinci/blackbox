@@ -6,7 +6,11 @@ import {
 
 export type NavDropdownId = "inventory" | "purchasing" | "vendors";
 
-export type NavDropdownItem = { label: string; to: string };
+export type NavDropdownItem = {
+  label: string;
+  to?: string;
+  action?: "upload-old-data";
+};
 
 export type TaxonomyKind = "brand" | "category" | "vendor_group";
 
@@ -20,6 +24,7 @@ export const NAV_DROPDOWN_MENUS: Record<NavDropdownId, NavDropdownItem[]> = {
     { label: "Out Returns", to: "/inventory/out-returns" },
     { label: "Vendor Returns", to: "/inventory/returns" },
     { label: "In / out report", to: "/inventory/reports" },
+    { label: "Upload Old Data", action: "upload-old-data" },
   ],
   purchasing: [
     { label: "Create Purchase Order", to: "/purchase-orders/new" },
@@ -233,7 +238,7 @@ export function parseNavMenuDigit(key: string): number | null {
 export function matchNavDropdownItem(
   event: KeyboardEvent,
   openDropdownId: NavDropdownId | null,
-): string | null {
+): NavDropdownItem | null {
   if (!openDropdownId) return null;
   if (event.altKey || event.ctrlKey || event.metaKey) return null;
 
@@ -244,7 +249,7 @@ export function matchNavDropdownItem(
   if (!item) return null;
 
   event.preventDefault();
-  return item.to;
+  return item;
 }
 
 function resolveSaleNavSection(permissions: string[]): AppNavLinkSection | null {

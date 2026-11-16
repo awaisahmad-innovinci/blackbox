@@ -10,11 +10,15 @@ import {
   DropdownMenuTrigger,
 } from "@blackbox/ui/dropdown-menu";
 import { useSession } from "@renderer/lib/session/context";
-import { useCatalogSync } from "@renderer/lib/sync/catalog-sync";
+import {
+  enqueueMasterDataLocalSync,
+  useCatalogSync,
+} from "@renderer/lib/sync/catalog-sync";
 import { LAST_FULL_PULL_AT_KEY } from "@renderer/lib/local-db/pull";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { NavDropdownMenuItem } from "@renderer/components/nav-dropdown-menu-item";
+import { ImportMasterDataDialog } from "@renderer/features/dashboard/ImportMasterDataDialog";
 import { AddTaxonomyDialog } from "@renderer/features/taxonomy/AddTaxonomyDialog";
 import type { TaxonomyKind } from "@renderer/lib/app-nav-keyboard";
 import { notifyTaxonomyCreated } from "@renderer/lib/taxonomy-created-sync";
@@ -89,6 +93,7 @@ export function AppShell() {
   );
   const [globalTaxonomyKind, setGlobalTaxonomyKind] =
     useState<TaxonomyKind | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [totpEnrollOpen, setTotpEnrollOpen] = useState(false);
   const [totpResetOpen, setTotpResetOpen] = useState(false);
   const [totpBusy, setTotpBusy] = useState(false);
@@ -100,6 +105,7 @@ export function AppShell() {
       openNavDropdown,
       setOpenNavDropdown,
       onGlobalTaxonomyShortcut: setGlobalTaxonomyKind,
+      onUploadOldData: () => setImportOpen(true),
     });
 
   useEffect(() => {
@@ -299,10 +305,16 @@ export function AppShell() {
                     {NAV_DROPDOWN_MENUS[section.dropdownId].map(
                       (item, menuIndex) => (
                         <NavDropdownMenuItem
-                          key={item.to}
+                          key={item.to ?? item.action ?? item.label}
                           index={menuIndex}
                           label={item.label}
-                          onSelect={() => navigate(item.to)}
+                          onSelect={() => {
+                            if (item.action === "upload-old-data") {
+                              setImportOpen(true);
+                              return;
+                            }
+                            if (item.to) navigate(item.to);
+                          }}
                         />
                       ),
                     )}
@@ -425,6 +437,14 @@ export function AppShell() {
           }}
         />
       ) : null}
+
+      <ImportMasterDataDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={(imported) => {
+          enqueueMasterDataLocalSync(imported.files.map((file) => file.file));
+        }}
+      />
 
       <TotpEnrollDialog
         open={totpEnrollOpen}

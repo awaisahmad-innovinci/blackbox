@@ -17,7 +17,6 @@ type ApiFetchOptions = RequestInit & {
 
 type JsonBody = object | unknown[] | null;
 
-let refreshInFlight: Promise<boolean> | null = null;
 let onSessionCleared: (() => void) | null = null;
 
 export function setOnSessionCleared(handler: (() => void) | null): void {
@@ -68,16 +67,20 @@ function messageFromBody(status: number, body: unknown): string {
  * Single-flight refresh: concurrent 401s share one refresh call.
  * On success, atomically replaces bb_refresh with the rotated token.
  */
-export async function refreshAccessToken(): Promise<boolean> {
-  if (refreshInFlight) {
-    return refreshInFlight;
+export type RefreshOutcome = "ok" | "invalid" | "offline";
+
+let refreshInFlightOutcome: Promise<RefreshOutcome> | null = null;
+
+export async function refreshAccessToken(): Promise<RefreshOutcome> {
+  if (refreshInFlightOutcome) {
+    return refreshInFlightOutcome;
   }
 
-  refreshInFlight = (async () => {
+  refreshInFlightOutcome = (async () => {
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
       clearSessionTokens();
-      return false;
+      return "invalid";
     }
 
     try {
@@ -89,31 +92,33 @@ export async function refreshAccessToken(): Promise<boolean> {
 
       const body = await parseJsonSafe(res);
       if (!res.ok) {
-        clearSessionTokens();
-        return false;
+        if (res.status === 401 || res.status === 403) {
+          clearSessionTokens();
+          return "invalid";
+        }
+        return "offline";
       }
 
       const tokens = (body as { tokens?: { accessToken?: string; refreshToken?: string } })
         ?.tokens;
       if (!tokens?.accessToken || !tokens.refreshToken) {
         clearSessionTokens();
-        return false;
+        return "invalid";
       }
 
       applyAuthTokens({
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       });
-      return true;
+      return "ok";
     } catch {
-      clearSessionTokens();
-      return false;
+      return "offline";
     } finally {
-      refreshInFlight = null;
+      refreshInFlightOutcome = null;
     }
   })();
 
-  return refreshInFlight;
+  return refreshInFlightOutcome;
 }
 
 export async function apiFetch<T = unknown>(
@@ -149,13 +154,15 @@ export async function apiFetch<T = unknown>(
 
   if (res.status === 401 && !skipAuth && !_isRetry) {
     const refreshed = await refreshAccessToken();
-    if (refreshed) {
-      // Retry original request exactly once — no recursive refresh.
+    if (refreshed === "ok") {
       return apiFetch<T>(path, { ...options, _isRetry: true });
     }
-    clearSessionTokens();
-    notifySessionCleared();
-    throw new ApiError(401, friendlyMessage(401));
+    if (refreshed === "invalid") {
+      clearSessionTokens();
+      notifySessionCleared();
+      throw new ApiError(401, friendlyMessage(401));
+    }
+    throw new TypeError("Unable to reach Blackbox. Check your connection and try again.");
   }
 
   const body = await parseJsonSafe(res);

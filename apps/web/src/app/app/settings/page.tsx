@@ -34,9 +34,6 @@ export default function SettingsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [requireRemoveApproval, setRequireRemoveApproval] = useState(true);
-  const [requireTillOpenApproval, setRequireTillOpenApproval] = useState(true);
-  const [requireTillWithdrawApproval, setRequireTillWithdrawApproval] =
-    useState(true);
   const [requireFocApproval, setRequireFocApproval] = useState(true);
   const [defaultGstRate, setDefaultGstRate] = useState("0");
   const [defaultSalesTaxRate, setDefaultSalesTaxRate] = useState("0");
@@ -57,8 +54,6 @@ export default function SettingsPage() {
       const next = await getCurrentTenant();
       setTenant(next);
       setRequireRemoveApproval(next.requireManagerApprovalRemoveSaleLine);
-      setRequireTillOpenApproval(next.requireManagerApprovalTillOpen);
-      setRequireTillWithdrawApproval(next.requireManagerApprovalTillWithdraw);
       setRequireFocApproval(next.requireManagerApprovalFoc);
       setDefaultGstRate(String(next.defaultGstRate ?? 0));
       setDefaultSalesTaxRate(String(next.defaultSalesTaxRate ?? 0));
@@ -127,16 +122,12 @@ export default function SettingsPage() {
       const updated = await updateCurrentTenant({
         name,
         requireManagerApprovalRemoveSaleLine: requireRemoveApproval,
-        requireManagerApprovalTillOpen: requireTillOpenApproval,
-        requireManagerApprovalTillWithdraw: requireTillWithdrawApproval,
         requireManagerApprovalFoc: requireFocApproval,
         defaultGstRate: Number(defaultGstRate) || 0,
         defaultSalesTaxRate: Number(defaultSalesTaxRate) || 0,
       });
       setTenant(updated);
       setRequireRemoveApproval(updated.requireManagerApprovalRemoveSaleLine);
-      setRequireTillOpenApproval(updated.requireManagerApprovalTillOpen);
-      setRequireTillWithdrawApproval(updated.requireManagerApprovalTillWithdraw);
       setRequireFocApproval(updated.requireManagerApprovalFoc);
       setDefaultGstRate(String(updated.defaultGstRate ?? 0));
       setDefaultSalesTaxRate(String(updated.defaultSalesTaxRate ?? 0));
@@ -438,45 +429,6 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-start gap-3">
                     <Checkbox
-                      id="requireTillOpenApproval"
-                      checked={requireTillOpenApproval}
-                      onCheckedChange={(checked) =>
-                        setRequireTillOpenApproval(checked === true)
-                      }
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor="requireTillOpenApproval" className="font-normal">
-                        Open till
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        When enabled, a valid manager authentication code is required
-                        before a cashier opens a till.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="requireTillWithdrawApproval"
-                      checked={requireTillWithdrawApproval}
-                      onCheckedChange={(checked) =>
-                        setRequireTillWithdrawApproval(checked === true)
-                      }
-                    />
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor="requireTillWithdrawApproval"
-                        className="font-normal"
-                      >
-                        Cash withdrawal
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        When enabled, a valid manager authentication code is required
-                        before collecting or withdrawing cash from a till.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Checkbox
                       id="requireFocApproval"
                       checked={requireFocApproval}
                       onCheckedChange={(checked) =>
@@ -509,18 +461,6 @@ export default function SettingsPage() {
                   <p>
                     Remove item from bill:{" "}
                     {tenant.requireManagerApprovalRemoveSaleLine
-                      ? "Manager approval required"
-                      : "No approval required"}
-                  </p>
-                  <p>
-                    Open till:{" "}
-                    {tenant.requireManagerApprovalTillOpen
-                      ? "Manager approval required"
-                      : "No approval required"}
-                  </p>
-                  <p>
-                    Cash withdrawal:{" "}
-                    {tenant.requireManagerApprovalTillWithdraw
                       ? "Manager approval required"
                       : "No approval required"}
                   </p>

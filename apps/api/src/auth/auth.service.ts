@@ -413,13 +413,15 @@ export class AuthService {
   /**
    * Email and username are unique only inside one business. When several
    * active accounts share the typed name, the password picks the account.
+   * Email is case-insensitive. Username must match the stored capitalization.
    */
   private async resolveLoginUser(
     identifier: string,
     password: string,
   ): Promise<User> {
-    const value = identifier.trim().toLowerCase();
-    if (!value) {
+    const username = identifier.trim();
+    const email = username.toLowerCase();
+    if (!username) {
       throw new UnauthorizedException("Invalid credentials");
     }
 
@@ -427,8 +429,9 @@ export class AuthService {
       .createQueryBuilder("u")
       .where("u.is_active = true")
       .andWhere("u.deleted_at IS NULL")
-      .andWhere("(LOWER(u.email) = :value OR LOWER(u.username) = :value)", {
-        value,
+      .andWhere("(LOWER(u.email) = :email OR u.username = :username)", {
+        email,
+        username,
       })
       .getMany();
 
