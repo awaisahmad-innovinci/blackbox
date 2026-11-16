@@ -7,11 +7,11 @@ export function requireManagerTillOpenApproval(
   return user?.requireManagerApprovalTillOpen === true;
 }
 
-/** Manager authentication code before collecting or withdrawing till cash (tenant setting). */
+/** Cash withdrawal always needs a manager authentication code. */
 export function requireManagerTillWithdrawApproval(
-  user: AuthUser | null | undefined,
+  _user: AuthUser | null | undefined,
 ): boolean {
-  return user?.requireManagerApprovalTillWithdraw === true;
+  return true;
 }
 
 /** Manager authentication code before posting a sale that includes FOC (tenant setting). */

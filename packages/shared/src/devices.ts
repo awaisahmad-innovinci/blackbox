@@ -32,5 +32,5 @@ export const OFFLINE_AUTHORIZATION_DAYS_DEFAULT = 7;
 /** Access token TTL in seconds (15 minutes). */
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 
-/** Refresh token TTL in seconds (7 days). */
-export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+/** Refresh token TTL in seconds (365 days). Logout is what ends the session. */
+export const REFRESH_TOKEN_TTL_SECONDS = 365 * 24 * 60 * 60;

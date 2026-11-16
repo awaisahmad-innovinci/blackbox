@@ -33,12 +33,14 @@ export function useAppNavKeyboard({
   openNavDropdown,
   setOpenNavDropdown,
   onGlobalTaxonomyShortcut,
+  onUploadOldData,
 }: {
   sections?: NavSection[];
   permissions?: string[];
   openNavDropdown: NavDropdownId | null;
   setOpenNavDropdown: Dispatch<SetStateAction<NavDropdownId | null>>;
   onGlobalTaxonomyShortcut?: (kind: TaxonomyKind) => void;
+  onUploadOldData?: () => void;
 }) {
   const navigate = useNavigate();
   const navRefs = useRef<(HTMLElement | null)[]>([]);
@@ -121,16 +123,20 @@ export function useAppNavKeyboard({
         return;
       }
 
-      const to = matchNavDropdownItem(event, openNavDropdown);
-      if (to) {
+      const item = matchNavDropdownItem(event, openNavDropdown);
+      if (item) {
         setOpenNavDropdown(null);
-        navigate(to);
+        if (item.action === "upload-old-data") {
+          onUploadOldData?.();
+        } else if (item.to) {
+          navigate(item.to);
+        }
       }
     }
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [navigate, focusNavIndex, setOpenNavDropdown, openNavDropdown, onGlobalTaxonomyShortcut, sections, permissions]);
+  }, [navigate, focusNavIndex, setOpenNavDropdown, openNavDropdown, onGlobalTaxonomyShortcut, onUploadOldData, sections, permissions]);
 
   const handleMenubarKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>) => {

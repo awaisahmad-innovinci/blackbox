@@ -14,7 +14,7 @@ export function RequirePermission({
 }) {
   const { status, hasPermission } = useAuth();
 
-  if (status === "loading") {
+  if (status === "loading" || status === "anonymous") {
     return <LoadingState label="Checking permissions" />;
   }
 

@@ -4,7 +4,6 @@ import type {
   CashierDashboardSummary,
   DashboardSummary,
   ManagerDashboardSummary,
-  MasterDataImportResult,
 } from "@blackbox/shared";
 import { formatMoney } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -18,10 +17,7 @@ import {
   isDeviceBound,
 } from "@renderer/lib/local-db/local-write";
 import { ApiError } from "@renderer/lib/api/client";
-import {
-  enqueueMasterDataLocalSync,
-  useCatalogSync,
-} from "@renderer/lib/sync/catalog-sync";
+import { useCatalogSync } from "@renderer/lib/sync/catalog-sync";
 import { useSyncDataVersion } from "@renderer/lib/sync/sync-status";
 import {
   resolveDataSourceMode,
@@ -29,7 +25,6 @@ import {
 } from "@renderer/lib/local-db/data-source";
 import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
-import { ImportMasterDataDialog } from "./ImportMasterDataDialog";
 import {
   KEYBOARD_HINT_APP_NAV,
   KeyboardHints,
@@ -165,7 +160,6 @@ export function DashboardPage() {
   );
   const [localDbLoading, setLocalDbLoading] = useState(true);
   const catalog = useCatalogSync();
-  const [importOpen, setImportOpen] = useState(false);
   const [ownerCashAmount, setOwnerCashAmount] = useState("");
   const [ownerCashSaving, setOwnerCashSaving] = useState(false);
   const [ownerCashError, setOwnerCashError] = useState<string | null>(null);
@@ -356,10 +350,6 @@ export function DashboardPage() {
     };
   }, []);
 
-  function onMasterDataImported(imported: MasterDataImportResult) {
-    enqueueMasterDataLocalSync(imported.files.map((file) => file.file));
-  }
-
   const cashierTills = managerSummary?.cashierTills ?? [];
   const openCashierTills = cashierTills.filter(
     (till) => till.currentCashBalance > 0,
@@ -404,24 +394,7 @@ export function DashboardPage() {
             </p>
           ) : null} */}
         </div>
-        {showInventoryDashboard && !cashierOnly ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setImportOpen(true)}
-          >
-            Upload Old Data
-          </Button>
-        ) : null}
       </div>
-
-      {!cashierOnly && showInventoryDashboard ? (
-        <ImportMasterDataDialog
-          open={importOpen}
-          onOpenChange={setImportOpen}
-          onImported={onMasterDataImported}
-        />
-      ) : null}
 
       {!localDbLoading && localDbStatus && !localDbStatus.connected ? (
         <div
