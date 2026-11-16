@@ -26,6 +26,7 @@ import {
   PlatformApiError,
   clearPlatformToken,
   createTenant,
+  sendEmailVerification,
   getPlatformToken,
   listTenants,
   loginPlatform,
@@ -48,6 +49,7 @@ type CreateFields = {
   email: string;
   username: string;
   password: string;
+  verificationCode: string;
 };
 
 const emptyCreate: CreateFields = {
@@ -56,6 +58,7 @@ const emptyCreate: CreateFields = {
   email: "",
   username: "",
   password: "",
+  verificationCode: "",
 };
 
 export function TenantManagement() {
@@ -79,6 +82,8 @@ export function TenantManagement() {
   const [createFields, setCreateFields] = useState<CreateFields>(emptyCreate);
   const [createAttempted, setCreateAttempted] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeNotice, setCodeNotice] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [issued, setIssued] = useState<IssuedCredentials | null>(null);
 
@@ -165,12 +170,14 @@ export function TenantManagement() {
     const email = createFields.email.trim();
     const ownerUsername = createFields.username.trim();
     const ownerPassword = createFields.password;
+    const verificationCode = createFields.verificationCode.trim();
     if (
       !businessName ||
       personNameError(fullName) ||
       emailError(email) ||
       usernameError(ownerUsername) ||
-      ownerPassword.length < 8
+      ownerPassword.length < 8 ||
+      !/^\d{6}$/.test(verificationCode)
     ) {
       return;
     }
@@ -182,6 +189,7 @@ export function TenantManagement() {
         email,
         username: ownerUsername,
         password: ownerPassword,
+        verificationCode,
       });
       setIssued({
         name: businessName,
@@ -192,6 +200,7 @@ export function TenantManagement() {
       });
       setCreateFields(emptyCreate);
       setCreateAttempted(false);
+      setCodeNotice(null);
       await load(token);
     } catch (err) {
       if (err instanceof PlatformApiError && err.status === 401) {
@@ -205,6 +214,33 @@ export function TenantManagement() {
       );
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function onSendCode() {
+    if (!token) return;
+    setCreateError(null);
+    setCodeNotice(null);
+    if (emailError(createFields.email)) {
+      setCreateAttempted(true);
+      return;
+    }
+    setSendingCode(true);
+    try {
+      const res = await sendEmailVerification(token, createFields.email.trim());
+      setCodeNotice(res.message);
+    } catch (err) {
+      if (err instanceof PlatformApiError && err.status === 401) {
+        clearPlatformToken();
+        setToken(null);
+        setLoginError("Session expired. Sign in again.");
+        return;
+      }
+      setCreateError(
+        err instanceof Error ? err.message : "Could not send the verification code.",
+      );
+    } finally {
+      setSendingCode(false);
     }
   }
 
@@ -413,22 +449,61 @@ export function TenantManagement() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="owner-email">Email</Label>
-                <Input
-                  id="owner-email"
-                  type="email"
-                  required
-                  value={createFields.email}
-                  aria-invalid={Boolean(emailErr)}
-                  onChange={(event) =>
-                    setCreateFields((fields) => ({
-                      ...fields,
-                      email: event.target.value,
-                    }))
-                  }
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="owner-email"
+                    type="email"
+                    required
+                    className="flex-1"
+                    value={createFields.email}
+                    aria-invalid={Boolean(emailErr)}
+                    onChange={(event) =>
+                      setCreateFields((fields) => ({
+                        ...fields,
+                        email: event.target.value,
+                      }))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={sendingCode || Boolean(emailError(createFields.email))}
+                    onClick={() => void onSendCode()}
+                  >
+                    {sendingCode ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      "Send code"
+                    )}
+                  </Button>
+                </div>
                 {emailErr ? (
                   <p className="text-destructive text-xs">{emailErr}</p>
                 ) : null}
+                {codeNotice ? (
+                  <p className="text-muted-foreground text-xs">{codeNotice}</p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="owner-verification-code">Verification code</Label>
+                <Input
+                  id="owner-verification-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  maxLength={6}
+                  value={createFields.verificationCode}
+                  onChange={(event) =>
+                    setCreateFields((fields) => ({
+                      ...fields,
+                      verificationCode: event.target.value.replace(/\D/g, ""),
+                    }))
+                  }
+                />
+                <p className="text-muted-foreground text-xs">
+                  Enter the 6-digit code sent to this email. The tenant is
+                  created only after the code is confirmed.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="owner-username">Username</Label>
@@ -473,7 +548,13 @@ export function TenantManagement() {
                   {createError}
                 </p>
               ) : null}
-              <Button type="submit" className="w-full" disabled={creating}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={
+                  creating || !/^\d{6}$/.test(createFields.verificationCode)
+                }
+              >
                 {creating ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />

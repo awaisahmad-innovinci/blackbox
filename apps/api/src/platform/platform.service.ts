@@ -1,5 +1,7 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -13,12 +15,17 @@ import type {
   ResetPlatformOwnerPasswordResponse,
 } from "@blackbox/shared";
 import * as argon2 from "argon2";
-import { DataSource, IsNull, Repository } from "typeorm";
+import { DataSource, IsNull, MoreThan, Repository } from "typeorm";
 import { AuthService } from "../auth/auth.service";
 import type { SignupTenantDto } from "../auth/dto/signup-tenant.dto";
+import { EmailVerificationCode } from "../db/entities/email-verification-code.entity";
 import { RefreshToken } from "../db/entities/refresh-token.entity";
 import { Tenant } from "../db/entities/tenant.entity";
 import { User } from "../db/entities/user.entity";
+import { MailService } from "../mail/mail.service";
+
+const EMAIL_ALREADY_REGISTERED =
+  "This email is already registered with an active account.";
 
 const PLATFORM_ACCESS_TTL_SECONDS = 8 * 60 * 60;
 
@@ -39,6 +46,7 @@ export class PlatformService {
     private readonly jwtService: JwtService,
     private readonly authService: AuthService,
     private readonly dataSource: DataSource,
+    private readonly mail: MailService,
     @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
     @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
@@ -79,6 +87,48 @@ export class PlatformService {
 
   createTenant(dto: SignupTenantDto): Promise<PlatformTenantSummary> {
     return this.authService.createTenantWorkspace(dto);
+  }
+
+  async sendEmailVerification(emailInput: string): Promise<{ message: string }> {
+    const email = emailInput.trim().toLowerCase();
+    const activeEmailCount = await this.users.count({
+      where: { email, isActive: true },
+    });
+    if (activeEmailCount > 0) {
+      throw new ConflictException(EMAIL_ALREADY_REGISTERED);
+    }
+
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCount = await this.dataSource
+      .getRepository(EmailVerificationCode)
+      .count({
+        where: { email, createdAt: MoreThan(oneHourAgo) },
+      });
+    if (recentCount >= 3) {
+      throw new BadRequestException(
+        "Too many verification codes were sent for this email. Try again later.",
+      );
+    }
+
+    const code = String(randomInt(100000, 1000000));
+    const codeHash = createHash("sha256").update(code).digest("hex");
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(
+        EmailVerificationCode,
+        { email, usedAt: IsNull() },
+        { usedAt: new Date() },
+      );
+      await manager.save(
+        manager.create(EmailVerificationCode, {
+          email,
+          codeHash,
+          expiresAt,
+        }),
+      );
+    });
+    await this.mail.sendEmailVerificationOtp(email, code);
+    return { message: "Verification code sent." };
   }
 
   async setTenantActive(

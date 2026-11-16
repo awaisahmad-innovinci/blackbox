@@ -51,6 +51,7 @@ export interface SignupTenantRequest {
   email: string;
   username: string;
   password: string;
+  verificationCode: string;
 }
 
 export interface PlatformLoginRequest {
