@@ -1859,7 +1859,8 @@ export function getReturnableSaleLinesLocal(
          l.quantity as soldQuantity,
          l.unit_price as unitPrice,
          coalesce(l.discount_percent, 0) as discountPercent,
-         l.sell_unit as sellUnit
+         l.sell_unit as sellUnit,
+         coalesce(l.gst_percent, 0) as gstPercent
        from sale_lines l
        left join product_skus sk on sk.id = l.product_sku_id
        left join products p on p.id = sk.product_id
@@ -1898,6 +1899,7 @@ export function getReturnableSaleLinesLocal(
         unitPrice: num(row.unitPrice),
         discountPercent: num(row.discountPercent),
         sellUnit: (row.sellUnit as "pc" | "box") ?? "pc",
+        gstPercent: num(row.gstPercent),
       };
     })
     .filter((line) => line.returnableQuantity > 0);

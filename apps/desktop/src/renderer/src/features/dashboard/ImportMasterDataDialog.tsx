@@ -224,7 +224,7 @@ export function ImportMasterDataDialog({
                 errors.length > 0
                   ? "border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
                   : succeeded
-                    ? "rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200"
+                    ? "rounded-lg border border-success/40 bg-success/10 px-4 py-3 text-sm text-success "
                     : "border-border bg-muted/40 rounded-lg border px-4 py-3 text-sm"
               }
             >

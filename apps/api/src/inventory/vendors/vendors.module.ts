@@ -20,9 +20,11 @@ import { VendorSkusService } from "./vendor-skus.service";
 import { VendorLedgerService } from "./vendor-ledger.service";
 import { VendorsController } from "./vendors.controller";
 import { VendorsService } from "./vendors.service";
+import { RbacModule } from "../../rbac/rbac.module";
 
 @Module({
   imports: [
+    RbacModule,
     ActivityLogModule,
     CashFlowModule,
     TypeOrmModule.forFeature([

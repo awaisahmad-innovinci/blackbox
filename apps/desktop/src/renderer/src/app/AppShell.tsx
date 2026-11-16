@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
+import { Button } from "@blackbox/ui/button";
+import { ThemeToggle } from "@blackbox/ui/theme-toggle";
 import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard";
 import {
   DropdownMenu,
@@ -55,11 +57,26 @@ function formatFullSyncAt(iso: string): string {
   }
 }
 
+/** Wordmark with the shelf-tag square: the one bit of yellow outside prices. */
+function BrandMark() {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span
+        aria-hidden
+        className="bg-shelf-tag text-shelf-tag-foreground inline-flex size-7 items-center justify-center rounded-[5px] text-sm font-bold"
+      >
+        B
+      </span>
+      <span className="text-base font-semibold tracking-tight">Blackbox</span>
+    </span>
+  );
+}
+
 function navItemClass(active: boolean): string {
   return cn(
     "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
     active
-      ? "bg-primary/10 text-primary"
+      ? "bg-accent text-accent-foreground"
       : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 }
@@ -187,15 +204,11 @@ export function AppShell() {
   if (deviceLocked) {
     return (
       <div className="bg-background text-foreground flex min-h-screen flex-col">
-        <header className="border-border flex items-center justify-between border-b px-8 py-4">
-          <span className="text-sm font-semibold">Blackbox</span>
-          <button
-            type="button"
-            className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-3 py-1.5 text-sm font-medium"
-            onClick={() => void signOut()}
-          >
+        <header className="border-border bg-card flex items-center justify-between border-b px-8 py-3">
+          <BrandMark />
+          <Button type="button" variant="ghost" size="sm" onClick={() => void signOut()}>
             Sign out
-          </button>
+          </Button>
         </header>
         <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-16">
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -221,10 +234,10 @@ export function AppShell() {
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
-      <header className="border-border/80 bg-card/40 sticky top-0 z-10 border-b backdrop-blur-md">
+      <header className="border-border bg-card sticky top-0 z-10 border-b">
         <div className="mx-auto flex min-h-14 w-full max-w-none items-center gap-6 px-8 py-2 lg:px-10">
-          <Link to="/" className="text-lg font-semibold tracking-tight">
-            Blackbox
+          <Link to="/" aria-label="Blackbox home" className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <BrandMark />
           </Link>
           <nav
             role="menubar"
@@ -313,18 +326,32 @@ export function AppShell() {
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             <button
               type="button"
               onClick={() => void syncNow()}
               disabled={sync.syncing}
               className={cn(
-                "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                "inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 sync.lastError
                   ? "text-destructive hover:bg-destructive/10"
                   : "text-muted-foreground hover:bg-muted",
               )}
               title={sync.lastError ?? "Sync pending changes now"}
             >
+              <span
+                aria-hidden
+                className={cn(
+                  "size-2 rounded-full",
+                  sync.lastError
+                    ? "bg-destructive"
+                    : sync.syncing
+                      ? "bg-info animate-pulse"
+                      : sync.pending
+                        ? "bg-warning"
+                        : "bg-success",
+                )}
+              />
               {sync.syncing
                 ? "Syncing…"
                 : sync.lastError
@@ -386,7 +413,7 @@ export function AppShell() {
       {deviceState === "pending" ? (
         <div
           role="status"
-          className="border-b border-amber-500/40 bg-amber-500/5 px-6 py-2 text-center text-xs text-amber-900 dark:text-amber-200"
+          className="border-warning/40 bg-warning/10 text-foreground border-b px-6 py-2 text-center text-xs"
         >
           This device is awaiting owner approval. Changes are saved locally and
           sync once it is trusted.

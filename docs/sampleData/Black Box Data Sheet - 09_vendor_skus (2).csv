@@ -1,0 +1,3799 @@
+vendor_code,sku,vendor_sku_code,purchase_unit_abbreviation,units_per_purchase_unit,purchase_price,minimum_order_quantity,lead_time_days,is_preferred,notes,status
+SMM-V01,FRUITI-O-01,,Pcs,1,319.42,0,0,TRUE,,active
+SMM-V01,FRUITI-O-02,,Pcs,1,158.42,0,0,TRUE,,active
+SMM-V01,FRUITI-O-03,,Pcs,1,521,0,0,TRUE,,active
+SMM-V01,FRUITI-O-04,,Pcs,1,521,0,0,TRUE,,active
+SMM-V01,FRUITI-O-05,,Pcs,1,158.42,0,0,TRUE,,active
+SMM-V01,FRUITI-O-06,,Pcs,1,158.42,0,0,TRUE,,active
+SMM-V01,FRUITI-O-07,,Pcs,1,158.42,0,0,TRUE,,active
+SMM-V01,FRUITI-O-08,,Pcs,1,319.5,0,0,TRUE,,active
+SMM-V01,FRUITI-O-09,,Pcs,1,276.33,0,0,TRUE,,active
+SMM-V01,FRUITI-O-10,,Pcs,1,521,0,0,TRUE,,active
+SMM-V01,Smile-01,,Pcs,1,118.42,0,0,TRUE,,active
+SMM-V01,Smile-02,,Pcs,1,185.67,0,0,TRUE,,active
+SMM-V01,Smile-03,,Pcs,1,219.42,0,0,TRUE,,active
+SMM-V01,Smile-04,,Pcs,1,185.67,0,0,TRUE,,active
+SMM-V01,Smile-05,,Pcs,1,71.04,0,0,TRUE,,active
+SMM-V01,Smile-06,,Pcs,1,71.04,0,0,TRUE,,active
+SMM-V01,Smile-07,,Pcs,1,71.04,0,0,TRUE,,active
+SMM-V01,SHANGRILA-01,,Pcs,1,380.13,0,0,TRUE,,active
+SMM-V01,SHANGRILA-02,,Pcs,1,380.15,0,0,TRUE,,active
+SMM-V01,SHANGRILA-03,,Pcs,1,534.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-04,,Pcs,1,419.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-05,,Pcs,1,419.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-06,,Pcs,1,218.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-07,,Pcs,1,395.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-08,,Pcs,1,218.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-09,,Pcs,1,395.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-10,,Pcs,1,218.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-11,,Pcs,1,395.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-12,,Pcs,1,395.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-13,,Pcs,1,436.83,0,0,TRUE,,active
+SMM-V01,SHANGRILA-14,,Pcs,1,366.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-15,,Pcs,1,216.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-16,,Pcs,1,522.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-17,,Pcs,1,304.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-18,,Pcs,1,522.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-19,,Pcs,1,117.13,0,0,TRUE,,active
+SMM-V01,SHANGRILA-20,,Pcs,1,218.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-21,,Pcs,1,269.89,0,0,TRUE,,active
+SMM-V01,SHANGRILA-22,,Pcs,1,269.89,0,0,TRUE,,active
+SMM-V01,SHANGRILA-23,,Pcs,1,191.53,0,0,TRUE,,active
+SMM-V01,SHANGRILA-24,,Pcs,1,270.13,0,0,TRUE,,active
+SMM-V01,SHANGRILA-25,,Pcs,1,279.83,0,0,TRUE,,active
+SMM-V01,SHANGRILA-26,,Pcs,1,701.75,0,0,TRUE,,active
+SMM-V01,SHANGRILA-27,,Pcs,1,564.24,0,0,TRUE,,active
+SMM-V01,SHANGRILA-28,,Pcs,1,338.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-29,,Pcs,1,520.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-30,,Pcs,1,828.25,0,0,TRUE,,active
+SMM-V01,SHANGRILA-31,,Pcs,1,413.83,0,0,TRUE,,active
+SMM-V01,SHANGRILA-32,,Pcs,1,207,0,0,TRUE,,active
+SMM-V01,SHANGRILA-33,,Pcs,1,86.42,0,0,TRUE,,active
+SMM-V01,SHANGRILA-34,,Pcs,1,207,0,0,TRUE,,active
+SMM-V01,SHANGRILA-35,,Pcs,1,396.13,0,0,TRUE,,active
+SMM-V01,SHANGRILA-36,,Pcs,1,216.75,0,0,TRUE,,active
+SMM-V01,SHANGRILA-37,,Pcs,1,346.83,0,0,TRUE,,active
+SMM-V01,SHANGRILA-38,,Pcs,1,383.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-39,,Pcs,1,295.25,0,0,TRUE,,active
+SMM-V01,SHANGRILA-40,,Pcs,1,162.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-41,,Pcs,1,145.6,0,0,TRUE,,active
+SMM-V01,SHANGRILA-42,,Pcs,1,114.4,0,0,TRUE,,active
+SMM-V01,SHANGRILA-43,,Pcs,1,153.54,0,0,TRUE,,active
+SMM-V01,SHANGRILA-44,,Pcs,1,76.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-45,,Pcs,1,719,0,0,TRUE,,active
+SMM-V01,SHANGRILA-46,,Pcs,1,279.38,0,0,TRUE,,active
+SMM-V01,SHANGRILA-47,,Pcs,1,72.08,0,0,TRUE,,active
+SMM-V01,SHANGRILA-48,,Pcs,1,66.46,0,0,TRUE,,active
+SMM-V01,SHANGRILA-49,,Pcs,1,117.13,0,0,TRUE,,active
+SMM-V01,SHANGRILA-50,,Pcs,1,207.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-51,,Pcs,1,207.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-52,,Pcs,1,224.42,0,0,TRUE,,active
+SMM-V01,SHANGRILA-53,,Pcs,1,225.42,0,0,TRUE,,active
+SMM-V01,SHANGRILA-54,,Pcs,1,226.17,0,0,TRUE,,active
+SMM-V01,SHANGRILA-55,,Pcs,1,343.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-56,,Pcs,1,189.25,0,0,TRUE,,active
+SMM-V01,SHANGRILA-57,,Pcs,1,121.63,0,0,TRUE,,active
+SMM-V01,SHANGRILA-58,,Pcs,1,216.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-59,,Pcs,1,252.13,0,0,TRUE,,active
+SMM-V01,SHANGRILA-60,,Pcs,1,121.67,0,0,TRUE,,active
+SMM-V01,SHANGRILA-61,,Pcs,1,681.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-62,,Pcs,1,383.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-63,,Pcs,1,200.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-64,,Pcs,1,200.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-65,,Pcs,1,312.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-66,,Pcs,1,200.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-67,,Pcs,1,200.92,0,0,TRUE,,active
+SMM-V01,SHANGRILA-68,,Pcs,1,491.08,0,0,TRUE,,active
+SMM-V01,SHANGRILA-69,,Pcs,1,508.96,0,0,TRUE,,active
+SMM-V01,SHANGRILA-70,,Pcs,1,395.5,0,0,TRUE,,active
+SMM-V01,SHANGRILA-71,,Pcs,1,351.33,0,0,TRUE,,active
+SMM-V01,SHANGRILA-72,,Pcs,1,655.17,0,0,TRUE,,active
+SMM-V01,SHANGRILA-73,,Pcs,1,706.58,0,0,TRUE,,active
+SMM-V02,Hico-01,,Pcs,1,1020.5,0,0,TRUE,,active
+SMM-V02,Hico-02,,Pcs,1,1020.5,0,0,TRUE,,active
+SMM-V02,Hico-03,,Pcs,1,1045,0,0,TRUE,,active
+SMM-V02,Hico-04,,Pcs,1,1020.5,0,0,TRUE,,active
+SMM-V02,Hico-05,,Pcs,1,1045.8,0,0,TRUE,,active
+SMM-V02,Hico-06,,Pcs,1,978.5,0,0,TRUE,,active
+SMM-V02,Hico-07,,Pcs,1,978.5,0,0,TRUE,,active
+SMM-V02,Hico-08,,Pcs,1,978.5,0,0,TRUE,,active
+SMM-V02,Hico-09,,Pcs,1,1020.67,0,0,TRUE,,active
+SMM-V02,Hico-10,,Pcs,1,1020,0,0,TRUE,,active
+SMM-V02,Hico-11,,Pcs,1,58.8,0,0,TRUE,,active
+SMM-V02,Hico-12,,Pcs,1,260.4,0,0,TRUE,,active
+SMM-V02,Hico-13,,Pcs,1,58.8,0,0,TRUE,,active
+SMM-V02,Hico-14,,Pcs,1,189,0,0,TRUE,,active
+SMM-V02,Hico-15,,Pcs,1,1088,0,0,TRUE,,active
+SMM-V02,Hico-16,,Pcs,1,1088,0,0,TRUE,,active
+SMM-V02,Hico-17,,Pcs,1,1088,0,0,TRUE,,active
+SMM-V02,Hico-18,,Pcs,1,1088,0,0,TRUE,,active
+SMM-V02,Hico-19,,Pcs,1,1088,0,0,TRUE,,active
+SMM-V05,HASSAN-01,,Pcs,1,1450,0,0,TRUE,,active
+SMM-V05,HASSAN-02,,Pcs,1,500,0,0,TRUE,,active
+SMM-V05,HASSAN-03,,Pcs,1,600,0,0,TRUE,,active
+SMM-V05,HASSAN-04,,Pcs,1,1795,0,0,TRUE,,active
+SMM-V05,HASSAN-05,,Pcs,1,1850,0,0,TRUE,,active
+SMM-V05,HASSAN-06,,Pcs,1,1375,0,0,TRUE,,active
+SMM-V05,HASSAN-07,,Pcs,1,230,0,0,TRUE,,active
+SMM-V05,HASSAN-08,,Pcs,1,270,0,0,TRUE,,active
+SMM-V06,SHAHQAM-01,,Pcs,1,500,0,0,TRUE,,active
+SMM-V06,SHAHQAM-02,,Pcs,1,500,0,0,TRUE,,active
+SMM-V06,SHAHQAM-03,,Pcs,1,260,0,0,TRUE,,active
+SMM-V06,SHAHQAM-04,,Pcs,1,900,0,0,TRUE,,active
+SMM-V06,SHAHQAM-05,,Pcs,1,170,0,0,TRUE,,active
+SMM-V06,SHAHQAM-06,,Pcs,1,170,0,0,TRUE,,active
+SMM-V06,SHAHQAM-07,,Pcs,1,240,0,0,TRUE,,active
+SMM-V06,SHAHQAM-08,,Pcs,1,170,0,0,TRUE,,active
+SMM-V07,Sufi-01,,Pcs,1,591.944,0,0,TRUE,,active
+SMM-V07,Sufi-02,,Pcs,1,1859.22,0,0,TRUE,,active
+SMM-V07,Sufi-03,,Pcs,1,1589.5,0,0,TRUE,,active
+SMM-V07,Sufi-04,,Pcs,1,595,0,0,TRUE,,active
+SMM-V07,Sufi-05,,Pcs,1,6070,0,0,TRUE,,active
+SMM-V07,Sufi-06,,Pcs,1,2763.7,0,0,TRUE,,active
+SMM-V07,Sufi-07,,Pcs,1,190.08,0,0,TRUE,,active
+SMM-V07,Sufi-08,,Pcs,1,380.08,0,0,TRUE,,active
+SMM-V07,Sufi-09,,Pcs,1,258.38,0,0,TRUE,,active
+SMM-V07,Sufi-10,,Pcs,1,991.75,0,0,TRUE,,active
+SMM-V07,Sufi-11,,Pcs,1,516.73,0,0,TRUE,,active
+SMM-V07,Sufi-12,,Pcs,1,1458.5,0,0,TRUE,,active
+SMM-V07,Sufi-13,,Pcs,1,231.21,0,0,TRUE,,active
+SMM-V07,Sufi-14,,Pcs,1,85.17,0,0,TRUE,,active
+SMM-V07,Sufi-15,,Pcs,1,1082.38,0,0,TRUE,,active
+SMM-V07,Sufi-16,,Pcs,1,497.4,0,0,TRUE,,active
+SMM-V07,Sufi-17,,Pcs,1,344.7,0,0,TRUE,,active
+SMM-V07,Sufi-18,,Pcs,1,527,0,0,TRUE,,active
+SMM-V07,Sufi-19,,Pcs,1,316.56,0,0,TRUE,,active
+SMM-V07,Sufi-20,,Pcs,1,333.3,0,0,TRUE,,active
+SMM-V07,Sufi-21,,Pcs,1,313.72,0,0,TRUE,,active
+SMM-V07,Sufi-22,,Pcs,1,135.25,0,0,TRUE,,active
+SMM-V07,Sufi-23,,Pcs,1,271.85,0,0,TRUE,,active
+SMM-V07,Sufi-24,,Pcs,1,71.5,0,0,TRUE,,active
+SMM-V07,Sufi-25,,Pcs,1,543.7,0,0,TRUE,,active
+SMM-V07,Sufi-26,,Pcs,1,53.17,0,0,TRUE,,active
+SMM-V07,Sufi-27,,Pcs,1,79.53,0,0,TRUE,,active
+SMM-V07,Sufi-28,,Pcs,1,151.83,0,0,TRUE,,active
+SMM-V07,Sufi-29,,Pcs,1,102.81,0,0,TRUE,,active
+SMM-V07,Sufi-30,,Pcs,1,102.81,0,0,TRUE,,active
+SMM-V07,Sufi-31,,Pcs,1,1151.83,0,0,TRUE,,active
+SMM-V07,Sufi-32,,Pcs,1,981.75,0,0,TRUE,,active
+SMM-V07,Sufi-33,,Pcs,1,1156,0,0,TRUE,,active
+SMM-V07,Sufi-34,,Pcs,1,1105,0,0,TRUE,,active
+SMM-V07,Sufi-35,,Pcs,1,1079,0,0,TRUE,,active
+SMM-V07,Sufi-36,,Pcs,1,1049,0,0,TRUE,,active
+SMM-V07,Sufi-37,,Pcs,1,799,0,0,TRUE,,active
+SMM-V07,Sufi-38,,Pcs,1,208.27,0,0,TRUE,,active
+SMM-V07,Sufi-39,,Pcs,1,484.5,0,0,TRUE,,active
+SMM-V07,Sufi-40,,Pcs,1,1156,0,0,TRUE,,active
+SMM-V07,Sufi-41,,Pcs,1,594.17,0,0,TRUE,,active
+SMM-V07,Sufi-42,,Pcs,1,1011.5,0,0,TRUE,,active
+SMM-V07,Sufi-43,,Pcs,1,1079.5,0,0,TRUE,,active
+SMM-V07,Sufi-44,,Pcs,1,1185.83,0,0,TRUE,,active
+SMM-V07,Sufi-45,,Pcs,1,1032.73,0,0,TRUE,,active
+SMM-V07,Sufi-46,,Pcs,1,2363,0,0,TRUE,,active
+SMM-V07,Sufi-47,,Pcs,1,390,0,0,TRUE,,active
+SMM-V08,CANOLIVE-01,,Pcs,1,573.306,0,0,TRUE,,active
+SMM-V09,Dalda-01,,Pcs,1,595,0,0,TRUE,,active
+SMM-V09,Dalda-02,,Pcs,1,2795.25,0,0,TRUE,,active
+SMM-V09,Dalda-03,,Pcs,1,1876.58,0,0,TRUE,,active
+SMM-V09,Dalda-04,,Pcs,1,1876.58,0,0,TRUE,,active
+SMM-V09,Dalda-05,,Pcs,1,2795.38,0,0,TRUE,,active
+SMM-V09,Dalda-06,,Pcs,1,595,0,0,TRUE,,active
+SMM-V09,Dalda-07,,Pcs,1,745.48,0,0,TRUE,,active
+SMM-V09,Dalda-08,,Pcs,1,5920,0,0,TRUE,,active
+SMM-V09,Dalda-09,,Pcs,1,5920,0,0,TRUE,,active
+SMM-V09,Dalda-10,,Pcs,1,8500,0,0,TRUE,,active
+SMM-V09,Tyfon-01,,Pcs,1,220,0,0,TRUE,,active
+SMM-V09,SHAHI-01,,Pcs,1,76.56,0,0,TRUE,,active
+SMM-V09,SHAHI-02,,Pcs,1,76.56,0,0,TRUE,,active
+SMM-V09,SHAHI-03,,Pcs,1,152,0,0,TRUE,,active
+SMM-V09,SHAHI-04,,Pcs,1,39.63,0,0,TRUE,,active
+SMM-V09,SHAHI-05,,Pcs,1,76.56,0,0,TRUE,,active
+SMM-V09,SHAHI-06,,Pcs,1,76.5,0,0,TRUE,,active
+SMM-V09,SHAHI-07,,Pcs,1,198.17,0,0,TRUE,,active
+SMM-V09,SHAHI-08,,Pcs,1,198.17,0,0,TRUE,,active
+SMM-V09,SHAHI-09,,Pcs,1,193.25,0,0,TRUE,,active
+SMM-V09,SHAHI-10,,Pcs,1,193.25,0,0,TRUE,,active
+SMM-V09,SHAHI-11,,Pcs,1,193.25,0,0,TRUE,,active
+SMM-V10,KASHMIR-01,,Pcs,1,589.53,0,0,TRUE,,active
+SMM-V10,KASHMIR-03,,Pcs,1,565.2,0,0,TRUE,,active
+SMM-V10,KASHMIR-04,,Pcs,1,588.6,0,0,TRUE,,active
+SMM-V10,KASHMIR-05,,Pcs,1,1769,0,0,TRUE,,active
+SMM-V10,KASHMIR-06,,Pcs,1,2674.5,0,0,TRUE,,active
+SMM-V10,KASHMIR-08,,Pcs,1,2943,0,0,TRUE,,active
+SMM-V10,KASHMIR-09,,Pcs,1,1476.75,0,0,TRUE,,active
+SMM-V11,EVA-01,,Pcs,1,576,0,0,TRUE,,active
+SMM-V11,EVA-02,,Pcs,1,596,0,0,TRUE,,active
+SMM-V11,EVA-03,,Pcs,1,590,0,0,TRUE,,active
+SMM-V11,EVA-07,,Pcs,1,602,0,0,TRUE,,active
+SMM-V12,PUNJAB-01,,Pcs,1,2435.67,0,0,TRUE,,active
+SMM-V12,PUNJAB-02,,Pcs,1,721.67,0,0,TRUE,,active
+SMM-V12,PUNJAB-03,,Pcs,1,1285.25,0,0,TRUE,,active
+SMM-V12,PUNJAB-04,,Pcs,1,2480.33,0,0,TRUE,,active
+SMM-V12,PUNJAB-05,,Pcs,1,337.58,0,0,TRUE,,active
+SMM-V12,PUNJAB-06,,Pcs,1,609.17,0,0,TRUE,,active
+SMM-V13,PAKPURE-01,,Pcs,1,2690.51,0,0,TRUE,,active
+SMM-V13,PAKPURE-02,,Pcs,1,1354.83,0,0,TRUE,,active
+SMM-V14,PAK-01,,Pcs,1,2536,0,0,TRUE,,active
+SMM-V15,Olper's-01,,Pcs,1,2521.5,0,0,TRUE,,active
+SMM-V15,Olper's-02,,Pcs,1,506.21,0,0,TRUE,,active
+SMM-V15,Olper's-03,,Pcs,1,350.68,0,0,TRUE,,active
+SMM-V15,Olper's-04,,Pcs,1,179.88,0,0,TRUE,,active
+SMM-V15,Olper's-05,,Pcs,1,89.1,0,0,TRUE,,active
+SMM-V15,Olper's-06,,Pcs,1,92.21,0,0,TRUE,,active
+SMM-V15,Olper's-07,,Pcs,1,217.53,0,0,TRUE,,active
+SMM-V15,Olper's-08,,Pcs,1,1045.25,0,0,TRUE,,active
+SMM-V15,Olper's-09,,Pcs,1,421.38,0,0,TRUE,,active
+SMM-V15,Olper's-10,,Pcs,1,1678.25,0,0,TRUE,,active
+SMM-V15,Olper's-11,,Pcs,1,2090,0,0,TRUE,,active
+SMM-V15,Olper's-12,,Pcs,1,369.17,0,0,TRUE,,active
+SMM-V15,Olper's-13,,Pcs,1,92.29,0,0,TRUE,,active
+SMM-V15,Olper's-14,,Pcs,1,88.51,0,0,TRUE,,active
+SMM-V15,Olper's-15,,Pcs,1,88.51,0,0,TRUE,,active
+SMM-V15,Olper's-16,,Pcs,1,88.51,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-01,,Pcs,1,200.73,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-02,,Pcs,1,185,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-03,,Pcs,1,401.5,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-04,,Pcs,1,363.25,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-05,,Pcs,1,1434,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-06,,Pcs,1,1094.5,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-07,,Pcs,1,1003.75,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-08,,Pcs,1,1910.96,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-09,,Pcs,1,1910.83,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-10,,Pcs,1,547,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-11,,Pcs,1,456,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-12,,Pcs,1,860.35,0,0,TRUE,,active
+SMM-V15,Lipton Yellow Label-13,,Pcs,1,72.97,0,0,TRUE,,active
+SMM-V15,Dairy Omung-01,,Pcs,1,396.83,0,0,TRUE,,active
+SMM-V15,Dairy Omung-02,,Pcs,1,64.51,0,0,TRUE,,active
+SMM-V15,Dairy Omung-03,,Pcs,1,146.06,0,0,TRUE,,active
+SMM-V15,Dairy Omung-04,,Pcs,1,54.13,0,0,TRUE,,active
+SMM-V15,Dairy Omung-05,,Pcs,1,44.48,0,0,TRUE,,active
+SMM-V15,SMART-01,,Pcs,1,695,0,0,TRUE,,active
+SMM-V15,SMART-02,,Pcs,1,350,0,0,TRUE,,active
+SMM-V15,SMART-03,,Pcs,1,350,0,0,TRUE,,active
+SMM-V15,MY WRAP-01,,Pcs,1,565.25,0,0,TRUE,,active
+SMM-V15,Smart Bin Roll-01,,Pcs,1,452.31,0,0,TRUE,,active
+SMM-V15,Smart Bin Roll-02,,Pcs,1,530.77,0,0,TRUE,,active
+SMM-V15,Smart Bin Roll-03,,Pcs,1,530.77,0,0,TRUE,,active
+SMM-V15,Smart Bin Roll-04,,Pcs,1,498.46,0,0,TRUE,,active
+SMM-V15,HAQ HALAL FOOD-01,,Pcs,1,212.5,0,0,TRUE,,active
+SMM-V16,BORGES-01,,Pcs,1,5593,0,0,TRUE,,active
+SMM-V16,BORGES-02,,Pcs,1,1179.67,0,0,TRUE,,active
+SMM-V16,BORGES-03,,Pcs,1,2327.5,0,0,TRUE,,active
+SMM-V16,BORGES-04,,Pcs,1,4634.3,0,0,TRUE,,active
+SMM-V16,BORGES-05,,Pcs,1,2712.5,0,0,TRUE,,active
+SMM-V16,BORGES-06,,Pcs,1,4270.67,0,0,TRUE,,active
+SMM-V16,BORGES-07,,Pcs,1,2871.67,0,0,TRUE,,active
+SMM-V16,BORGES-08,,Pcs,1,2893,0,0,TRUE,,active
+SMM-V16,BORGES-09,,Pcs,1,1638.92,0,0,TRUE,,active
+SMM-V16,BORGES-10,,Pcs,1,907.2,0,0,TRUE,,active
+SMM-V16,BORGES-11,,Pcs,1,1486.8,0,0,TRUE,,active
+SMM-V16,BORGES-12,,Pcs,1,827.17,0,0,TRUE,,active
+SMM-V16,BORGES-13,,Pcs,1,5621,0,0,TRUE,,active
+SMM-V16,BORGES-14,,Pcs,1,1146.83,0,0,TRUE,,active
+SMM-V16,BORGES-15,,Pcs,1,667.3,0,0,TRUE,,active
+SMM-V16,BORGES-16,,Pcs,1,579.5,0,0,TRUE,,active
+SMM-V16,BORGES-17,,Pcs,1,15721,0,0,TRUE,,active
+SMM-V16,BORGES-18,,Pcs,1,16525,0,0,TRUE,,active
+SMM-V16,BORGES-19,,Pcs,1,9639.5,0,0,TRUE,,active
+SMM-V16,BORGES-20,,Pcs,1,9087.5,0,0,TRUE,,active
+SMM-V16,BORGES-21,,Pcs,1,8511.67,0,0,TRUE,,active
+SMM-V16,BORGES-22,,Pcs,1,695.67,0,0,TRUE,,active
+SMM-V16,BORGES-23,,Pcs,1,1278.33,0,0,TRUE,,active
+SMM-V16,BORGES-24,,Pcs,1,672,0,0,TRUE,,active
+SMM-V16,BORGES-25,,Pcs,1,1193.67,0,0,TRUE,,active
+SMM-V16,BORGES-26,,Pcs,1,405.13,0,0,TRUE,,active
+SMM-V16,BORGES-27,,Pcs,1,423,0,0,TRUE,,active
+SMM-V16,BORGES-28,,Pcs,1,428.92,0,0,TRUE,,active
+SMM-V16,BORGES-29,,Pcs,1,240,0,0,TRUE,,active
+SMM-V16,BORGES-30,,Pcs,1,1391.17,0,0,TRUE,,active
+SMM-V16,BORGES-31,,Pcs,1,836,0,0,TRUE,,active
+SMM-V16,BORGES-32,,Pcs,1,1358.67,0,0,TRUE,,active
+SMM-V16,BORGES-33,,Pcs,1,812.33,0,0,TRUE,,active
+SMM-V16,BORGES-34,,Pcs,1,1259.67,0,0,TRUE,,active
+SMM-V16,BORGES-35,,Pcs,1,1278.33,0,0,TRUE,,active
+SMM-V16,BORGES-36,,Pcs,1,2415.67,0,0,TRUE,,active
+SMM-V17,PONS-01,,Pcs,1,9882,0,0,TRUE,,active
+SMM-V17,PONS-02,,Pcs,1,3519,0,0,TRUE,,active
+SMM-V17,PONS-03,,Pcs,1,3105,0,0,TRUE,,active
+SMM-V17,PONS-04,,Pcs,1,3042,0,0,TRUE,,active
+SMM-V17,PONS-05,,Pcs,1,4779,0,0,TRUE,,active
+SMM-V17,PONS-06,,Pcs,1,1062,0,0,TRUE,,active
+SMM-V17,PONS-07,,Pcs,1,1899,0,0,TRUE,,active
+SMM-V17,PONS-08,,Pcs,1,1458,0,0,TRUE,,active
+SMM-V17,PONS-09,,Pcs,1,2898,0,0,TRUE,,active
+SMM-V17,PONS-10,,Pcs,1,5319,0,0,TRUE,,active
+SMM-V18,SASS0-01,,Pcs,1,2521.5,0,0,TRUE,,active
+SMM-V18,SASS0-02,,Pcs,1,4268,0,0,TRUE,,active
+SMM-V18,SASS0-03,,Pcs,1,3782.9,0,0,TRUE,,active
+SMM-V18,SASS0-04,,Pcs,1,7760.3,0,0,TRUE,,active
+SMM-V18,SASS0-05,,Pcs,1,6984.3,0,0,TRUE,,active
+SMM-V18,SASS0-06,,Pcs,1,7372.33,0,0,TRUE,,active
+SMM-V18,SASS0-07,,Pcs,1,2909.5,0,0,TRUE,,active
+SMM-V18,SASS0-08,,Pcs,1,7177.67,0,0,TRUE,,active
+SMM-V19,MUNDIAL-01,,Pcs,1,2150,0,0,TRUE,,active
+SMM-V19,MUNDIAL-02,,Pcs,1,4630,0,0,TRUE,,active
+SMM-V19,Polac-01,,Pcs,1,370,0,0,TRUE,,active
+SMM-V19,Polac-02,,Pcs,1,760,0,0,TRUE,,active
+SMM-V20,National-01,,Pcs,1,281.75,0,0,TRUE,,active
+SMM-V20,National-02,,Pcs,1,143,0,0,TRUE,,active
+SMM-V20,National-03,,Pcs,1,106.9,0,0,TRUE,,active
+SMM-V20,National-04,,Pcs,1,133.39,0,0,TRUE,,active
+SMM-V20,National-05,,Pcs,1,133.08,0,0,TRUE,,active
+SMM-V20,National-06,,Pcs,1,133.38,0,0,TRUE,,active
+SMM-V20,National-07,,Pcs,1,133.42,0,0,TRUE,,active
+SMM-V20,National-08,,Pcs,1,133.08,0,0,TRUE,,active
+SMM-V20,National-09,,Pcs,1,133.39,0,0,TRUE,,active
+SMM-V20,National-10,,Pcs,1,125.58,0,0,TRUE,,active
+SMM-V20,National-11,,Pcs,1,133.08,0,0,TRUE,,active
+SMM-V20,National-12,,Pcs,1,134.54,0,0,TRUE,,active
+SMM-V20,National-13,,Pcs,1,133.38,0,0,TRUE,,active
+SMM-V20,National-14,,Pcs,1,133.42,0,0,TRUE,,active
+SMM-V20,National-15,,Pcs,1,133.38,0,0,TRUE,,active
+SMM-V20,National-16,,Pcs,1,263.67,0,0,TRUE,,active
+SMM-V20,National-17,,Pcs,1,134.54,0,0,TRUE,,active
+SMM-V20,National-18,,Pcs,1,133.39,0,0,TRUE,,active
+SMM-V20,National-19,,Pcs,1,105.43,0,0,TRUE,,active
+SMM-V20,National-20,,Pcs,1,261.42,0,0,TRUE,,active
+SMM-V20,National-21,,Pcs,1,263.67,0,0,TRUE,,active
+SMM-V20,National-22,,Pcs,1,448.42,0,0,TRUE,,active
+SMM-V20,National-23,,Pcs,1,488.83,0,0,TRUE,,active
+SMM-V20,National-24,,Pcs,1,488.83,0,0,TRUE,,active
+SMM-V20,National-25,,Pcs,1,418.17,0,0,TRUE,,active
+SMM-V20,National-26,,Pcs,1,220.42,0,0,TRUE,,active
+SMM-V20,National-27,,Pcs,1,263.67,0,0,TRUE,,active
+SMM-V20,National-28,,Pcs,1,223.13,0,0,TRUE,,active
+SMM-V20,National-29,,Pcs,1,100,0,0,TRUE,,active
+SMM-V20,National-30,,Pcs,1,55,0,0,TRUE,,active
+SMM-V20,National-31,,Pcs,1,115.75,0,0,TRUE,,active
+SMM-V20,National-32,,Pcs,1,115.75,0,0,TRUE,,active
+SMM-V20,National-33,,Pcs,1,134.53,0,0,TRUE,,active
+SMM-V20,National-34,,Pcs,1,335.67,0,0,TRUE,,active
+SMM-V20,National-35,,Pcs,1,239.92,0,0,TRUE,,active
+SMM-V20,National-36,,Pcs,1,301.92,0,0,TRUE,,active
+SMM-V20,National-37,,Pcs,1,307.67,0,0,TRUE,,active
+SMM-V20,National-38,,Pcs,1,166.51,0,0,TRUE,,active
+SMM-V20,National-39,,Pcs,1,112.33,0,0,TRUE,,active
+SMM-V20,National-40,,Pcs,1,178.58,0,0,TRUE,,active
+SMM-V20,National-41,,Pcs,1,140.92,0,0,TRUE,,active
+SMM-V20,National-42,,Pcs,1,112.33,0,0,TRUE,,active
+SMM-V20,National-43,,Pcs,1,198.25,0,0,TRUE,,active
+SMM-V20,National-44,,Pcs,1,178.58,0,0,TRUE,,active
+SMM-V20,National-45,,Pcs,1,178.58,0,0,TRUE,,active
+SMM-V20,National-46,,Pcs,1,112.33,0,0,TRUE,,active
+SMM-V20,National-47,,Pcs,1,112.42,0,0,TRUE,,active
+SMM-V20,National-48,,Pcs,1,178.58,0,0,TRUE,,active
+SMM-V20,National-49,,Pcs,1,22.11,0,0,TRUE,,active
+SMM-V20,National-50,,Pcs,1,66.13,0,0,TRUE,,active
+SMM-V20,National-51,,Pcs,1,123.46,0,0,TRUE,,active
+SMM-V20,National-52,,Pcs,1,572.5,0,0,TRUE,,active
+SMM-V20,National-53,,Pcs,1,622.75,0,0,TRUE,,active
+SMM-V20,National-54,,Pcs,1,405.5,0,0,TRUE,,active
+SMM-V20,National-55,,Pcs,1,324.33,0,0,TRUE,,active
+SMM-V20,National-56,,Pcs,1,405.67,0,0,TRUE,,active
+SMM-V20,National-57,,Pcs,1,329,0,0,TRUE,,active
+SMM-V20,National-58,,Pcs,1,373.17,0,0,TRUE,,active
+SMM-V20,National-59,,Pcs,1,333.33,0,0,TRUE,,active
+SMM-V20,National-60,,Pcs,1,394.42,0,0,TRUE,,active
+SMM-V20,National-61,,Pcs,1,473,0,0,TRUE,,active
+SMM-V20,National-62,,Pcs,1,383.12,0,0,TRUE,,active
+SMM-V20,National-63,,Pcs,1,283.13,0,0,TRUE,,active
+SMM-V20,National-64,,Pcs,1,218.38,0,0,TRUE,,active
+SMM-V20,National-65,,Pcs,1,121.04,0,0,TRUE,,active
+SMM-V20,National-66,,Pcs,1,218.38,0,0,TRUE,,active
+SMM-V20,National-67,,Pcs,1,121.04,0,0,TRUE,,active
+SMM-V20,National-68,,Pcs,1,394.5,0,0,TRUE,,active
+SMM-V20,National-69,,Pcs,1,103.42,0,0,TRUE,,active
+SMM-V20,National-70,,Pcs,1,197.75,0,0,TRUE,,active
+SMM-V20,National-71,,Pcs,1,165.17,0,0,TRUE,,active
+SMM-V20,National-72,,Pcs,1,555.75,0,0,TRUE,,active
+SMM-V20,National-73,,Pcs,1,281.72,0,0,TRUE,,active
+SMM-V20,National-74,,Pcs,1,572.5,0,0,TRUE,,active
+SMM-V20,National-75,,Pcs,1,425.5,0,0,TRUE,,active
+SMM-V20,National-76,,Pcs,1,149.67,0,0,TRUE,,active
+SMM-V20,National-77,,Pcs,1,599.67,0,0,TRUE,,active
+SMM-V20,National-78,,Pcs,1,197.83,0,0,TRUE,,active
+SMM-V20,National-79,,Pcs,1,210,0,0,TRUE,,active
+SMM-V20,National-80,,Pcs,1,615.25,0,0,TRUE,,active
+SMM-V20,National-81,,Pcs,1,369.17,0,0,TRUE,,active
+SMM-V20,National-82,,Pcs,1,599.67,0,0,TRUE,,active
+SMM-V20,National-83,,Pcs,1,1084.75,0,0,TRUE,,active
+SMM-V20,National-84,,Pcs,1,1084.75,0,0,TRUE,,active
+SMM-V20,National-85,,Pcs,1,64.99,0,0,TRUE,,active
+SMM-V21,Shan-01,,Pcs,1,527.77,0,0,TRUE,,active
+SMM-V21,Shan-02,,Pcs,1,492.67,0,0,TRUE,,active
+SMM-V21,Shan-03,,Pcs,1,492.67,0,0,TRUE,,active
+SMM-V21,Shan-04,,Pcs,1,492.67,0,0,TRUE,,active
+SMM-V21,Shan-05,,Pcs,1,492.67,0,0,TRUE,,active
+SMM-V21,Shan-06,,Pcs,1,305,0,0,TRUE,,active
+SMM-V21,Shan-07,,Pcs,1,250.58,0,0,TRUE,,active
+SMM-V21,Shan-08,,Pcs,1,267.92,0,0,TRUE,,active
+SMM-V21,Shan-09,,Pcs,1,250.67,0,0,TRUE,,active
+SMM-V21,Shan-10,,Pcs,1,250.67,0,0,TRUE,,active
+SMM-V21,Shan-11,,Pcs,1,250.5,0,0,TRUE,,active
+SMM-V21,Shan-12,,Pcs,1,267.89,0,0,TRUE,,active
+SMM-V21,Shan-13,,Pcs,1,267.89,0,0,TRUE,,active
+SMM-V21,Shan-14,,Pcs,1,267.83,0,0,TRUE,,active
+SMM-V21,Shan-15,,Pcs,1,267.83,0,0,TRUE,,active
+SMM-V21,Shan-16,,Pcs,1,131.58,0,0,TRUE,,active
+SMM-V21,Shan-17,,Pcs,1,123.33,0,0,TRUE,,active
+SMM-V21,Shan-18,,Pcs,1,123.39,0,0,TRUE,,active
+SMM-V21,Shan-19,,Pcs,1,123.42,0,0,TRUE,,active
+SMM-V21,Shan-20,,Pcs,1,131.67,0,0,TRUE,,active
+SMM-V21,Shan-21,,Pcs,1,123.42,0,0,TRUE,,active
+SMM-V21,Shan-22,,Pcs,1,123.33,0,0,TRUE,,active
+SMM-V21,Shan-23,,Pcs,1,124.54,0,0,TRUE,,active
+SMM-V21,Shan-24,,Pcs,1,123.33,0,0,TRUE,,active
+SMM-V21,Shan-25,,Pcs,1,131.61,0,0,TRUE,,active
+SMM-V21,Shan-26,,Pcs,1,131.5,0,0,TRUE,,active
+SMM-V21,Shan-27,,Pcs,1,131.58,0,0,TRUE,,active
+SMM-V21,Shan-28,,Pcs,1,131.63,0,0,TRUE,,active
+SMM-V21,Shan-29,,Pcs,1,123.38,0,0,TRUE,,active
+SMM-V21,Shan-30,,Pcs,1,118.83,0,0,TRUE,,active
+SMM-V21,Shan-31,,Pcs,1,131.67,0,0,TRUE,,active
+SMM-V21,Shan-32,,Pcs,1,305,0,0,TRUE,,active
+SMM-V21,Shan-33,,Pcs,1,123.33,0,0,TRUE,,active
+SMM-V21,Shan-34,,Pcs,1,250.58,0,0,TRUE,,active
+SMM-V21,Shan-35,,Pcs,1,131.58,0,0,TRUE,,active
+SMM-V21,Shan-36,,Pcs,1,123.42,0,0,TRUE,,active
+SMM-V21,Shan-37,,Pcs,1,123.33,0,0,TRUE,,active
+SMM-V21,Shan-38,,Pcs,1,124.5,0,0,TRUE,,active
+SMM-V21,Shan-39,,Pcs,1,131.58,0,0,TRUE,,active
+SMM-V21,Shan-40,,Pcs,1,250.61,0,0,TRUE,,active
+SMM-V21,Shan-41,,Pcs,1,250.61,0,0,TRUE,,active
+SMM-V21,Shan-42,,Pcs,1,250.58,0,0,TRUE,,active
+SMM-V21,Shan-43,,Pcs,1,123.38,0,0,TRUE,,active
+SMM-V21,Shan-44,,Pcs,1,123.42,0,0,TRUE,,active
+SMM-V21,Shan-45,,Pcs,1,104.58,0,0,TRUE,,active
+SMM-V21,Shan-46,,Pcs,1,131.63,0,0,TRUE,,active
+SMM-V21,Shan-47,,Pcs,1,123.38,0,0,TRUE,,active
+SMM-V21,Shan-48,,Pcs,1,123.38,0,0,TRUE,,active
+SMM-V21,Shan-49,,Pcs,1,104.17,0,0,TRUE,,active
+SMM-V21,Shan-50,,Pcs,1,123.33,0,0,TRUE,,active
+SMM-V21,Shan-51,,Pcs,1,123.42,0,0,TRUE,,active
+SMM-V21,Shan-52,,Pcs,1,127.92,0,0,TRUE,,active
+SMM-V21,Shan-53,,Pcs,1,233,0,0,TRUE,,active
+SMM-V21,Shan-54,,Pcs,1,160.5,0,0,TRUE,,active
+SMM-V21,Shan-55,,Pcs,1,267.5,0,0,TRUE,,active
+SMM-V21,Shan-56,,Pcs,1,268.75,0,0,TRUE,,active
+SMM-V21,Shan-57,,Pcs,1,250.58,0,0,TRUE,,active
+SMM-V21,Shan-58,,Pcs,1,210,0,0,TRUE,,active
+SMM-V21,Shan-59,,Pcs,1,629.83,0,0,TRUE,,active
+SMM-V21,Shan-60,,Pcs,1,319.17,0,0,TRUE,,active
+SMM-V21,Shan-61,,Pcs,1,172.58,0,0,TRUE,,active
+SMM-V21,Shan-62,,Pcs,1,82.59,0,0,TRUE,,active
+SMM-V21,Shan-63,,Pcs,1,64,0,0,TRUE,,active
+SMM-V21,Shan-64,,Pcs,1,64,0,0,TRUE,,active
+SMM-V21,Shan-65,,Pcs,1,520.33,0,0,TRUE,,active
+SMM-V21,Shan-66,,Pcs,1,253.17,0,0,TRUE,,active
+SMM-V21,Shan-67,,Pcs,1,917.17,0,0,TRUE,,active
+SMM-V21,Shan-68,,Pcs,1,504.4,0,0,TRUE,,active
+SMM-V21,Shan-69,,Pcs,1,550.33,0,0,TRUE,,active
+SMM-V21,Shan-70,,Pcs,1,71.25,0,0,TRUE,,active
+SMM-V21,Shan-71,,Pcs,1,258,0,0,TRUE,,active
+SMM-V21,Shan-72,,Pcs,1,258,0,0,TRUE,,active
+SMM-V21,Shan-73,,Pcs,1,301,0,0,TRUE,,active
+SMM-V21,Shan-74,,Pcs,1,114.83,0,0,TRUE,,active
+SMM-V21,Shan-75,,Pcs,1,39.4,0,0,TRUE,,active
+SMM-V21,Shan-76,,Pcs,1,157.56,0,0,TRUE,,active
+SMM-V21,Shan-77,,Pcs,1,39.4,0,0,TRUE,,active
+SMM-V21,RITE-01,,Pcs,1,334.67,0,0,TRUE,,active
+SMM-V21,RITE-02,,Pcs,1,222.75,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-01,,Pcs,1,64.92,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-02,,Pcs,1,161,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-03,,Pcs,1,287.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-04,,Pcs,1,96.33,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-05,,Pcs,1,161.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-06,,Pcs,1,96.33,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-07,,Pcs,1,286.17,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-08,,Pcs,1,60.03,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-09,,Pcs,1,,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-10,,Pcs,1,,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-11,,Pcs,1,187.44,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-12,,Pcs,1,343.83,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-13,,Pcs,1,166.5,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-14,,Pcs,1,185.61,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-15,,Pcs,1,187.42,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-16,,Pcs,1,185.61,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-17,,Pcs,1,187.42,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-18,,Pcs,1,187.44,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-19,,Pcs,1,122.75,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-20,,Pcs,1,49.33,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-21,,Pcs,1,95,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-22,,Pcs,1,89.5,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-23,,Pcs,1,107.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-24,,Pcs,1,63.58,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-25,,Pcs,1,185.61,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-26,,Pcs,1,348.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-27,,Pcs,1,240.3,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-28,,Pcs,1,245.33,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-29,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-30,,Pcs,1,137.42,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-31,,Pcs,1,138.63,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-32,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-33,,Pcs,1,137.33,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-34,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-35,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-36,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-37,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-38,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-39,,Pcs,1,256.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-40,,Pcs,1,230.33,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-41,,Pcs,1,230.25,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-42,,Pcs,1,197.17,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-43,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-44,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-45,,Pcs,1,138.63,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-46,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-47,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-48,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-49,,Pcs,1,138.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-50,,Pcs,1,151.42,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-51,,Pcs,1,203.07,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-52,,Pcs,1,160.92,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-53,,Pcs,1,259.83,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-54,,Pcs,1,184.67,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-55,,Pcs,1,79,0,0,TRUE,,active
+SMM-V21,BAKE PARLOR-56,,Pcs,1,144.92,0,0,TRUE,,active
+SMM-V21,Sucral -01,,Pcs,1,135.25,0,0,TRUE,,active
+SMM-V21,Sucral -02,,Pcs,1,206.92,0,0,TRUE,,active
+SMM-V21,Sucral -03,,Pcs,1,153.33,0,0,TRUE,,active
+SMM-V21,Sucral -04,,Pcs,1,306.58,0,0,TRUE,,active
+SMM-V21,Sucral -05,,Pcs,1,993,0,0,TRUE,,active
+SMM-V21,Sucral -06,,Pcs,1,811.67,0,0,TRUE,,active
+SMM-V21,Sucral -07,,Pcs,1,441.83,0,0,TRUE,,active
+SMM-V21,Sucral -08,,Pcs,1,1082,0,0,TRUE,,active
+SMM-V21,SHIELD-01,,Pcs,1,64.63,0,0,TRUE,,active
+SMM-V21,SHIELD-02,,Pcs,1,225,0,0,TRUE,,active
+SMM-V21,SHIELD-03,,Pcs,1,220,0,0,TRUE,,active
+SMM-V21,SHIELD-04,,Pcs,1,300.17,0,0,TRUE,,active
+SMM-V21,SHIELD-05,,Pcs,1,135.17,0,0,TRUE,,active
+SMM-V21,SHIELD-06,,Pcs,1,115.33,0,0,TRUE,,active
+SMM-V21,SHIELD-07,,Pcs,1,153.83,0,0,TRUE,,active
+SMM-V21,SHIELD-08,,Pcs,1,61.54,0,0,TRUE,,active
+SMM-V21,SHIELD-09,,Pcs,1,225.17,0,0,TRUE,,active
+SMM-V21,SHIELD-10,,Pcs,1,181.83,0,0,TRUE,,active
+SMM-V21,SHIELD-11,,Pcs,1,221.5,0,0,TRUE,,active
+SMM-V21,SHIELD-12,,Pcs,1,196.17,0,0,TRUE,,active
+SMM-V21,SHIELD-13,,Pcs,1,237.33,0,0,TRUE,,active
+SMM-V21,SHIELD-14,,Pcs,1,139,0,0,TRUE,,active
+SMM-V21,SHIELD-15,,Pcs,1,237.25,0,0,TRUE,,active
+SMM-V21,SHIELD-16,,Pcs,1,197.67,0,0,TRUE,,active
+SMM-V21,SHIELD-17,,Pcs,1,142.25,0,0,TRUE,,active
+SMM-V21,SHIELD-18,,Pcs,1,446.67,0,0,TRUE,,active
+SMM-V21,SHIELD-19,,Pcs,1,375.25,0,0,TRUE,,active
+SMM-V21,SHIELD-20,,Pcs,1,205.33,0,0,TRUE,,active
+SMM-V21,SHIELD-21,,Pcs,1,150.25,0,0,TRUE,,active
+SMM-V21,SHIELD-22,,Pcs,1,119.17,0,0,TRUE,,active
+SMM-V21,SHIELD-23,,Pcs,1,183.6,0,0,TRUE,,active
+SMM-V21,SHIELD-24,,Pcs,1,150.25,0,0,TRUE,,active
+SMM-V21,SHIELD-25,,Pcs,1,126.5,0,0,TRUE,,active
+SMM-V21,SHIELD-26,,Pcs,1,158.25,0,0,TRUE,,active
+SMM-V21,SHIELD-27,,Pcs,1,521,0,0,TRUE,,active
+SMM-V21,SHIELD-28,,Pcs,1,632.67,0,0,TRUE,,active
+SMM-V21,SHIELD-29,,Pcs,1,670,0,0,TRUE,,active
+SMM-V21,SHIELD-30,,Pcs,1,1414.33,0,0,TRUE,,active
+SMM-V21,SHIELD-31,,Pcs,1,1008,0,0,TRUE,,active
+SMM-V21,SHIELD-32,,Pcs,1,135.17,0,0,TRUE,,active
+SMM-V21,SHIELD-33,,Pcs,1,225.17,0,0,TRUE,,active
+SMM-V21,SHIELD-34,,Pcs,1,595.67,0,0,TRUE,,active
+SMM-V21,SHIELD-35,,Pcs,1,136.08,0,0,TRUE,,active
+SMM-V21,SHIELD-36,,Pcs,1,127.04,0,0,TRUE,,active
+SMM-V21,SHIELD-37,,Pcs,1,163.31,0,0,TRUE,,active
+SMM-V21,SHIELD-38,,Pcs,1,145.15,0,0,TRUE,,active
+SMM-V21,SHIELD-39,,Pcs,1,181.46,0,0,TRUE,,active
+SMM-V21,SHIELD-40,,Pcs,1,60.75,0,0,TRUE,,active
+SMM-V21,SHIELD-41,,Pcs,1,32.83,0,0,TRUE,,active
+SMM-V21,SHIELD-42,,Pcs,1,226.83,0,0,TRUE,,active
+SMM-V21,SHIELD-43,,Pcs,1,31.78,0,0,TRUE,,active
+SMM-V21,SHIELD-44,,Pcs,1,38.11,0,0,TRUE,,active
+SMM-V21,SHIELD-45,,Pcs,1,46,0,0,TRUE,,active
+SMM-V21,SHIELD-46,,Pcs,1,136.08,0,0,TRUE,,active
+SMM-V21,SHIELD-47,,Pcs,1,181.44,0,0,TRUE,,active
+SMM-V21,SHIELD-48,,Pcs,1,74.42,0,0,TRUE,,active
+SMM-V21,SHIELD-49,,Pcs,1,127.5,0,0,TRUE,,active
+SMM-V21,Hero-01,,Pcs,1,70.25,0,0,TRUE,,active
+SMM-V21,DOMEX-01,,Pcs,1,544.5,0,0,TRUE,,active
+SMM-V21,DOMEX-02,,Pcs,1,408.17,0,0,TRUE,,active
+SMM-V21,DOMEX-03,,Pcs,1,200,0,0,TRUE,,active
+SMM-V21,DOMEX-04,,Pcs,1,408.17,0,0,TRUE,,active
+SMM-V21,Comfort-01,,Pcs,1,236.33,0,0,TRUE,,active
+SMM-V21,Comfort-02,,Pcs,1,427.33,0,0,TRUE,,active
+SMM-V21,Comfort-03,,Pcs,1,726.33,0,0,TRUE,,active
+SMM-V21,Comfort-04,,Pcs,1,427.33,0,0,TRUE,,active
+SMM-V21,Comfort-05,,Pcs,1,726,0,0,TRUE,,active
+SMM-V21,TRESEMME-01,,Pcs,1,740,0,0,TRUE,,active
+SMM-V21,TRESEMME-02,,Pcs,1,740,0,0,TRUE,,active
+SMM-V21,TRESEMME-03,,Pcs,1,1230,0,0,TRUE,,active
+SMM-V21,ABBOTT-01,,Pcs,1,2979,0,0,TRUE,,active
+SMM-V21,ABBOTT-02,,Pcs,1,2979,0,0,TRUE,,active
+SMM-V22,Hamdard-01,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-02,,Pcs,1,241.42,0,0,TRUE,,active
+SMM-V22,Hamdard-03,,Pcs,1,71.42,0,0,TRUE,,active
+SMM-V22,Hamdard-04,,Pcs,1,238.46,0,0,TRUE,,active
+SMM-V22,Hamdard-05,,Pcs,1,144.83,0,0,TRUE,,active
+SMM-V22,Hamdard-06,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-07,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-08,,Pcs,1,144.83,0,0,TRUE,,active
+SMM-V22,Hamdard-09,,Pcs,1,101.38,0,0,TRUE,,active
+SMM-V22,Hamdard-10,,Pcs,1,111.17,0,0,TRUE,,active
+SMM-V22,Hamdard-11,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-12,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-13,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-14,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-15,,Pcs,1,144.83,0,0,TRUE,,active
+SMM-V22,Hamdard-16,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-17,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-18,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-19,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-20,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-21,,Pcs,1,112.67,0,0,TRUE,,active
+SMM-V22,Hamdard-22,,Pcs,1,62.8,0,0,TRUE,,active
+SMM-V22,Hamdard-23,,Pcs,1,112.58,0,0,TRUE,,active
+SMM-V22,Hamdard-24,,Pcs,1,129.25,0,0,TRUE,,active
+SMM-V22,Hamdard-25,,Pcs,1,129.25,0,0,TRUE,,active
+SMM-V22,Hamdard-26,,Pcs,1,130.92,0,0,TRUE,,active
+SMM-V22,Hamdard-27,,Pcs,1,107.67,0,0,TRUE,,active
+SMM-V22,Hamdard-28,,Pcs,1,107.67,0,0,TRUE,,active
+SMM-V22,Hamdard-29,,Pcs,1,131.33,0,0,TRUE,,active
+SMM-V22,Hamdard-30,,Pcs,1,405.57,0,0,TRUE,,active
+SMM-V22,Hamdard-31,,Pcs,1,736.17,0,0,TRUE,,active
+SMM-V22,Hamdard-32,,Pcs,1,1344.25,0,0,TRUE,,active
+SMM-V22,Hamdard-33,,Pcs,1,386.67,0,0,TRUE,,active
+SMM-V22,Hamdard-34,,Pcs,1,427.33,0,0,TRUE,,active
+SMM-V22,Hamdard-35,,Pcs,1,400.6,0,0,TRUE,,active
+SMM-V22,Hamdard-36,,Pcs,1,487.5,0,0,TRUE,,active
+SMM-V22,Hamdard-37,,Pcs,1,375,0,0,TRUE,,active
+SMM-V22,Hamdard-38,,Pcs,1,360,0,0,TRUE,,active
+SMM-V22,Hamdard-39,,Pcs,1,433.33,0,0,TRUE,,active
+SMM-V22,Hamdard-40,,Pcs,1,375,0,0,TRUE,,active
+SMM-V22,Hamdard-41,,Pcs,1,434.25,0,0,TRUE,,active
+SMM-V22,Hamdard-42,,Pcs,1,427.33,0,0,TRUE,,active
+SMM-V22,Hamdard-43,,Pcs,1,255,0,0,TRUE,,active
+SMM-V22,Hamdard-44,,Pcs,1,202,0,0,TRUE,,active
+SMM-V22,Hamdard-45,,Pcs,1,262.33,0,0,TRUE,,active
+SMM-V22,Hamdard-46,,Pcs,1,262.33,0,0,TRUE,,active
+SMM-V22,Hamdard-47,,Pcs,1,337.3,0,0,TRUE,,active
+SMM-V22,Hamdard-48,,Pcs,1,262.67,0,0,TRUE,,active
+SMM-V22,Hamdard-49,,Pcs,1,18.77,0,0,TRUE,,active
+SMM-V22,Hamdard-50,,Pcs,1,525.5,0,0,TRUE,,active
+SMM-V22,Hamdard-51,,Pcs,1,165.17,0,0,TRUE,,active
+SMM-V22,Hamdard-52,,Pcs,1,67.5,0,0,TRUE,,active
+SMM-V22,Hamdard-53,,Pcs,1,87.9,0,0,TRUE,,active
+SMM-V22,Hamdard-54,,Pcs,1,106.66,0,0,TRUE,,active
+SMM-V22,Hamdard-55,,Pcs,1,187.67,0,0,TRUE,,active
+SMM-V22,Hamdard-56,,Pcs,1,144,0,0,TRUE,,active
+SMM-V22,Hamdard-57,,Pcs,1,625.83,0,0,TRUE,,active
+SMM-V22,Hamdard-58,,Pcs,1,375.33,0,0,TRUE,,active
+SMM-V22,Hamdard-59,,Pcs,1,375.33,0,0,TRUE,,active
+SMM-V22,Hamdard-60,,Pcs,1,375.33,0,0,TRUE,,active
+SMM-V22,Hamdard-61,,Pcs,1,360.67,0,0,TRUE,,active
+SMM-V22,Hamdard-62,,Pcs,1,391.17,0,0,TRUE,,active
+SMM-V22,Hamdard-63,,Pcs,1,391.17,0,0,TRUE,,active
+SMM-V22,Hamdard-64,,Pcs,1,40.06,0,0,TRUE,,active
+SMM-V22,Hamdard-65,,Pcs,1,123,0,0,TRUE,,active
+SMM-V22,Hamdard-66,,Pcs,1,123,0,0,TRUE,,active
+SMM-V22,Hamdard-67,,Pcs,1,83.58,0,0,TRUE,,active
+SMM-V22,Hamdard-68,,Pcs,1,135,0,0,TRUE,,active
+SMM-V22,Hamdard-69,,Pcs,1,225,0,0,TRUE,,active
+SMM-V22,Hamdard-70,,Pcs,1,150,0,0,TRUE,,active
+SMM-V22,Hamdard-71,,Pcs,1,255,0,0,TRUE,,active
+SMM-V22,Hamdard-72,,Pcs,1,102.5,0,0,TRUE,,active
+SMM-V22,Hamdard-73,,Pcs,1,165,0,0,TRUE,,active
+SMM-V22,Hamdard-74,,Pcs,1,196.75,0,0,TRUE,,active
+SMM-V22,Hamdard-75,,Pcs,1,172.33,0,0,TRUE,,active
+SMM-V22,Hamdard-76,,Pcs,1,112.5,0,0,TRUE,,active
+SMM-V22,Hamdard-77,,Pcs,1,93.75,0,0,TRUE,,active
+SMM-V22,Hamdard-78,,Pcs,1,240,0,0,TRUE,,active
+SMM-V22,Hamdard-79,,Pcs,1,119.17,0,0,TRUE,,active
+SMM-V22,Hamdard-80,,Pcs,1,142.22,0,0,TRUE,,active
+SMM-V22,Hamdard-81,,Pcs,1,172.33,0,0,TRUE,,active
+SMM-V22,Hamdard-82,,Pcs,1,277.33,0,0,TRUE,,active
+SMM-V22,Hamdard-83,,Pcs,1,513.83,0,0,TRUE,,active
+SMM-V22,Hamdard-84,,Pcs,1,135,0,0,TRUE,,active
+SMM-V22,Hamdard-85,,Pcs,1,146,0,0,TRUE,,active
+SMM-V22,Hamdard-86,,Pcs,1,180.33,0,0,TRUE,,active
+SMM-V22,Hamdard-87,,Pcs,1,750,0,0,TRUE,,active
+SMM-V22,Brooke Bond Supreme-01,,Pcs,1,172.05,0,0,TRUE,,active
+SMM-V22,Brooke Bond Supreme-02,,Pcs,1,382.4,0,0,TRUE,,active
+SMM-V22,Brooke Bond Supreme-03,,Pcs,1,337.17,0,0,TRUE,,active
+SMM-V22,Brooke Bond Supreme-04,,Pcs,1,908.17,0,0,TRUE,,active
+SMM-V22,Brooke Bond Supreme-05,,Pcs,1,1768.5,0,0,TRUE,,active
+SMM-V23,FALAK-01,,Pcs,1,645.83,0,0,TRUE,,active
+SMM-V23,FALAK-02,,Pcs,1,60.64,0,0,TRUE,,active
+SMM-V23,FALAK-03,,Pcs,1,686.76,0,0,TRUE,,active
+SMM-V23,FALAK-04,,Pcs,1,426.67,0,0,TRUE,,active
+SMM-V23,FALAK-05,,Pcs,1,972.33,0,0,TRUE,,active
+SMM-V23,FALAK-06,,Pcs,1,294.83,0,0,TRUE,,active
+SMM-V23,FALAK-07,,Pcs,1,88,0,0,TRUE,,active
+SMM-V23,FALAK-08,,Pcs,1,167.17,0,0,TRUE,,active
+SMM-V23,FALAK-09,,Pcs,1,203.5,0,0,TRUE,,active
+SMM-V23,FALAK-10,,Pcs,1,283,0,0,TRUE,,active
+SMM-V23,FALAK-11,,Pcs,1,442.17,0,0,TRUE,,active
+SMM-V23,FALAK-12,,Pcs,1,353.83,0,0,TRUE,,active
+SMM-V23,FALAK-13,,Pcs,1,264.5,0,0,TRUE,,active
+SMM-V23,FALAK-14,,Pcs,1,194.5,0,0,TRUE,,active
+SMM-V23,FALAK-15,,Pcs,1,494.7,0,0,TRUE,,active
+SMM-V23,Inse Guard-01,,Pcs,1,502.83,0,0,TRUE,,active
+SMM-V23,Inse Guard-02,,Pcs,1,539.33,0,0,TRUE,,active
+SMM-V23,Inse Guard-03,,Pcs,1,379.5,0,0,TRUE,,active
+SMM-V23,Inse Guard-04,,Pcs,1,211,0,0,TRUE,,active
+SMM-V23,Inse Guard-05,,Pcs,1,345.17,0,0,TRUE,,active
+SMM-V23,KIWI-01,,Pcs,1,368,0,0,TRUE,,active
+SMM-V23,KIWI-02,,Pcs,1,368,0,0,TRUE,,active
+SMM-V23,KIWI-03,,Pcs,1,361.83,0,0,TRUE,,active
+SMM-V23,KIWI-04,,Pcs,1,368,0,0,TRUE,,active
+SMM-V23,KIWI-05,,Pcs,1,306.25,0,0,TRUE,,active
+SMM-V23,KIWI-06,,Pcs,1,393.83,0,0,TRUE,,active
+SMM-V23,KIWI-07,,Pcs,1,368,0,0,TRUE,,active
+SMM-V23,KIWI-08,,Pcs,1,393.8,0,0,TRUE,,active
+SMM-V23,KIWI-09,,Pcs,1,660.42,0,0,TRUE,,active
+SMM-V23,KIWI-10,,Pcs,1,303.75,0,0,TRUE,,active
+SMM-V23,KIWI-11,,Pcs,1,281.83,0,0,TRUE,,active
+SMM-V23,KIWI-12,,Pcs,1,313.56,0,0,TRUE,,active
+SMM-V23,KIWI-13,,Pcs,1,660.33,0,0,TRUE,,active
+SMM-V23,KIWI-14,,Pcs,1,255.33,0,0,TRUE,,active
+SMM-V23,KIWI-15,,Pcs,1,303.71,0,0,TRUE,,active
+SMM-V23,KIWI-16,,Pcs,1,105.17,0,0,TRUE,,active
+SMM-V23,KIWI-17,,Pcs,1,158.08,0,0,TRUE,,active
+SMM-V23,KIWI-18,,Pcs,1,202,0,0,TRUE,,active
+SMM-V23,KIWI-19,,Pcs,1,393.25,0,0,TRUE,,active
+SMM-V23,KIWI-20,,Pcs,1,348,0,0,TRUE,,active
+SMM-V23,KIWI-21,,Pcs,1,431.25,0,0,TRUE,,active
+SMM-V23,KIWI-22,,Pcs,1,718.33,0,0,TRUE,,active
+SMM-V23,KIWI-23,,Pcs,1,764,0,0,TRUE,,active
+SMM-V23,KIWI-24,,Pcs,1,521.58,0,0,TRUE,,active
+SMM-V23,KIWI-25,,Pcs,1,702.33,0,0,TRUE,,active
+SMM-V23,KIWI-26,,Pcs,1,747.17,0,0,TRUE,,active
+SMM-V23,KIWI-27,,Pcs,1,481.29,0,0,TRUE,,active
+SMM-V23,KIWI-28,,Pcs,1,431.33,0,0,TRUE,,active
+SMM-V23,KIWI-29,,Pcs,1,547,0,0,TRUE,,active
+SMM-V23,KIWI-30,,Pcs,1,667.33,0,0,TRUE,,active
+SMM-V23,KIWI-31,,Pcs,1,644.58,0,0,TRUE,,active
+SMM-V23,KIWI-32,,Pcs,1,675.5,0,0,TRUE,,active
+SMM-V23,KIWI-33,,Pcs,1,405.17,0,0,TRUE,,active
+SMM-V23,KIWI-34,,Pcs,1,564.17,0,0,TRUE,,active
+SMM-V23,KIWI-35,,Pcs,1,622,0,0,TRUE,,active
+SMM-V23,BLACK CAT-01,,Pcs,1,199.5,0,0,TRUE,,active
+SMM-V23,BLACK CAT-02,,Pcs,1,135.67,0,0,TRUE,,active
+SMM-V23,BLACK CAT-03,,Pcs,1,147.67,0,0,TRUE,,active
+SMM-V23,BLACK CAT-04,,Pcs,1,147.67,0,0,TRUE,,active
+SMM-V23,Rabbit-01,,Pcs,1,153.17,0,0,TRUE,,active
+SMM-V23,Rabbit-02,,Pcs,1,276.5,0,0,TRUE,,active
+SMM-V24,Oreal-01,,Pcs,1,134.33,0,0,TRUE,,active
+SMM-V24,Oreal-02,,Pcs,1,134.23,0,0,TRUE,,active
+SMM-V24,Oreal-03,,Pcs,1,138.46,0,0,TRUE,,active
+SMM-V24,Oreal-04,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-05,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-06,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-07,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-08,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-09,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-10,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-11,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-12,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-13,,Pcs,1,151,0,0,TRUE,,active
+SMM-V24,Oreal-14,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-15,,Pcs,1,167,0,0,TRUE,,active
+SMM-V24,Oreal-16,,Pcs,1,159,0,0,TRUE,,active
+SMM-V24,Oreal-17,,Pcs,1,159.46,0,0,TRUE,,active
+SMM-V24,Oreal-18,,Pcs,1,142.69,0,0,TRUE,,active
+SMM-V24,Oreal-19,,Pcs,1,104.92,0,0,TRUE,,active
+SMM-V24,Oreal-20,,Pcs,1,96.92,0,0,TRUE,,active
+SMM-V24,Oreal-21,,Pcs,1,37.77,0,0,TRUE,,active
+SMM-V24,Oreal-22,,Pcs,1,225.98,0,0,TRUE,,active
+SMM-V24,Oreal-23,,Pcs,1,209,0,0,TRUE,,active
+SMM-V24,Oreal-24,,Pcs,1,209.83,0,0,TRUE,,active
+SMM-V24,Oreal-25,,Pcs,1,1177.33,0,0,TRUE,,active
+SMM-V24,Oreal-26,,Pcs,1,20.98,0,0,TRUE,,active
+SMM-V24,Oreal-27,,Pcs,1,41.96,0,0,TRUE,,active
+SMM-V24,Oreal-28,,Pcs,1,250,0,0,TRUE,,active
+SMM-V24,Oreal-29,,Pcs,1,250,0,0,TRUE,,active
+SMM-V24,Oreal-30,,Pcs,1,250,0,0,TRUE,,active
+SMM-V24,Oreal-31,,Pcs,1,250,0,0,TRUE,,active
+SMM-V24,Oreal-32,,Pcs,1,250,0,0,TRUE,,active
+SMM-V24,Oreal-33,,Pcs,1,250,0,0,TRUE,,active
+SMM-V24,Oreal-34,,Pcs,1,250,0,0,TRUE,,active
+SMM-V25,SUNRISE-01,,Pcs,1,39.5,0,0,TRUE,,active
+SMM-V26,MARHABA-01,,Pcs,1,63.98,0,0,TRUE,,active
+SMM-V26,MARHABA-02,,Pcs,1,360,0,0,TRUE,,active
+SMM-V26,MARHABA-03,,Pcs,1,405,0,0,TRUE,,active
+SMM-V26,MARHABA-04,,Pcs,1,71.67,0,0,TRUE,,active
+SMM-V26,MARHABA-05,,Pcs,1,637.15,0,0,TRUE,,active
+SMM-V26,MARHABA-06,,Pcs,1,670.33,0,0,TRUE,,active
+SMM-V26,MARHABA-07,,Pcs,1,417.17,0,0,TRUE,,active
+SMM-V26,MARHABA-08,,Pcs,1,200,0,0,TRUE,,active
+SMM-V26,MARHABA-09,,Pcs,1,227.83,0,0,TRUE,,active
+SMM-V26,MARHABA-10,,Pcs,1,414.08,0,0,TRUE,,active
+SMM-V26,MARHABA-11,,Pcs,1,166.67,0,0,TRUE,,active
+SMM-V26,MARHABA-12,,Pcs,1,414.08,0,0,TRUE,,active
+SMM-V26,MARHABA-13,,Pcs,1,468.67,0,0,TRUE,,active
+SMM-V26,MARHABA-14,,Pcs,1,166.67,0,0,TRUE,,active
+SMM-V26,MARHABA-15,,Pcs,1,93,0,0,TRUE,,active
+SMM-V26,MARHABA-16,,Pcs,1,617.17,0,0,TRUE,,active
+SMM-V26,MARHABA-17,,Pcs,1,46.67,0,0,TRUE,,active
+SMM-V26,MARHABA-18,,Pcs,1,66.67,0,0,TRUE,,active
+SMM-V26,MARHABA-19,,Pcs,1,103.33,0,0,TRUE,,active
+SMM-V26,MARHABA-20,,Pcs,1,88.83,0,0,TRUE,,active
+SMM-V26,MARHABA-21,,Pcs,1,185.75,0,0,TRUE,,active
+SMM-V26,MARHABA-22,,Pcs,1,52.38,0,0,TRUE,,active
+SMM-V27,GOLDPEAK-01,,Pcs,1,125,0,0,TRUE,,active
+SMM-V27,GOLDPEAK-02,,Pcs,1,110,0,0,TRUE,,active
+SMM-V28,Rossmoor-01,,Pcs,1,470,0,0,TRUE,,active
+SMM-V28,Rossmoor-02,,Pcs,1,632,0,0,TRUE,,active
+SMM-V28,Rossmoor-03,,Pcs,1,213.08,0,0,TRUE,,active
+SMM-V28,Rossmoor-04,,Pcs,1,128.67,0,0,TRUE,,active
+SMM-V28,Rossmoor-05,,Pcs,1,90.25,0,0,TRUE,,active
+SMM-V28,Rossmoor-06,,Pcs,1,90.25,0,0,TRUE,,active
+SMM-V28,Rossmoor-07,,Pcs,1,216.67,0,0,TRUE,,active
+SMM-V28,Rossmoor-08,,Pcs,1,144.42,0,0,TRUE,,active
+SMM-V28,Rossmoor-09,,Pcs,1,144.5,0,0,TRUE,,active
+SMM-V28,Rossmoor-10,,Pcs,1,162.5,0,0,TRUE,,active
+SMM-V28,Rossmoor-11,,Pcs,1,114.5,0,0,TRUE,,active
+SMM-V28,Rossmoor-12,,Pcs,1,155.75,0,0,TRUE,,active
+SMM-V28,Rossmoor-13,,Pcs,1,206.17,0,0,TRUE,,active
+SMM-V28,Rossmoor-14,,Pcs,1,203.33,0,0,TRUE,,active
+SMM-V28,Rossmoor-15,,Pcs,1,178,0,0,TRUE,,active
+SMM-V28,Rossmoor-16,,Pcs,1,180.83,0,0,TRUE,,active
+SMM-V28,Rossmoor-17,,Pcs,1,150,0,0,TRUE,,active
+SMM-V28,Rossmoor-18,,Pcs,1,210.5,0,0,TRUE,,active
+SMM-V28,Rossmoor-19,,Pcs,1,98.5,0,0,TRUE,,active
+SMM-V28,Rossmoor-20,,Pcs,1,131.67,0,0,TRUE,,active
+SMM-V28,Rossmoor-21,,Pcs,1,140.33,0,0,TRUE,,active
+SMM-V28,Rossmoor-22,,Pcs,1,177.83,0,0,TRUE,,active
+SMM-V28,Salman's-01,,Pcs,1,546.67,0,0,TRUE,,active
+SMM-V28,My Cook-01,,Pcs,1,69.58,0,0,TRUE,,active
+SMM-V28,My Cook-02,,Pcs,1,65.58,0,0,TRUE,,active
+SMM-V28,My Cook-03,,Pcs,1,90.42,0,0,TRUE,,active
+SMM-V28,My Cook-04,,Pcs,1,82.23,0,0,TRUE,,active
+SMM-V28,My Cook-05,,Pcs,1,40,0,0,TRUE,,active
+SMM-V28,My Cook-06,,Pcs,1,58.33,0,0,TRUE,,active
+SMM-V28,My Cook-07,,Pcs,1,135.67,0,0,TRUE,,active
+SMM-V28,My Cook-08,,Pcs,1,82.33,0,0,TRUE,,active
+SMM-V28,My Cook-09,,Pcs,1,135.67,0,0,TRUE,,active
+SMM-V28,My Cook-10,,Pcs,1,108.5,0,0,TRUE,,active
+SMM-V28,My Cook-11,,Pcs,1,41.17,0,0,TRUE,,active
+SMM-V28,PAKEATO-01,,Pcs,1,84.75,0,0,TRUE,,active
+SMM-V28,PAKEATO-02,,Pcs,1,150.67,0,0,TRUE,,active
+SMM-V28,PAKEATO-03,,Pcs,1,150.67,0,0,TRUE,,active
+SMM-V28,Mother Choice-01,,Pcs,1,142.67,0,0,TRUE,,active
+SMM-V28,Mother Choice-02,,Pcs,1,104,0,0,TRUE,,active
+SMM-V29,Laziza-01,,Pcs,1,219,0,0,TRUE,,active
+SMM-V29,Laziza-02,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-03,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-04,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-05,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-06,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-07,,Pcs,1,219.67,0,0,TRUE,,active
+SMM-V29,Laziza-08,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-09,,Pcs,1,,0,0,TRUE,,active
+SMM-V29,Laziza-10,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-11,,Pcs,1,219.67,0,0,TRUE,,active
+SMM-V29,Laziza-12,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-13,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V29,Laziza-14,,Pcs,1,292.88,0,0,TRUE,,active
+SMM-V29,Laziza-15,,Pcs,1,220.67,0,0,TRUE,,active
+SMM-V29,Laziza-16,,Pcs,1,211.83,0,0,TRUE,,active
+SMM-V29,Laziza-17,,Pcs,1,207.33,0,0,TRUE,,active
+SMM-V29,Laziza-18,,Pcs,1,210.83,0,0,TRUE,,active
+SMM-V29,Laziza-19,,Pcs,1,220.67,0,0,TRUE,,active
+SMM-V29,Laziza-20,,Pcs,1,216,0,0,TRUE,,active
+SMM-V29,Laziza-21,,Pcs,1,217.62,0,0,TRUE,,active
+SMM-V29,Laziza-22,,Pcs,1,216,0,0,TRUE,,active
+SMM-V29,Sugarie-01,,Pcs,1,130,0,0,TRUE,,active
+SMM-V29,Sugarie-02,,Pcs,1,130.67,0,0,TRUE,,active
+SMM-V29,Sugarie-03,,Pcs,1,135.17,0,0,TRUE,,active
+SMM-V29,Sugarie-04,,Pcs,1,191.17,0,0,TRUE,,active
+SMM-V29,Sugarie-05,,Pcs,1,362.67,0,0,TRUE,,active
+SMM-V29,Sugarie-06,,Pcs,1,191.08,0,0,TRUE,,active
+SMM-V29,Sugarie-07,,Pcs,1,175,0,0,TRUE,,active
+SMM-V29,Sugarie-08,,Pcs,1,362.58,0,0,TRUE,,active
+SMM-V29,Sugarie-09,,Pcs,1,151.9,0,0,TRUE,,active
+SMM-V29,Sugarie-10,,Pcs,1,175,0,0,TRUE,,active
+SMM-V30,FAUJI-01,,Pcs,1,144,0,0,TRUE,,active
+SMM-V30,FAUJI-02,,Pcs,1,170.5,0,0,TRUE,,active
+SMM-V30,FAUJI-03,,Pcs,1,375.33,0,0,TRUE,,active
+SMM-V30,FAUJI-04,,Pcs,1,555,0,0,TRUE,,active
+SMM-V30,FAUJI-05,,Pcs,1,650,0,0,TRUE,,active
+SMM-V30,FAUJI-06,,Pcs,1,244.83,0,0,TRUE,,active
+SMM-V30,FAUJI-07,,Pcs,1,179.5,0,0,TRUE,,active
+SMM-V30,FAUJI-08,,Pcs,1,244.83,0,0,TRUE,,active
+SMM-V30,FAUJI-09,,Pcs,1,467,0,0,TRUE,,active
+SMM-V30,FAUJI-10,,Pcs,1,711,0,0,TRUE,,active
+SMM-V30,FAUJI-11,,Pcs,1,938.5,0,0,TRUE,,active
+SMM-V30,Nurpur-01,,Pcs,1,505.83,0,0,TRUE,,active
+SMM-V30,Nurpur-02,,Pcs,1,343.52,0,0,TRUE,,active
+SMM-V30,Nurpur-03,,Pcs,1,81.71,0,0,TRUE,,active
+SMM-V30,Nurpur-04,,Pcs,1,90,0,0,TRUE,,active
+SMM-V30,Nurpur-05,,Pcs,1,90,0,0,TRUE,,active
+SMM-V30,Nurpur-06,,Pcs,1,249.42,0,0,TRUE,,active
+SMM-V30,Nurpur-07,,Pcs,1,395.27,0,0,TRUE,,active
+SMM-V30,Nurpur-08,,Pcs,1,752.93,0,0,TRUE,,active
+SMM-V30,Nurpur-09,,Pcs,1,753,0,0,TRUE,,active
+SMM-V30,Nurpur-10,,Pcs,1,648.5,0,0,TRUE,,active
+SMM-V30,Nurpur-11,,Pcs,1,602,0,0,TRUE,,active
+SMM-V30,Nurpur-12,,Pcs,1,602.17,0,0,TRUE,,active
+SMM-V30,Nurpur-13,,Pcs,1,630,0,0,TRUE,,active
+SMM-V31,Rafhan-01,,Pcs,1,178.27,0,0,TRUE,,active
+SMM-V31,Rafhan-02,,Pcs,1,178.27,0,0,TRUE,,active
+SMM-V31,Rafhan-03,,Pcs,1,203.75,0,0,TRUE,,active
+SMM-V31,Rafhan-04,,Pcs,1,206.42,0,0,TRUE,,active
+SMM-V31,Rafhan-05,,Pcs,1,194.5,0,0,TRUE,,active
+SMM-V31,Rafhan-06,,Pcs,1,203.67,0,0,TRUE,,active
+SMM-V31,Rafhan-07,,Pcs,1,170,0,0,TRUE,,active
+SMM-V31,KNORR-01,,Pcs,1,133.65,0,0,TRUE,,active
+SMM-V31,KNORR-02,,Pcs,1,234.58,0,0,TRUE,,active
+SMM-V31,KNORR-03,,Pcs,1,412.83,0,0,TRUE,,active
+SMM-V31,KNORR-04,,Pcs,1,114.21,0,0,TRUE,,active
+SMM-V31,KNORR-05,,Pcs,1,422.17,0,0,TRUE,,active
+SMM-V31,KNORR-06,,Pcs,1,239.25,0,0,TRUE,,active
+SMM-V31,KNORR-07,,Pcs,1,374.33,0,0,TRUE,,active
+SMM-V31,KNORR-08,,Pcs,1,374.33,0,0,TRUE,,active
+SMM-V31,KNORR-09,,Pcs,1,374.33,0,0,TRUE,,active
+SMM-V31,KNORR-10,,Pcs,1,114.21,0,0,TRUE,,active
+SMM-V31,KNORR-11,,Pcs,1,374.33,0,0,TRUE,,active
+SMM-V31,KNORR-12,,Pcs,1,46.92,0,0,TRUE,,active
+SMM-V31,KNORR-13,,Pcs,1,258,0,0,TRUE,,active
+SMM-V31,KNORR-14,,Pcs,1,92.9,0,0,TRUE,,active
+SMM-V31,KNORR-15,,Pcs,1,173.56,0,0,TRUE,,active
+SMM-V31,KNORR-16,,Pcs,1,92.9,0,0,TRUE,,active
+SMM-V31,KNORR-17,,Pcs,1,258,0,0,TRUE,,active
+SMM-V31,KNORR-18,,Pcs,1,173.56,0,0,TRUE,,active
+SMM-V31,KNORR-19,,Pcs,1,65.68,0,0,TRUE,,active
+SMM-V31,KNORR-20,,Pcs,1,411.2,0,0,TRUE,,active
+SMM-V31,KNORR-21,,Pcs,1,411.2,0,0,TRUE,,active
+SMM-V31,KNORR-22,,Pcs,1,65.68,0,0,TRUE,,active
+SMM-V31,KNORR-23,,Pcs,1,164.2,0,0,TRUE,,active
+SMM-V31,KNORR-24,,Pcs,1,411.2,0,0,TRUE,,active
+SMM-V31,KNORR-25,,Pcs,1,411.2,0,0,TRUE,,active
+SMM-V31,KNORR-26,,Pcs,1,46.92,0,0,TRUE,,active
+SMM-V31,DOVE-01,,Pcs,1,425,0,0,TRUE,,active
+SMM-V31,DOVE-02,,Pcs,1,840,0,0,TRUE,,active
+SMM-V31,DOVE-03,,Pcs,1,840.5,0,0,TRUE,,active
+SMM-V31,DOVE-04,,Pcs,1,840.5,0,0,TRUE,,active
+SMM-V31,DOVE-05,,Pcs,1,840.5,0,0,TRUE,,active
+SMM-V31,DOVE-06,,Pcs,1,502.5,0,0,TRUE,,active
+SMM-V31,DOVE-07,,Pcs,1,502.5,0,0,TRUE,,active
+SMM-V31,DOVE-08,,Pcs,1,520,0,0,TRUE,,active
+SMM-V31,DOVE-09,,Pcs,1,502.5,0,0,TRUE,,active
+SMM-V31,DOVE-10,,Pcs,1,548.18,0,0,TRUE,,active
+SMM-V31,DOVE-11,,Pcs,1,502.5,0,0,TRUE,,active
+SMM-V31,DOVE-12,,Pcs,1,1507.33,0,0,TRUE,,active
+SMM-V31,DOVE-13,,Pcs,1,1834.33,0,0,TRUE,,active
+SMM-V31,DOVE-14,,Pcs,1,173.91,0,0,TRUE,,active
+SMM-V31,DOVE-15,,Pcs,1,830,0,0,TRUE,,active
+SMM-V31,DOVE-16,,Pcs,1,415,0,0,TRUE,,active
+SMM-V31,DOVE-17,,Pcs,1,430,0,0,TRUE,,active
+SMM-V31,DOVE-18,,Pcs,1,430,0,0,TRUE,,active
+SMM-V31,DOVE-19,,Pcs,1,430,0,0,TRUE,,active
+SMM-V31,DOVE-20,,Pcs,1,1290,0,0,TRUE,,active
+SMM-V31,DOVE-21,,Pcs,1,1260,0,0,TRUE,,active
+SMM-V31,DOVE-22,,Pcs,1,415,0,0,TRUE,,active
+SMM-V31,DOVE-23,,Pcs,1,415,0,0,TRUE,,active
+SMM-V31,DOVE-24,,Pcs,1,415,0,0,TRUE,,active
+SMM-V31,DOVE-25,,Pcs,1,415,0,0,TRUE,,active
+SMM-V31,DOVE-26,,Pcs,1,415,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-01,,Pcs,1,1142.28,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-02,,Pcs,1,1679.81,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-03,,Pcs,1,289.58,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-04,,Pcs,1,595.12,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-05,,Pcs,1,2524.5,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-06,,Pcs,1,297.56,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-07,,Pcs,1,595.14,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-08,,Pcs,1,581.83,0,0,TRUE,,active
+SMM-V31,SURF EXCEL-09,,Pcs,1,627.33,0,0,TRUE,,active
+SMM-V31,SUNLIGHT-01,,Pcs,1,190.47,0,0,TRUE,,active
+SMM-V31,SUNLIGHT-02,,Pcs,1,190.47,0,0,TRUE,,active
+SMM-V31,SUNLIGHT-03,,Pcs,1,525.44,0,0,TRUE,,active
+SMM-V31,SUNLIGHT-04,,Pcs,1,525.44,0,0,TRUE,,active
+SMM-V31,Vim-01,,Pcs,1,47.17,0,0,TRUE,,active
+SMM-V31,Vim-02,,Pcs,1,89.67,0,0,TRUE,,active
+SMM-V31,Vim-03,,Pcs,1,75.5,0,0,TRUE,,active
+SMM-V31,Vim-04,,Pcs,1,151,0,0,TRUE,,active
+SMM-V31,Vim-05,,Pcs,1,139.58,0,0,TRUE,,active
+SMM-V31,Vim-06,,Pcs,1,232.64,0,0,TRUE,,active
+SMM-V31,Vim-07,,Pcs,1,92.1,0,0,TRUE,,active
+SMM-V31,Vim-08,,Pcs,1,363,0,0,TRUE,,active
+SMM-V31,Vim-09,,Pcs,1,242,0,0,TRUE,,active
+SMM-V31,Vim-10,,Pcs,1,417.79,0,0,TRUE,,active
+SMM-V31,Vim-11,,Pcs,1,84.91,0,0,TRUE,,active
+SMM-V31,Vim-12,,Pcs,1,169.83,0,0,TRUE,,active
+SMM-V31,Vim-13,,Pcs,1,85,0,0,TRUE,,active
+SMM-V31,Vim-14,,Pcs,1,160.58,0,0,TRUE,,active
+SMM-V31,SUNSILK-01,,Pcs,1,731.78,0,0,TRUE,,active
+SMM-V31,SUNSILK-02,,Pcs,1,457.03,0,0,TRUE,,active
+SMM-V31,SUNSILK-03,,Pcs,1,1281.33,0,0,TRUE,,active
+SMM-V31,SUNSILK-04,,Pcs,1,778.5,0,0,TRUE,,active
+SMM-V31,SUNSILK-05,,Pcs,1,457.04,0,0,TRUE,,active
+SMM-V31,SUNSILK-06,,Pcs,1,778.5,0,0,TRUE,,active
+SMM-V31,SUNSILK-07,,Pcs,1,731.78,0,0,TRUE,,active
+SMM-V31,SUNSILK-08,,Pcs,1,1048.25,0,0,TRUE,,active
+SMM-V31,SUNSILK-09,,Pcs,1,485.42,0,0,TRUE,,active
+SMM-V31,SUNSILK-10,,Pcs,1,731.83,0,0,TRUE,,active
+SMM-V31,SUNSILK-11,,Pcs,1,457.03,0,0,TRUE,,active
+SMM-V31,SUNSILK-12,,Pcs,1,457.03,0,0,TRUE,,active
+SMM-V31,SUNSILK-13,,Pcs,1,731.79,0,0,TRUE,,active
+SMM-V31,SUNSILK-14,,Pcs,1,412.14,0,0,TRUE,,active
+SMM-V31,SUNSILK-15,,Pcs,1,457.02,0,0,TRUE,,active
+SMM-V31,SUNSILK-16,,Pcs,1,485.42,0,0,TRUE,,active
+SMM-V31,SUNSILK-17,,Pcs,1,710,0,0,TRUE,,active
+SMM-V31,SUNSILK-18,,Pcs,1,695,0,0,TRUE,,active
+SMM-V31,SUNSILK-19,,Pcs,1,425,0,0,TRUE,,active
+SMM-V31,SUNSILK-20,,Pcs,1,778.5,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-01,,Pcs,1,292.33,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-02,,Pcs,1,566.5,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-03,,Pcs,1,1050,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-04,,Pcs,1,292.33,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-05,,Pcs,1,292.36,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-06,,Pcs,1,566.5,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-07,,Pcs,1,1050.67,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-08,,Pcs,1,1050.67,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-09,,Pcs,1,566.43,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-10,,Pcs,1,292.33,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-11,,Pcs,1,566.5,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-12,,Pcs,1,292.33,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-13,,Pcs,1,395,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-14,,Pcs,1,695,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-15,,Pcs,1,395,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-16,,Pcs,1,103.99,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-17,,Pcs,1,93.59,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-18,,Pcs,1,94.54,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-19,,Pcs,1,118.17,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-20,,Pcs,1,122.9,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-21,,Pcs,1,122.91,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-22,,Pcs,1,362,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-23,,Pcs,1,362,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-24,,Pcs,1,94.54,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-25,,Pcs,1,122.92,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-26,,Pcs,1,254.67,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-27,,Pcs,1,254.67,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-28,,Pcs,1,254.67,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-29,,Pcs,1,818.33,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-30,,Pcs,1,409,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-31,,Pcs,1,772.67,0,0,TRUE,,active
+SMM-V31,LIFEBUOY-32,,Pcs,1,409,0,0,TRUE,,active
+SMM-V31,CLEAR-01,,Pcs,1,790,0,0,TRUE,,active
+SMM-V31,CLEAR-02,,Pcs,1,457,0,0,TRUE,,active
+SMM-V31,CLEAR-03,,Pcs,1,457.14,0,0,TRUE,,active
+SMM-V31,CLEAR-04,,Pcs,1,790,0,0,TRUE,,active
+SMM-V31,CLEAR-05,,Pcs,1,430.47,0,0,TRUE,,active
+SMM-V31,LUX-01,,Pcs,1,,0,0,TRUE,,active
+SMM-V31,LUX-02,,Pcs,1,123.83,0,0,TRUE,,active
+SMM-V31,LUX-03,,Pcs,1,152.42,0,0,TRUE,,active
+SMM-V31,LUX-04,,Pcs,1,152.42,0,0,TRUE,,active
+SMM-V31,LUX-05,,Pcs,1,331.58,0,0,TRUE,,active
+SMM-V31,LUX-06,,Pcs,1,419.17,0,0,TRUE,,active
+SMM-V31,LUX-07,,Pcs,1,419.17,0,0,TRUE,,active
+SMM-V31,LUX-08,,Pcs,1,419.17,0,0,TRUE,,active
+SMM-V31,LUX-09,,Pcs,1,419.17,0,0,TRUE,,active
+SMM-V31,LUX-10,,Pcs,1,428.67,0,0,TRUE,,active
+SMM-V31,LUX-11,,Pcs,1,403.28,0,0,TRUE,,active
+SMM-V31,LUX-12,,Pcs,1,152.42,0,0,TRUE,,active
+SMM-V31,LUX-13,,Pcs,1,820,0,0,TRUE,,active
+SMM-V31,LUX-14,,Pcs,1,820,0,0,TRUE,,active
+SMM-V31,LUX-15,,Pcs,1,739,0,0,TRUE,,active
+SMM-V31,LUX-16,,Pcs,1,739,0,0,TRUE,,active
+SMM-V31,LUX-17,,Pcs,1,739,0,0,TRUE,,active
+SMM-V31,LUX-18,,Pcs,1,408.67,0,0,TRUE,,active
+SMM-V31,LUX-19,,Pcs,1,395,0,0,TRUE,,active
+SMM-V31,LUX-20,,Pcs,1,500,0,0,TRUE,,active
+SMM-V31,LUX-21,,Pcs,1,500,0,0,TRUE,,active
+SMM-V31,LUX-22,,Pcs,1,395,0,0,TRUE,,active
+SMM-V31,LUX-23,,Pcs,1,395,0,0,TRUE,,active
+SMM-V31,Hellmann's-01,,Pcs,1,374.33,0,0,TRUE,,active
+SMM-V31,Hellmann's-02,,Pcs,1,655.83,0,0,TRUE,,active
+SMM-V31,Hellmann's-03,,Pcs,1,562,0,0,TRUE,,active
+SMM-V31,Hellmann's-04,,Pcs,1,562,0,0,TRUE,,active
+SMM-V31,Hellmann's-05,,Pcs,1,525.5,0,0,TRUE,,active
+SMM-V31,Hellmann's-06,,Pcs,1,562,0,0,TRUE,,active
+SMM-V32,Youngs's-01,,Pcs,1,660.32,0,0,TRUE,,active
+SMM-V32,Youngs's-02,,Pcs,1,382.17,0,0,TRUE,,active
+SMM-V32,Youngs's-03,,Pcs,1,660.32,0,0,TRUE,,active
+SMM-V32,Youngs's-04,,Pcs,1,382.17,0,0,TRUE,,active
+SMM-V32,Youngs's-05,,Pcs,1,1335.17,0,0,TRUE,,active
+SMM-V32,Youngs's-06,,Pcs,1,708.83,0,0,TRUE,,active
+SMM-V32,Youngs's-07,,Pcs,1,420,0,0,TRUE,,active
+SMM-V32,Youngs's-08,,Pcs,1,977.83,0,0,TRUE,,active
+SMM-V32,Youngs's-09,,Pcs,1,435.67,0,0,TRUE,,active
+SMM-V32,Youngs's-10,,Pcs,1,874.17,0,0,TRUE,,active
+SMM-V32,Youngs's-11,,Pcs,1,400.42,0,0,TRUE,,active
+SMM-V32,Youngs's-12,,Pcs,1,1141.48,0,0,TRUE,,active
+SMM-V32,Youngs's-13,,Pcs,1,525.67,0,0,TRUE,,active
+SMM-V32,Youngs's-14,,Pcs,1,883.67,0,0,TRUE,,active
+SMM-V32,Youngs's-15,,Pcs,1,740.67,0,0,TRUE,,active
+SMM-V32,Youngs's-16,,Pcs,1,884.83,0,0,TRUE,,active
+SMM-V32,Youngs's-17,,Pcs,1,1517.37,0,0,TRUE,,active
+SMM-V32,Youngs's-18,,Pcs,1,716.5,0,0,TRUE,,active
+SMM-V32,Youngs's-19,,Pcs,1,804.67,0,0,TRUE,,active
+SMM-V32,Youngs's-20,,Pcs,1,803.75,0,0,TRUE,,active
+SMM-V32,Youngs's-21,,Pcs,1,1429.33,0,0,TRUE,,active
+SMM-V32,Youngs's-22,,Pcs,1,625.58,0,0,TRUE,,active
+SMM-V32,Youngs's-23,,Pcs,1,444.33,0,0,TRUE,,active
+SMM-V32,Youngs's-24,,Pcs,1,181.17,0,0,TRUE,,active
+SMM-V32,Youngs's-25,,Pcs,1,930.67,0,0,TRUE,,active
+SMM-V32,Youngs's-26,,Pcs,1,495,0,0,TRUE,,active
+SMM-V32,Youngs's-27,,Pcs,1,244.58,0,0,TRUE,,active
+SMM-V32,Youngs's-28,,Pcs,1,472,0,0,TRUE,,active
+SMM-V32,Youngs's-29,,Pcs,1,518.67,0,0,TRUE,,active
+SMM-V32,Youngs's-30,,Pcs,1,385.33,0,0,TRUE,,active
+SMM-V32,Youngs's-31,,Pcs,1,298.83,0,0,TRUE,,active
+SMM-V32,Youngs's-32,,Pcs,1,229.5,0,0,TRUE,,active
+SMM-V32,Youngs's-33,,Pcs,1,485.17,0,0,TRUE,,active
+SMM-V32,Youngs's-34,,Pcs,1,226.67,0,0,TRUE,,active
+SMM-V32,Youngs's-35,,Pcs,1,1170.21,0,0,TRUE,,active
+SMM-V32,Youngs's-36,,Pcs,1,280.6,0,0,TRUE,,active
+SMM-V32,Youngs's-37,,Pcs,1,904.67,0,0,TRUE,,active
+SMM-V32,Youngs's-38,,Pcs,1,656.73,0,0,TRUE,,active
+SMM-V32,Youngs's-39,,Pcs,1,518.33,0,0,TRUE,,active
+SMM-V32,Youngs's-40,,Pcs,1,645.49,0,0,TRUE,,active
+SMM-V32,Youngs's-41,,Pcs,1,280.58,0,0,TRUE,,active
+SMM-V32,Youngs's-42,,Pcs,1,593.67,0,0,TRUE,,active
+SMM-V32,Youngs's-43,,Pcs,1,608,0,0,TRUE,,active
+SMM-V32,Youngs's-44,,Pcs,1,153.33,0,0,TRUE,,active
+SMM-V32,Youngs's-45,,Pcs,1,609.67,0,0,TRUE,,active
+SMM-V32,Youngs's-46,,Pcs,1,401.83,0,0,TRUE,,active
+SMM-V32,Youngs's-47,,Pcs,1,399.31,0,0,TRUE,,active
+SMM-V32,Youngs's-48,,Pcs,1,648.83,0,0,TRUE,,active
+SMM-V32,Youngs's-49,,Pcs,1,430,0,0,TRUE,,active
+SMM-V32,Youngs's-50,,Pcs,1,25.5,0,0,TRUE,,active
+SMM-V32,Youngs's-51,,Pcs,1,25.5,0,0,TRUE,,active
+SMM-V32,Youngs's-52,,Pcs,1,169.15,0,0,TRUE,,active
+SMM-V32,Youngs's-53,,Pcs,1,192,0,0,TRUE,,active
+SMM-V32,Youngs's-54,,Pcs,1,193.83,0,0,TRUE,,active
+SMM-V32,Youngs's-55,,Pcs,1,214.33,0,0,TRUE,,active
+SMM-V32,Youngs's-56,,Pcs,1,214.33,0,0,TRUE,,active
+SMM-V32,Youngs's-57,,Pcs,1,214.33,0,0,TRUE,,active
+SMM-V32,Youngs's-58,,Pcs,1,42.5,0,0,TRUE,,active
+SMM-V32,Youngs's-59,,Pcs,1,254.15,0,0,TRUE,,active
+SMM-V32,Youngs's-60,,Pcs,1,254.14,0,0,TRUE,,active
+SMM-V32,Youngs's-61,,Pcs,1,169.15,0,0,TRUE,,active
+SMM-V32,Youngs's-62,,Pcs,1,25.5,0,0,TRUE,,active
+SMM-V32,Youngs's-63,,Pcs,1,649,0,0,TRUE,,active
+SMM-V32,Youngs's-64,,Pcs,1,361.67,0,0,TRUE,,active
+SMM-V32,Youngs's-65,,Pcs,1,622.83,0,0,TRUE,,active
+SMM-V32,Youngs's-66,,Pcs,1,1224.5,0,0,TRUE,,active
+SMM-V32,Youngs's-67,,Pcs,1,1104.33,0,0,TRUE,,active
+SMM-V32,Youngs's-68,,Pcs,1,1241.33,0,0,TRUE,,active
+SMM-V32,Youngs's-69,,Pcs,1,753.33,0,0,TRUE,,active
+SMM-V33,BAKEWELL-01,,Pcs,1,343,0,0,TRUE,,active
+SMM-V33,BAKEWELL-02,,Pcs,1,121.5,0,0,TRUE,,active
+SMM-V33,BAKEWELL-03,,Pcs,1,67.5,0,0,TRUE,,active
+SMM-V33,BAKEWELL-04,,Pcs,1,85.5,0,0,TRUE,,active
+SMM-V33,FOODNET-01,,Pcs,1,189,0,0,TRUE,,active
+SMM-V33,FOODNET-02,,Pcs,1,99,0,0,TRUE,,active
+SMM-V33,FOODNET-03,,Pcs,1,81,0,0,TRUE,,active
+SMM-V33,FOODNET-04,,Pcs,1,81,0,0,TRUE,,active
+SMM-V33,FOODNET-05,,Pcs,1,112.5,0,0,TRUE,,active
+SMM-V33,FOODNET-06,,Pcs,1,189,0,0,TRUE,,active
+SMM-V33,FOODNET-07,,Pcs,1,95.56,0,0,TRUE,,active
+SMM-V33,FOODNET-08,,Pcs,1,95.58,0,0,TRUE,,active
+SMM-V33,FOODNET-09,,Pcs,1,74.67,0,0,TRUE,,active
+SMM-V33,FOODNET-10,,Pcs,1,74.71,0,0,TRUE,,active
+SMM-V33,FOODNET-11,,Pcs,1,329.21,0,0,TRUE,,active
+SMM-V33,FOODNET-12,,Pcs,1,196.42,0,0,TRUE,,active
+SMM-V33,FOODNET-13,,Pcs,1,669,0,0,TRUE,,active
+SMM-V33,FOODNET-14,,Pcs,1,94.5,0,0,TRUE,,active
+SMM-V33,FOODNET-15,,Pcs,1,211.5,0,0,TRUE,,active
+SMM-V33,FOODNET-16,,Pcs,1,121.5,0,0,TRUE,,active
+SMM-V33,FOODNET-17,,Pcs,1,230.38,0,0,TRUE,,active
+SMM-V33,FOODNET-18,,Pcs,1,211.5,0,0,TRUE,,active
+SMM-V33,FOODNET-19,,Pcs,1,144,0,0,TRUE,,active
+SMM-V33,Klim-01,,Pcs,1,99,0,0,TRUE,,active
+SMM-V33,Klim-02,,Pcs,1,324,0,0,TRUE,,active
+SMM-V33,Klim-03,,Pcs,1,200.95,0,0,TRUE,,active
+SMM-V33,Klim-04,,Pcs,1,181.38,0,0,TRUE,,active
+SMM-V33,Klim-05,,Pcs,1,196.5,0,0,TRUE,,active
+SMM-V33,Klim-06,,Pcs,1,181.38,0,0,TRUE,,active
+SMM-V33,Klim-07,,Pcs,1,139.5,0,0,TRUE,,active
+SMM-V33,Klim-08,,Pcs,1,139.5,0,0,TRUE,,active
+SMM-V33,Klim-09,,Pcs,1,127.44,0,0,TRUE,,active
+SMM-V33,Klim-10,,Pcs,1,201.78,0,0,TRUE,,active
+SMM-V33,Klim-11,,Pcs,1,117,0,0,TRUE,,active
+SMM-V34,Bakea-01,,Pcs,1,446.23,0,0,TRUE,,active
+SMM-V34,Bakea-02,,Pcs,1,460,0,0,TRUE,,active
+SMM-V34,Bakea-03,,Pcs,1,372,0,0,TRUE,,active
+SMM-V34,Bakea-04,,Pcs,1,427.8,0,0,TRUE,,active
+SMM-V34,Bakea-05,,Pcs,1,437.1,0,0,TRUE,,active
+SMM-V34,Bakea-06,,Pcs,1,372,0,0,TRUE,,active
+SMM-V34,Bakea-07,,Pcs,1,506.85,0,0,TRUE,,active
+SMM-V34,Bakea-08,,Pcs,1,372,0,0,TRUE,,active
+SMM-V34,Bakea-09,,Pcs,1,837,0,0,TRUE,,active
+SMM-V34,Bakea-10,,Pcs,1,837,0,0,TRUE,,active
+SMM-V34,Bakea-11,,Pcs,1,376.65,0,0,TRUE,,active
+SMM-V34,Bakea-12,,Pcs,1,376.65,0,0,TRUE,,active
+SMM-V34,Bakea-13,,Pcs,1,353.33,0,0,TRUE,,active
+SMM-V34,Bakea-14,,Pcs,1,181.35,0,0,TRUE,,active
+SMM-V34,Bakea-15,,Pcs,1,353.4,0,0,TRUE,,active
+SMM-V34,Bakea-16,,Pcs,1,697.5,0,0,TRUE,,active
+SMM-V34,Bakea-17,,Pcs,1,150,0,0,TRUE,,active
+SMM-V34,Bakea-18,,Pcs,1,148.83,0,0,TRUE,,active
+SMM-V34,Bakea-19,,Pcs,1,111.6,0,0,TRUE,,active
+SMM-V34,Bakea-20,,Pcs,1,744,0,0,TRUE,,active
+SMM-V34,Bakea-21,,Pcs,1,381.3,0,0,TRUE,,active
+SMM-V34,Bakea-22,,Pcs,1,153.45,0,0,TRUE,,active
+SMM-V34,Bakea-23,,Pcs,1,111.6,0,0,TRUE,,active
+SMM-V34,Bakea-24,,Pcs,1,111.6,0,0,TRUE,,active
+SMM-V34,Bakea-25,,Pcs,1,148.8,0,0,TRUE,,active
+SMM-V34,Bakea-26,,Pcs,1,111.6,0,0,TRUE,,active
+SMM-V34,Bakea-27,,Pcs,1,111.6,0,0,TRUE,,active
+SMM-V34,Bakea-28,,Pcs,1,120.9,0,0,TRUE,,active
+SMM-V34,Bakea-29,,Pcs,1,241.83,0,0,TRUE,,active
+SMM-V34,Bakea-30,,Pcs,1,279,0,0,TRUE,,active
+SMM-V34,Bakea-31,,Pcs,1,162.75,0,0,TRUE,,active
+SMM-V34,Bakea-32,,Pcs,1,451,0,0,TRUE,,active
+SMM-V34,Bakea-33,,Pcs,1,279,0,0,TRUE,,active
+SMM-V34,Bakea-34,,Pcs,1,260,0,0,TRUE,,active
+SMM-V34,Bakea-35,,Pcs,1,200,0,0,TRUE,,active
+SMM-V34,Bakea-36,,Pcs,1,255.75,0,0,TRUE,,active
+SMM-V34,Bakea-37,,Pcs,1,167.33,0,0,TRUE,,active
+SMM-V34,Bakea-38,,Pcs,1,204.6,0,0,TRUE,,active
+SMM-V34,Bakea-39,,Pcs,1,418.5,0,0,TRUE,,active
+SMM-V34,Bakea-40,,Pcs,1,790.5,0,0,TRUE,,active
+SMM-V34,Bakea-41,,Pcs,1,348.67,0,0,TRUE,,active
+SMM-V34,Bakea-42,,Pcs,1,199.95,0,0,TRUE,,active
+SMM-V34,Bakea-43,,Pcs,1,167.4,0,0,TRUE,,active
+SMM-V34,Bakea-44,,Pcs,1,269.67,0,0,TRUE,,active
+SMM-V34,Bakea-45,,Pcs,1,186,0,0,TRUE,,active
+SMM-V35,SATANAJ-01,,Pcs,1,719,0,0,TRUE,,active
+SMM-V35,SATANAJ-02,,Pcs,1,719.1,0,0,TRUE,,active
+SMM-V36,Milkyz Food-01,,Pcs,1,520.5,0,0,TRUE,,active
+SMM-V36,Milkyz Food-02,,Pcs,1,520.67,0,0,TRUE,,active
+SMM-V36,Milkyz Food-03,,Pcs,1,520.67,0,0,TRUE,,active
+SMM-V36,Milkyz Food-04,,Pcs,1,361.5,0,0,TRUE,,active
+SMM-V36,Milkyz Food-05,,Pcs,1,542.67,0,0,TRUE,,active
+SMM-V36,Milkyz Food-06,,Pcs,1,1003,0,0,TRUE,,active
+SMM-V36,Milkyz Food-07,,Pcs,1,741.33,0,0,TRUE,,active
+SMM-V36,Milkyz Food-08,,Pcs,1,741.33,0,0,TRUE,,active
+SMM-V36,Milkyz Food-09,,Pcs,1,609.17,0,0,TRUE,,active
+SMM-V37,NAYA-01,,Pcs,1,355,0,0,TRUE,,active
+SMM-V37,NAYA-02,,Pcs,1,874.5,0,0,TRUE,,active
+SMM-V37,NAYA-03,,Pcs,1,364.5,0,0,TRUE,,active
+SMM-V37,NAYA-04,,Pcs,1,568.5,0,0,TRUE,,active
+SMM-V37,NAYA-05,,Pcs,1,313.67,0,0,TRUE,,active
+SMM-V37,NAYA-06,,Pcs,1,217,0,0,TRUE,,active
+SMM-V37,NAYA-07,,Pcs,1,217,0,0,TRUE,,active
+SMM-V37,NAYA-08,,Pcs,1,217,0,0,TRUE,,active
+SMM-V37,NAYA-09,,Pcs,1,217,0,0,TRUE,,active
+SMM-V37,NAYA-10,,Pcs,1,124,0,0,TRUE,,active
+SMM-V37,NAYA-11,,Pcs,1,124,0,0,TRUE,,active
+SMM-V37,NAYA-12,,Pcs,1,124,0,0,TRUE,,active
+SMM-V37,NAYA-13,,Pcs,1,124,0,0,TRUE,,active
+SMM-V37,NAYA-14,,Pcs,1,124,0,0,TRUE,,active
+SMM-V37,NAYA-15,,Pcs,1,255,0,0,TRUE,,active
+SMM-V37,NAYA-16,,Pcs,1,255,0,0,TRUE,,active
+SMM-V37,NAYA-17,,Pcs,1,457.5,0,0,TRUE,,active
+SMM-V37,NAYA-18,,Pcs,1,514,0,0,TRUE,,active
+SMM-V37,NAYA-19,,Pcs,1,457.67,0,0,TRUE,,active
+SMM-V37,NAYA-20,,Pcs,1,405,0,0,TRUE,,active
+SMM-V37,NAYA-21,,Pcs,1,299.33,0,0,TRUE,,active
+SMM-V37,NAYA-22,,Pcs,1,337.5,0,0,TRUE,,active
+SMM-V37,NAYA-23,,Pcs,1,251.33,0,0,TRUE,,active
+SMM-V37,NAYA-24,,Pcs,1,299,0,0,TRUE,,active
+SMM-V37,NAYA-25,,Pcs,1,487,0,0,TRUE,,active
+SMM-V37,NAYA-26,,Pcs,1,307.5,0,0,TRUE,,active
+SMM-V37,NAYA-27,,Pcs,1,405,0,0,TRUE,,active
+SMM-V37,NAYA-28,,Pcs,1,476.33,0,0,TRUE,,active
+SMM-V37,NAYA-29,,Pcs,1,307.67,0,0,TRUE,,active
+SMM-V37,NAYA-30,,Pcs,1,390,0,0,TRUE,,active
+SMM-V37,NAYA-31,,Pcs,1,299.25,0,0,TRUE,,active
+SMM-V37,NAYA-32,,Pcs,1,371.33,0,0,TRUE,,active
+SMM-V37,NAYA-33,,Pcs,1,330,0,0,TRUE,,active
+SMM-V37,NAYA-34,,Pcs,1,255,0,0,TRUE,,active
+SMM-V37,NAYA-35,,Pcs,1,135,0,0,TRUE,,active
+SMM-V37,NAYA-36,,Pcs,1,112.5,0,0,TRUE,,active
+SMM-V37,NAYA-37,,Pcs,1,232.5,0,0,TRUE,,active
+SMM-V37,NAYA-38,,Pcs,1,187.5,0,0,TRUE,,active
+SMM-V37,NAYA-39,,Pcs,1,232.5,0,0,TRUE,,active
+SMM-V38,Nayab-01,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-02,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-03,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-04,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-05,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-06,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-07,,Pcs,1,252,0,0,TRUE,,active
+SMM-V38,Nayab-08,,Pcs,1,252,0,0,TRUE,,active
+SMM-V38,Nayab-09,,Pcs,1,252,0,0,TRUE,,active
+SMM-V38,Nayab-10,,Pcs,1,165,0,0,TRUE,,active
+SMM-V38,Nayab-11,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-12,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-13,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-14,,Pcs,1,315,0,0,TRUE,,active
+SMM-V38,Nayab-15,,Pcs,1,252,0,0,TRUE,,active
+SMM-V38,Nayab-16,,Pcs,1,167,0,0,TRUE,,active
+SMM-V38,Nayab-17,,Pcs,1,266,0,0,TRUE,,active
+SMM-V38,Nayab-18,,Pcs,1,252,0,0,TRUE,,active
+SMM-V38,Nayab-19,,Pcs,1,252,0,0,TRUE,,active
+SMM-V38,Nayab-20,,Pcs,1,252,0,0,TRUE,,active
+SMM-V38,Nayab-21,,Pcs,1,250,0,0,TRUE,,active
+SMM-V40,MEEZAN-01,,Pcs,1,565,0,0,TRUE,,active
+SMM-V40,MEEZAN-02,,Pcs,1,2570,0,0,TRUE,,active
+SMM-V40,MEEZAN-03,,Pcs,1,2570,0,0,TRUE,,active
+SMM-V40,MEEZAN-04,,Pcs,1,2825,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-01,,Pcs,1,95.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-02,,Pcs,1,105.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-03,,Pcs,1,95.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-04,,Pcs,1,155.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-05,,Pcs,1,159.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-06,,Pcs,1,292.5,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-07,,Pcs,1,146.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-08,,Pcs,1,146.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-09,,Pcs,1,160.4,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-10,,Pcs,1,725.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-11,,Pcs,1,362.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-12,,Pcs,1,185.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-13,,Pcs,1,80.3,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-14,,Pcs,1,298.4,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-15,,Pcs,1,150.4,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-16,,Pcs,1,179.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-17,,Pcs,1,179.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-18,,Pcs,1,220.5,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-19,,Pcs,1,79.8,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-20,,Pcs,1,240,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-21,,Pcs,1,120.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-22,,Pcs,1,140.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-23,,Pcs,1,110.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-24,,Pcs,1,79.8,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-25,,Pcs,1,89.8,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-26,,Pcs,1,79.8,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-27,,Pcs,1,158.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-28,,Pcs,1,338,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-29,,Pcs,1,272.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-30,,Pcs,1,148.9,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-31,,Pcs,1,545.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-32,,Pcs,1,81.42,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-33,,Pcs,1,48.68,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-34,,Pcs,1,232.4,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-35,,Pcs,1,161.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-36,,Pcs,1,80.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-37,,Pcs,1,40.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-38,,Pcs,1,112.8,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-39,,Pcs,1,222.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-40,,Pcs,1,148.39,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-41,,Pcs,1,168.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-42,,Pcs,1,162.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-43,,Pcs,1,320.4,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-44,,Pcs,1,88.9,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-45,,Pcs,1,120.5,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-46,,Pcs,1,85.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-47,,Pcs,1,166.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-48,,Pcs,1,272.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-49,,Pcs,1,152.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-50,,Pcs,1,95.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-51,,Pcs,1,95.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-52,,Pcs,1,95.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-53,,Pcs,1,68.48,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-54,,Pcs,1,148.68,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-55,,Pcs,1,70.04,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-56,,Pcs,1,130.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-57,,Pcs,1,175.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-58,,Pcs,1,50.42,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-59,,Pcs,1,69.58,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-60,,Pcs,1,358.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-61,,Pcs,1,193.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-62,,Pcs,1,440.8,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-63,,Pcs,1,222.4,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-64,,Pcs,1,99.72,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-65,,Pcs,1,597,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-66,,Pcs,1,151.8,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-67,,Pcs,1,288.6,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-68,,Pcs,1,140.2,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-69,,Pcs,1,95.25,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-70,,Pcs,1,298.5,0,0,TRUE,,active
+SMM-V41,IQBAL FOODS-71,,Pcs,1,104.77,0,0,TRUE,,active
+SMM-V43,TANG-01,,Pcs,1,92.69,0,0,TRUE,,active
+SMM-V43,TANG-02,,Pcs,1,324.39,0,0,TRUE,,active
+SMM-V43,TANG-03,,Pcs,1,769.27,0,0,TRUE,,active
+SMM-V43,TANG-04,,Pcs,1,2363,0,0,TRUE,,active
+SMM-V43,TANG-05,,Pcs,1,92.69,0,0,TRUE,,active
+SMM-V43,TANG-06,,Pcs,1,324.39,0,0,TRUE,,active
+SMM-V43,TANG-07,,Pcs,1,769.27,0,0,TRUE,,active
+SMM-V43,TANG-08,,Pcs,1,,0,0,TRUE,,active
+SMM-V43,TANG-09,,Pcs,1,92.68,0,0,TRUE,,active
+SMM-V43,TANG-10,,Pcs,1,324.4,0,0,TRUE,,active
+SMM-V43,TANG-11,,Pcs,1,,0,0,TRUE,,active
+SMM-V43,TANG-12,,Pcs,1,92.68,0,0,TRUE,,active
+SMM-V43,TANG-13,,Pcs,1,324.4,0,0,TRUE,,active
+SMM-V43,Mondelez-01,,Pcs,1,135.08,0,0,TRUE,,active
+SMM-V43,Mondelez-02,,Pcs,1,44.56,0,0,TRUE,,active
+SMM-V43,Mondelez-03,,Pcs,1,44.56,0,0,TRUE,,active
+SMM-V43,Mondelez-04,,Pcs,1,202.56,0,0,TRUE,,active
+SMM-V43,Mondelez-05,,Pcs,1,135.04,0,0,TRUE,,active
+SMM-V43,Mondelez-06,,Pcs,1,87.03,0,0,TRUE,,active
+SMM-V43,Mondelez-07,,Pcs,1,26.11,0,0,TRUE,,active
+SMM-V43,Mondelez-08,,Pcs,1,43.51,0,0,TRUE,,active
+SMM-V43,Mondelez-09,,Pcs,1,757,0,0,TRUE,,active
+SMM-V43,Mondelez-10,,Pcs,1,891,0,0,TRUE,,active
+SMM-V43,Mondelez-11,,Pcs,1,712.67,0,0,TRUE,,active
+SMM-V43,Mondelez-12,,Pcs,1,445.42,0,0,TRUE,,active
+SMM-V43,Mondelez-13,,Pcs,1,712.67,0,0,TRUE,,active
+SMM-V43,Mondelez-14,,Pcs,1,445.42,0,0,TRUE,,active
+SMM-V43,Mondelez-15,,Pcs,1,26.73,0,0,TRUE,,active
+SMM-V43,Mondelez-16,,Pcs,1,133.63,0,0,TRUE,,active
+SMM-V43,Mondelez-17,,Pcs,1,222.71,0,0,TRUE,,active
+SMM-V43,Mondelez-18,,Pcs,1,222.75,0,0,TRUE,,active
+SMM-V43,Mondelez-19,,Pcs,1,89.08,0,0,TRUE,,active
+SMM-V43,Mondelez-20,,Pcs,1,712.67,0,0,TRUE,,active
+SMM-V43,Mondelez-21,,Pcs,1,89.08,0,0,TRUE,,active
+SMM-V43,Mondelez-22,,Pcs,1,445.5,0,0,TRUE,,active
+SMM-V43,Mondelez-23,,Pcs,1,445.5,0,0,TRUE,,active
+SMM-V44,SUNSIP-01,,Pcs,1,309.13,0,0,TRUE,,active
+SMM-V44,SUNSIP-02,,Pcs,1,309.13,0,0,TRUE,,active
+SMM-V44,Hilal-01,,Pcs,1,26.72,0,0,TRUE,,active
+SMM-V44,Hilal-02,,Pcs,1,26.72,0,0,TRUE,,active
+SMM-V44,Hilal-03,,Pcs,1,26.72,0,0,TRUE,,active
+SMM-V44,Hilal-04,,Pcs,1,8.49,0,0,TRUE,,active
+SMM-V44,Hilal-05,,Pcs,1,8.49,0,0,TRUE,,active
+SMM-V44,Hilal-06,,Pcs,1,17.18,0,0,TRUE,,active
+SMM-V44,Hilal-07,,Pcs,1,17.18,0,0,TRUE,,active
+SMM-V44,Hilal-08,,Pcs,1,34.86,0,0,TRUE,,active
+SMM-V44,Hilal-09,,Pcs,1,25.75,0,0,TRUE,,active
+SMM-V44,Hilal-10,,Pcs,1,25.93,0,0,TRUE,,active
+SMM-V44,Hilal-11,,Pcs,1,17.01,0,0,TRUE,,active
+SMM-V44,Hilal-12,,Pcs,1,8.83,0,0,TRUE,,active
+SMM-V44,Hilal-13,,Pcs,1,43.16,0,0,TRUE,,active
+SMM-V44,Hilal-14,,Pcs,1,26.23,0,0,TRUE,,active
+SMM-V44,Hilal-15,,Pcs,1,26.23,0,0,TRUE,,active
+SMM-V44,Hilal-16,,Pcs,1,8.77,0,0,TRUE,,active
+SMM-V44,Hilal-17,,Pcs,1,8.77,0,0,TRUE,,active
+SMM-V44,Hilal-18,,Pcs,1,8.77,0,0,TRUE,,active
+SMM-V44,Hilal-19,,Pcs,1,8.23,0,0,TRUE,,active
+SMM-V44,Hilal-20,,Pcs,1,17.56,0,0,TRUE,,active
+SMM-V44,Hilal-21,,Pcs,1,44.19,0,0,TRUE,,active
+SMM-V44,Hilal-22,,Pcs,1,44.19,0,0,TRUE,,active
+SMM-V44,Hilal-23,,Pcs,1,162.58,0,0,TRUE,,active
+SMM-V44,Hilal-24,,Pcs,1,139.25,0,0,TRUE,,active
+SMM-V44,Hilal-25,,Pcs,1,139.25,0,0,TRUE,,active
+SMM-V44,Hilal-26,,Pcs,1,139.25,0,0,TRUE,,active
+SMM-V44,Hilal-27,,Pcs,1,209.67,0,0,TRUE,,active
+SMM-V44,Hilal-28,,Pcs,1,202.33,0,0,TRUE,,active
+SMM-V44,Hilal-29,,Pcs,1,209.67,0,0,TRUE,,active
+SMM-V44,Hilal-30,,Pcs,1,35.25,0,0,TRUE,,active
+SMM-V44,Hilal-31,,Pcs,1,139.25,0,0,TRUE,,active
+SMM-V44,Quaker-01,,Pcs,1,665,0,0,TRUE,,active
+SMM-V45,Tapal-01,,Pcs,1,122.85,0,0,TRUE,,active
+SMM-V45,Tapal-02,,Pcs,1,179.17,0,0,TRUE,,active
+SMM-V45,Tapal-03,,Pcs,1,362,0,0,TRUE,,active
+SMM-V45,Tapal-04,,Pcs,1,468,0,0,TRUE,,active
+SMM-V45,Tapal-05,,Pcs,1,678,0,0,TRUE,,active
+SMM-V45,Tapal-06,,Pcs,1,94.8,0,0,TRUE,,active
+SMM-V45,Tapal-07,,Pcs,1,94.8,0,0,TRUE,,active
+SMM-V45,Tapal-08,,Pcs,1,1672,0,0,TRUE,,active
+SMM-V46,Vital Tea-01,,Pcs,1,184.18,0,0,TRUE,,active
+SMM-V46,Vital Tea-02,,Pcs,1,361.67,0,0,TRUE,,active
+SMM-V46,Vital Tea-03,,Pcs,1,843,0,0,TRUE,,active
+SMM-V46,Vital Tea-04,,Pcs,1,121.88,0,0,TRUE,,active
+SMM-V46,Vital Tea-05,,Pcs,1,881.83,0,0,TRUE,,active
+SMM-V46,Vital Tea-06,,Pcs,1,220.33,0,0,TRUE,,active
+SMM-V46,Vital Tea-07,,Pcs,1,220.33,0,0,TRUE,,active
+SMM-V46,Vital Tea-08,,Pcs,1,220.33,0,0,TRUE,,active
+SMM-V46,Vital Tea-09,,Pcs,1,220.33,0,0,TRUE,,active
+SMM-V46,Vital Tea-10,,Pcs,1,220.33,0,0,TRUE,,active
+SMM-V46,Vital Tea-11,,Pcs,1,220.33,0,0,TRUE,,active
+SMM-V46,Vital Tea-12,,Pcs,1,176.33,0,0,TRUE,,active
+SMM-V46,Vital Tea-13,,Pcs,1,352.67,0,0,TRUE,,active
+SMM-V46,Vital Tea-14,,Pcs,1,264.5,0,0,TRUE,,active
+SMM-V46,Vital Tea-15,,Pcs,1,264.5,0,0,TRUE,,active
+SMM-V46,Vital Tea-16,,Pcs,1,264.5,0,0,TRUE,,active
+SMM-V46,Vital Tea-17,,Pcs,1,1837.5,0,0,TRUE,,active
+SMM-V46,Vital Tea-18,,Pcs,1,220,0,0,TRUE,,active
+SMM-V46,Vital Tea-19,,Pcs,1,881.75,0,0,TRUE,,active
+SMM-V46,Vital Tea-20,,Pcs,1,1704.75,0,0,TRUE,,active
+SMM-V47,QARSHI-01,,Pcs,1,500,0,0,TRUE,,active
+SMM-V47,QARSHI-02,,Pcs,1,466.67,0,0,TRUE,,active
+SMM-V47,QARSHI-03,,Pcs,1,500,0,0,TRUE,,active
+SMM-V47,QARSHI-04,,Pcs,1,15.83,0,0,TRUE,,active
+SMM-V47,QARSHI-05,,Pcs,1,611,0,0,TRUE,,active
+SMM-V47,QARSHI-06,,Pcs,1,13,0,0,TRUE,,active
+SMM-V47,QARSHI-07,,Pcs,1,611,0,0,TRUE,,active
+SMM-V49,Life Style-01,,Pcs,1,1500,0,0,TRUE,,active
+SMM-V49,Life Style-02,,Pcs,1,675.17,0,0,TRUE,,active
+SMM-V49,Life Style-03,,Pcs,1,375.08,0,0,TRUE,,active
+SMM-V49,Life Style-04,,Pcs,1,375.08,0,0,TRUE,,active
+SMM-V49,Life Style-05,,Pcs,1,375.08,0,0,TRUE,,active
+SMM-V49,Life Style-06,,Pcs,1,450,0,0,TRUE,,active
+SMM-V49,Life Style-07,,Pcs,1,450,0,0,TRUE,,active
+SMM-V49,Life Style-08,,Pcs,1,300,0,0,TRUE,,active
+SMM-V49,Life Style-09,,Pcs,1,300,0,0,TRUE,,active
+SMM-V49,Life Style-10,,Pcs,1,75,0,0,TRUE,,active
+SMM-V49,Life Style-11,,Pcs,1,348.83,0,0,TRUE,,active
+SMM-V50,Meetha-01,,Pcs,1,600,0,0,TRUE,,active
+SMM-V51,SHEZAN-01,,Pcs,1,410,0,0,TRUE,,active
+SMM-V51,SHEZAN-02,,Pcs,1,695,0,0,TRUE,,active
+SMM-V51,SHEZAN-03,,Pcs,1,410,0,0,TRUE,,active
+SMM-V51,SHEZAN-04,,Pcs,1,695,0,0,TRUE,,active
+SMM-V51,SHEZAN-05,,Pcs,1,695,0,0,TRUE,,active
+SMM-V51,SHEZAN-06,,Pcs,1,410,0,0,TRUE,,active
+SMM-V51,SHEZAN-07,,Pcs,1,210,0,0,TRUE,,active
+SMM-V51,SHEZAN-08,,Pcs,1,210,0,0,TRUE,,active
+SMM-V51,SHEZAN-09,,Pcs,1,210,0,0,TRUE,,active
+SMM-V51,SHEZAN-10,,Pcs,1,40.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-11,,Pcs,1,297.5,0,0,TRUE,,active
+SMM-V51,SHEZAN-12,,Pcs,1,246.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-13,,Pcs,1,259.25,0,0,TRUE,,active
+SMM-V51,SHEZAN-14,,Pcs,1,456.5,0,0,TRUE,,active
+SMM-V51,SHEZAN-15,,Pcs,1,259.25,0,0,TRUE,,active
+SMM-V51,SHEZAN-16,,Pcs,1,456.63,0,0,TRUE,,active
+SMM-V51,SHEZAN-17,,Pcs,1,554.25,0,0,TRUE,,active
+SMM-V51,SHEZAN-18,,Pcs,1,1050,0,0,TRUE,,active
+SMM-V51,SHEZAN-19,,Pcs,1,1008,0,0,TRUE,,active
+SMM-V51,SHEZAN-20,,Pcs,1,1050,0,0,TRUE,,active
+SMM-V51,SHEZAN-21,,Pcs,1,1008,0,0,TRUE,,active
+SMM-V51,SHEZAN-22,,Pcs,1,88.5,0,0,TRUE,,active
+SMM-V51,SHEZAN-23,,Pcs,1,229.58,0,0,TRUE,,active
+SMM-V51,SHEZAN-24,,Pcs,1,274.17,0,0,TRUE,,active
+SMM-V51,SHEZAN-25,,Pcs,1,274.17,0,0,TRUE,,active
+SMM-V51,SHEZAN-26,,Pcs,1,274.17,0,0,TRUE,,active
+SMM-V51,SHEZAN-27,,Pcs,1,274.17,0,0,TRUE,,active
+SMM-V51,SHEZAN-28,,Pcs,1,274.17,0,0,TRUE,,active
+SMM-V51,SHEZAN-29,,Pcs,1,182.5,0,0,TRUE,,active
+SMM-V51,SHEZAN-30,,Pcs,1,246.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-31,,Pcs,1,246.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-32,,Pcs,1,246.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-33,,Pcs,1,246.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-34,,Pcs,1,246.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-35,,Pcs,1,159.5,0,0,TRUE,,active
+SMM-V51,SHEZAN-36,,Pcs,1,182.5,0,0,TRUE,,active
+SMM-V51,SHEZAN-37,,Pcs,1,253.85,0,0,TRUE,,active
+SMM-V51,SHEZAN-38,,Pcs,1,275,0,0,TRUE,,active
+SMM-V51,SHEZAN-39,,Pcs,1,179.88,0,0,TRUE,,active
+SMM-V51,SHEZAN-40,,Pcs,1,96.87,0,0,TRUE,,active
+SMM-V51,SHEZAN-41,,Pcs,1,317.42,0,0,TRUE,,active
+SMM-V51,SHEZAN-42,,Pcs,1,469.17,0,0,TRUE,,active
+SMM-V51,SHEZAN-43,,Pcs,1,155.08,0,0,TRUE,,active
+SMM-V51,SHEZAN-44,,Pcs,1,165,0,0,TRUE,,active
+SMM-V51,SHEZAN-45,,Pcs,1,258.44,0,0,TRUE,,active
+SMM-V51,SHEZAN-46,,Pcs,1,352.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-47,,Pcs,1,98.31,0,0,TRUE,,active
+SMM-V51,SHEZAN-48,,Pcs,1,191.67,0,0,TRUE,,active
+SMM-V51,SHEZAN-49,,Pcs,1,98.31,0,0,TRUE,,active
+SMM-V51,SHEZAN-50,,Pcs,1,358.33,0,0,TRUE,,active
+SMM-V51,SHEZAN-51,,Pcs,1,245.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-52,,Pcs,1,1420,0,0,TRUE,,active
+SMM-V51,SHEZAN-53,,Pcs,1,598.75,0,0,TRUE,,active
+SMM-V51,SHEZAN-54,,Pcs,1,40.83,0,0,TRUE,,active
+SMM-V51,SHEZAN-55,,Pcs,1,40.83,0,0,TRUE,,active
+SMM-V51,TROPICO-01,,Pcs,1,210.94,0,0,TRUE,,active
+SMM-V51,TROPICO-02,,Pcs,1,46.67,0,0,TRUE,,active
+SMM-V51,TROPICO-03,,Pcs,1,46.67,0,0,TRUE,,active
+SMM-V51,TROPICO-04,,Pcs,1,210.93,0,0,TRUE,,active
+SMM-V51,Haleeb-01,,Pcs,1,354,0,0,TRUE,,active
+SMM-V51,Haleeb-02,,Pcs,1,90.46,0,0,TRUE,,active
+SMM-V51,Haleeb-03,,Pcs,1,225,0,0,TRUE,,active
+SMM-V51,Haleeb-04,,Pcs,1,157.04,0,0,TRUE,,active
+SMM-V51,Haleeb-05,,Pcs,1,155.21,0,0,TRUE,,active
+SMM-V51,Haleeb-06,,Pcs,1,301.78,0,0,TRUE,,active
+SMM-V51,Haleeb-07,,Pcs,1,74.07,0,0,TRUE,,active
+SMM-V51,Haleeb-08,,Pcs,1,185.83,0,0,TRUE,,active
+SMM-V51,Haleeb-09,,Pcs,1,34.22,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-01,,Pcs,1,362,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-02,,Pcs,1,553.06,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-03,,Pcs,1,346.6,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-04,,Pcs,1,351.5,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-05,,Pcs,1,347.33,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-06,,Pcs,1,332.83,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-07,,Pcs,1,332.83,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-08,,Pcs,1,218.83,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-09,,Pcs,1,292.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-10,,Pcs,1,274.5,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-11,,Pcs,1,254.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-12,,Pcs,1,260.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-13,,Pcs,1,294.75,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-14,,Pcs,1,294.75,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-15,,Pcs,1,282,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-16,,Pcs,1,295.5,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-17,,Pcs,1,294.75,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-18,,Pcs,1,282,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-19,,Pcs,1,167.69,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-20,,Pcs,1,169.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-21,,Pcs,1,187.5,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-22,,Pcs,1,432.5,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-23,,Pcs,1,309.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-24,,Pcs,1,323.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-25,,Pcs,1,323.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-26,,Pcs,1,165.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-27,,Pcs,1,388.92,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-28,,Pcs,1,207.35,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-29,,Pcs,1,178.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-30,,Pcs,1,174.33,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-31,,Pcs,1,99.08,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-32,,Pcs,1,189.08,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-33,,Pcs,1,268,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-34,,Pcs,1,203.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-35,,Pcs,1,200.13,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-36,,Pcs,1,342.71,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-37,,Pcs,1,200.13,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-38,,Pcs,1,232.92,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-39,,Pcs,1,368.58,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-40,,Pcs,1,566.75,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-41,,Pcs,1,391.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-42,,Pcs,1,391.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-43,,Pcs,1,319.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-44,,Pcs,1,260.33,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-45,,Pcs,1,299.5,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-46,,Pcs,1,260.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-47,,Pcs,1,284.83,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-48,,Pcs,1,260.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-49,,Pcs,1,355.83,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-50,,Pcs,1,376.53,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-51,,Pcs,1,435.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-52,,Pcs,1,388.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-53,,Pcs,1,371.67,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-54,,Pcs,1,332.68,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-55,,Pcs,1,475.17,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-56,,Pcs,1,610.5,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-57,,Pcs,1,470,0,0,TRUE,,active
+SMM-V52,MITCHELL'S-58,,Pcs,1,709,0,0,TRUE,,active
+SMM-V52,Opa-01,,Pcs,1,1691,0,0,TRUE,,active
+SMM-V52,Opa-02,,Pcs,1,1691,0,0,TRUE,,active
+SMM-V52,Opa-03,,Pcs,1,1691,0,0,TRUE,,active
+SMM-V52,Opa-04,,Pcs,1,755.67,0,0,TRUE,,active
+SMM-V52,Opa-05,,Pcs,1,437.59,0,0,TRUE,,active
+SMM-V52,Opa-06,,Pcs,1,388.97,0,0,TRUE,,active
+SMM-V52,Opa-07,,Pcs,1,344.77,0,0,TRUE,,active
+SMM-V52,Opa-08,,Pcs,1,305,0,0,TRUE,,active
+SMM-V52,Opa-09,,Pcs,1,882,0,0,TRUE,,active
+SMM-V52,Opa-10,,Pcs,1,882,0,0,TRUE,,active
+SMM-V52,Opa-11,,Pcs,1,882,0,0,TRUE,,active
+SMM-V52,Opa-12,,Pcs,1,882,0,0,TRUE,,active
+SMM-V52,Opa-13,,Pcs,1,543.68,0,0,TRUE,,active
+SMM-V53,NEXT-01,,Pcs,1,65,0,0,TRUE,,active
+SMM-V53,NEXT-02,,Pcs,1,108.33,0,0,TRUE,,active
+SMM-V53,NEXT-03,,Pcs,1,50,0,0,TRUE,,active
+SMM-V53,NEXT-04,,Pcs,1,80.58,0,0,TRUE,,active
+SMM-V53,NEXT-05,,Pcs,1,80.58,0,0,TRUE,,active
+SMM-V53,SUNSTONE-01,,Pcs,1,325,0,0,TRUE,,active
+SMM-V54,PepsiCo-01,,Pcs,1,95.83,0,0,TRUE,,active
+SMM-V54,PepsiCo-02,,Pcs,1,95.83,0,0,TRUE,,active
+SMM-V54,PepsiCo-03,,Pcs,1,80.42,0,0,TRUE,,active
+SMM-V54,PepsiCo-04,,Pcs,1,72.08,0,0,TRUE,,active
+SMM-V54,PepsiCo-05,,Pcs,1,102.5,0,0,TRUE,,active
+SMM-V54,PepsiCo-06,,Pcs,1,102.5,0,0,TRUE,,active
+SMM-V54,PepsiCo-07,,Pcs,1,58.33,0,0,TRUE,,active
+SMM-V54,PepsiCo-08,,Pcs,1,141.8,0,0,TRUE,,active
+SMM-V54,PepsiCo-09,,Pcs,1,146.75,0,0,TRUE,,active
+SMM-V54,PepsiCo-10,,Pcs,1,81.67,0,0,TRUE,,active
+SMM-V54,PepsiCo-11,,Pcs,1,141.8,0,0,TRUE,,active
+SMM-V54,PepsiCo-12,,Pcs,1,80.42,0,0,TRUE,,active
+SMM-V54,PepsiCo-13,,Pcs,1,141.75,0,0,TRUE,,active
+SMM-V54,PepsiCo-14,,Pcs,1,95.83,0,0,TRUE,,active
+SMM-V55,Fresher-01,,Pcs,1,262.25,0,0,TRUE,,active
+SMM-V55,Fresher-02,,Pcs,1,213.75,0,0,TRUE,,active
+SMM-V55,Fresher-03,,Pcs,1,87,0,0,TRUE,,active
+SMM-V55,Fresher-04,,Pcs,1,104.5,0,0,TRUE,,active
+SMM-V55,Fresher-05,,Pcs,1,213.75,0,0,TRUE,,active
+SMM-V55,Fresher-06,,Pcs,1,111.08,0,0,TRUE,,active
+SMM-V55,Fresher-07,,Pcs,1,94.04,0,0,TRUE,,active
+SMM-V55,Fresher-08,,Pcs,1,213.75,0,0,TRUE,,active
+SMM-V55,Fresher-09,,Pcs,1,111.08,0,0,TRUE,,active
+SMM-V55,Fresher-10,,Pcs,1,94.04,0,0,TRUE,,active
+SMM-V55,Fresher-11,,Pcs,1,213.67,0,0,TRUE,,active
+SMM-V55,Fresher-12,,Pcs,1,111.08,0,0,TRUE,,active
+SMM-V55,Fresher-13,,Pcs,1,213.83,0,0,TRUE,,active
+SMM-V55,Fresher-14,,Pcs,1,136.83,0,0,TRUE,,active
+SMM-V55,Fresher-15,,Pcs,1,111.08,0,0,TRUE,,active
+SMM-V55,Fresher-16,,Pcs,1,101.5,0,0,TRUE,,active
+SMM-V55,Fresher-17,,Pcs,1,101.5,0,0,TRUE,,active
+SMM-V55,Fresher-18,,Pcs,1,111.08,0,0,TRUE,,active
+SMM-V55,Fresher-19,,Pcs,1,111.07,0,0,TRUE,,active
+SMM-V55,Fresher-20,,Pcs,1,87,0,0,TRUE,,active
+SMM-V55,Fresher-21,,Pcs,1,87,0,0,TRUE,,active
+SMM-V55,Fresher-22,,Pcs,1,101.42,0,0,TRUE,,active
+SMM-V55,Fresher-23,,Pcs,1,86.67,0,0,TRUE,,active
+SMM-V56,COCA-COLA-01,,Pcs,1,160,0,0,TRUE,,active
+SMM-V56,COCA-COLA-02,,Pcs,1,60.83,0,0,TRUE,,active
+SMM-V56,COCA-COLA-03,,Pcs,1,79.22,0,0,TRUE,,active
+SMM-V56,COCA-COLA-04,,Pcs,1,79.19,0,0,TRUE,,active
+SMM-V56,COCA-COLA-05,,Pcs,1,79.21,0,0,TRUE,,active
+SMM-V56,COCA-COLA-06,,Pcs,1,60.83,0,0,TRUE,,active
+SMM-V56,COCA-COLA-07,,Pcs,1,79.22,0,0,TRUE,,active
+SMM-V56,COCA-COLA-08,,Pcs,1,60.83,0,0,TRUE,,active
+SMM-V56,COCA-COLA-09,,Pcs,1,79.21,0,0,TRUE,,active
+SMM-V56,COCA-COLA-10,,Pcs,1,79.21,0,0,TRUE,,active
+SMM-V56,COCA-COLA-11,,Pcs,1,79.19,0,0,TRUE,,active
+SMM-V56,COCA-COLA-12,,Pcs,1,47.5,0,0,TRUE,,active
+SMM-V56,COCA-COLA-13,,Pcs,1,56.67,0,0,TRUE,,active
+SMM-V56,COCA-COLA-14,,Pcs,1,60.83,0,0,TRUE,,active
+SMM-V56,COCA-COLA-15,,Pcs,1,93.25,0,0,TRUE,,active
+SMM-V56,COCA-COLA-16,,Pcs,1,93.28,0,0,TRUE,,active
+SMM-V56,COCA-COLA-17,,Pcs,1,93.28,0,0,TRUE,,active
+SMM-V56,COCA-COLA-18,,Pcs,1,108.75,0,0,TRUE,,active
+SMM-V56,COCA-COLA-19,,Pcs,1,104.17,0,0,TRUE,,active
+SMM-V56,COCA-COLA-20,,Pcs,1,40.02,0,0,TRUE,,active
+SMM-V56,COCA-COLA-21,,Pcs,1,161.67,0,0,TRUE,,active
+SMM-V56,COCA-COLA-22,,Pcs,1,169.2,0,0,TRUE,,active
+SMM-V56,COCA-COLA-23,,Pcs,1,161.67,0,0,TRUE,,active
+SMM-V56,COCA-COLA-24,,Pcs,1,161.67,0,0,TRUE,,active
+SMM-V57,Gourmet-01,,Pcs,1,52.5,0,0,TRUE,,active
+SMM-V57,Gourmet-02,,Pcs,1,26.25,0,0,TRUE,,active
+SMM-V57,Gourmet-03,,Pcs,1,111.33,0,0,TRUE,,active
+SMM-V57,Gourmet-04,,Pcs,1,111.33,0,0,TRUE,,active
+SMM-V57,Gourmet-05,,Pcs,1,75,0,0,TRUE,,active
+SMM-V57,Gourmet-06,,Pcs,1,72.5,0,0,TRUE,,active
+SMM-V57,Gourmet-07,,Pcs,1,64.17,0,0,TRUE,,active
+SMM-V57,Gourmet-08,,Pcs,1,167.5,0,0,TRUE,,active
+SMM-V57,Gourmet-09,,Pcs,1,167.5,0,0,TRUE,,active
+SMM-V57,Gourmet-10,,Pcs,1,75,0,0,TRUE,,active
+SMM-V57,Gourmet-11,,Pcs,1,43.33,0,0,TRUE,,active
+SMM-V57,Gourmet-12,,Pcs,1,43.33,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-01,,Pcs,1,150,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-02,,Pcs,1,75,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-03,,Pcs,1,77.08,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-04,,Pcs,1,77.08,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-05,,Pcs,1,77.08,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-06,,Pcs,1,77.08,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-07,,Pcs,1,77.08,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-08,,Pcs,1,75,0,0,TRUE,,active
+SMM-V58,Murree Brewery's-09,,Pcs,1,150,0,0,TRUE,,active
+SMM-V58,Tops-01,,Pcs,1,100,0,0,TRUE,,active
+SMM-V58,Tops-02,,Pcs,1,100,0,0,TRUE,,active
+SMM-V58,Tops-03,,Pcs,1,100,0,0,TRUE,,active
+SMM-V58,Tops-04,,Pcs,1,100,0,0,TRUE,,active
+SMM-V58,Tops-05,,Pcs,1,100,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-01,,Pcs,1,454.05,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-02,,Pcs,1,169.75,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-03,,Pcs,1,296,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-04,,Pcs,1,272.35,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-05,,Pcs,1,339.55,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-06,,Pcs,1,201.35,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-07,,Pcs,1,394,0,0,TRUE,,active
+SMM-V59,SATEEN SOFT-08,,Pcs,1,394.8,0,0,TRUE,,active
+SMM-V59,XTRA CLEEN-01,,Pcs,1,274.7,0,0,TRUE,,active
+SMM-V59,XTRA CLEEN-02,,Pcs,1,210.08,0,0,TRUE,,active
+SMM-V59,Trust-01,,Pcs,1,321.63,0,0,TRUE,,active
+SMM-V59,Trust-02,,Pcs,1,321.63,0,0,TRUE,,active
+SMM-V59,Trust-03,,Pcs,1,179.5,0,0,TRUE,,active
+SMM-V59,Trust-04,,Pcs,1,179.5,0,0,TRUE,,active
+SMM-V59,Trust-05,,Pcs,1,104.72,0,0,TRUE,,active
+SMM-V59,Trust-06,,Pcs,1,179.5,0,0,TRUE,,active
+SMM-V59,Trust-07,,Pcs,1,89.75,0,0,TRUE,,active
+SMM-V59,Trust-08,,Pcs,1,179.5,0,0,TRUE,,active
+SMM-V59,Trust-09,,Pcs,1,336.58,0,0,TRUE,,active
+SMM-V59,Trust-10,,Pcs,1,374,0,0,TRUE,,active
+SMM-V59,Trust-11,,Pcs,1,564.04,0,0,TRUE,,active
+SMM-V59,Trust-12,,Pcs,1,564.04,0,0,TRUE,,active
+SMM-V59,Trust-13,,Pcs,1,172.04,0,0,TRUE,,active
+SMM-V59,Trust-14,,Pcs,1,216.92,0,0,TRUE,,active
+SMM-V59,Trust-15,,Pcs,1,187,0,0,TRUE,,active
+SMM-V59,Trust-16,,Pcs,1,299.21,0,0,TRUE,,active
+SMM-V59,Trust-17,,Pcs,1,104.71,0,0,TRUE,,active
+SMM-V59,Anne Fresh-01,,Pcs,1,103.54,0,0,TRUE,,active
+SMM-V59,Anne Fresh-02,,Pcs,1,98.83,0,0,TRUE,,active
+SMM-V59,BONUS-01,,Pcs,1,350.17,0,0,TRUE,,active
+SMM-V59,BONUS-02,,Pcs,1,175.08,0,0,TRUE,,active
+SMM-V59,BONUS-03,,Pcs,1,490.61,0,0,TRUE,,active
+SMM-V59,BONUS-04,,Pcs,1,254.4,0,0,TRUE,,active
+SMM-V59,BONUS-05,,Pcs,1,89.94,0,0,TRUE,,active
+SMM-V59,BONUS-06,,Pcs,1,262.58,0,0,TRUE,,active
+SMM-V59,BONUS-07,,Pcs,1,1226.67,0,0,TRUE,,active
+SMM-V59,BONUS-08,,Pcs,1,717.75,0,0,TRUE,,active
+SMM-V59,BRITE-01,,Pcs,1,288.33,0,0,TRUE,,active
+SMM-V59,BRITE-02,,Pcs,1,576.69,0,0,TRUE,,active
+SMM-V59,BRITE-03,,Pcs,1,1106.83,0,0,TRUE,,active
+SMM-V59,BRITE-04,,Pcs,1,1627.75,0,0,TRUE,,active
+SMM-V59,BRITE-05,,Pcs,1,9.03,0,0,TRUE,,active
+SMM-V59,BRITE-06,,Pcs,1,613.92,0,0,TRUE,,active
+SMM-V59,BRITE-07,,Pcs,1,613.92,0,0,TRUE,,active
+SMM-V59,BRITE-08,,Pcs,1,306.96,0,0,TRUE,,active
+SMM-V59,EXPRESS-01,,Pcs,1,901.25,0,0,TRUE,,active
+SMM-V59,EXPRESS-02,,Pcs,1,239.13,0,0,TRUE,,active
+SMM-V59,EXPRESS-03,,Pcs,1,694.35,0,0,TRUE,,active
+SMM-V59,EXPRESS-04,,Pcs,1,478.22,0,0,TRUE,,active
+SMM-V59,Max-01,,Pcs,1,32.41,0,0,TRUE,,active
+SMM-V59,Max-02,,Pcs,1,55.56,0,0,TRUE,,active
+SMM-V59,Max-03,,Pcs,1,97.24,0,0,TRUE,,active
+SMM-V59,Max-04,,Pcs,1,92.61,0,0,TRUE,,active
+SMM-V59,Max-05,,Pcs,1,185.21,0,0,TRUE,,active
+SMM-V59,Max-06,,Pcs,1,287.25,0,0,TRUE,,active
+SMM-V59,Max-07,,Pcs,1,323.75,0,0,TRUE,,active
+SMM-V59,Max-08,,Pcs,1,442.33,0,0,TRUE,,active
+SMM-V59,Max-09,,Pcs,1,392.17,0,0,TRUE,,active
+SMM-V59,Max-10,,Pcs,1,259.92,0,0,TRUE,,active
+SMM-V59,Max-11,,Pcs,1,205.21,0,0,TRUE,,active
+SMM-V59,Max-12,,Pcs,1,269.04,0,0,TRUE,,active
+SMM-V59,Max-13,,Pcs,1,164.58,0,0,TRUE,,active
+SMM-V59,Max-14,,Pcs,1,192.08,0,0,TRUE,,active
+SMM-V59,Max-15,,Pcs,1,242.13,0,0,TRUE,,active
+SMM-V59,Max-16,,Pcs,1,429.42,0,0,TRUE,,active
+SMM-V59,Max-17,,Pcs,1,192.08,0,0,TRUE,,active
+SMM-V59,Max-18,,Pcs,1,456,0,0,TRUE,,active
+SMM-V59,Max-19,,Pcs,1,827,0,0,TRUE,,active
+SMM-V59,Max-20,,Pcs,1,827.17,0,0,TRUE,,active
+SMM-V59,Max-21,,Pcs,1,565,0,0,TRUE,,active
+SMM-V59,Max-22,,Pcs,1,478.33,0,0,TRUE,,active
+SMM-V59,Max-23,,Pcs,1,478.83,0,0,TRUE,,active
+SMM-V59,Max-24,,Pcs,1,236,0,0,TRUE,,active
+SMM-V59,Softlan-01,,Pcs,1,472.67,0,0,TRUE,,active
+SMM-V59,Softlan-02,,Pcs,1,472.67,0,0,TRUE,,active
+SMM-V59,Softlan-03,,Pcs,1,472.67,0,0,TRUE,,active
+SMM-V59,Softlan-04,,Pcs,1,550,0,0,TRUE,,active
+SMM-V59,Softlan-05,,Pcs,1,1028,0,0,TRUE,,active
+SMM-V59,Softlan-06,,Pcs,1,1028,0,0,TRUE,,active
+SMM-V59,Protex-01,,Pcs,1,119.56,0,0,TRUE,,active
+SMM-V59,Protex-02,,Pcs,1,147.14,0,0,TRUE,,active
+SMM-V59,Protex-03,,Pcs,1,110.36,0,0,TRUE,,active
+SMM-V59,Protex-04,,Pcs,1,147.14,0,0,TRUE,,active
+SMM-V59,Protex-05,,Pcs,1,119.56,0,0,TRUE,,active
+SMM-V59,Protex-06,,Pcs,1,423.04,0,0,TRUE,,active
+SMM-V59,Protex-07,,Pcs,1,423.04,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-01,,Pcs,1,354.5,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-02,,Pcs,1,1063.67,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-03,,Pcs,1,390,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-04,,Pcs,1,647,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-05,,Pcs,1,647,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-06,,Pcs,1,354.54,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-07,,Pcs,1,354.54,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-08,,Pcs,1,436.83,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-09,,Pcs,1,390,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-10,,Pcs,1,354.5,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-11,,Pcs,1,354.5,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-12,,Pcs,1,354.5,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-13,,Pcs,1,147.14,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-14,,Pcs,1,147.14,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-15,,Pcs,1,147.14,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-16,,Pcs,1,413.83,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-17,,Pcs,1,717.33,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-18,,Pcs,1,174.72,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-19,,Pcs,1,319.08,0,0,TRUE,,active
+SMM-V59,PALMOLIVE-20,,Pcs,1,319.08,0,0,TRUE,,active
+SMM-V59,Colgate-01,,Pcs,1,161,0,0,TRUE,,active
+SMM-V59,Colgate-02,,Pcs,1,205.75,0,0,TRUE,,active
+SMM-V59,Colgate-03,,Pcs,1,67.08,0,0,TRUE,,active
+SMM-V59,Colgate-04,,Pcs,1,299.67,0,0,TRUE,,active
+SMM-V59,Colgate-05,,Pcs,1,357.67,0,0,TRUE,,active
+SMM-V59,Colgate-06,,Pcs,1,67.08,0,0,TRUE,,active
+SMM-V59,Colgate-07,,Pcs,1,214.67,0,0,TRUE,,active
+SMM-V59,Colgate-08,,Pcs,1,313.04,0,0,TRUE,,active
+SMM-V59,Colgate-09,,Pcs,1,608.25,0,0,TRUE,,active
+SMM-V59,Colgate-10,,Pcs,1,178.92,0,0,TRUE,,active
+SMM-V59,Colgate-11,,Pcs,1,214.67,0,0,TRUE,,active
+SMM-V59,Colgate-12,,Pcs,1,380.13,0,0,TRUE,,active
+SMM-V59,Colgate-13,,Pcs,1,393.5,0,0,TRUE,,active
+SMM-V59,Colgate-14,,Pcs,1,370,0,0,TRUE,,active
+SMM-V59,Colgate-15,,Pcs,1,205.75,0,0,TRUE,,active
+SMM-V59,Colgate-16,,Pcs,1,235,0,0,TRUE,,active
+SMM-V59,Colgate-17,,Pcs,1,385,0,0,TRUE,,active
+SMM-V59,Colgate-18,,Pcs,1,205.73,0,0,TRUE,,active
+SMM-V59,Colgate-19,,Pcs,1,205.75,0,0,TRUE,,active
+SMM-V59,Colgate-20,,Pcs,1,304.17,0,0,TRUE,,active
+SMM-V59,Colgate-21,,Pcs,1,205.75,0,0,TRUE,,active
+SMM-V59,Colgate-22,,Pcs,1,304.17,0,0,TRUE,,active
+SMM-V59,Colgate-23,,Pcs,1,304.17,0,0,TRUE,,active
+SMM-V59,Colgate-24,,Pcs,1,134.17,0,0,TRUE,,active
+SMM-V59,Colgate-25,,Pcs,1,178.83,0,0,TRUE,,active
+SMM-V59,Colgate-26,,Pcs,1,232.5,0,0,TRUE,,active
+SMM-V59,Colgate-27,,Pcs,1,357.75,0,0,TRUE,,active
+SMM-V59,Colgate-28,,Pcs,1,402.5,0,0,TRUE,,active
+SMM-V59,Colgate-29,,Pcs,1,438.33,0,0,TRUE,,active
+SMM-V59,Colgate-30,,Pcs,1,220,0,0,TRUE,,active
+SMM-V59,Colgate-31,,Pcs,1,220,0,0,TRUE,,active
+SMM-V59,Colgate-32,,Pcs,1,393.58,0,0,TRUE,,active
+SMM-V59,Colgate-33,,Pcs,1,438.33,0,0,TRUE,,active
+SMM-V59,Colgate-34,,Pcs,1,355.71,0,0,TRUE,,active
+SMM-V59,Colgate-35,,Pcs,1,357.79,0,0,TRUE,,active
+SMM-V59,Colgate-36,,Pcs,1,168.43,0,0,TRUE,,active
+SMM-V59,Colgate-37,,Pcs,1,101.07,0,0,TRUE,,active
+SMM-V59,Colgate-38,,Pcs,1,85.57,0,0,TRUE,,active
+SMM-V59,Colgate-39,,Pcs,1,136.17,0,0,TRUE,,active
+SMM-V59,Colgate-40,,Pcs,1,101.67,0,0,TRUE,,active
+SMM-V59,Colgate-41,,Pcs,1,184.43,0,0,TRUE,,active
+SMM-V59,Colgate-42,,Pcs,1,120.29,0,0,TRUE,,active
+SMM-V59,Colgate-43,,Pcs,1,84.19,0,0,TRUE,,active
+SMM-V59,Colgate-44,,Pcs,1,178.93,0,0,TRUE,,active
+SMM-V59,Colgate-45,,Pcs,1,161.62,0,0,TRUE,,active
+SMM-V59,Colgate-46,,Pcs,1,224,0,0,TRUE,,active
+SMM-V59,Colgate-47,,Pcs,1,142.17,0,0,TRUE,,active
+SMM-V59,Colgate-48,,Pcs,1,168,0,0,TRUE,,active
+SMM-V59,Colgate-49,,Pcs,1,192.57,0,0,TRUE,,active
+SMM-V59,Colgate-50,,Pcs,1,161.62,0,0,TRUE,,active
+SMM-V59,Colgate-51,,Pcs,1,370,0,0,TRUE,,active
+SMM-V59,Colgate-52,,Pcs,1,455.83,0,0,TRUE,,active
+SMM-V59,Colgate-53,,Pcs,1,774.83,0,0,TRUE,,active
+SMM-V59,Colgate-54,,Pcs,1,455.83,0,0,TRUE,,active
+SMM-V59,Colgate-55,,Pcs,1,744.83,0,0,TRUE,,active
+SMM-V61,TULIP-01,,Pcs,1,214.53,0,0,TRUE,,active
+SMM-V61,TULIP-02,,Pcs,1,90.69,0,0,TRUE,,active
+SMM-V61,TULIP-03,,Pcs,1,156.64,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-01,,Pcs,1,255.57,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-02,,Pcs,1,222.6,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-03,,Pcs,1,156.64,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-04,,Pcs,1,181.37,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-05,,Pcs,1,221.6,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-06,,Pcs,1,205.2,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-07,,Pcs,1,288.83,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-08,,Pcs,1,536.39,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-09,,Pcs,1,148.28,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-10,,Pcs,1,370.7,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-11,,Pcs,1,742,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-12,,Pcs,1,189.61,0,0,TRUE,,active
+SMM-V61,ROSE PETAL-13,,Pcs,1,82.45,0,0,TRUE,,active
+SMM-V61,Sc Johnson-01,,Pcs,1,545.83,0,0,TRUE,,active
+SMM-V61,Sc Johnson-02,,Pcs,1,1091.67,0,0,TRUE,,active
+SMM-V61,Sc Johnson-03,,Pcs,1,389.83,0,0,TRUE,,active
+SMM-V61,Sc Johnson-04,,Pcs,1,389.83,0,0,TRUE,,active
+SMM-V61,Sc Johnson-05,,Pcs,1,255,0,0,TRUE,,active
+SMM-V61,Sc Johnson-06,,Pcs,1,734.17,0,0,TRUE,,active
+SMM-V62,COOL&COOL-01,,Pcs,1,244.67,0,0,TRUE,,active
+SMM-V62,COOL&COOL-02,,Pcs,1,267,0,0,TRUE,,active
+SMM-V62,COOL&COOL-03,,Pcs,1,323.17,0,0,TRUE,,active
+SMM-V62,COOL&COOL-04,,Pcs,1,353,0,0,TRUE,,active
+SMM-V62,COOL&COOL-05,,Pcs,1,673.33,0,0,TRUE,,active
+SMM-V63,Molfix-01,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V63,Molfix-02,,Pcs,1,3550,0,0,TRUE,,active
+SMM-V63,Molfix-03,,Pcs,1,3550,0,0,TRUE,,active
+SMM-V63,Molfix-04,,Pcs,1,3550,0,0,TRUE,,active
+SMM-V63,Molfix-05,,Pcs,1,2550,0,0,TRUE,,active
+SMM-V63,Molfix-06,,Pcs,1,2479.5,0,0,TRUE,,active
+SMM-V63,Molfix-07,,Pcs,1,1390,0,0,TRUE,,active
+SMM-V63,Molfix-08,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V63,Molfix-09,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V63,Molfix-10,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V63,Molfix-11,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V63,Molfix-12,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V63,Molfix-13,,Pcs,1,2416.75,0,0,TRUE,,active
+SMM-V63,Molfix-14,,Pcs,1,2956.5,0,0,TRUE,,active
+SMM-V63,Molfix-15,,Pcs,1,2500,0,0,TRUE,,active
+SMM-V63,Molfix-16,,Pcs,1,2500,0,0,TRUE,,active
+SMM-V63,Molfix-17,,Pcs,1,2550,0,0,TRUE,,active
+SMM-V63,Molfix-18,,Pcs,1,2550,0,0,TRUE,,active
+SMM-V63,Molfix-19,,Pcs,1,2550,0,0,TRUE,,active
+SMM-V63,Molfix-20,,Pcs,1,2550,0,0,TRUE,,active
+SMM-V63,MOLPED-01,,Pcs,1,496.38,0,0,TRUE,,active
+SMM-V63,MOLPED-02,,Pcs,1,750,0,0,TRUE,,active
+SMM-V63,MOLPED-03,,Pcs,1,320,0,0,TRUE,,active
+SMM-V63,MOLPED-04,,Pcs,1,496.38,0,0,TRUE,,active
+SMM-V63,MOLPED-05,,Pcs,1,750,0,0,TRUE,,active
+SMM-V63,MOLPED-06,,Pcs,1,257.5,0,0,TRUE,,active
+SMM-V63,MOLPED-07,,Pcs,1,620,0,0,TRUE,,active
+SMM-V63,MOLPED-08,,Pcs,1,620,0,0,TRUE,,active
+SMM-V63,MOLPED-09,,Pcs,1,320,0,0,TRUE,,active
+SMM-V63,MOLPED-10,,Pcs,1,496.38,0,0,TRUE,,active
+SMM-V63,MOLPED-11,,Pcs,1,496.38,0,0,TRUE,,active
+SMM-V63,MOLPED-12,,Pcs,1,257.88,0,0,TRUE,,active
+SMM-V63,MOLPED-13,,Pcs,1,257.88,0,0,TRUE,,active
+SMM-V63,MOLPED-14,,Pcs,1,496.5,0,0,TRUE,,active
+SMM-V63,MOLPED-15,,Pcs,1,496.5,0,0,TRUE,,active
+SMM-V63,MOLPED-16,,Pcs,1,257.88,0,0,TRUE,,active
+SMM-V63,MOLPED-17,,Pcs,1,620,0,0,TRUE,,active
+SMM-V63,MOLPED-18,,Pcs,1,620,0,0,TRUE,,active
+SMM-V63,MOLPED-19,,Pcs,1,749.98,0,0,TRUE,,active
+SMM-V63,MOLPED-20,,Pcs,1,749.98,0,0,TRUE,,active
+SMM-V63,MOLPED-21,,Pcs,1,257.88,0,0,TRUE,,active
+SMM-V63,MOLPED-22,,Pcs,1,320,0,0,TRUE,,active
+SMM-V63,MOLPED-23,,Pcs,1,350,0,0,TRUE,,active
+SMM-V63,MOLPED-24,,Pcs,1,NO ENTRY,0,0,TRUE,,active
+SMM-V63,Always-01,,Pcs,1,430,0,0,TRUE,,active
+SMM-V63,Always-02,,Pcs,1,430,0,0,TRUE,,active
+SMM-V63,Always-03,,Pcs,1,750,0,0,TRUE,,active
+SMM-V63,Always-04,,Pcs,1,750,0,0,TRUE,,active
+SMM-V63,Always-05,,Pcs,1,1242,0,0,TRUE,,active
+SMM-V63,Always-06,,Pcs,1,330,0,0,TRUE,,active
+SMM-V63,Always-07,,Pcs,1,520,0,0,TRUE,,active
+SMM-V64,Carebaby-01,,Pcs,1,2320,0,0,TRUE,,active
+SMM-V64,Carebaby-02,,Pcs,1,2320,0,0,TRUE,,active
+SMM-V64,Carebaby-03,,Pcs,1,2320,0,0,TRUE,,active
+SMM-V64,SAFNIC-01,,Pcs,1,283.28,0,0,TRUE,,active
+SMM-V64,SAFNIC-02,,Pcs,1,191.6,0,0,TRUE,,active
+SMM-V64,BEJAAN-01,,Pcs,1,125.45,0,0,TRUE,,active
+SMM-V64,BEJAAN-02,,Pcs,1,885,0,0,TRUE,,active
+SMM-V64,BEJAAN-03,,Pcs,1,557.58,0,0,TRUE,,active
+SMM-V64,BEJAAN-04,,Pcs,1,225.6,0,0,TRUE,,active
+SMM-V64,BEJAAN-05,,Pcs,1,217.33,0,0,TRUE,,active
+SMM-V64,BEJAAN-06,,Pcs,1,114.63,0,0,TRUE,,active
+SMM-V64,BEJAAN-07,,Pcs,1,221,0,0,TRUE,,active
+SMM-V64,BEJAAN-08,,Pcs,1,221,0,0,TRUE,,active
+SMM-V64,BEJAAN-09,,Pcs,1,256.63,0,0,TRUE,,active
+SMM-V64,BEJAAN-10,,Pcs,1,388,0,0,TRUE,,active
+SMM-V64,BEJAAN-11,,Pcs,1,,0,0,TRUE,,active
+SMM-V64,BEJAAN-12,,Pcs,1,284.69,0,0,TRUE,,active
+SMM-V64,Sofnic-01,,Pcs,1,216.38,0,0,TRUE,,active
+SMM-V64,Sofnic-02,,Pcs,1,183.35,0,0,TRUE,,active
+SMM-V64,Sofnic-03,,Pcs,1,188.75,0,0,TRUE,,active
+SMM-V64,Sofnic-04,,Pcs,1,82.53,0,0,TRUE,,active
+SMM-V64,Sofnic-05,,Pcs,1,104.06,0,0,TRUE,,active
+SMM-V64,LUXURY SOFT-01,,Pcs,1,399,0,0,TRUE,,active
+SMM-V64,LUXURY SOFT-02,,Pcs,1,224.7,0,0,TRUE,,active
+SMM-V64,LUXURY SOFT-03,,Pcs,1,212.8,0,0,TRUE,,active
+SMM-V64,KINGTOX-01,,Pcs,1,478.38,0,0,TRUE,,active
+SMM-V64,KINGTOX-02,,Pcs,1,235.48,0,0,TRUE,,active
+SMM-V64,KINGTOX-03,,Pcs,1,652.71,0,0,TRUE,,active
+SMM-V64,KINGTOX-04,,Pcs,1,393.33,0,0,TRUE,,active
+SMM-V64,KINGTOX-05,,Pcs,1,393.33,0,0,TRUE,,active
+SMM-V64,KINGTOX-06,,Pcs,1,652.67,0,0,TRUE,,active
+SMM-V64,KINGTOX-07,,Pcs,1,227.23,0,0,TRUE,,active
+SMM-V64,KINGTOX-08,,Pcs,1,84.27,0,0,TRUE,,active
+SMM-V64,KINGTOX-09,,Pcs,1,84.25,0,0,TRUE,,active
+SMM-V64,KINGTOX-10,,Pcs,1,487.5,0,0,TRUE,,active
+SMM-V64,KINGTOX-11,,Pcs,1,393.27,0,0,TRUE,,active
+SMM-V64,KINGTOX-12,,Pcs,1,652.67,0,0,TRUE,,active
+SMM-V64,KINGTOX-13,,Pcs,1,75.58,0,0,TRUE,,active
+SMM-V64,KINGTOX-14,,Pcs,1,74.76,0,0,TRUE,,active
+SMM-V64,KINGTOX-15,,Pcs,1,371.67,0,0,TRUE,,active
+SMM-V64,KINGTOX-16,,Pcs,1,371.67,0,0,TRUE,,active
+SMM-V64,KINGTOX-17,,Pcs,1,147.19,0,0,TRUE,,active
+SMM-V64,KINGTOX-18,,Pcs,1,283.5,0,0,TRUE,,active
+SMM-V64,KINGTOX-19,,Pcs,1,283.54,0,0,TRUE,,active
+SMM-V64,KINGTOX-20,,Pcs,1,283.5,0,0,TRUE,,active
+SMM-V64,Frey-01,,Pcs,1,238.67,0,0,TRUE,,active
+SMM-V64,Frey-02,,Pcs,1,238.67,0,0,TRUE,,active
+SMM-V64,Frey-03,,Pcs,1,238.67,0,0,TRUE,,active
+SMM-V64,Frey-04,,Pcs,1,238.67,0,0,TRUE,,active
+SMM-V64,Golden Prearl-01,,Pcs,1,104.33,0,0,TRUE,,active
+SMM-V64,Drizalle-01,,Pcs,1,1295,0,0,TRUE,,active
+SMM-V64,Drizalle-02,,Pcs,1,942.56,0,0,TRUE,,active
+SMM-V64,Drizalle-03,,Pcs,1,746.2,0,0,TRUE,,active
+SMM-V64,Drizalle-04,,Pcs,1,942.56,0,0,TRUE,,active
+SMM-V65,Bona Papa-01,,Pcs,1,2357,0,0,TRUE,,active
+SMM-V65,Momse-01,,Pcs,1,1298.5,0,0,TRUE,,active
+SMM-V65,Momse-02,,Pcs,1,2052.25,0,0,TRUE,,active
+SMM-V65,Momse-03,,Pcs,1,2052,0,0,TRUE,,active
+SMM-V65,Momse-04,,Pcs,1,2766,0,0,TRUE,,active
+SMM-V65,Momse-05,,Pcs,1,2000,0,0,TRUE,,active
+SMM-V65,NAZUK-01,,Pcs,1,125.25,0,0,TRUE,,active
+SMM-V65,NOFEA-01,,Pcs,1,1356.67,0,0,TRUE,,active
+SMM-V65,NOFEA-02,,Pcs,1,1266.25,0,0,TRUE,,active
+SMM-V65,NOFEA-03,,Pcs,1,587.92,0,0,TRUE,,active
+SMM-V65,NOFEA-04,,Pcs,1,587.92,0,0,TRUE,,active
+SMM-V65,NOFEA-05,,Pcs,1,411.54,0,0,TRUE,,active
+SMM-V65,NOFEA-06,,Pcs,1,506.5,0,0,TRUE,,active
+SMM-V65,NOFEA-07,,Pcs,1,284.92,0,0,TRUE,,active
+SMM-V65,NOFEA-08,,Pcs,1,141.42,0,0,TRUE,,active
+SMM-V65,NOFEA-09,,Pcs,1,253.25,0,0,TRUE,,active
+SMM-V65,NOFEA-10,,Pcs,1,126.58,0,0,TRUE,,active
+SMM-V65,NOFEA-11,,Pcs,1,253.25,0,0,TRUE,,active
+SMM-V65,NOFEA-12,,Pcs,1,705.5,0,0,TRUE,,active
+SMM-V65,NOFEA-13,,Pcs,1,141.42,0,0,TRUE,,active
+SMM-V66,Good Care-01,,Pcs,1,1973,0,0,TRUE,,active
+SMM-V66,Good Care-02,,Pcs,1,1973,0,0,TRUE,,active
+SMM-V66,Familia-01,,Pcs,1,226,0,0,TRUE,,active
+SMM-V66,Familia-02,,Pcs,1,404.6,0,0,TRUE,,active
+SMM-V66,Familia-03,,Pcs,1,331.89,0,0,TRUE,,active
+SMM-V66,Familia-04,,Pcs,1,226.7,0,0,TRUE,,active
+SMM-V66,Papia-01,,Pcs,1,279.3,0,0,TRUE,,active
+SMM-V66,Papia-02,,Pcs,1,519.2,0,0,TRUE,,active
+SMM-V66,Papia-03,,Pcs,1,364.28,0,0,TRUE,,active
+SMM-V66,Papia-04,,Pcs,1,380.44,0,0,TRUE,,active
+SMM-V67,TRIBULUS-01,,Pcs,1,237.28,0,0,TRUE,,active
+SMM-V67,TRIBULUS-02,,Pcs,1,183.05,0,0,TRUE,,active
+SMM-V67,SILKEASE-01,,Pcs,1,108.48,0,0,TRUE,,active
+SMM-V68,TUX-01,,Pcs,1,101.34,0,0,TRUE,,active
+SMM-V68,TUX-02,,Pcs,1,197.17,0,0,TRUE,,active
+SMM-V68,TUX-03,,Pcs,1,236.89,0,0,TRUE,,active
+SMM-V68,TUX-04,,Pcs,1,205.22,0,0,TRUE,,active
+SMM-V68,TUX-05,,Pcs,1,480,0,0,TRUE,,active
+SMM-V68,TUX-06,,Pcs,1,23.59,0,0,TRUE,,active
+SMM-V68,TUX-07,,Pcs,1,205.06,0,0,TRUE,,active
+SMM-V68,TUX-08,,Pcs,1,101.44,0,0,TRUE,,active
+SMM-V68,TUX-09,,Pcs,1,273.06,0,0,TRUE,,active
+SMM-V68,TUX-10,,Pcs,1,351.06,0,0,TRUE,,active
+SMM-V68,TUX-11,,Pcs,1,152.17,0,0,TRUE,,active
+SMM-V68,TUX-12,,Pcs,1,189.27,0,0,TRUE,,active
+SMM-V68,TUX-13,,Pcs,1,249.83,0,0,TRUE,,active
+SMM-V68,Mortein-01,,Pcs,1,655.04,0,0,TRUE,,active
+SMM-V68,Mortein-02,,Pcs,1,475,0,0,TRUE,,active
+SMM-V68,Mortein-03,,Pcs,1,990,0,0,TRUE,,active
+SMM-V68,Mortein-04,,Pcs,1,667.13,0,0,TRUE,,active
+SMM-V68,Mortein-05,,Pcs,1,1054,0,0,TRUE,,active
+SMM-V68,Mortein-06,,Pcs,1,630.04,0,0,TRUE,,active
+SMM-V68,Mortein-07,,Pcs,1,990,0,0,TRUE,,active
+SMM-V68,Mortein-08,,Pcs,1,475.04,0,0,TRUE,,active
+SMM-V68,Mortein-09,,Pcs,1,655.04,0,0,TRUE,,active
+SMM-V68,Mortein-10,,Pcs,1,990,0,0,TRUE,,active
+SMM-V68,Mortein-11,,Pcs,1,475.04,0,0,TRUE,,active
+SMM-V68,Mortein-12,,Pcs,1,430,0,0,TRUE,,active
+SMM-V68,Mortein-13,,Pcs,1,852.8,0,0,TRUE,,active
+SMM-V68,Mortein-14,,Pcs,1,1114.94,0,0,TRUE,,active
+SMM-V68,Mortein-15,,Pcs,1,173.01,0,0,TRUE,,active
+SMM-V68,OVERKILL-01,,Pcs,1,471.3,0,0,TRUE,,active
+SMM-V68,OVERKILL-02,,Pcs,1,377.33,0,0,TRUE,,active
+SMM-V68,OVERKILL-03,,Pcs,1,369,0,0,TRUE,,active
+SMM-V68,OVERKILL-04,,Pcs,1,87.42,0,0,TRUE,,active
+SMM-V68,OVERKILL-05,,Pcs,1,188.67,0,0,TRUE,,active
+SMM-V68,OVERKILL-06,,Pcs,1,71.33,0,0,TRUE,,active
+SMM-V68,CHERRY BLOSSOM-01,,Pcs,1,503.42,0,0,TRUE,,active
+SMM-V68,CHERRY BLOSSOM-02,,Pcs,1,773.75,0,0,TRUE,,active
+SMM-V68,CHERRY BLOSSOM-03,,Pcs,1,251.75,0,0,TRUE,,active
+SMM-V68,CHERRY BLOSSOM-04,,Pcs,1,503.42,0,0,TRUE,,active
+SMM-V68,BUTTERFLY-01,,Pcs,1,390.5,0,0,TRUE,,active
+SMM-V68,BUTTERFLY-02,,Pcs,1,301,0,0,TRUE,,active
+SMM-V68,BUTTERFLY-03,,Pcs,1,374.17,0,0,TRUE,,active
+SMM-V68,BUTTERFLY-04,,Pcs,1,260.33,0,0,TRUE,,active
+SMM-V68,BUTTERFLY-05,,Pcs,1,235.92,0,0,TRUE,,active
+SMM-V68,Butterfly-06,,Pcs,1,277.75,0,0,TRUE,,active
+SMM-V68,Butterfly-07,,Pcs,1,277.75,0,0,TRUE,,active
+SMM-V68,Butterfly-08,,Pcs,1,515.83,0,0,TRUE,,active
+SMM-V68,Butterfly-09,,Pcs,1,515.83,0,0,TRUE,,active
+SMM-V68,Butterfly-10,,Pcs,1,793.67,0,0,TRUE,,active
+SMM-V68,Butterfly-11,,Pcs,1,793.67,0,0,TRUE,,active
+SMM-V68,Butterfly-12,,Pcs,1,277.75,0,0,TRUE,,active
+SMM-V68,Butterfly-13,,Pcs,1,277.75,0,0,TRUE,,active
+SMM-V68,Butterfly-14,,Pcs,1,515.83,0,0,TRUE,,active
+SMM-V68,Butterfly-15,,Pcs,1,515.83,0,0,TRUE,,active
+SMM-V68,Butterfly-16,,Pcs,1,357.17,0,0,TRUE,,active
+SMM-V68,Butterfly-17,,Pcs,1,698.42,0,0,TRUE,,active
+SMM-V68,Butterfly-18,,Pcs,1,341.17,0,0,TRUE,,active
+SMM-V68,Butterfly-19,,Pcs,1,277.75,0,0,TRUE,,active
+SMM-V68,Butterfly-20,,Pcs,1,158.75,0,0,TRUE,,active
+SMM-V68,Butterfly-21,,Pcs,1,158.75,0,0,TRUE,,active
+SMM-V68,Veet-01,,Pcs,1,345.38,0,0,TRUE,,active
+SMM-V68,Veet-02,,Pcs,1,345.38,0,0,TRUE,,active
+SMM-V68,Veet-03,,Pcs,1,625.58,0,0,TRUE,,active
+SMM-V68,Veet-04,,Pcs,1,625.58,0,0,TRUE,,active
+SMM-V68,Robin-01,,Pcs,1,934.5,0,0,TRUE,,active
+SMM-V68,Robin-02,,Pcs,1,934.5,0,0,TRUE,,active
+SMM-V68,Robin-03,,Pcs,1,502.08,0,0,TRUE,,active
+SMM-V68,Robin-04,,Pcs,1,502.08,0,0,TRUE,,active
+SMM-V68,Robin-05,,Pcs,1,502.08,0,0,TRUE,,active
+SMM-V68,Robin-06,,Pcs,1,463.42,0,0,TRUE,,active
+SMM-V68,Robin-07,,Pcs,1,888.17,0,0,TRUE,,active
+SMM-V68,Robin-08,,Pcs,1,500,0,0,TRUE,,active
+SMM-V68,DETTOL-01,,Pcs,1,2249.75,0,0,TRUE,,active
+SMM-V68,DETTOL-02,,Pcs,1,1392.17,0,0,TRUE,,active
+SMM-V68,DETTOL-03,,Pcs,1,1392.17,0,0,TRUE,,active
+SMM-V68,DETTOL-04,,Pcs,1,1392.17,0,0,TRUE,,active
+SMM-V68,DETTOL-05,,Pcs,1,2250,0,0,TRUE,,active
+SMM-V68,DETTOL-06,,Pcs,1,3465,0,0,TRUE,,active
+SMM-V68,DETTOL-07,,Pcs,1,220,0,0,TRUE,,active
+SMM-V68,DETTOL-08,,Pcs,1,136.07,0,0,TRUE,,active
+SMM-V68,DETTOL-09,,Pcs,1,114.11,0,0,TRUE,,active
+SMM-V68,DETTOL-10,,Pcs,1,114.11,0,0,TRUE,,active
+SMM-V68,DETTOL-11,,Pcs,1,136.07,0,0,TRUE,,active
+SMM-V68,DETTOL-12,,Pcs,1,122.31,0,0,TRUE,,active
+SMM-V68,DETTOL-13,,Pcs,1,131.67,0,0,TRUE,,active
+SMM-V68,DETTOL-14,,Pcs,1,174.68,0,0,TRUE,,active
+SMM-V68,DETTOL-15,,Pcs,1,174.69,0,0,TRUE,,active
+SMM-V68,DETTOL-16,,Pcs,1,136.07,0,0,TRUE,,active
+SMM-V68,DETTOL-17,,Pcs,1,174.68,0,0,TRUE,,active
+SMM-V68,DETTOL-18,,Pcs,1,140,0,0,TRUE,,active
+SMM-V68,DETTOL-19,,Pcs,1,320.67,0,0,TRUE,,active
+SMM-V68,DETTOL-20,,Pcs,1,511.86,0,0,TRUE,,active
+SMM-V68,DETTOL-21,,Pcs,1,511.86,0,0,TRUE,,active
+SMM-V68,DETTOL-22,,Pcs,1,488.83,0,0,TRUE,,active
+SMM-V68,DETTOL-23,,Pcs,1,311.08,0,0,TRUE,,active
+SMM-V68,DETTOL-24,,Pcs,1,488.83,0,0,TRUE,,active
+SMM-V68,DETTOL-25,,Pcs,1,488.83,0,0,TRUE,,active
+SMM-V68,Harpic-01,,Pcs,1,179.76,0,0,TRUE,,active
+SMM-V68,Harpic-02,,Pcs,1,449.44,0,0,TRUE,,active
+SMM-V68,Harpic-03,,Pcs,1,853.94,0,0,TRUE,,active
+SMM-V68,Harpic-04,,Pcs,1,125.84,0,0,TRUE,,active
+SMM-V68,Harpic-05,,Pcs,1,539.33,0,0,TRUE,,active
+SMM-V68,Harpic-06,,Pcs,1,1078.67,0,0,TRUE,,active
+SMM-V69,PRIME-01,,Pcs,1,276.67,0,0,TRUE,,active
+SMM-V69,PRIME-02,,Pcs,1,402.48,0,0,TRUE,,active
+SMM-V69,PRIME-03,,Pcs,1,644.42,0,0,TRUE,,active
+SMM-V69,PRIME-04,,Pcs,1,482.5,0,0,TRUE,,active
+SMM-V69,NAQOOSH-01,,Pcs,1,284.83,0,0,TRUE,,active
+SMM-V69,DASTARKHWAN-01,,Pcs,1,277.08,0,0,TRUE,,active
+SMM-V69,Wipes-01,,Pcs,1,214.6,0,0,TRUE,,active
+SMM-V69,Wipes-02,,Pcs,1,289.27,0,0,TRUE,,active
+SMM-V69,Wipes-03,,Pcs,1,292,0,0,TRUE,,active
+SMM-V69,Wipes-04,,Pcs,1,157.55,0,0,TRUE,,active
+SMM-V70,Canbebe-01,,Pcs,1,1353.5,0,0,TRUE,,active
+SMM-V70,Canbebe-02,,Pcs,1,1353.5,0,0,TRUE,,active
+SMM-V70,Canbebe-03,,Pcs,1,3635.25,0,0,TRUE,,active
+SMM-V71,Wcare-01,,Pcs,1,331.67,0,0,TRUE,,active
+SMM-V71,Wcare-02,,Pcs,1,435,0,0,TRUE,,active
+SMM-V71,Wcare-03,,Pcs,1,217.33,0,0,TRUE,,active
+SMM-V71,Wcare-04,,Pcs,1,173.67,0,0,TRUE,,active
+SMM-V71,Wcare-05,,Pcs,1,553.33,0,0,TRUE,,active
+SMM-V71,Wcare-06,,Pcs,1,479.83,0,0,TRUE,,active
+SMM-V71,Wcare-07,,Pcs,1,916.5,0,0,TRUE,,active
+SMM-V71,Wcare-08,,Pcs,1,916.5,0,0,TRUE,,active
+SMM-V71,Wcare-09,,Pcs,1,1091,0,0,TRUE,,active
+SMM-V71,Wcare-10,,Pcs,1,946.5,0,0,TRUE,,active
+SMM-V71,Wcare-11,,Pcs,1,339,0,0,TRUE,,active
+SMM-V71,Wcare-12,,Pcs,1,1091,0,0,TRUE,,active
+SMM-V71,Wcare-13,,Pcs,1,1091,0,0,TRUE,,active
+SMM-V71,Wcare-14,,Pcs,1,1091,0,0,TRUE,,active
+SMM-V71,Wcare-15,,Pcs,1,1091,0,0,TRUE,,active
+SMM-V71,Wcare-16,,Pcs,1,392.75,0,0,TRUE,,active
+SMM-V71,Wcare-17,,Pcs,1,480,0,0,TRUE,,active
+SMM-V71,Wcare-18,,Pcs,1,392.75,0,0,TRUE,,active
+SMM-V71,Wcare-19,,Pcs,1,392.75,0,0,TRUE,,active
+SMM-V71,Wcare-20,,Pcs,1,204,0,0,TRUE,,active
+SMM-V73,Paradise-01,,Pcs,1,341.83,0,0,TRUE,,active
+SMM-V73,Paradise-02,,Pcs,1,341.83,0,0,TRUE,,active
+SMM-V73,Paradise-03,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,Paradise-04,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,Paradise-05,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,Paradise-06,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,Paradise-07,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,Paradise-08,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,Paradise-09,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,Paradise-10,,Pcs,1,342,0,0,TRUE,,active
+SMM-V73,POWERPLUS-01,,Pcs,1,459.67,0,0,TRUE,,active
+SMM-V73,POWERPLUS-02,,Pcs,1,723,0,0,TRUE,,active
+SMM-V73,POWERPLUS-03,,Pcs,1,704,0,0,TRUE,,active
+SMM-V73,POWERPLUS-04,,Pcs,1,493.17,0,0,TRUE,,active
+SMM-V73,POWERPLUS-05,,Pcs,1,142.38,0,0,TRUE,,active
+SMM-V73,POWERPLUS-06,,Pcs,1,667,0,0,TRUE,,active
+SMM-V73,POWERPLUS-07,,Pcs,1,110.96,0,0,TRUE,,active
+SMM-V73,POWERPLUS-08,,Pcs,1,498.83,0,0,TRUE,,active
+SMM-V73,POWERPLUS-09,,Pcs,1,229.83,0,0,TRUE,,active
+SMM-V73,POWERPLUS-10,,Pcs,1,263.42,0,0,TRUE,,active
+SMM-V73,POWERPLUS-11,,Pcs,1,114.33,0,0,TRUE,,active
+SMM-V73,POWERPLUS-12,,Pcs,1,232,0,0,TRUE,,active
+SMM-V73,POWERPLUS-13,,Pcs,1,280,0,0,TRUE,,active
+SMM-V73,POWERPLUS-14,,Pcs,1,149.08,0,0,TRUE,,active
+SMM-V73,POWERPLUS-15,,Pcs,1,237.67,0,0,TRUE,,active
+SMM-V73,POWERPLUS-16,,Pcs,1,239.92,0,0,TRUE,,active
+SMM-V73,POWERPLUS-17,,Pcs,1,181.58,0,0,TRUE,,active
+SMM-V73,POWERPLUS-18,,Pcs,1,211.83,0,0,TRUE,,active
+SMM-V73,POWERPLUS-19,,Pcs,1,269,0,0,TRUE,,active
+SMM-V73,POWERPLUS-20,,Pcs,1,269,0,0,TRUE,,active
+SMM-V73,POWERPLUS-21,,Pcs,1,168.17,0,0,TRUE,,active
+SMM-V73,POWERPLUS-22,,Pcs,1,98.67,0,0,TRUE,,active
+SMM-V73,POWERPLUS-23,,Pcs,1,683,0,0,TRUE,,active
+SMM-V73,POWERPLUS-24,,Pcs,1,67.25,0,0,TRUE,,active
+SMM-V73,POWERPLUS-25,,Pcs,1,347.5,0,0,TRUE,,active
+SMM-V73,POWERPLUS-26,,Pcs,1,347.5,0,0,TRUE,,active
+SMM-V73,POWERPLUS-27,,Pcs,1,353.08,0,0,TRUE,,active
+SMM-V73,POWERPLUS-28,,Pcs,1,353.08,0,0,TRUE,,active
+SMM-V73,POWERPLUS-29,,Pcs,1,331,0,0,TRUE,,active
+SMM-V73,POWERPLUS-30,,Pcs,1,207.42,0,0,TRUE,,active
+SMM-V73,POWERPLUS-31,,Pcs,1,138.81,0,0,TRUE,,active
+SMM-V73,POWERPLUS-32,,Pcs,1,105.56,0,0,TRUE,,active
+SMM-V73,POWERPLUS-33,,Pcs,1,130.42,0,0,TRUE,,active
+SMM-V73,POWERPLUS-34,,Pcs,1,85.94,0,0,TRUE,,active
+SMM-V73,POWERPLUS-35,,Pcs,1,149.47,0,0,TRUE,,active
+SMM-V73,POWERPLUS-36,,Pcs,1,116.58,0,0,TRUE,,active
+SMM-V73,POWERPLUS-37,,Pcs,1,116.58,0,0,TRUE,,active
+SMM-V74,Fast Action-01,,Pcs,1,360,0,0,TRUE,,active
+SMM-V74,Fast Action-02,,Pcs,1,184,0,0,TRUE,,active
+SMM-V74,Fast Action-03,,Pcs,1,196,0,0,TRUE,,active
+SMM-V74,Fast Action-04,,Pcs,1,173.06,0,0,TRUE,,active
+SMM-V74,Fast Action-05,,Pcs,1,129.33,0,0,TRUE,,active
+SMM-V74,Fast Action-06,,Pcs,1,143,0,0,TRUE,,active
+SMM-V74,Fast Action-07,,Pcs,1,288.86,0,0,TRUE,,active
+SMM-V74,Fast Action-08,,Pcs,1,192,0,0,TRUE,,active
+SMM-V74,Fast Action-09,,Pcs,1,127.43,0,0,TRUE,,active
+SMM-V74,Fast Action-10,,Pcs,1,169.14,0,0,TRUE,,active
+SMM-V74,Fast Action-11,,Pcs,1,260,0,0,TRUE,,active
+SMM-V74,Fast Action-12,,Pcs,1,260,0,0,TRUE,,active
+SMM-V74,Fast Action-13,,Pcs,1,353.4,0,0,TRUE,,active
+SMM-V74,Fast Action-14,,Pcs,1,217.33,0,0,TRUE,,active
+SMM-V74,Fast Action-15,,Pcs,1,401.25,0,0,TRUE,,active
+SMM-V74,Fast Action-16,,Pcs,1,370.88,0,0,TRUE,,active
+SMM-V74,Fast Action-17,,Pcs,1,96.65,0,0,TRUE,,active
+SMM-V74,Fast Action-18,,Pcs,1,179.5,0,0,TRUE,,active
+SMM-V74,Fast Action-19,,Pcs,1,345.33,0,0,TRUE,,active
+SMM-V74,Fast Action-20,,Pcs,1,344.12,0,0,TRUE,,active
+SMM-V74,Fast Action-21,,Pcs,1,258.67,0,0,TRUE,,active
+SMM-V74,Fast Action-22,,Pcs,1,308.57,0,0,TRUE,,active
+SMM-V74,Fast Action-23,,Pcs,1,180.5,0,0,TRUE,,active
+SMM-V74,Fast Action-24,,Pcs,1,31.21,0,0,TRUE,,active
+SMM-V74,Fast Action-25,,Pcs,1,70.4,0,0,TRUE,,active
+SMM-V74,Fast Action-26,,Pcs,1,133.58,0,0,TRUE,,active
+SMM-V74,Fast Action-27,,Pcs,1,174.67,0,0,TRUE,,active
+SMM-V74,Fast Action-28,,Pcs,1,110,0,0,TRUE,,active
+SMM-V74,Fast Action-29,,Pcs,1,281.85,0,0,TRUE,,active
+SMM-V74,Fast Action-30,,Pcs,1,396.31,0,0,TRUE,,active
+SMM-V74,Fast Action-31,,Pcs,1,83.64,0,0,TRUE,,active
+SMM-V74,Fast Action-32,,Pcs,1,140,0,0,TRUE,,active
+SMM-V74,Fast Action-33,,Pcs,1,180.57,0,0,TRUE,,active
+SMM-V74,Fast Action-34,,Pcs,1,196.38,0,0,TRUE,,active
+SMM-V74,Fast Action-35,,Pcs,1,136,0,0,TRUE,,active
+SMM-V74,Fast Action-36,,Pcs,1,184,0,0,TRUE,,active
+SMM-V74,Fast Action-37,,Pcs,1,237.33,0,0,TRUE,,active
+SMM-V74,Fast Action-38,,Pcs,1,158.38,0,0,TRUE,,active
+SMM-V74,Fast Action-39,,Pcs,1,576,0,0,TRUE,,active
+SMM-V74,Fast Action-40,,Pcs,1,108/,0,0,TRUE,,active
+SMM-V74,Fast Action-41,,Pcs,1,52.79,0,0,TRUE,,active
+SMM-V74,Fast Action-42,,Pcs,1,240,0,0,TRUE,,active
+SMM-V75,Happy-01,,Pcs,1,680,0,0,TRUE,,active
+SMM-V75,Happy-02,,Pcs,1,980,0,0,TRUE,,active
+SMM-V75,Happy-03,,Pcs,1,780,0,0,TRUE,,active
+SMM-V75,Happy-04,,Pcs,1,980,0,0,TRUE,,active
+SMM-V75,Happy-05,,Pcs,1,980,0,0,TRUE,,active
+SMM-V75,Happy-06,,Pcs,1,780,0,0,TRUE,,active
+SMM-V75,Happy-07,,Pcs,1,750,0,0,TRUE,,active
+SMM-V75,Happy-08,,Pcs,1,750,0,0,TRUE,,active
+SMM-V75,Happy-09,,Pcs,1,750,0,0,TRUE,,active
+SMM-V75,Happy-10,,Pcs,1,680,0,0,TRUE,,active
+SMM-V75,Happy-11,,Pcs,1,680,0,0,TRUE,,active
+SMM-V75,Happy-12,,Pcs,1,680,0,0,TRUE,,active
+SMM-V75,Happy-13,,Pcs,1,1250,0,0,TRUE,,active
+SMM-V75,Happy-14,,Pcs,1,1250,0,0,TRUE,,active
+SMM-V75,Happy-15,,Pcs,1,1250,0,0,TRUE,,active
+SMM-V75,Happy-16,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V75,Happy-17,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V75,Happy-18,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V75,Happy-19,,Pcs,1,390,0,0,TRUE,,active
+SMM-V75,Happy-20,,Pcs,1,480,0,0,TRUE,,active
+SMM-V75,Happy-21,,Pcs,1,350,0,0,TRUE,,active
+SMM-V75,Happy-22,,Pcs,1,550,0,0,TRUE,,active
+SMM-V75,Happy-23,,Pcs,1,85,0,0,TRUE,,active
+SMM-V75,Happy-24,,Pcs,1,265,0,0,TRUE,,active
+SMM-V75,Happy-25,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-26,,Pcs,1,575,0,0,TRUE,,active
+SMM-V75,Happy-27,,Pcs,1,780,0,0,TRUE,,active
+SMM-V75,Happy-28,,Pcs,1,780,0,0,TRUE,,active
+SMM-V75,Happy-29,,Pcs,1,490,0,0,TRUE,,active
+SMM-V75,Happy-30,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-31,,Pcs,1,780,0,0,TRUE,,active
+SMM-V75,Happy-32,,Pcs,1,780,0,0,TRUE,,active
+SMM-V75,Happy-33,,Pcs,1,260,0,0,TRUE,,active
+SMM-V75,Happy-34,,Pcs,1,365,0,0,TRUE,,active
+SMM-V75,Happy-35,,Pcs,1,390,0,0,TRUE,,active
+SMM-V75,Happy-36,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-37,,Pcs,1,150,0,0,TRUE,,active
+SMM-V75,Happy-38,,Pcs,1,250,0,0,TRUE,,active
+SMM-V75,Happy-39,,Pcs,1,275,0,0,TRUE,,active
+SMM-V75,Happy-40,,Pcs,1,820,0,0,TRUE,,active
+SMM-V75,Happy-41,,Pcs,1,820,0,0,TRUE,,active
+SMM-V75,Happy-42,,Pcs,1,880,0,0,TRUE,,active
+SMM-V75,Happy-43,,Pcs,1,880,0,0,TRUE,,active
+SMM-V75,Happy-44,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-45,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-46,,Pcs,1,2750,0,0,TRUE,,active
+SMM-V75,Happy-47,,Pcs,1,820,0,0,TRUE,,active
+SMM-V75,Happy-48,,Pcs,1,3950,0,0,TRUE,,active
+SMM-V75,Happy-49,,Pcs,1,2150,0,0,TRUE,,active
+SMM-V75,Happy-50,,Pcs,1,1350,0,0,TRUE,,active
+SMM-V75,Happy-51,,Pcs,1,1350,0,0,TRUE,,active
+SMM-V75,Happy-52,,Pcs,1,1350,0,0,TRUE,,active
+SMM-V75,Happy-53,,Pcs,1,1350,0,0,TRUE,,active
+SMM-V75,Happy-54,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-55,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-56,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-57,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-58,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-59,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-60,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-61,,Pcs,1,630,0,0,TRUE,,active
+SMM-V75,Happy-62,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-63,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-64,,Pcs,1,580,0,0,TRUE,,active
+SMM-V75,Happy-65,,Pcs,1,365,0,0,TRUE,,active
+SMM-V75,Happy-66,,Pcs,1,210,0,0,TRUE,,active
+SMM-V75,Happy-67,,Pcs,1,210,0,0,TRUE,,active
+SMM-V75,Happy-68,,Pcs,1,210,0,0,TRUE,,active
+SMM-V75,Happy-69,,Pcs,1,220,0,0,TRUE,,active
+SMM-V75,Happy-70,,Pcs,1,230,0,0,TRUE,,active
+SMM-V75,Happy-71,,Pcs,1,145,0,0,TRUE,,active
+SMM-V75,Happy-72,,Pcs,1,210,0,0,TRUE,,active
+SMM-V75,Happy-73,,Pcs,1,410,0,0,TRUE,,active
+SMM-V75,Happy-74,,Pcs,1,155,0,0,TRUE,,active
+SMM-V75,Happy-75,,Pcs,1,460,0,0,TRUE,,active
+SMM-V75,Happy-76,,Pcs,1,390,0,0,TRUE,,active
+SMM-V75,Air Wicker-01,,Pcs,1,680,0,0,TRUE,,active
+SMM-V75,PREDO-01,,Pcs,1,530,0,0,TRUE,,active
+SMM-V75,SUAVE-01,,Pcs,1,2150,0,0,TRUE,,active
+SMM-V75,Vanish-01,,Pcs,1,1550,0,0,TRUE,,active
+SMM-V75,ARIEL-01,,Pcs,1,2850,0,0,TRUE,,active
+SMM-V75,ARIEL-02,,Pcs,1,1950,0,0,TRUE,,active
+SMM-V75,TIMOTEI-01,,Pcs,1,850,0,0,TRUE,,active
+SMM-V75,ABAAN-01,,Pcs,1,410,0,0,TRUE,,active
+SMM-V76,Nexton-01,,Pcs,1,476.17,0,0,TRUE,,active
+SMM-V76,Nexton-02,,Pcs,1,292,0,0,TRUE,,active
+SMM-V76,Nexton-03,,Pcs,1,476,0,0,TRUE,,active
+SMM-V76,Nexton-04,,Pcs,1,292,0,0,TRUE,,active
+SMM-V76,Nexton-05,,Pcs,1,476,0,0,TRUE,,active
+SMM-V76,Nexton-06,,Pcs,1,292,0,0,TRUE,,active
+SMM-V76,Nexton-07,,Pcs,1,476,0,0,TRUE,,active
+SMM-V76,Nexton-08,,Pcs,1,292,0,0,TRUE,,active
+SMM-V76,Nexton-09,,Pcs,1,476,0,0,TRUE,,active
+SMM-V76,Nexton-10,,Pcs,1,772.5,0,0,TRUE,,active
+SMM-V76,Nexton-11,,Pcs,1,381.83,0,0,TRUE,,active
+SMM-V76,Nexton-12,,Pcs,1,1392.33,0,0,TRUE,,active
+SMM-V76,Nexton-13,,Pcs,1,875.83,0,0,TRUE,,active
+SMM-V76,Nexton-14,,Pcs,1,471.67,0,0,TRUE,,active
+SMM-V76,Nexton-15,,Pcs,1,772.67,0,0,TRUE,,active
+SMM-V76,Nexton-16,,Pcs,1,381.83,0,0,TRUE,,active
+SMM-V76,Nexton-17,,Pcs,1,853.33,0,0,TRUE,,active
+SMM-V76,Nexton-18,,Pcs,1,717.83,0,0,TRUE,,active
+SMM-V76,Nexton-19,,Pcs,1,268.67,0,0,TRUE,,active
+SMM-V76,Nexton-20,,Pcs,1,1122.83,0,0,TRUE,,active
+SMM-V76,Nexton-21,,Pcs,1,777,0,0,TRUE,,active
+SMM-V76,Nexton-22,,Pcs,1,1212.67,0,0,TRUE,,active
+SMM-V76,Nexton-23,,Pcs,1,696.17,0,0,TRUE,,active
+SMM-V76,Nexton-24,,Pcs,1,215.58,0,0,TRUE,,active
+SMM-V76,Nexton-25,,Pcs,1,215.58,0,0,TRUE,,active
+SMM-V76,Nexton-26,,Pcs,1,215.58,0,0,TRUE,,active
+SMM-V76,Nexton-27,,Pcs,1,561.5,0,0,TRUE,,active
+SMM-V76,Nexton-28,,Pcs,1,561.5,0,0,TRUE,,active
+SMM-V76,Nexton-29,,Pcs,1,315.83,0,0,TRUE,,active
+SMM-V76,Nexton-30,,Pcs,1,561.5,0,0,TRUE,,active
+SMM-V76,Nexton-31,,Pcs,1,210.5,0,0,TRUE,,active
+SMM-V76,Nexton-32,,Pcs,1,494,0,0,TRUE,,active
+SMM-V76,Nexton-33,,Pcs,1,538.08,0,0,TRUE,,active
+SMM-V76,Nexton-34,,Pcs,1,561.33,0,0,TRUE,,active
+SMM-V76,Nexton-35,,Pcs,1,562,0,0,TRUE,,active
+SMM-V76,Nexton-36,,Pcs,1,489.67,0,0,TRUE,,active
+SMM-V76,Nexton-37,,Pcs,1,494,0,0,TRUE,,active
+SMM-V76,Nexton-38,,Pcs,1,137.33,0,0,TRUE,,active
+SMM-V76,Nexton-39,,Pcs,1,268.67,0,0,TRUE,,active
+SMM-V76,Nexton-40,,Pcs,1,268.5,0,0,TRUE,,active
+SMM-V76,Nexton-41,,Pcs,1,268.67,0,0,TRUE,,active
+SMM-V76,Nexton-42,,Pcs,1,268.67,0,0,TRUE,,active
+SMM-V76,Nexton-43,,Pcs,1,268.67,0,0,TRUE,,active
+SMM-V76,Nexton-44,,Pcs,1,412,0,0,TRUE,,active
+SMM-V76,Nexton-45,,Pcs,1,412,0,0,TRUE,,active
+SMM-V76,Nexton-46,,Pcs,1,731.25,0,0,TRUE,,active
+SMM-V76,Nexton-47,,Pcs,1,731.25,0,0,TRUE,,active
+SMM-V76,Nexton-48,,Pcs,1,636.08,0,0,TRUE,,active
+SMM-V76,Nexton-49,,Pcs,1,228.67,0,0,TRUE,,active
+SMM-V76,Nexton-50,,Pcs,1,731.25,0,0,TRUE,,active
+SMM-V76,Nexton-51,,Pcs,1,228.67,0,0,TRUE,,active
+SMM-V76,Nexton-52,,Pcs,1,228.67,0,0,TRUE,,active
+SMM-V76,Nexton-53,,Pcs,1,273.67,0,0,TRUE,,active
+SMM-V76,Nexton-54,,Pcs,1,273.67,0,0,TRUE,,active
+SMM-V76,Nexton-55,,Pcs,1,731.25,0,0,TRUE,,active
+SMM-V76,Nexton-56,,Pcs,1,381.67,0,0,TRUE,,active
+SMM-V76,Nexton-57,,Pcs,1,381.67,0,0,TRUE,,active
+SMM-V76,Nexton-58,,Pcs,1,381.67,0,0,TRUE,,active
+SMM-V76,Nexton-59,,Pcs,1,350,0,0,TRUE,,active
+SMM-V77,FUJIAN GOODS-01,,Pcs,1,250,0,0,TRUE,,active
+SMM-V78,STARA-01,,Pcs,1,175,0,0,TRUE,,active
+SMM-V78,STARA-02,,Pcs,1,225,0,0,TRUE,,active
+SMM-V78,HMD-01,,Pcs,1,175,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-01,,Pcs,1,368.86,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-02,,Pcs,1,461.5,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-03,,Pcs,1,289,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-04,,Pcs,1,507.93,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-05,,Pcs,1,668,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-06,,Pcs,1,264.33,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-07,,Pcs,1,401.85,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-08,,Pcs,1,401.85,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-09,,Pcs,1,184.67,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-10,,Pcs,1,264.33,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-11,,Pcs,1,688.35,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-12,,Pcs,1,124.89,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-13,,Pcs,1,174.83,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-14,,Pcs,1,285.5,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-15,,Pcs,1,548.81,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-16,,Pcs,1,533.67,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-17,,Pcs,1,152.25,0,0,TRUE,,active
+SMM-V79,MOTHERCARE-18,,Pcs,1,169.17,0,0,TRUE,,active
+SMM-V80,Johnson's-01,,Pcs,1,460,0,0,TRUE,,active
+SMM-V80,Johnson's-02,,Pcs,1,450,0,0,TRUE,,active
+SMM-V80,Johnson's-03,,Pcs,1,460,0,0,TRUE,,active
+SMM-V80,Johnson's-04,,Pcs,1,625,0,0,TRUE,,active
+SMM-V80,Johnson's-05,,Pcs,1,630,0,0,TRUE,,active
+SMM-V80,Johnson's-06,,Pcs,1,200,0,0,TRUE,,active
+SMM-V80,Johnson's-07,,Pcs,1,200,0,0,TRUE,,active
+SMM-V80,Johnson's-08,,Pcs,1,200,0,0,TRUE,,active
+SMM-V80,Johnson's-09,,Pcs,1,870,0,0,TRUE,,active
+SMM-V80,Johnson's-10,,Pcs,1,690,0,0,TRUE,,active
+SMM-V80,Johnson's-11,,Pcs,1,920,0,0,TRUE,,active
+SMM-V80,Johnson's-12,,Pcs,1,730,0,0,TRUE,,active
+SMM-V80,Johnson's-13,,Pcs,1,590,0,0,TRUE,,active
+SMM-V80,Johnson's-14,,Pcs,1,470,0,0,TRUE,,active
+SMM-V80,Johnson's-15,,Pcs,1,790,0,0,TRUE,,active
+SMM-V80,Johnson's-16,,Pcs,1,620,0,0,TRUE,,active
+SMM-V80,Johnson's-17,,Pcs,1,280,0,0,TRUE,,active
+SMM-V80,Johnson's-18,,Pcs,1,390,0,0,TRUE,,active
+SMM-V80,Johnson's-19,,Pcs,1,480,0,0,TRUE,,active
+SMM-V80,ENCHANTEUR-01,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,ENCHANTEUR-02,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,ENCHANTEUR-03,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,ENCHANTEUR-04,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,ENCHANTEUR-05,,Pcs,1,480,0,0,TRUE,,active
+SMM-V80,ENCHANTEUR-06,,Pcs,1,480,0,0,TRUE,,active
+SMM-V80,Nair-01,,Pcs,1,695,0,0,TRUE,,active
+SMM-V80,Nair-02,,Pcs,1,595,0,0,TRUE,,active
+SMM-V80,HEAD & SHOULDERS-01,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,HEAD & SHOULDERS-02,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,HEAD & SHOULDERS-03,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,HEAD & SHOULDERS-04,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,HEAD & SHOULDERS-05,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,HEAD & SHOULDERS-06,,Pcs,1,425,0,0,TRUE,,active
+SMM-V80,PANTENE-01,,Pcs,1,740,0,0,TRUE,,active
+SMM-V80,PANTENE-02,,Pcs,1,740,0,0,TRUE,,active
+SMM-V80,PANTENE-03,,Pcs,1,1090,0,0,TRUE,,active
+SMM-V80,PANTENE-04,,Pcs,1,1090,0,0,TRUE,,active
+SMM-V80,PERT-01,,Pcs,1,910,0,0,TRUE,,active
+SMM-V80,Garnier-01,,Pcs,1,1190,0,0,TRUE,,active
+SMM-V80,Garnier-02,,Pcs,1,1190,0,0,TRUE,,active
+SMM-V80,Garnier-03,,Pcs,1,1190,0,0,TRUE,,active
+SMM-V80,Garnier-04,,Pcs,1,1190,0,0,TRUE,,active
+SMM-V80,Revlon-01,,Pcs,1,790,0,0,TRUE,,active
+SMM-V80,Revlon-02,,Pcs,1,890,0,0,TRUE,,active
+SMM-V80,Finesse-01,,Pcs,1,1030,0,0,TRUE,,active
+SMM-V80,Finesse-02,,Pcs,1,1090,0,0,TRUE,,active
+SMM-V80,Nyle-01,,Pcs,1,660,0,0,TRUE,,active
+SMM-V80,Nyle-02,,Pcs,1,660,0,0,TRUE,,active
+SMM-V80,Nyle-03,,Pcs,1,660,0,0,TRUE,,active
+SMM-V80,XHC-01,,Pcs,1,650,0,0,TRUE,,active
+SMM-V80,XHC-02,,Pcs,1,650,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-01,,Pcs,1,850,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-02,,Pcs,1,570,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-03,,Pcs,1,570,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-04,,Pcs,1,570,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-05,,Pcs,1,920,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-06,,Pcs,1,570,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-07,,Pcs,1,920,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-08,,Pcs,1,570,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-09,,Pcs,1,570,0,0,TRUE,,active
+SMM-V80,Schwarzkopf-10,,Pcs,1,580,0,0,TRUE,,active
+SMM-V80,LAQUILA-01,,Pcs,1,230,0,0,TRUE,,active
+SMM-V80,LAQUILA-02,,Pcs,1,230,0,0,TRUE,,active
+SMM-V80,LAQUILA-03,,Pcs,1,230,0,0,TRUE,,active
+SMM-V80,LANA-01,,Pcs,1,220,0,0,TRUE,,active
+SMM-V80,LANA-02,,Pcs,1,220,0,0,TRUE,,active
+SMM-V80,Yardlie-01,,Pcs,1,730,0,0,TRUE,,active
+SMM-V80,Yardlie-02,,Pcs,1,730,0,0,TRUE,,active
+SMM-V80,Yardlie-03,,Pcs,1,740,0,0,TRUE,,active
+SMM-V80,Yardlie-04,,Pcs,1,740,0,0,TRUE,,active
+SMM-V80,Yardlie-05,,Pcs,1,740,0,0,TRUE,,active
+SMM-V80,GELLEME-01,,Pcs,1,210,0,0,TRUE,,active
+SMM-V80,GELLEME-02,,Pcs,1,330,0,0,TRUE,,active
+SMM-V80,GELLEME-03,,Pcs,1,210,0,0,TRUE,,active
+SMM-V80,Closeup-01,,Pcs,1,160,0,0,TRUE,,active
+SMM-V80,Closeup-02,,Pcs,1,345,0,0,TRUE,,active
+SMM-V80,Closeup-03,,Pcs,1,160,0,0,TRUE,,active
+SMM-V80,Closeup-04,,Pcs,1,350,0,0,TRUE,,active
+SMM-V80,Closeup-05,,Pcs,1,355,0,0,TRUE,,active
+SMM-V80,Closeup-06,,Pcs,1,340,0,0,TRUE,,active
+SMM-V80,NIVEA-01,,Pcs,1,1480,0,0,TRUE,,active
+SMM-V80,NIVEA-02,,Pcs,1,1320,0,0,TRUE,,active
+SMM-V80,NIVEA-03,,Pcs,1,1390,0,0,TRUE,,active
+SMM-V80,DABUR-01,,Pcs,1,490,0,0,TRUE,,active
+SMM-V80,LISTERINE-01,,Pcs,1,495,0,0,TRUE,,active
+SMM-V80,LISTERINE-02,,Pcs,1,495,0,0,TRUE,,active
+SMM-V80,LISTERINE-03,,Pcs,1,495,0,0,TRUE,,active
+SMM-V80,LISTERINE-04,,Pcs,1,495,0,0,TRUE,,active
+SMM-V80,LISTERINE-05,,Pcs,1,520,0,0,TRUE,,active
+SMM-V80,LISTERINE-06,,Pcs,1,495,0,0,TRUE,,active
+SMM-V80,JOLLY-01,,Pcs,1,320,0,0,TRUE,,active
+SMM-V80,JOLLY-02,,Pcs,1,320,0,0,TRUE,,active
+SMM-V80,AXE-01,,Pcs,1,1090,0,0,TRUE,,active
+SMM-V80,4ME-01,,Pcs,1,380,0,0,TRUE,,active
+SMM-V81,Care-01,,Pcs,1,607.54,0,0,TRUE,,active
+SMM-V81,Care-02,,Pcs,1,867.8,0,0,TRUE,,active
+SMM-V81,Care-03,,Pcs,1,355.04,0,0,TRUE,,active
+SMM-V81,Care-04,,Pcs,1,167.25,0,0,TRUE,,active
+SMM-V81,Care-05,,Pcs,1,161.22,0,0,TRUE,,active
+SMM-V82,English-01,,Pcs,1,216.75,0,0,TRUE,,active
+SMM-V82,English-02,,Pcs,1,189.75,0,0,TRUE,,active
+SMM-V82,English-03,,Pcs,1,547.5,0,0,TRUE,,active
+SMM-V82,English-04,,Pcs,1,225.42,0,0,TRUE,,active
+SMM-V82,English-05,,Pcs,1,225.42,0,0,TRUE,,active
+SMM-V82,English-06,,Pcs,1,147.33,0,0,TRUE,,active
+SMM-V82,English-07,,Pcs,1,281.83,0,0,TRUE,,active
+SMM-V82,English-08,,Pcs,1,173.5,0,0,TRUE,,active
+SMM-V82,English-09,,Pcs,1,329.5,0,0,TRUE,,active
+SMM-V82,English-10,,Pcs,1,327.67,0,0,TRUE,,active
+SMM-V82,English-11,,Pcs,1,,0,0,TRUE,,active
+SMM-V83,EDENROC-01,,Pcs,1,218.33,0,0,TRUE,,active
+SMM-V83,EDENROC-02,,Pcs,1,159,0,0,TRUE,,active
+SMM-V83,EDENROC-03,,Pcs,1,180.62,0,0,TRUE,,active
+SMM-V83,EDENROC-04,,Pcs,1,159,0,0,TRUE,,active
+SMM-V83,EDENROC-05,,Pcs,1,159,0,0,TRUE,,active
+SMM-V83,EDENROC-06,,Pcs,1,252,0,0,TRUE,,active
+SMM-V83,EDENROC-07,,Pcs,1,335.17,0,0,TRUE,,active
+SMM-V83,EDENROC-08,,Pcs,1,419.17,0,0,TRUE,,active
+SMM-V83,EDENROC-09,,Pcs,1,251,0,0,TRUE,,active
+SMM-V83,EDENROC-10,,Pcs,1,209.15,0,0,TRUE,,active
+SMM-V83,Join Beauty-01,,Pcs,1,162,0,0,TRUE,,active
+SMM-V83,Join Beauty-02,,Pcs,1,299,0,0,TRUE,,active
+SMM-V83,Join Beauty-03,,Pcs,1,174.46,0,0,TRUE,,active
+SMM-V83,Join Beauty-04,,Pcs,1,200,0,0,TRUE,,active
+SMM-V83,Join Beauty-05,,Pcs,1,350,0,0,TRUE,,active
+SMM-V83,Join Beauty-06,,Pcs,1,350,0,0,TRUE,,active
+SMM-V83,Join Beauty-07,,Pcs,1,580,0,0,TRUE,,active
+SMM-V83,Join Beauty-08,,Pcs,1,370,0,0,TRUE,,active
+SMM-V83,Join Beauty-09,,Pcs,1,620,0,0,TRUE,,active
+SMM-V83,Join Beauty-10,,Pcs,1,90,0,0,TRUE,,active
+SMM-V83,Join Beauty-11,,Pcs,1,120,0,0,TRUE,,active
+SMM-V83,Join Beauty-12,,Pcs,1,140,0,0,TRUE,,active
+SMM-V83,Join Beauty-13,,Pcs,1,650,0,0,TRUE,,active
+SMM-V83,Join Beauty-14,,Pcs,1,273,0,0,TRUE,,active
+SMM-V83,Join Beauty-15,,Pcs,1,162,0,0,TRUE,,active
+SMM-V84,FORHAN'S-01,,Pcs,1,282.85,0,0,TRUE,,active
+SMM-V84,FORHAN'S-02,,Pcs,1,384.13,0,0,TRUE,,active
+SMM-V84,FORHAN'S-03,,Pcs,1,256.13,0,0,TRUE,,active
+SMM-V84,FORHAN'S-04,,Pcs,1,402.83,0,0,TRUE,,active
+SMM-V84,FORHAN'S-05,,Pcs,1,651.17,0,0,TRUE,,active
+SMM-V84,FORHAN'S-06,,Pcs,1,651,0,0,TRUE,,active
+SMM-V84,FORHAN'S-07,,Pcs,1,374.33,0,0,TRUE,,active
+SMM-V84,FORHAN'S-08,,Pcs,1,153,0,0,TRUE,,active
+SMM-V84,FORHAN'S-09,,Pcs,1,166.83,0,0,TRUE,,active
+SMM-V84,FORHAN'S-10,,Pcs,1,339,0,0,TRUE,,active
+SMM-V84,FORHAN'S-11,,Pcs,1,454.33,0,0,TRUE,,active
+SMM-V84,FORHAN'S-12,,Pcs,1,359,0,0,TRUE,,active
+SMM-V84,FORHAN'S-13,,Pcs,1,593.83,0,0,TRUE,,active
+SMM-V84,FORHAN'S-14,,Pcs,1,153,0,0,TRUE,,active
+SMM-V84,FORHAN'S-15,,Pcs,1,339,0,0,TRUE,,active
+SMM-V84,FORHAN'S-16,,Pcs,1,175.67,0,0,TRUE,,active
+SMM-V84,FORHAN'S-17,,Pcs,1,577.67,0,0,TRUE,,active
+SMM-V84,FORHAN'S-18,,Pcs,1,156.67,0,0,TRUE,,active
+SMM-V84,FORHAN'S-19,,Pcs,1,327.33,0,0,TRUE,,active
+SMM-V84,FORHAN'S-20,,Pcs,1,208.17,0,0,TRUE,,active
+SMM-V84,FORHAN'S-21,,Pcs,1,173.75,0,0,TRUE,,active
+SMM-V84,FORHAN'S-22,,Pcs,1,467.33,0,0,TRUE,,active
+SMM-V84,FORHAN'S-23,,Pcs,1,148.5,0,0,TRUE,,active
+SMM-V85,IPSA-01,,Pcs,1,647.5,0,0,TRUE,,active
+SMM-V85,IPSA-02,,Pcs,1,713.5,0,0,TRUE,,active
+SMM-V85,IPSA-03,,Pcs,1,966.83,0,0,TRUE,,active
+SMM-V85,IPSA-04,,Pcs,1,571,0,0,TRUE,,active
+SMM-V85,IPSA-05,,Pcs,1,966.9,0,0,TRUE,,active
+SMM-V85,IPSA-06,,Pcs,1,1021,0,0,TRUE,,active
+SMM-V85,IPSA-07,,Pcs,1,1076,0,0,TRUE,,active
+SMM-V85,IPSA-08,,Pcs,1,1593,0,0,TRUE,,active
+SMM-V85,IPSA-09,,Pcs,1,1758.33,0,0,TRUE,,active
+SMM-V85,IPSA-10,,Pcs,1,879,0,0,TRUE,,active
+SMM-V85,IPSA-11,,Pcs,1,1208,0,0,TRUE,,active
+SMM-V86,PROBENT-01,,Pcs,1,250,0,0,TRUE,,active
+SMM-V86,Probent-02,,Pcs,1,635.8,0,0,TRUE,,active
+SMM-V86,Probent-03,,Pcs,1,668,0,0,TRUE,,active
+SMM-V86,Probent-04,,Pcs,1,780,0,0,TRUE,,active
+SMM-V86,Probent-05,,Pcs,1,620,0,0,TRUE,,active
+SMM-V86,Probent-06,,Pcs,1,639,0,0,TRUE,,active
+SMM-V86,Probent-07,,Pcs,1,699.75,0,0,TRUE,,active
+SMM-V86,Probent-08,,Pcs,1,719.8,0,0,TRUE,,active
+SMM-V86,Probent-09,,Pcs,1,439.83,0,0,TRUE,,active
+SMM-V86,Probent-10,,Pcs,1,476,0,0,TRUE,,active
+SMM-V87,SHEED-01,,Pcs,1,400.39,0,0,TRUE,,active
+SMM-V87,SHEED-02,,Pcs,1,272.26,0,0,TRUE,,active
+SMM-V87,KERNEL POP-01,,Pcs,1,442.33,0,0,TRUE,,active
+SMM-V87,KERNEL POP-02,,Pcs,1,316.25,0,0,TRUE,,active
+SMM-V87,KERNEL POP-03,,Pcs,1,442.33,0,0,TRUE,,active
+SMM-V87,KERNEL POP-04,,Pcs,1,442.33,0,0,TRUE,,active
+SMM-V87,KERNEL POP-05,,Pcs,1,153.5,0,0,TRUE,,active
+SMM-V87,KERNEL POP-06,,Pcs,1,153.5,0,0,TRUE,,active
+SMM-V87,KERNEL POP-07,,Pcs,1,153.5,0,0,TRUE,,active
+SMM-V87,KERNEL POP-08,,Pcs,1,153.5,0,0,TRUE,,active
+SMM-V87,KERNEL POP-09,,Pcs,1,442.33,0,0,TRUE,,active
+SMM-V87,COW&GATE-01,,Pcs,1,2111.04,0,0,TRUE,,active
+SMM-V87,COW&GATE-02,,Pcs,1,1794.22,0,0,TRUE,,active
+SMM-V87,COW&GATE-03,,Pcs,1,2111.04,0,0,TRUE,,active
+SMM-V87,COW&GATE-04,,Pcs,1,1717.33,0,0,TRUE,,active
+SMM-V88,Pur-01,,Pcs,1,1502,0,0,TRUE,,active
+SMM-V88,Pur-02,,Pcs,1,1816,0,0,TRUE,,active
+SMM-V88,Pur-03,,Pcs,1,1324,0,0,TRUE,,active
+SMM-V88,Pur-04,,Pcs,1,1397,0,0,TRUE,,active
+SMM-V88,Pur-05,,Pcs,1,848,0,0,TRUE,,active
+SMM-V88,Pur-06,,Pcs,1,820,0,0,TRUE,,active
+SMM-V88,Pur-07,,Pcs,1,1341,0,0,TRUE,,active
+SMM-V89,Lubna's-01,,Pcs,1,146.43,0,0,TRUE,,active
+SMM-V89,Lubna's-02,,Pcs,1,254.29,0,0,TRUE,,active
+SMM-V89,Lubna's-03,,Pcs,1,291.43,0,0,TRUE,,active
+SMM-V89,Lubna's-04,,Pcs,1,690,0,0,TRUE,,active
+SMM-V89,Lubna's-05,,Pcs,1,690,0,0,TRUE,,active
+SMM-V89,Lubna's-06,,Pcs,1,1150,0,0,TRUE,,active
+SMM-V89,Lubna's-07,,Pcs,1,255,0,0,TRUE,,active
+SMM-V89,Lubna's-08,,Pcs,1,270,0,0,TRUE,,active
+SMM-V89,Lubna's-09,,Pcs,1,250.77,0,0,TRUE,,active
+SMM-V90,Rivaj-01,,Pcs,1,605,0,0,TRUE,,active
+SMM-V90,Rivaj-02,,Pcs,1,605,0,0,TRUE,,active
+SMM-V90,Rivaj-03,,Pcs,1,605,0,0,TRUE,,active
+SMM-V90,Rivaj-04,,Pcs,1,605,0,0,TRUE,,active
+SMM-V90,Rivaj-05,,Pcs,1,605,0,0,TRUE,,active
+SMM-V90,Rivaj-06,,Pcs,1,115,0,0,TRUE,,active
+SMM-V90,Rivaj-07,,Pcs,1,115,0,0,TRUE,,active
+SMM-V90,Rivaj-08,,Pcs,1,584,0,0,TRUE,,active
+SMM-V90,Rivaj-09,,Pcs,1,714,0,0,TRUE,,active
+SMM-V90,Rivaj-10,,Pcs,1,218,0,0,TRUE,,active
+SMM-V90,Rivaj-11,,Pcs,1,218,0,0,TRUE,,active
+SMM-V91,Kahf Cosmetic-01,,Pcs,1,80,0,0,TRUE,,active
+SMM-V92,Dermacos-01,,Pcs,1,2107,0,0,TRUE,,active
+SMM-V93,Finex-01,,Pcs,1,90,0,0,TRUE,,active
+SMM-V93,Finex-02,,Pcs,1,340,0,0,TRUE,,active
+SMM-V93,Finex-03,,Pcs,1,340,0,0,TRUE,,active
+SMM-V93,Finex-04,,Pcs,1,340,0,0,TRUE,,active
+SMM-V93,Finex-05,,Pcs,1,295,0,0,TRUE,,active
+SMM-V93,Finex-06,,Pcs,1,,0,0,TRUE,,active
+SMM-V93,ME&ME-01,,Pcs,1,560,0,0,TRUE,,active
+SMM-V94,Finco-01,,Pcs,1,110,0,0,TRUE,,active
+SMM-V94,Finco-02,,Pcs,1,185,0,0,TRUE,,active
+SMM-V94,Finco-03,,Pcs,1,365,0,0,TRUE,,active
+SMM-V94,Finco-04,,Pcs,1,300,0,0,TRUE,,active
+SMM-V95,SUN BRITE-01,,Pcs,1,342.99,0,0,TRUE,,active
+SMM-V95,SUN BRITE-02,,Pcs,1,232.44,0,0,TRUE,,active
+SMM-V95,SUN BRITE-03,,Pcs,1,59.67,0,0,TRUE,,active
+SMM-V95,SUN BRITE-04,,Pcs,1,129.69,0,0,TRUE,,active
+SMM-V95,SUN BRITE-05,,Pcs,1,687.75,0,0,TRUE,,active
+SMM-V95,SUN BRITE-06,,Pcs,1,460.17,0,0,TRUE,,active
+SMM-V95,SUN BRITE-07,,Pcs,1,51.69,0,0,TRUE,,active
+SMM-V96,Capri-01,,Pcs,1,84.9,0,0,TRUE,,active
+SMM-V96,Capri-02,,Pcs,1,152.83,0,0,TRUE,,active
+SMM-V96,Capri-03,,Pcs,1,118.87,0,0,TRUE,,active
+SMM-V96,Capri-04,,Pcs,1,152.82,0,0,TRUE,,active
+SMM-V96,Capri-05,,Pcs,1,118.87,0,0,TRUE,,active
+SMM-V96,Capri-06,,Pcs,1,152.82,0,0,TRUE,,active
+SMM-V96,Capri-07,,Pcs,1,118.86,0,0,TRUE,,active
+SMM-V96,Capri-08,,Pcs,1,152.82,0,0,TRUE,,active
+SMM-V96,Capri-09,,Pcs,1,118.5,0,0,TRUE,,active
+SMM-V96,Capri-10,,Pcs,1,152.82,0,0,TRUE,,active
+SMM-V96,Capri-11,,Pcs,1,84.9,0,0,TRUE,,active
+SMM-V96,Capri-12,,Pcs,1,144.33,0,0,TRUE,,active
+SMM-V96,Capri-13,,Pcs,1,331.13,0,0,TRUE,,active
+SMM-V96,Capri-14,,Pcs,1,331.13,0,0,TRUE,,active
+SMM-V96,Capri-15,,Pcs,1,331.13,0,0,TRUE,,active
+SMM-V96,Capri-16,,Pcs,1,331.13,0,0,TRUE,,active
+SMM-V96,Capri-17,,Pcs,1,331.13,0,0,TRUE,,active
+SMM-V96,Capri-18,,Pcs,1,442.21,0,0,TRUE,,active
+SMM-V96,Capri-19,,Pcs,1,399.04,0,0,TRUE,,active
+SMM-V96,Capri-20,,Pcs,1,442.21,0,0,TRUE,,active
+SMM-V96,Capri-21,,Pcs,1,322.64,0,0,TRUE,,active
+SMM-V96,Capri-22,,Pcs,1,118.86,0,0,TRUE,,active
+SMM-V96,Capri-23,,Pcs,1,390.56,0,0,TRUE,,active
+SMM-V96,Capri-24,,Pcs,1,416.04,0,0,TRUE,,active
+SMM-V96,Capri-25,,Pcs,1,416.04,0,0,TRUE,,active
+SMM-V96,Capri-26,,Pcs,1,416.04,0,0,TRUE,,active
+SMM-V96,Capri-27,,Pcs,1,416.04,0,0,TRUE,,active
+SMM-V96,Capri-28,,Pcs,1,416.04,0,0,TRUE,,active
+SMM-V96,Capri-29,,Pcs,1,349.38,0,0,TRUE,,active
+SMM-V96,Capri-30,,Pcs,1,349.38,0,0,TRUE,,active
+SMM-V96,Capri-31,,Pcs,1,349.38,0,0,TRUE,,active
+SMM-V96,Capri-32,,Pcs,1,206.37,0,0,TRUE,,active
+SMM-V96,Capri-33,,Pcs,1,206.37,0,0,TRUE,,active
+SMM-V96,Capri-34,,Pcs,1,171.97,0,0,TRUE,,active
+SMM-V96,Capri-35,,Pcs,1,73.76,0,0,TRUE,,active
+SMM-V96,Capri-36,,Pcs,1,73.76,0,0,TRUE,,active
+SMM-V96,Capri-37,,Pcs,1,73.76,0,0,TRUE,,active
+SMM-V96,Capri-38,,Pcs,1,237.73,0,0,TRUE,,active
+SMM-V96,Capri-39,,Pcs,1,237.73,0,0,TRUE,,active
+SMM-V97,SANSOL-01,,Pcs,1,231,0,0,TRUE,,active
+SMM-V97,SANSOL-02,,Pcs,1,260.83,0,0,TRUE,,active
+SMM-V97,Medicam-01,,Pcs,1,152.42,0,0,TRUE,,active
+SMM-V97,Medicam-02,,Pcs,1,254.08,0,0,TRUE,,active
+SMM-V97,Medicam-03,,Pcs,1,389.5,0,0,TRUE,,active
+SMM-V97,Medicam-04,,Pcs,1,169.33,0,0,TRUE,,active
+SMM-V97,Medicam-05,,Pcs,1,228.67,0,0,TRUE,,active
+SMM-V97,Medicam-06,,Pcs,1,245.58,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-01,,Pcs,1,151.25,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-02,,Pcs,1,151,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-03,,Pcs,1,254.08,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-04,,Pcs,1,151,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-05,,Pcs,1,220.25,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-06,,Pcs,1,350.25,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-07,,Pcs,1,252,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-08,,Pcs,1,381.5,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-09,,Pcs,1,381.5,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-10,,Pcs,1,381.5,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-11,,Pcs,1,268,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-12,,Pcs,1,403.25,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-13,,Pcs,1,184.75,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-14,,Pcs,1,268,0,0,TRUE,,active
+SMM-V98,Saeed Ghani-15,,Pcs,1,352,0,0,TRUE,,active
+SMM-V99,BNB-01,,Pcs,1,640,0,0,TRUE,,active
+SMM-V99,BNB-02,,Pcs,1,476,0,0,TRUE,,active
+SMM-V99,BNB-03,,Pcs,1,956,0,0,TRUE,,active
+SMM-V100,Meclay London-01,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-02,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-03,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-04,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-05,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-06,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-07,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-08,,Pcs,1,981.33,0,0,TRUE,,active
+SMM-V100,Meclay London-09,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-10,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-11,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-12,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-13,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-14,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-15,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-16,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-17,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-18,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-19,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-20,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-21,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-22,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-23,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-24,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-25,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-26,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-27,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-28,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-29,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-30,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,Meclay London-31,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-32,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-33,,Pcs,1,592.75,0,0,TRUE,,active
+SMM-V100,Meclay London-34,,Pcs,1,335,0,0,TRUE,,active
+SMM-V100,NecLins-01,,Pcs,1,114,0,0,TRUE,,active
+SMM-V100,NecLins-02,,Pcs,1,162.86,0,0,TRUE,,active
+SMM-V100,NecLins-03,,Pcs,1,244.29,0,0,TRUE,,active
+SMM-V101,Bio Amla-01,,Pcs,1,611,0,0,TRUE,,active
+SMM-V101,Bio Amla-02,,Pcs,1,436.42,0,0,TRUE,,active
+SMM-V101,Bio Amla-03,,Pcs,1,296.78,0,0,TRUE,,active
+SMM-V101,Bio Amla-04,,Pcs,1,157.08,0,0,TRUE,,active
+SMM-V101,Bio Amla-05,,Pcs,1,414.5,0,0,TRUE,,active
+SMM-V101,Bio Amla-06,,Pcs,1,139.5,0,0,TRUE,,active
+SMM-V101,Bio Amla-07,,Pcs,1,244.33,0,0,TRUE,,active
+SMM-V102,Vince-01,,Pcs,1,760,0,0,TRUE,,active
+SMM-V102,Vince-02,,Pcs,1,472,0,0,TRUE,,active
+SMM-V102,Vince-03,,Pcs,1,472,0,0,TRUE,,active
+SMM-V102,Vince-04,,Pcs,1,472,0,0,TRUE,,active
+SMM-V102,Vince-05,,Pcs,1,356,0,0,TRUE,,active
+SMM-V102,Vince-06,,Pcs,1,356,0,0,TRUE,,active
+SMM-V102,Vince-07,,Pcs,1,356,0,0,TRUE,,active
+SMM-V102,Vince-08,,Pcs,1,356,0,0,TRUE,,active
+SMM-V102,Vince-09,,Pcs,1,1408,0,0,TRUE,,active
+SMM-V102,Vince-10,,Pcs,1,356,0,0,TRUE,,active
+SMM-V102,Vince-11,,Pcs,1,848,0,0,TRUE,,active
+SMM-V102,Vince-12,,Pcs,1,872,0,0,TRUE,,active
+SMM-V102,Vince-13,,Pcs,1,832,0,0,TRUE,,active
+SMM-V102,Vince-14,,Pcs,1,704,0,0,TRUE,,active
+SMM-V102,Vince-15,,Pcs,1,1552,0,0,TRUE,,active
+SMM-V102,Vince-16,,Pcs,1,1516,0,0,TRUE,,active
+SMM-V102,Vince-17,,Pcs,1,1552,0,0,TRUE,,active
+SMM-V102,Vince-18,,Pcs,1,1516,0,0,TRUE,,active
+SMM-V102,Vince-19,,Pcs,1,1516,0,0,TRUE,,active
+SMM-V102,Vince-20,,Pcs,1,760,0,0,TRUE,,active
+SMM-V102,Vince-21,,Pcs,1,760,0,0,TRUE,,active
+SMM-V102,Vince-22,,Pcs,1,760,0,0,TRUE,,active
+SMM-V103,Loreal-01,,Pcs,1,458.67,0,0,TRUE,,active
+SMM-V103,Loreal-02,,Pcs,1,458.67,0,0,TRUE,,active
+SMM-V103,Loreal-03,,Pcs,1,458.67,0,0,TRUE,,active
+SMM-V103,Loreal-04,,Pcs,1,458.67,0,0,TRUE,,active
+SMM-V103,Loreal-05,,Pcs,1,517,0,0,TRUE,,active
+SMM-V103,Loreal-06,,Pcs,1,458.67,0,0,TRUE,,active
+SMM-V103,Loreal-07,,Pcs,1,458.67,0,0,TRUE,,active
+SMM-V103,Loreal-08,,Pcs,1,517,0,0,TRUE,,active
+SMM-V103,Loreal-09,,Pcs,1,517,0,0,TRUE,,active
+SMM-V103,Loreal-10,,Pcs,1,442,0,0,TRUE,,active
+SMM-V103,Loreal-11,,Pcs,1,499.5,0,0,TRUE,,active
+SMM-V103,Loreal-12,,Pcs,1,442,0,0,TRUE,,active
+SMM-V103,Loreal-13,,Pcs,1,442,0,0,TRUE,,active
+SMM-V103,Loreal-14,,Pcs,1,442,0,0,TRUE,,active
+SMM-V103,Loreal-15,,Pcs,1,442,0,0,TRUE,,active
+SMM-V103,Loreal-16,,Pcs,1,442,0,0,TRUE,,active
+SMM-V103,Loreal-17,,Pcs,1,775.5,0,0,TRUE,,active
+SMM-V103,Loreal-18,,Pcs,1,775.5,0,0,TRUE,,active
+SMM-V103,Loreal-19,,Pcs,1,875.67,0,0,TRUE,,active
+SMM-V103,Loreal-20,,Pcs,1,775.5,0,0,TRUE,,active
+SMM-V103,Loreal-21,,Pcs,1,775.5,0,0,TRUE,,active
+SMM-V103,Loreal-22,,Pcs,1,775.5,0,0,TRUE,,active
+SMM-V103,Loreal-23,,Pcs,1,875.67,0,0,TRUE,,active
+SMM-V103,Loreal-24,,Pcs,1,775.5,0,0,TRUE,,active
+SMM-V103,Loreal-25,,Pcs,1,875.67,0,0,TRUE,,active
+SMM-V103,Loreal-26,,Pcs,1,1650,0,0,TRUE,,active
+SMM-V104,KEUNE-01,,Pcs,1,1670,0,0,TRUE,,active
+SMM-V104,KEUNE-02,,Pcs,1,1265,0,0,TRUE,,active
+SMM-V105,DARI MOOCH-01,,Pcs,1,679.2,0,0,TRUE,,active
+SMM-V106,FAIR&LOVELY-01,,Pcs,1,395,0,0,TRUE,,active
+SMM-V107,Haut Notch-01,,Pcs,1,420.17,0,0,TRUE,,active
+SMM-V107,Haut Notch-02,,Pcs,1,369.33,0,0,TRUE,,active
+SMM-V107,Haut Notch-03,,Pcs,1,420.17,0,0,TRUE,,active
+SMM-V107,Haut Notch-04,,Pcs,1,420.17,0,0,TRUE,,active
+SMM-V107,Haut Notch-05,,Pcs,1,336,0,0,TRUE,,active
+SMM-V107,Haut Notch-06,,Pcs,1,551.67,0,0,TRUE,,active
+SMM-V107,Haut Notch-07,,Pcs,1,369.25,0,0,TRUE,,active
+SMM-V107,Haut Notch-08,,Pcs,1,454,0,0,TRUE,,active
+SMM-V107,Haut Notch-09,,Pcs,1,301.33,0,0,TRUE,,active
+SMM-V107,Haut Notch-10,,Pcs,1,318.33,0,0,TRUE,,active
+SMM-V107,Haut Notch-11,,Pcs,1,487.75,0,0,TRUE,,active
+SMM-V107,Haut Notch-12,,Pcs,1,479.5,0,0,TRUE,,active
+SMM-V107,Haut Notch-13,,Pcs,1,645,0,0,TRUE,,active
+SMM-V107,Haut Notch-14,,Pcs,1,475.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-01,,Pcs,1,809,0,0,TRUE,,active
+SMM-V108,Fruitamins-02,,Pcs,1,553.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-03,,Pcs,1,893,0,0,TRUE,,active
+SMM-V108,Fruitamins-04,,Pcs,1,565.17,0,0,TRUE,,active
+SMM-V108,Fruitamins-05,,Pcs,1,826.5,0,0,TRUE,,active
+SMM-V108,Fruitamins-06,,Pcs,1,1615,0,0,TRUE,,active
+SMM-V108,Fruitamins-07,,Pcs,1,1615,0,0,TRUE,,active
+SMM-V108,Fruitamins-08,,Pcs,1,608,0,0,TRUE,,active
+SMM-V108,Fruitamins-09,,Pcs,1,646,0,0,TRUE,,active
+SMM-V108,Fruitamins-10,,Pcs,1,585.83,0,0,TRUE,,active
+SMM-V108,Fruitamins-11,,Pcs,1,585.83,0,0,TRUE,,active
+SMM-V108,Fruitamins-12,,Pcs,1,841.67,0,0,TRUE,,active
+SMM-V108,Fruitamins-13,,Pcs,1,1199.67,0,0,TRUE,,active
+SMM-V108,Fruitamins-14,,Pcs,1,335.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-15,,Pcs,1,403.67,0,0,TRUE,,active
+SMM-V108,Fruitamins-16,,Pcs,1,367.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-17,,Pcs,1,744,0,0,TRUE,,active
+SMM-V108,Fruitamins-18,,Pcs,1,646.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-19,,Pcs,1,446.38,0,0,TRUE,,active
+SMM-V108,Fruitamins-20,,Pcs,1,546.17,0,0,TRUE,,active
+SMM-V108,Fruitamins-21,,Pcs,1,608,0,0,TRUE,,active
+SMM-V108,Fruitamins-22,,Pcs,1,409.17,0,0,TRUE,,active
+SMM-V108,Fruitamins-23,,Pcs,1,460.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-24,,Pcs,1,525.46,0,0,TRUE,,active
+SMM-V108,Fruitamins-25,,Pcs,1,344.08,0,0,TRUE,,active
+SMM-V108,Fruitamins-26,,Pcs,1,237.17,0,0,TRUE,,active
+SMM-V108,Fruitamins-27,,Pcs,1,337.25,0,0,TRUE,,active
+SMM-V108,Fruitamins-28,,Pcs,1,279,0,0,TRUE,,active
+SMM-V108,Fruitamins-29,,Pcs,1,372,0,0,TRUE,,active
+SMM-V108,Fruitamins-30,,Pcs,1,323,0,0,TRUE,,active
+SMM-V108,Fruitamins-31,,Pcs,1,147.17,0,0,TRUE,,active
+SMM-V108,Fruitamins-32,,Pcs,1,147.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-33,,Pcs,1,147.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-34,,Pcs,1,147.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-35,,Pcs,1,147.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-36,,Pcs,1,147.33,0,0,TRUE,,active
+SMM-V108,Fruitamins-37,,Pcs,1,348.67,0,0,TRUE,,active
+SMM-V108,Fruitamins-38,,Pcs,1,348.83,0,0,TRUE,,active
+SMM-V108,Fruitamins-39,,Pcs,1,348.83,0,0,TRUE,,active
+SMM-V108,Fruitamins-40,,Pcs,1,348.83,0,0,TRUE,,active
+SMM-V108,Fruitamins-41,,Pcs,1,348.83,0,0,TRUE,,active
+SMM-V108,Fruitamins-42,,Pcs,1,348.83,0,0,TRUE,,active
+SMM-V108,Braavo-01,,Pcs,1,134.36,0,0,TRUE,,active
+SMM-V108,Braavo-02,,Pcs,1,81.43,0,0,TRUE,,active
+SMM-V108,Braavo-03,,Pcs,1,146.57,0,0,TRUE,,active
+SMM-V108,PEPSODENT-01,,Pcs,1,415,0,0,TRUE,,active
+SMM-V108,PEPSODENT-02,,Pcs,1,200,0,0,TRUE,,active
+SMM-V108,KODOMO-01,,Pcs,1,190,0,0,TRUE,,active
+SMM-V108,KODOMO-02,,Pcs,1,190,0,0,TRUE,,active
+SMM-V108,DORITOS-01,,Pcs,1,450,0,0,TRUE,,active
+SMM-V108,MEAOON-01,,Pcs,1,522.33,0,0,TRUE,,active
+SMM-V108,ROYAL HEART-01,,Pcs,1,781.33,0,0,TRUE,,active
+SMM-V108,WHISKAS-01,,Pcs,1,255,0,0,TRUE,,active
+SMM-V108,DIAMOND-01,,Pcs,1,470,0,0,TRUE,,active
+SMM-V108,SOHNI'S-01,,Pcs,1,255,0,0,TRUE,,active
+SMM-V108,SOHNI'S-02,,Pcs,1,255,0,0,TRUE,,active
+SMM-V108,SOHNI'S-03,,Pcs,1,,0,0,TRUE,,active
+SMM-V108,SAVORIA-01,,Pcs,1,560.5,0,0,TRUE,,active
+SMM-V108,CANDY SHANDY-01,,Pcs,1,261.11,0,0,TRUE,,active
+SMM-V108,CANDY SHANDY-02,,Pcs,1,261.11,0,0,TRUE,,active
+SMM-V108,CANDY SHANDY-03,,Pcs,1,261.11,0,0,TRUE,,active
+SMM-V108,CANDY SHANDY-04,,Pcs,1,261.11,0,0,TRUE,,active
+SMM-V108,CANDY SHANDY-05,,Pcs,1,261.11,0,0,TRUE,,active
+SMM-V110,Coopoliva-01,,Pcs,1,517,0,0,TRUE,,active
+SMM-V110,Coopoliva-02,,Pcs,1,658,0,0,TRUE,,active
+SMM-V110,Coopoliva-03,,Pcs,1,878.83,0,0,TRUE,,active
+SMM-V110,Coopoliva-04,,Pcs,1,1015,0,0,TRUE,,active
+SMM-V110,Coopoliva-05,,Pcs,1,1015,0,0,TRUE,,active
+SMM-V110,Coopoliva-06,,Pcs,1,1762.5,0,0,TRUE,,active
+SMM-V110,Coopoliva-07,,Pcs,1,658,0,0,TRUE,,active
+SMM-V110,Coopoliva-08,,Pcs,1,879,0,0,TRUE,,active
+SMM-V110,Coopoliva-09,,Pcs,1,1015,0,0,TRUE,,active
+SMM-V110,Coopoliva-10,,Pcs,1,1015,0,0,TRUE,,active
+SMM-V110,Coopoliva-11,,Pcs,1,1762,0,0,TRUE,,active
+SMM-V110,Coopoliva-12,,Pcs,1,1762.5,0,0,TRUE,,active
+SMM-V110,Coopoliva-13,,Pcs,1,1762.5,0,0,TRUE,,active
+SMM-V111,DIPITT-01,,Pcs,1,319.33,0,0,TRUE,,active
+SMM-V111,DIPITT-02,,Pcs,1,370.67,0,0,TRUE,,active
+SMM-V111,DIPITT-03,,Pcs,1,497.5,0,0,TRUE,,active
+SMM-V111,DIPITT-04,,Pcs,1,411.18,0,0,TRUE,,active
+SMM-V111,DIPITT-05,,Pcs,1,324.62,0,0,TRUE,,active
+SMM-V111,DIPITT-06,,Pcs,1,399.17,0,0,TRUE,,active
+SMM-V111,DIPITT-07,,Pcs,1,411.17,0,0,TRUE,,active
+SMM-V111,DIPITT-08,,Pcs,1,378.17,0,0,TRUE,,active
+SMM-V111,DIPITT-09,,Pcs,1,357.17,0,0,TRUE,,active
+SMM-V111,DIPITT-10,,Pcs,1,315.17,0,0,TRUE,,active
+SMM-V111,DIPITT-11,,Pcs,1,270.33,0,0,TRUE,,active
+SMM-V111,DIPITT-12,,Pcs,1,346.25,0,0,TRUE,,active
+SMM-V111,DIPITT-13,,Pcs,1,411.18,0,0,TRUE,,active
+SMM-V111,DIPITT-14,,Pcs,1,367.75,0,0,TRUE,,active
+SMM-V111,DIPITT-15,,Pcs,1,159.5,0,0,TRUE,,active
+SMM-V111,DIPITT-16,,Pcs,1,378.17,0,0,TRUE,,active
+SMM-V111,DIPITT-17,,Pcs,1,411,0,0,TRUE,,active
+SMM-V111,DIPITT-18,,Pcs,1,314.65,0,0,TRUE,,active
+SMM-V111,DIPITT-19,,Pcs,1,231,0,0,TRUE,,active
+SMM-V111,DIPITT-20,,Pcs,1,216.25,0,0,TRUE,,active
+SMM-V111,DIPITT-21,,Pcs,1,194.67,0,0,TRUE,,active
+SMM-V111,DIPITT-22,,Pcs,1,181.67,0,0,TRUE,,active
+SMM-V111,DIPITT-23,,Pcs,1,459.83,0,0,TRUE,,active
+SMM-V111,DIPITT-24,,Pcs,1,459.83,0,0,TRUE,,active
+SMM-V111,DIPITT-25,,Pcs,1,459.67,0,0,TRUE,,active
+SMM-V111,DIPITT-26,,Pcs,1,497.74,0,0,TRUE,,active
+SMM-V111,DIPITT-27,,Pcs,1,441,0,0,TRUE,,active
+SMM-V111,DIPITT-28,,Pcs,1,367.67,0,0,TRUE,,active
+SMM-V111,DIPITT-29,,Pcs,1,280.2,0,0,TRUE,,active
+SMM-V111,DIPITT-30,,Pcs,1,207.75,0,0,TRUE,,active
+SMM-V111,DIPITT-31,,Pcs,1,376.55,0,0,TRUE,,active
+SMM-V111,DIPITT-32,,Pcs,1,260,0,0,TRUE,,active
+SMM-V112,NANDOS-01,,Pcs,1,954.75,0,0,TRUE,,active
+SMM-V112,NANDOS-02,,Pcs,1,935.66,0,0,TRUE,,active
+SMM-V112,NANDOS-03,,Pcs,1,954.67,0,0,TRUE,,active
+SMM-V112,NANDOS-04,,Pcs,1,935.66,0,0,TRUE,,active
+SMM-V112,NANDOS-05,,Pcs,1,935.66,0,0,TRUE,,active
+SMM-V113,Zia-01,,Pcs,1,178.17,0,0,TRUE,,active
+SMM-V113,Zia-02,,Pcs,1,267.33,0,0,TRUE,,active
+SMM-V114,Nutella-01,,Pcs,1,1100,0,0,TRUE,,active
+SMM-V114,Nutella-02,,Pcs,1,1500,0,0,TRUE,,active
+SMM-V114,Nutella-03,,Pcs,1,2750,0,0,TRUE,,active
+SMM-V115,Nur-01,,Pcs,1,1053.17,0,0,TRUE,,active
+SMM-V116,Alshifa-01,,Pcs,1,1320.67,0,0,TRUE,,active
+SMM-V117,MARIO'S-01,,Pcs,1,151.7,0,0,TRUE,,active
+SMM-V117,MARIO'S-02,,Pcs,1,285.33,0,0,TRUE,,active
+SMM-V117,MARIO'S-03,,Pcs,1,,0,0,TRUE,,active
+SMM-V117,MARIO'S-04,,Pcs,1,149.63,0,0,TRUE,,active
+SMM-V117,MARIO'S-05,,Pcs,1,149.63,0,0,TRUE,,active
+SMM-V117,MARIO'S-06,,Pcs,1,149.63,0,0,TRUE,,active
+SMM-V117,MARIO'S-07,,Pcs,1,149.63,0,0,TRUE,,active
+SMM-V117,MARIO'S-08,,Pcs,1,149.63,0,0,TRUE,,active
+SMM-V117,MARIO'S-09,,Pcs,1,149.63,0,0,TRUE,,active
+SMM-V117,MARIO'S-10,,Pcs,1,175.9,0,0,TRUE,,active
+SMM-V117,MARIO'S-11,,Pcs,1,166.58,0,0,TRUE,,active
+SMM-V117,COOKANIA-01,,Pcs,1,35.4,0,0,TRUE,,active
+SMM-V117,COOKANIA-02,,Pcs,1,88.67,0,0,TRUE,,active
+SMM-V117,COOKANIA-03,,Pcs,1,26.87,0,0,TRUE,,active
+SMM-V117,COOKANIA-04,,Pcs,1,44.3,0,0,TRUE,,active
+SMM-V117,COOKANIA-05,,Pcs,1,88.6,0,0,TRUE,,active
+SMM-V117,COOKANIA-06,,Pcs,1,18.04,0,0,TRUE,,active
+SMM-V117,COOKANIA-07,,Pcs,1,88.6,0,0,TRUE,,active
+SMM-V117,COOKANIA-08,,Pcs,1,18,0,0,TRUE,,active
+SMM-V117,COOKANIA-09,,Pcs,1,88.5,0,0,TRUE,,active
+SMM-V117,COOKANIA-10,,Pcs,1,35.44,0,0,TRUE,,active
+SMM-V118,INDOMIE-01,,Pcs,1,55.57,0,0,TRUE,,active
+SMM-V118,INDOMIE-02,,Pcs,1,76.94,0,0,TRUE,,active
+SMM-V118,INDOMIE-03,,Pcs,1,55.57,0,0,TRUE,,active
+SMM-V118,INDOMIE-04,,Pcs,1,76.94,0,0,TRUE,,active
+SMM-V118,INDOMIE-05,,Pcs,1,55.67,0,0,TRUE,,active
+SMM-V119,KOLSON-01,,Pcs,1,183.65,0,0,TRUE,,active
+SMM-V119,KOLSON-02,,Pcs,1,220,0,0,TRUE,,active
+SMM-V119,KOLSON-03,,Pcs,1,183.7,0,0,TRUE,,active
+SMM-V119,KOLSON-04,,Pcs,1,186.65,0,0,TRUE,,active
+SMM-V119,KOLSON-05,,Pcs,1,183.68,0,0,TRUE,,active
+SMM-V119,KOLSON-06,,Pcs,1,356.39,0,0,TRUE,,active
+SMM-V119,KOLSON-07,,Pcs,1,183.67,0,0,TRUE,,active
+SMM-V119,KOLSON-08,,Pcs,1,165.21,0,0,TRUE,,active
+SMM-V119,KOLSON-09,,Pcs,1,239.35,0,0,TRUE,,active
+SMM-V119,KOLSON-10,,Pcs,1,201.21,0,0,TRUE,,active
+SMM-V119,KOLSON-11,,Pcs,1,270.63,0,0,TRUE,,active
+SMM-V119,KOLSON-12,,Pcs,1,43.83,0,0,TRUE,,active
+SMM-V119,KOLSON-13,,Pcs,1,44.09,0,0,TRUE,,active
+SMM-V119,KOLSON-14,,Pcs,1,25.31,0,0,TRUE,,active
+SMM-V119,KOLSON-15,,Pcs,1,45.15,0,0,TRUE,,active
+SMM-V120,TREET-01,,Pcs,1,63.83,0,0,TRUE,,active
+SMM-V120,TREET-02,,Pcs,1,171.88,0,0,TRUE,,active
+SMM-V120,TREET-03,,Pcs,1,250.44,0,0,TRUE,,active
+SMM-V120,TREET-04,,Pcs,1,147.33,0,0,TRUE,,active
+SMM-V120,TREET-05,,Pcs,1,89.33,0,0,TRUE,,active
+SMM-V120,TREET-06,,Pcs,1,114.92,0,0,TRUE,,active
+SMM-V120,TREET-07,,Pcs,1,349.56,0,0,TRUE,,active
+SMM-V120,TREET-08,,Pcs,1,466.5,0,0,TRUE,,active
+SMM-V120,TREET-09,,Pcs,1,129.28,0,0,TRUE,,active
+SMM-V120,TREET-10,,Pcs,1,488.33,0,0,TRUE,,active
+SMM-V120,TREET-11,,Pcs,1,466.5,0,0,TRUE,,active
+SMM-V120,TREET-12,,Pcs,1,54.02,0,0,TRUE,,active
+SMM-V120,TREET-13,,Pcs,1,210.67,0,0,TRUE,,active
+SMM-V120,TREET-14,,Pcs,1,114.89,0,0,TRUE,,active
+SMM-V120,TREET-15,,Pcs,1,63.83,0,0,TRUE,,active
+SMM-V120,TREET-16,,Pcs,1,314.31,0,0,TRUE,,active
+SMM-V120,TREET-17,,Pcs,1,687.5,0,0,TRUE,,active
+SMM-V120,MilkFields-01,,Pcs,1,362.75,0,0,TRUE,,active
+SMM-V120,MilkFields-02,,Pcs,1,91.92,0,0,TRUE,,active
+SMM-V120,MilkFields-03,,Pcs,1,91.89,0,0,TRUE,,active
+SMM-V120,MilkFields-04,,Pcs,1,42.83,0,0,TRUE,,active
+SMM-V121,Safeguard-01,,Pcs,1,207,0,0,TRUE,,active
+SMM-V121,Safeguard-02,,Pcs,1,207,0,0,TRUE,,active
+SMM-V121,GILLETTE-01,,Pcs,1,524,0,0,TRUE,,active
+SMM-V121,GILLETTE-02,,Pcs,1,2700,0,0,TRUE,,active
+SMM-V121,GILLETTE-03,,Pcs,1,170,0,0,TRUE,,active
+SMM-V121,GILLETTE-04,,Pcs,1,135,0,0,TRUE,,active
+SMM-V121,GILLETTE-05,,Pcs,1,5280,0,0,TRUE,,active
+SMM-V121,GILLETTE-06,,Pcs,1,5220,0,0,TRUE,,active
+SMM-V121,GILLETTE-07,,Pcs,1,6480,0,0,TRUE,,active
+SMM-V121,GILLETTE-08,,Pcs,1,846,0,0,TRUE,,active
+SMM-V121,GILLETTE-09,,Pcs,1,90,0,0,TRUE,,active
+SMM-V121,GILLETTE-10,,Pcs,1,3000,0,0,TRUE,,active
+SMM-V121,GILLETTE-11,,Pcs,1,6030,0,0,TRUE,,active
+SMM-V121,GILLETTE-12,,Pcs,1,840,0,0,TRUE,,active
+SMM-V121,GILLETTE-13,,Pcs,1,890,0,0,TRUE,,active
+SMM-V121,GILLETTE-14,,Pcs,1,840,0,0,TRUE,,active
+SMM-V121,GILLETTE-15,,Pcs,1,585,0,0,TRUE,,active
+SMM-V122,DORCO-01,,Pcs,1,390,0,0,TRUE,,active
+SMM-V122,DORCO-02,,Pcs,1,250,0,0,TRUE,,active
+SMM-V122,DORCO-03,,Pcs,1,65,0,0,TRUE,,active
+SMM-V122,DORCO-04,,Pcs,1,460,0,0,TRUE,,active
+SMM-V122,DORCO-05,,Pcs,1,490,0,0,TRUE,,active
+SMM-V122,DORCO-06,,Pcs,1,110,0,0,TRUE,,active
+SMM-V122,DORCO-07,,Pcs,1,133.75,0,0,TRUE,,active
+SMM-V122,DORCO-08,,Pcs,1,45,0,0,TRUE,,active
+SMM-V123,SENSODYNE-01,,Pcs,1,468,0,0,TRUE,,active
+SMM-V123,SENSODYNE-02,,Pcs,1,445,0,0,TRUE,,active
+SMM-V123,SENSODYNE-03,,Pcs,1,359,0,0,TRUE,,active
+SMM-V123,SENSODYNE-04,,Pcs,1,490,0,0,TRUE,,active
+SMM-V123,SENSODYNE-05,,Pcs,1,508,0,0,TRUE,,active
+SMM-V123,SENSODYNE-06,,Pcs,1,387,0,0,TRUE,,active
+SMM-V123,SENSODYNE-07,,Pcs,1,342,0,0,TRUE,,active
+SMM-V123,SENSODYNE-08,,Pcs,1,421.03,0,0,TRUE,,active
+SMM-V123,SENSODYNE-09,,Pcs,1,414,0,0,TRUE,,active
+SMM-V123,SENSODYNE-10,,Pcs,1,391.5,0,0,TRUE,,active
+SMM-V123,SENSODYNE-11,,Pcs,1,297,0,0,TRUE,,active
+SMM-V124,Doctor-01,,Pcs,1,205.17,0,0,TRUE,,active
+SMM-V124,Doctor-02,,Pcs,1,205,0,0,TRUE,,active
+SMM-V124,Doctor-03,,Pcs,1,136.75,0,0,TRUE,,active
+SMM-V124,Doctor-04,,Pcs,1,196.58,0,0,TRUE,,active
+SMM-V124,Doctor-05,,Pcs,1,342,0,0,TRUE,,active
+SMM-V124,Doctor-06,,Pcs,1,273.58,0,0,TRUE,,active
+SMM-V124,Doctor-07,,Pcs,1,239.33,0,0,TRUE,,active
+SMM-V124,Doctor-08,,Pcs,1,213.83,0,0,TRUE,,active
+SMM-V124,Doctor-09,,Pcs,1,188,0,0,TRUE,,active
+SMM-V124,Doctor-10,,Pcs,1,342,0,0,TRUE,,active
+SMM-V124,Doctor-11,,Pcs,1,247.92,0,0,TRUE,,active
+SMM-V124,Doctor-12,,Pcs,1,290.67,0,0,TRUE,,active
+SMM-V124,Doctor-13,,Pcs,1,384.75,0,0,TRUE,,active
+SMM-V124,Nexera-01,,Pcs,1,324.92,0,0,TRUE,,active
+SMM-V124,Nexera-02,,Pcs,1,205.17,0,0,TRUE,,active
+SMM-V124,Nexera-03,,Pcs,1,316.33,0,0,TRUE,,active
+SMM-V124,Mr. White-01,,Pcs,1,128.17,0,0,TRUE,,active
+SMM-V124,Mr. White-02,,Pcs,1,171,0,0,TRUE,,active
+SMM-V124,Mr. White-03,,Pcs,1,128.17,0,0,TRUE,,active
+SMM-V125,LAYS-01,,Pcs,1,131.36,0,0,TRUE,,active
+SMM-V125,LAYS-02,,Pcs,1,43.96,0,0,TRUE,,active
+SMM-V125,LAYS-03,,Pcs,1,61.54,0,0,TRUE,,active
+SMM-V125,LAYS-04,,Pcs,1,61.54,0,0,TRUE,,active
+SMM-V125,LAYS-05,,Pcs,1,43.96,0,0,TRUE,,active
+SMM-V125,LAYS-06,,Pcs,1,87.73,0,0,TRUE,,active
+SMM-V125,LAYS-07,,Pcs,1,27.67,0,0,TRUE,,active
+SMM-V125,LAYS-08,,Pcs,1,131.36,0,0,TRUE,,active
+SMM-V125,LAYS-09,,Pcs,1,87.73,0,0,TRUE,,active
+SMM-V125,LAYS-10,,Pcs,1,61.54,0,0,TRUE,,active
+SMM-V125,LAYS-11,,Pcs,1,61.54,0,0,TRUE,,active
+SMM-V125,LAYS-12,,Pcs,1,131.36,0,0,TRUE,,active
+SMM-V125,LAYS-13,,Pcs,1,61.54,0,0,TRUE,,active
+SMM-V125,LAYS-14,,Pcs,1,88.56,0,0,TRUE,,active
+SMM-V125,LAYS-15,,Pcs,1,61.16,0,0,TRUE,,active
+SMM-V125,LAYS-16,,Pcs,1,43.96,0,0,TRUE,,active
+SMM-V125,LAYS-17,,Pcs,1,87.73,0,0,TRUE,,active
+SMM-V125,LAYS-18,,Pcs,1,61.15,0,0,TRUE,,active
+SMM-V125,LAYS-19,,Pcs,1,88.56,0,0,TRUE,,active
+SMM-V125,LAYS-20,,Pcs,1,88.56,0,0,TRUE,,active
+SMM-V126,POP NOSH-01,,Pcs,1,163.6,0,0,TRUE,,active
+SMM-V126,POP NOSH-02,,Pcs,1,122.7,0,0,TRUE,,active
+SMM-V126,POP NOSH-03,,Pcs,1,57.24,0,0,TRUE,,active
+SMM-V126,POP NOSH-04,,Pcs,1,40.89,0,0,TRUE,,active
+SMM-V126,POP NOSH-05,,Pcs,1,42.29,0,0,TRUE,,active
+SMM-V126,POP NOSH-06,,Pcs,1,40.89,0,0,TRUE,,active
+SMM-V126,POP NOSH-07,,Pcs,1,57.24,0,0,TRUE,,active
+SMM-V126,POP NOSH-08,,Pcs,1,122.7,0,0,TRUE,,active
+SMM-V126,POP NOSH-09,,Pcs,1,163.6,0,0,TRUE,,active
+SMM-V126,POP NOSH-10,,Pcs,1,40.89,0,0,TRUE,,active
+SMM-V126,POP NOSH-11,,Pcs,1,122.7,0,0,TRUE,,active
+SMM-V126,POP NOSH-12,,Pcs,1,40.89,0,0,TRUE,,active
+SMM-V126,POP NOSH-13,,Pcs,1,40.89,0,0,TRUE,,active
+SMM-V127,CORNTOON-01,,Pcs,1,90,0,0,TRUE,,active
+SMM-V127,CORNTOON-02,,Pcs,1,72,0,0,TRUE,,active
+SMM-V127,CORNTOON-03,,Pcs,1,90,0,0,TRUE,,active
+SMM-V127,CORNTOON-04,,Pcs,1,43.75,0,0,TRUE,,active
+SMM-V127,CORNTOON-05,,Pcs,1,90,0,0,TRUE,,active
+SMM-V127,NIMORA-01,,Pcs,1,41.67,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-01,,Pcs,1,27.5,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-02,,Pcs,1,55.21,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-03,,Pcs,1,27.5,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-04,,Pcs,1,55.21,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-05,,Pcs,1,36.66,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-06,,Pcs,1,36.67,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-07,,Pcs,1,36.66,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-08,,Pcs,1,27.5,0,0,TRUE,,active
+SMM-V128,SUPER CRISP-09,,Pcs,1,55.2,0,0,TRUE,,active
+SMM-V129,KORNEEZ-01,,Pcs,1,84.83,0,0,TRUE,,active
+SMM-V129,KORNEEZ-02,,Pcs,1,84.83,0,0,TRUE,,active
+SMM-V129,KORNEEZ-03,,Pcs,1,61.67,0,0,TRUE,,active
+SMM-V129,KORNEEZ-04,,Pcs,1,84.83,0,0,TRUE,,active
+SMM-V129,KORNEEZ-05,,Pcs,1,84.83,0,0,TRUE,,active
+SMM-V129,KORNEEZ-06,,Pcs,1,84.83,0,0,TRUE,,active
+SMM-V129,KORNEEZ-07,,Pcs,1,46.25,0,0,TRUE,,active
+SMM-V129,KORNEEZ-08,,Pcs,1,84.83,0,0,TRUE,,active
+SMM-V130,MUNCH OH-01,,Pcs,1,160,0,0,TRUE,,active
+SMM-V130,MUNCH OH-02,,Pcs,1,80,0,0,TRUE,,active
+SMM-V130,MUNCH OH-03,,Pcs,1,80,0,0,TRUE,,active
+SMM-V130,MUNCH OH-04,,Pcs,1,80,0,0,TRUE,,active
+SMM-V130,MUNCH OH-05,,Pcs,1,200,0,0,TRUE,,active
+SMM-V130,MUNCH OH-06,,Pcs,1,200,0,0,TRUE,,active
+SMM-V130,MUNCH OH-07,,Pcs,1,160,0,0,TRUE,,active
+SMM-V130,MUNCH OH-08,,Pcs,1,80,0,0,TRUE,,active
+SMM-V130,MUNCH OH-09,,Pcs,1,80,0,0,TRUE,,active
+SMM-V131,JOJO-01,,Pcs,1,76.9,0,0,TRUE,,active
+SMM-V131,JOJO-02,,Pcs,1,76.9,0,0,TRUE,,active
+SMM-V131,JOJO-03,,Pcs,1,115.33,0,0,TRUE,,active
+SMM-V131,JOJO-04,,Pcs,1,138.33,0,0,TRUE,,active
+SMM-V131,JOJO-05,,Pcs,1,30.75,0,0,TRUE,,active
+SMM-V131,JOJO-06,,Pcs,1,153.83,0,0,TRUE,,active
+SMM-V131,JOJO-07,,Pcs,1,30.73,0,0,TRUE,,active
+SMM-V131,JOJO-08,,Pcs,1,38.44,0,0,TRUE,,active
+SMM-V131,JOJO-09,,Pcs,1,153.83,0,0,TRUE,,active
+SMM-V131,JOJO-10,,Pcs,1,230.75,0,0,TRUE,,active
+SMM-V132,MAYFAIR-01,,Pcs,1,45.47,0,0,TRUE,,active
+SMM-V132,MAYFAIR-02,,Pcs,1,83.13,0,0,TRUE,,active
+SMM-V132,MAYFAIR-03,,Pcs,1,193.83,0,0,TRUE,,active
+SMM-V132,MAYFAIR-04,,Pcs,1,40.46,0,0,TRUE,,active
+SMM-V132,MAYFAIR-05,,Pcs,1,40.87,0,0,TRUE,,active
+SMM-V132,MAYFAIR-06,,Pcs,1,194.33,0,0,TRUE,,active
+SMM-V132,MAYFAIR-07,,Pcs,1,199.33,0,0,TRUE,,active
+SMM-V132,MAYFAIR-08,,Pcs,1,38.73,0,0,TRUE,,active
+SMM-V132,MAYFAIR-09,,Pcs,1,9.18,0,0,TRUE,,active
+SMM-V132,MAYFAIR-10,,Pcs,1,17.75,0,0,TRUE,,active
+SMM-V132,MAYFAIR-11,,Pcs,1,36.61,0,0,TRUE,,active
+SMM-V132,MAYFAIR-12,,Pcs,1,45.46,0,0,TRUE,,active
+SMM-V132,MAYFAIR-13,,Pcs,1,34.7,0,0,TRUE,,active
+SMM-V132,MAYFAIR-14,,Pcs,1,34.7,0,0,TRUE,,active
+SMM-V132,MAYFAIR-15,,Pcs,1,42.971,0,0,TRUE,,active
+SMM-V132,MAYFAIR-16,,Pcs,1,35.12,0,0,TRUE,,active
+SMM-V132,MAYFAIR-17,,Pcs,1,27.29,0,0,TRUE,,active
+SMM-V132,MAYFAIR-18,,Pcs,1,,0,0,TRUE,,active
+SMM-V132,MAYFAIR-19,,Pcs,1,199.33,0,0,TRUE,,active
+SMM-V132,MAYFAIR-20,,Pcs,1,199.33,0,0,TRUE,,active
+SMM-V132,MAYFAIR-21,,Pcs,1,194.33,0,0,TRUE,,active
+SMM-V132,MAYFAIR-22,,Pcs,1,194.33,0,0,TRUE,,active
+SMM-V132,MAYFAIR-23,,Pcs,1,194.33,0,0,TRUE,,active
+SMM-V132,MAYFAIR-24,,Pcs,1,16.111,0,0,TRUE,,active
+SMM-V132,MAYFAIR-25,,Pcs,1,16.111,0,0,TRUE,,active
+SMM-V132,MAYFAIR-26,,Pcs,1,202.83,0,0,TRUE,,active
+SMM-V132,MAYFAIR-27,,Pcs,1,194.33,0,0,TRUE,,active
+SMM-V133,Peek Freans-01,,Pcs,1,52.16,0,0,TRUE,,active
+SMM-V133,Peek Freans-02,,Pcs,1,86.9,0,0,TRUE,,active
+SMM-V133,Peek Freans-03,,Pcs,1,32.64,0,0,TRUE,,active
+SMM-V133,Peek Freans-04,,Pcs,1,32.64,0,0,TRUE,,active
+SMM-V133,Peek Freans-05,,Pcs,1,52.16,0,0,TRUE,,active
+SMM-V133,Peek Freans-06,,Pcs,1,34.84,0,0,TRUE,,active
+SMM-V133,Peek Freans-07,,Pcs,1,34.84,0,0,TRUE,,active
+SMM-V133,Peek Freans-08,,Pcs,1,26.01,0,0,TRUE,,active
+SMM-V133,Peek Freans-09,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-10,,Pcs,1,18.31,0,0,TRUE,,active
+SMM-V133,Peek Freans-11,,Pcs,1,9.23,0,0,TRUE,,active
+SMM-V133,Peek Freans-12,,Pcs,1,18.31,0,0,TRUE,,active
+SMM-V133,Peek Freans-13,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-14,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-15,,Pcs,1,9.23,0,0,TRUE,,active
+SMM-V133,Peek Freans-16,,Pcs,1,18.31,0,0,TRUE,,active
+SMM-V133,Peek Freans-17,,Pcs,1,18.36,0,0,TRUE,,active
+SMM-V133,Peek Freans-18,,Pcs,1,18.43,0,0,TRUE,,active
+SMM-V133,Peek Freans-19,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-20,,Pcs,1,27.54,0,0,TRUE,,active
+SMM-V133,Peek Freans-21,,Pcs,1,18.35,0,0,TRUE,,active
+SMM-V133,Peek Freans-22,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-23,,Pcs,1,9.23,0,0,TRUE,,active
+SMM-V133,Peek Freans-24,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-25,,Pcs,1,18.35,0,0,TRUE,,active
+SMM-V133,Peek Freans-26,,Pcs,1,91.81,0,0,TRUE,,active
+SMM-V133,Peek Freans-27,,Pcs,1,27.54,0,0,TRUE,,active
+SMM-V133,Peek Freans-28,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-29,,Pcs,1,36.71,0,0,TRUE,,active
+SMM-V133,Peek Freans-30,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-31,,Pcs,1,27.54,0,0,TRUE,,active
+SMM-V133,Peek Freans-32,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-33,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-34,,Pcs,1,45.89,0,0,TRUE,,active
+SMM-V133,Peek Freans-35,,Pcs,1,36.71,0,0,TRUE,,active
+SMM-V133,Peek Freans-36,,Pcs,1,18.35,0,0,TRUE,,active
+SMM-V133,Peek Freans-37,,Pcs,1,45.9,0,0,TRUE,,active
+SMM-V133,Peek Freans-38,,Pcs,1,27.5,0,0,TRUE,,active
+SMM-V133,Peek Freans-39,,Pcs,1,294.44,0,0,TRUE,,active
+SMM-V133,Peek Freans-40,,Pcs,1,88.74,0,0,TRUE,,active
+SMM-V133,Peek Freans-41,,Pcs,1,88.74,0,0,TRUE,,active
+SMM-V133,Peek Freans-42,,Pcs,1,18.36,0,0,TRUE,,active
+SMM-V133,Peek Freans-43,,Pcs,1,45.9,0,0,TRUE,,active
+SMM-V133,Peek Freans-44,,Pcs,1,36.71,0,0,TRUE,,active
+SMM-V133,Peek Freans-45,,Pcs,1,27.54,0,0,TRUE,,active
+SMM-V134,LU-01,,Pcs,1,48.07,0,0,TRUE,,active
+SMM-V134,LU-02,,Pcs,1,47.46,0,0,TRUE,,active
+SMM-V134,LU-03,,Pcs,1,47.2,0,0,TRUE,,active
+SMM-V134,LU-04,,Pcs,1,46.7,0,0,TRUE,,active
+SMM-V134,LU-05,,Pcs,1,47.5,0,0,TRUE,,active
+SMM-V134,LU-06,,Pcs,1,27.5,0,0,TRUE,,active
+SMM-V134,LU-07,,Pcs,1,48.07,0,0,TRUE,,active
+SMM-V134,LU-08,,Pcs,1,47.4,0,0,TRUE,,active
+SMM-V134,LU-09,,Pcs,1,27.54,0,0,TRUE,,active
+SMM-V134,LU-10,,Pcs,1,28.17,0,0,TRUE,,active
+SMM-V134,LU-11,,Pcs,1,45.8,0,0,TRUE,,active
+SMM-V134,LU-12,,Pcs,1,93.5,0,0,TRUE,,active
+SMM-V134,LU-13,,Pcs,1,93.67,0,0,TRUE,,active
+SMM-V134,LU-14,,Pcs,1,93.5,0,0,TRUE,,active
+SMM-V134,LU-15,,Pcs,1,9.26,0,0,TRUE,,active
+SMM-V134,LU-16,,Pcs,1,47.45,0,0,TRUE,,active
+SMM-V134,Blue Band-01,,Pcs,1,45.13,0,0,TRUE,,active
+SMM-V134,Blue Band-02,,Pcs,1,181.35,0,0,TRUE,,active
+SMM-V134,Blue Band-03,,Pcs,1,260.13,0,0,TRUE,,active
+SMM-V134,Blue Band-04,,Pcs,1,501.06,0,0,TRUE,,active
+SMM-V134,Blue Band-05,,Pcs,1,1174.33,0,0,TRUE,,active
+SMM-V135,SWEETZONE-01,,Pcs,1,488,0,0,TRUE,,active
+SMM-V135,SWEETZONE-02,,Pcs,1,384,0,0,TRUE,,active
+SMM-V135,SWEETZONE-03,,Pcs,1,384,0,0,TRUE,,active
+SMM-V135,SWEETZONE-04,,Pcs,1,488,0,0,TRUE,,active
+SMM-V135,SWEETZONE-05,,Pcs,1,504,0,0,TRUE,,active
+SMM-V135,SWEETZONE-06,,Pcs,1,488,0,0,TRUE,,active
+SMM-V135,SWEETZONE-07,,Pcs,1,344,0,0,TRUE,,active
+SMM-V135,SWEETZONE-08,,Pcs,1,176,0,0,TRUE,,active
+SMM-V135,SWEETZONE-09,,Pcs,1,176,0,0,TRUE,,active
+SMM-V135,SWEETZONE-10,,Pcs,1,176,0,0,TRUE,,active
+SMM-V136,American Kuisine-01,,Pcs,1,940.42,0,0,TRUE,,active
+SMM-V136,American Kuisine-02,,Pcs,1,188.08,0,0,TRUE,,active
+SMM-V136,HOOPIX-01,,Pcs,1,277.42,0,0,TRUE,,active
+SMM-V136,HOOPIX-02,,Pcs,1,277.42,0,0,TRUE,,active
+SMM-V136,HOOPIX-03,,Pcs,1,277.42,0,0,TRUE,,active
+SMM-V136,HOOPIX-04,,Pcs,1,277.42,0,0,TRUE,,active
+SMM-V136,HOOPIX-05,,Pcs,1,277.42,0,0,TRUE,,active
+SMM-V136,HOOPIX-06,,Pcs,1,277.42,0,0,TRUE,,active
+SMM-V136,HOOPIX-07,,Pcs,1,277.42,0,0,TRUE,,active
+SMM-V136,Kraving-01,,Pcs,1,294.33,0,0,TRUE,,active
+SMM-V136,Kraving-02,,Pcs,1,294.33,0,0,TRUE,,active
+SMM-V136,Kraving-03,,Pcs,1,294.33,0,0,TRUE,,active
+SMM-V136,Kraving-04,,Pcs,1,294.33,0,0,TRUE,,active
+SMM-V136,Kraving-05,,Pcs,1,294.33,0,0,TRUE,,active
+SMM-V136,VIENNA-01,,Pcs,1,114,0,0,TRUE,,active
+SMM-V136,CHOCOLATE B&B-01,,Pcs,1,212.79,0,0,TRUE,,active
+SMM-V136,CHOCOLATE B&B-02,,Pcs,1,213.8,0,0,TRUE,,active
+SMM-V136,CHOCOLATE B&B-03,,Pcs,1,251.7,0,0,TRUE,,active
+SMM-V136,CHOCOLATE B&B-04,,Pcs,1,251.8,0,0,TRUE,,active
+SMM-V136,CHOCOLATE B&B-05,,Pcs,1,212.79,0,0,TRUE,,active
+SMM-V136,CHOCOLATE B&B-06,,Pcs,1,270,0,0,TRUE,,active
+SMM-V136,CHOCI TOKI-01,,Pcs,1,213.7,0,0,TRUE,,active
+SMM-V136,CHOCI TOKI-02,,Pcs,1,213.7,0,0,TRUE,,active
+SMM-V136,CHOCI TOKI-03,,Pcs,1,213.8,0,0,TRUE,,active
+SMM-V137,Bisconni-01,,Pcs,1,28.06,0,0,TRUE,,active
+SMM-V137,Bisconni-02,,Pcs,1,28.06,0,0,TRUE,,active
+SMM-V137,Bisconni-03,,Pcs,1,28.06,0,0,TRUE,,active
+SMM-V137,Bisconni-04,,Pcs,1,28.06,0,0,TRUE,,active
+SMM-V137,Bisconni-05,,Pcs,1,35.9,0,0,TRUE,,active
+SMM-V137,Bisconni-06,,Pcs,1,18.1,0,0,TRUE,,active
+SMM-V137,Bisconni-07,,Pcs,1,44.64,0,0,TRUE,,active
+SMM-V137,Bisconni-08,,Pcs,1,44.64,0,0,TRUE,,active
+SMM-V137,Bisconni-09,,Pcs,1,37.41,0,0,TRUE,,active
+SMM-V137,Bisconni-10,,Pcs,1,17.64,0,0,TRUE,,active
+SMM-V137,Bisconni-11,,Pcs,1,27.92,0,0,TRUE,,active
+SMM-V137,Bisconni-12,,Pcs,1,28,0,0,TRUE,,active
+SMM-V137,Bisconni-13,,Pcs,1,37.41,0,0,TRUE,,active
+SMM-V137,Bisconni-14,,Pcs,1,37.41,0,0,TRUE,,active
+SMM-V137,Bisconni-15,,Pcs,1,17.84,0,0,TRUE,,active
+SMM-V137,Bisconni-16,,Pcs,1,27.05,0,0,TRUE,,active
+SMM-V137,Bisconni-17,,Pcs,1,9.13,0,0,TRUE,,active
+SMM-V137,Bisconni-18,,Pcs,1,9.13,0,0,TRUE,,active
+SMM-V137,Bisconni-19,,Pcs,1,9.13,0,0,TRUE,,active
+SMM-V137,Bisconni-20,,Pcs,1,18.7,0,0,TRUE,,active
+SMM-V137,Bisconni-21,,Pcs,1,18.7,0,0,TRUE,,active
+SMM-V137,Bisconni-22,,Pcs,1,45.59,0,0,TRUE,,active
+SMM-V137,Bisconni-23,,Pcs,1,91.17,0,0,TRUE,,active
+SMM-V137,Bisconni-24,,Pcs,1,27.34,0,0,TRUE,,active
+SMM-V137,Bisconni-25,,Pcs,1,28,0,0,TRUE,,active
+SMM-V137,Bisconni-26,,Pcs,1,27.34,0,0,TRUE,,active
+SMM-V137,Bisconni-27,,Pcs,1,17.47,0,0,TRUE,,active
+SMM-V137,Bisconni-28,,Pcs,1,36.5,0,0,TRUE,,active
+SMM-V138,Giggly-01,,Pcs,1,44.83,0,0,TRUE,,active
+SMM-V138,Giggly-02,,Pcs,1,88.61,0,0,TRUE,,active
+SMM-V138,Giggly-03,,Pcs,1,25.93,0,0,TRUE,,active
+SMM-V138,Giggly-04,,Pcs,1,25.93,0,0,TRUE,,active
+SMM-V139,Pick Fit-01,,Pcs,1,817.5,0,0,TRUE,,active
+SMM-V139,Pick Fit-02,,Pcs,1,180.92,0,0,TRUE,,active
+SMM-V139,Pick Fit-03,,Pcs,1,180.92,0,0,TRUE,,active
+SMM-V139,Pick Fit-04,,Pcs,1,180.92,0,0,TRUE,,active
+SMM-V139,Pick Fit-05,,Pcs,1,180.92,0,0,TRUE,,active
+SMM-V140,Dr-Talbeena-01,,Pcs,1,373.5,0,0,TRUE,,active
+SMM-V140,Dr-Talbeena-02,,Pcs,1,279,0,0,TRUE,,active
+SMM-V140,Dr-Talbeena-03,,Pcs,1,279,0,0,TRUE,,active
+SMM-V140,Dr-Talbeena-04,,Pcs,1,279,0,0,TRUE,,active
+SMM-V140,Dr-Talbeena-05,,Pcs,1,261,0,0,TRUE,,active
+SMM-V140,Dr-Talbeena-06,,Pcs,1,319.5,0,0,TRUE,,active
+SMM-V141,Nature's Home-01,,Pcs,1,171,0,0,TRUE,,active
+SMM-V141,Nature's Home-02,,Pcs,1,171,0,0,TRUE,,active
+SMM-V142,MEIJI-01,,Pcs,1,5096,0,0,TRUE,,active
+SMM-V142,MEIJI-02,,Pcs,1,1122.33,0,0,TRUE,,active
+SMM-V142,MEIJI-03,,Pcs,1,2343.67,0,0,TRUE,,active
+SMM-V142,MEIJI-04,,Pcs,1,5096,0,0,TRUE,,active
+SMM-V142,MEIJI-05,,Pcs,1,2343.67,0,0,TRUE,,active
+SMM-V142,MEIJI-06,,Pcs,1,5096,0,0,TRUE,,active
+SMM-V142,MEIJI-07,,Pcs,1,2343.67,0,0,TRUE,,active
+SMM-V142,MEIJI-08,,Pcs,1,2343.67,0,0,TRUE,,active
+SMM-V143,MORINAGA-01,,Pcs,1,2254,0,0,TRUE,,active
+SMM-V143,MORINAGA-02,,Pcs,1,2653,0,0,TRUE,,active
+SMM-V143,MORINAGA-03,,Pcs,1,2252.67,0,0,TRUE,,active
+SMM-V143,MORINAGA-04,,Pcs,1,3351.2,0,0,TRUE,,active
+SMM-V143,MORINAGA-05,,Pcs,1,3556,0,0,TRUE,,active
+SMM-V143,MORINAGA-06,,Pcs,1,2497.5,0,0,TRUE,,active
+SMM-V143,MORINAGA-07,,Pcs,1,2619.82,0,0,TRUE,,active
+SMM-V143,MORINAGA-08,,Pcs,1,5661,0,0,TRUE,,active
+SMM-V143,MORINAGA-09,,Pcs,1,3924.33,0,0,TRUE,,active
+SMM-V144,DayFresh-01,,Pcs,1,359.58,0,0,TRUE,,active
+SMM-V144,DayFresh-02,,Pcs,1,412.54,0,0,TRUE,,active
+SMM-V144,DayFresh-03,,Pcs,1,101,0,0,TRUE,,active
+SMM-V144,DayFresh-04,,Pcs,1,79.17,0,0,TRUE,,active
+SMM-V144,DayFresh-05,,Pcs,1,79.17,0,0,TRUE,,active
+SMM-V144,DayFresh-06,,Pcs,1,540,0,0,TRUE,,active
+SMM-V145,Dawn-01,,Pcs,1,117,0,0,TRUE,,active
+SMM-V145,Dawn-02,,Pcs,1,216,0,0,TRUE,,active
+SMM-V145,Dawn-03,,Pcs,1,117,0,0,TRUE,,active
+SMM-V145,Dawn-04,,Pcs,1,216,0,0,TRUE,,active
+SMM-V145,Dawn-05,,Pcs,1,297,0,0,TRUE,,active
+SMM-V145,Dawn-06,,Pcs,1,162,0,0,TRUE,,active
+SMM-V145,Dawn-07,,Pcs,1,162,0,0,TRUE,,active
+SMM-V145,Dawn-08,,Pcs,1,180,0,0,TRUE,,active
+SMM-V145,Dawn-09,,Pcs,1,45,0,0,TRUE,,active
+SMM-V145,Dawn-10,,Pcs,1,90,0,0,TRUE,,active
+SMM-V145,Dawn-11,,Pcs,1,77,0,0,TRUE,,active
+SMM-V145,Dawn-12,,Pcs,1,127.33,0,0,TRUE,,active
+SMM-V145,Dawn-13,,Pcs,1,136,0,0,TRUE,,active
+SMM-V145,Dawn-14,,Pcs,1,342,0,0,TRUE,,active
+SMM-V145,Dawn-15,,Pcs,1,252,0,0,TRUE,,active
+SMM-V145,Dawn-16,,Pcs,1,91,0,0,TRUE,,active
+SMM-V145,Dawn-17,,Pcs,1,91,0,0,TRUE,,active
+SMM-V145,Dawn-18,,Pcs,1,189,0,0,TRUE,,active
+SMM-V145,Dawn-19,,Pcs,1,180,0,0,TRUE,,active
+SMM-V145,Dawn-20,,Pcs,1,144,0,0,TRUE,,active
+SMM-V145,Dawn-21,,Pcs,1,90,0,0,TRUE,,active
+SMM-V145,Dawn-22,,Pcs,1,252,0,0,TRUE,,active
+SMM-V145,Dawn-23,,Pcs,1,91,0,0,TRUE,,active
+SMM-V145,Dawn-24,,Pcs,1,222,0,0,TRUE,,active
+SMM-V145,Dawn-25,,Pcs,1,880,0,0,TRUE,,active
+SMM-V145,Dawn-26,,Pcs,1,995.33,0,0,TRUE,,active
+SMM-V146,KITCHEN CUISINE-01,,Pcs,1,93.21,0,0,TRUE,,active
+SMM-V146,KITCHEN CUISINE-02,,Pcs,1,93.21,0,0,TRUE,,active
+SMM-V146,KITCHEN CUISINE-03,,Pcs,1,186.44,0,0,TRUE,,active
+SMM-V146,KITCHEN CUISINE-04,,Pcs,1,80,0,0,TRUE,,active
+SMM-V146,KITCHEN CUISINE-05,,Pcs,1,186.44,0,0,TRUE,,active
+SMM-V146,KITCHEN CUISINE-06,,Pcs,1,186.44,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-01,,Pcs,1,270,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-02,,Pcs,1,270,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-03,,Pcs,1,216,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-04,,Pcs,1,117,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-05,,Pcs,1,360,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-06,,Pcs,1,360,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-07,,Pcs,1,360,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-08,,Pcs,1,278,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-09,,Pcs,1,144,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-10,,Pcs,1,360,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-11,,Pcs,1,360,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-12,,Pcs,1,360,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-13,,Pcs,1,95,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-14,,Pcs,1,315,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-15,,Pcs,1,234,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-16,,Pcs,1,234,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-17,,Pcs,1,91,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-18,,Pcs,1,270,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-19,,Pcs,1,185,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-20,,Pcs,1,153,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-21,,Pcs,1,153,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-22,,Pcs,1,153,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-23,,Pcs,1,50,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-24,,Pcs,1,110,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-25,,Pcs,1,36,0,0,TRUE,,active
+SMM-V147,BREAD & BEYOND-26,,Pcs,1,36,0,0,TRUE,,active
+SMM-V148,Bunny's-01,,Pcs,1,117,0,0,TRUE,,active
+SMM-V148,Bunny's-02,,Pcs,1,216,0,0,TRUE,,active
+SMM-V148,Bunny's-03,,Pcs,1,117,0,0,TRUE,,active
+SMM-V148,Bunny's-04,,Pcs,1,216,0,0,TRUE,,active
+SMM-V148,Bunny's-05,,Pcs,1,162,0,0,TRUE,,active
+SMM-V148,Bunny's-06,,Pcs,1,240,0,0,TRUE,,active
+SMM-V148,Bunny's-07,,Pcs,1,145,0,0,TRUE,,active
+SMM-V148,Bunny's-08,,Pcs,1,78,0,0,TRUE,,active
+SMM-V148,Bunny's-09,,Pcs,1,91,0,0,TRUE,,active
+SMM-V148,Bunny's-10,,Pcs,1,180,0,0,TRUE,,active
+SMM-V148,Bunny's-11,,Pcs,1,180,0,0,TRUE,,active
+SMM-V148,Bunny's-12,,Pcs,1,297,0,0,TRUE,,active
+SMM-V148,Bunny's-13,,Pcs,1,27,0,0,TRUE,,active
+SMM-V148,Bunny's-14,,Pcs,1,85,0,0,TRUE,,active
+SMM-V148,Bunny's-15,,Pcs,1,235,0,0,TRUE,,active
+SMM-V148,Bunny's-16,,Pcs,1,153,0,0,TRUE,,active
+SMM-V148,Bunny's-17,,Pcs,1,90,0,0,TRUE,,active
+SMM-V148,Bunny's-18,,Pcs,1,230,0,0,TRUE,,active
+SMM-V148,Bunny's-19,,Pcs,1,145,0,0,TRUE,,active
+SMM-V148,Bunny's-20,,Pcs,1,135,0,0,TRUE,,active
+SMM-V148,Bunny's-21,,Pcs,1,18,0,0,TRUE,,active
+SMM-V148,Bunny's-22,,Pcs,1,90,0,0,TRUE,,active
+SMM-V148,Bunny's-23,,Pcs,1,27,0,0,TRUE,,active
+SMM-V148,Bunny's-24,,Pcs,1,27,0,0,TRUE,,active
+SMM-V148,Bunny's-25,,Pcs,1,27,0,0,TRUE,,active
+SMM-V149,ANHAAR-01,,Pcs,1,247,0,0,TRUE,,active
+SMM-V149,ANHAAR-02,,Pcs,1,253,0,0,TRUE,,active
+SMM-V149,ANHAAR-03,,Pcs,1,253,0,0,TRUE,,active
+SMM-V149,ANHAAR-04,,Pcs,1,253,0,0,TRUE,,active
+SMM-V149,ANHAAR-05,,Pcs,1,247,0,0,TRUE,,active
+SMM-V149,ANHAAR-06,,Pcs,1,205,0,0,TRUE,,active
+SMM-V149,ANHAAR-07,,Pcs,1,250,0,0,TRUE,,active
+SMM-V149,ANHAAR-08,,Pcs,1,375,0,0,TRUE,,active
+SMM-V149,ANHAAR-09,,Pcs,1,375,0,0,TRUE,,active
+SMM-V149,ANHAAR-10,,Pcs,1,379,0,0,TRUE,,active
+SMM-V150,PREMA-01,,Pcs,1,120,0,0,TRUE,,active
+SMM-V150,PREMA-02,,Pcs,1,111,0,0,TRUE,,active
+SMM-V150,PREMA-03,,Pcs,1,120,0,0,TRUE,,active
+SMM-V150,PREMA-04,,Pcs,1,111,0,0,TRUE,,active
+SMM-V150,PREMA-05,,Pcs,1,387,0,0,TRUE,,active
+SMM-V151,ADAM'S-01,,Pcs,1,138,0,0,TRUE,,active
+SMM-V151,ADAM'S-02,,Pcs,1,138,0,0,TRUE,,active
+SMM-V151,ADAM'S-03,,Pcs,1,607,0,0,TRUE,,active
+SMM-V151,ADAM'S-04,,Pcs,1,300,0,0,TRUE,,active
+SMM-V151,ADAM'S-05,,Pcs,1,330,0,0,TRUE,,active
+SMM-V151,ADAM'S-06,,Pcs,1,525,0,0,TRUE,,active
+SMM-V151,ADAM'S-07,,Pcs,1,330,0,0,TRUE,,active
+SMM-V151,ADAM'S-08,,Pcs,1,217,0,0,TRUE,,active
+SMM-V151,ADAM'S-09,,Pcs,1,364,0,0,TRUE,,active
+SMM-V151,ADAM'S-10,,Pcs,1,693,0,0,TRUE,,active
+SMM-V151,ADAM'S-11,,Pcs,1,693,0,0,TRUE,,active
+SMM-V151,ADAM'S-12,,Pcs,1,266,0,0,TRUE,,active
+SMM-V151,ADAM'S-13,,Pcs,1,659,0,0,TRUE,,active
+SMM-V151,ADAM'S-14,,Pcs,1,607,0,0,TRUE,,active
+SMM-V151,ADAM'S-15,,Pcs,1,663,0,0,TRUE,,active
+SMM-V151,ADAM'S-16,,Pcs,1,665,0,0,TRUE,,active
+SMM-V151,ADAM'S-17,,Pcs,1,1282,0,0,TRUE,,active
+SMM-V151,ADAM'S-18,,Pcs,1,1159,0,0,TRUE,,active
+SMM-V151,ADAM'S-19,,Pcs,1,1287,0,0,TRUE,,active
+SMM-V151,ADAM'S-20,,Pcs,1,138,0,0,TRUE,,active
+SMM-V151,ADAM'S-21,,Pcs,1,236,0,0,TRUE,,active
+SMM-V151,ADAM'S-22,,Pcs,1,366,0,0,TRUE,,active
+SMM-V152,PRINGLES-01,,Pcs,1,465,0,0,TRUE,,active
+SMM-V152,PRINGLES-02,,Pcs,1,465,0,0,TRUE,,active
+SMM-V152,MARS-01,,Pcs,1,258.33,0,0,TRUE,,active
+SMM-V152,TWIX-01,,Pcs,1,354.17,0,0,TRUE,,active
+SMM-V152,BOUNTY-01,,Pcs,1,341.67,0,0,TRUE,,active
+SMM-V152,SNICKERS-01,,Pcs,1,270.83,0,0,TRUE,,active
+SMM-V152,GALAXY-01,,Pcs,1,393.75,0,0,TRUE,,active
+SMM-V152,HISS-01,,Pcs,1,45.83,0,0,TRUE,,active
+SMM-V152,SHIRIN ASAL-01,,Pcs,1,45.83,0,0,TRUE,,active
+SMM-V152,Kinder Joy-01,,Pcs,1,460,0,0,TRUE,,active
+SMM-V152,TRIDENT-01,,Pcs,1,300,0,0,TRUE,,active
+SMM-V152,TRIDENT-02,,Pcs,1,300,0,0,TRUE,,active
+SMM-V153,MASS-01,,Pcs,1,180,0,0,TRUE,,active
+SMM-V153,DARK CROWN-01,,Pcs,1,180,0,0,TRUE,,active
+SMM-V154,REDBULL-01,,Pcs,1,427.94,0,0,TRUE,,active
+SMM-V154,REDBULL-02,,Pcs,1,453.62,0,0,TRUE,,active
+SMM-V154,REDBULL-03,,Pcs,1,413.08,0,0,TRUE,,active
+SMM-V155,Markhor-01,,Pcs,1,249,0,0,TRUE,,active
+SMM-V155,Markhor-02,,Pcs,1,125,0,0,TRUE,,active
+SMM-V155,Markhor-03,,Pcs,1,100,0,0,TRUE,,active
+SMM-V156,BARBICAN-01,,Pcs,1,520,0,0,TRUE,,active
+SMM-V156,BARBICAN-02,,Pcs,1,520,0,0,TRUE,,active
+SMM-V157,Sabroso-01,,Pcs,1,1075,0,0,TRUE,,active
+SMM-V157,Sabroso-02,,Pcs,1,784.25,0,0,TRUE,,active
+SMM-V157,Sabroso-03,,Pcs,1,1075,0,0,TRUE,,active
+SMM-V157,Sabroso-04,,Pcs,1,863,0,0,TRUE,,active
+SMM-V157,Sabroso-05,,Pcs,1,1033,0,0,TRUE,,active
+SMM-V157,Sabroso-06,,Pcs,1,1059,0,0,TRUE,,active
+SMM-V157,Sabroso-07,,Pcs,1,888.13,0,0,TRUE,,active
+SMM-V157,Sabroso-08,,Pcs,1,501.6,0,0,TRUE,,active
+SMM-V157,Sabroso-09,,Pcs,1,215.5,0,0,TRUE,,active
+SMM-V157,Sabroso-10,,Pcs,1,909,0,0,TRUE,,active
+SMM-V157,Sabroso-11,,Pcs,1,888.33,0,0,TRUE,,active
+SMM-V157,Sabroso-12,,Pcs,1,929.75,0,0,TRUE,,active
+SMM-V157,Sabroso-13,,Pcs,1,933.67,0,0,TRUE,,active
+SMM-V157,Sabroso-14,,Pcs,1,1059,0,0,TRUE,,active
+SMM-V157,Sabroso-15,,Pcs,1,992,0,0,TRUE,,active
+SMM-V157,Sabroso-16,,Pcs,1,1105,0,0,TRUE,,active
+SMM-V157,Sabroso-17,,Pcs,1,415,0,0,TRUE,,active
+SMM-V157,Sabroso-18,,Pcs,1,427.33,0,0,TRUE,,active
+SMM-V157,Sabroso-19,,Pcs,1,827.33,0,0,TRUE,,active
+SMM-V157,Sabroso-20,,Pcs,1,1122.33,0,0,TRUE,,active
+SMM-V158,Menu-01,,Pcs,1,1005,0,0,TRUE,,active
+SMM-V158,Menu-02,,Pcs,1,1071,0,0,TRUE,,active
+SMM-V158,Menu-03,,Pcs,1,998.75,0,0,TRUE,,active
+SMM-V158,Menu-04,,Pcs,1,365.5,0,0,TRUE,,active
+SMM-V158,Menu-05,,Pcs,1,0,0,0,TRUE,,active
+SMM-V158,Menu-06,,Pcs,1,892.5,0,0,TRUE,,active
+SMM-V158,Menu-07,,Pcs,1,686.5,0,0,TRUE,,active
+SMM-V158,Menu-08,,Pcs,1,905.17,0,0,TRUE,,active
+SMM-V158,Menu-09,,Pcs,1,442,0,0,TRUE,,active
+SMM-V158,Menu-10,,Pcs,1,903,0,0,TRUE,,active
+SMM-V158,Menu-11,,Pcs,1,843,0,0,TRUE,,active
+SMM-V158,Menu-12,,Pcs,1,1582.33,0,0,TRUE,,active
+SMM-V158,Menu-13,,Pcs,1,446,0,0,TRUE,,active
+SMM-V158,Menu-14,,Pcs,1,480,0,0,TRUE,,active
+SMM-V159,K&N's-01,,Pcs,1,446.33,0,0,TRUE,,active
+SMM-V159,K&N's-02,,Pcs,1,425,0,0,TRUE,,active
+SMM-V159,K&N's-03,,Pcs,1,442,0,0,TRUE,,active
+SMM-V159,K&N's-04,,Pcs,1,584.2,0,0,TRUE,,active
+SMM-V159,K&N's-05,,Pcs,1,831,0,0,TRUE,,active
+SMM-V159,K&N's-06,,Pcs,1,584.25,0,0,TRUE,,active
+SMM-V159,K&N's-07,,Pcs,1,831.17,0,0,TRUE,,active
+SMM-V159,K&N's-08,,Pcs,1,497.25,0,0,TRUE,,active
+SMM-V159,K&N's-09,,Pcs,1,540,0,0,TRUE,,active
+SMM-V159,K&N's-10,,Pcs,1,514.17,0,0,TRUE,,active
+SMM-V159,K&N's-11,,Pcs,1,446.2,0,0,TRUE,,active
+SMM-V159,K&N's-12,,Pcs,1,0,0,0,TRUE,,active
+SMM-V159,K&N's-13,,Pcs,1,990,0,0,TRUE,,active
+SMM-V159,K&N's-14,,Pcs,1,990.2,0,0,TRUE,,active
+SMM-V159,K&N's-15,,Pcs,1,1071,0,0,TRUE,,active
+SMM-V159,K&N's-16,,Pcs,1,1007,0,0,TRUE,,active
+SMM-V159,K&N's-17,,Pcs,1,965,0,0,TRUE,,active
+SMM-V159,K&N's-18,,Pcs,1,1203,0,0,TRUE,,active
+SMM-V159,K&N's-19,,Pcs,1,1126.25,0,0,TRUE,,active
+SMM-V159,K&N's-20,,Pcs,1,1232.5,0,0,TRUE,,active
+SMM-V159,K&N's-21,,Pcs,1,977.67,0,0,TRUE,,active
+SMM-V159,K&N's-22,,Pcs,1,1219.75,0,0,TRUE,,active
+SMM-V159,K&N's-23,,Pcs,1,1181.5,0,0,TRUE,,active
+SMM-V159,K&N's-24,,Pcs,1,1100.5,0,0,TRUE,,active
+SMM-V159,K&N's-25,,Pcs,1,1020,0,0,TRUE,,active
+SMM-V159,K&N's-26,,Pcs,1,936.5,0,0,TRUE,,active
+SMM-V159,K&N's-27,,Pcs,1,1071,0,0,TRUE,,active
+SMM-V159,K&N's-28,,Pcs,1,981.8,0,0,TRUE,,active
+SMM-V159,K&N's-29,,Pcs,1,1177.33,0,0,TRUE,,active
+SMM-V159,K&N's-30,,Pcs,1,1181.5,0,0,TRUE,,active
+SMM-V159,K&N's-31,,Pcs,1,1096,0,0,TRUE,,active
+SMM-V160,HAMME-01,,Pcs,1,501.8,0,0,TRUE,,active
+SMM-V160,HAMME-02,,Pcs,1,501.8,0,0,TRUE,,active
+SMM-V160,HAMME-03,,Pcs,1,305.5,0,0,TRUE,,active
+SMM-V160,HAMME-04,,Pcs,1,501.83,0,0,TRUE,,active
+SMM-V161,FORMULA1-01,,Pcs,1,1110,0,0,TRUE,,active
+SMM-V161,FORMULA1-02,,Pcs,1,1250,0,0,TRUE,,active
+SMM-V161,FORMULA1-03,,Pcs,1,960,0,0,TRUE,,active
+SMM-V161,SHINEX-01,,Pcs,1,250,0,0,TRUE,,active
+SMM-V161,7CF-01,,Pcs,1,320,0,0,TRUE,,active
+SMM-V161,7CF-02,,Pcs,1,320,0,0,TRUE,,active
+SMM-V161,7CF-03,,Pcs,1,320,0,0,TRUE,,active
+SMM-V161,7CF-04,,Pcs,1,410,0,0,TRUE,,active
+SMM-V161,7CF-05,,Pcs,1,360,0,0,TRUE,,active
+SMM-V161,7CF-06,,Pcs,1,320,0,0,TRUE,,active
+SMM-V161,7CF-07,,Pcs,1,350,0,0,TRUE,,active
+SMM-V161,7CF-08,,Pcs,1,300,0,0,TRUE,,active
+SMM-V161,7CF-09,,Pcs,1,380,0,0,TRUE,,active
+SMM-V161,FLAMINGO-01,,Pcs,1,550,0,0,TRUE,,active
+SMM-V161,FLAMINGO-02,,Pcs,1,550,0,0,TRUE,,active
+SMM-V161,FLAMINGO-03,,Pcs,1,550,0,0,TRUE,,active
+SMM-V161,FLAMINGO-04,,Pcs,1,370,0,0,TRUE,,active
+SMM-V161,PRATO-01,,Pcs,1,400,0,0,TRUE,,active
+SMM-V161,WZ-01,,Pcs,1,150,0,0,TRUE,,active
+SMM-V161,TONYIN-01,,Pcs,1,1080,0,0,TRUE,,active
+SMM-V161,LIBAINA-01,,Pcs,1,750,0,0,TRUE,,active
+SMM-V161,KANGAROO-01,,Pcs,1,1700,0,0,TRUE,,active
+SMM-V161,WD-01,,Pcs,1,720,0,0,TRUE,,active
+SMM-V161,WD-02,,Pcs,1,920,0,0,TRUE,,active
+SMM-V161,AREON-01,,Pcs,1,150,0,0,TRUE,,active
+SMM-V161,AREON-02,,Pcs,1,850,0,0,TRUE,,active
+SMM-V161,GLEDE-01,,Pcs,1,175,0,0,TRUE,,active
+SMM-V161,E WORLD-01,,Pcs,1,350,0,0,TRUE,,active
+SMM-V161,AIRPRO-01,,Pcs,1,590,0,0,TRUE,,active
+SMM-V161,DRIVE-01,,Pcs,1,450,0,0,TRUE,,active
+SMM-V162,DTR-01,,Pcs,1,436.33,0,0,TRUE,,active
+SMM-V163,BIG PAW-01,,Pcs,1,2193.5,0,0,TRUE,,active
+SMM-V164,BENTONITE-01,,Pcs,1,1271,0,0,TRUE,,active
+SMM-V164,BENTONITE-02,,Pcs,1,1271,0,0,TRUE,,active
+SMM-V164,BENTONITE-03,,Pcs,1,1271,0,0,TRUE,,active
+SMM-V164,BENTONITE-04,,Pcs,1,1423.67,0,0,TRUE,,active
+SMM-V165,Tid Eaz-01,,Pcs,1,778.67,0,0,TRUE,,active
+SMM-V165,Tid Eaz-02,,Pcs,1,1250,0,0,TRUE,,active
+SMM-V165,Tid Eaz-03,,Pcs,1,865.67,0,0,TRUE,,active
+SMM-V165,Tid Eaz-04,,Pcs,1,1074.33,0,0,TRUE,,active
+SMM-V165,Tid Eaz-05,,Pcs,1,287.17,0,0,TRUE,,active
+SMM-V165,Tid Eaz-06,,Pcs,1,287.17,0,0,TRUE,,active
+SMM-V165,Tid Eaz-07,,Pcs,1,440,0,0,TRUE,,active
+SMM-V165,Tid Eaz-08,,Pcs,1,470,0,0,TRUE,,active
+SMM-V165,Tid Eaz-09,,Pcs,1,508.17,0,0,TRUE,,active
+SMM-V165,Tid Eaz-10,,Pcs,1,744.67,0,0,TRUE,,active
+SMM-V165,Tid Eaz-11,,Pcs,1,672.5,0,0,TRUE,,active
+SMM-V165,Tid Eaz-12,,Pcs,1,285.42,0,0,TRUE,,active
+SMM-V165,Tid Eaz-13,,Pcs,1,508,0,0,TRUE,,active
+SMM-V165,Tid Eaz-14,,Pcs,1,231.42,0,0,TRUE,,active
+SMM-V165,Tid Eaz-15,,Pcs,1,221,0,0,TRUE,,active
+SMM-V165,Tid Eaz-16,,Pcs,1,256.67,0,0,TRUE,,active
+SMM-V165,Tid Eaz-17,,Pcs,1,231.42,0,0,TRUE,,active
+SMM-V165,Tid Eaz-18,,Pcs,1,400.17,0,0,TRUE,,active
+SMM-V165,Tid Eaz-19,,Pcs,1,550,0,0,TRUE,,active
+SMM-V165,Tid Eaz-20,,Pcs,1,478.5,0,0,TRUE,,active
+SMM-V165,Tid Eaz-21,,Pcs,1,478.5,0,0,TRUE,,active
+SMM-V166,MY WRAP-02,,Pcs,1,707.67,0,0,TRUE,,active
+SMM-V166,MY WRAP-03,,Pcs,1,942,0,0,TRUE,,active
+SMM-V166,MY WRAP-04,,Pcs,1,451.33,0,0,TRUE,,active
+SMM-V166,MY WRAP-05,,Pcs,1,308.67,0,0,TRUE,,active
+SMM-V166,MY WRAP-06,,Pcs,1,612.5,0,0,TRUE,,active
+SMM-V166,MY WRAP-07,,Pcs,1,375.33,0,0,TRUE,,active
+SMM-V166,MY WRAP-08,,Pcs,1,280.33,0,0,TRUE,,active
+SMM-V166,MY WRAP-09,,Pcs,1,308.67,0,0,TRUE,,active
+SMM-V166,MY WRAP-10,,Pcs,1,308.67,0,0,TRUE,,active
+SMM-V166,MY WRAP-11,,Pcs,1,470.25,0,0,TRUE,,active
+SMM-V166,MY WRAP-12,,Pcs,1,451.17,0,0,TRUE,,active
+SMM-V166,MY WRAP-13,,Pcs,1,327.75,0,0,TRUE,,active
+SMM-V166,MY WRAP-14,,Pcs,1,375.33,0,0,TRUE,,active
+SMM-V166,MY WRAP-15,,Pcs,1,422.83,0,0,TRUE,,active
+SMM-V166,MY WRAP-16,,Pcs,1,375.17,0,0,TRUE,,active
+SMM-V166,MY WRAP-17,,Pcs,1,375.33,0,0,TRUE,,active
+SMM-V166,MY WRAP-18,,Pcs,1,660.33,0,0,TRUE,,active
+SMM-V166,MY WRAP-19,,Pcs,1,261.17,0,0,TRUE,,active
+SMM-V166,MY WRAP-20,,Pcs,1,375.17,0,0,TRUE,,active
+SMM-V167,Triox-01,,Pcs,1,61.75,0,0,TRUE,,active
+SMM-V167,Triox-02,,Pcs,1,118.75,0,0,TRUE,,active
+SMM-V168,Favourite-01,,Pcs,1,190,0,0,TRUE,,active
+SMM-V168,Favourite-02,,Pcs,1,150,0,0,TRUE,,active
+SMM-V168,Favourite-03,,Pcs,1,150,0,0,TRUE,,active
+SMM-V169,Festival-01,,Pcs,1,420,0,0,TRUE,,active
+SMM-V169,Fruitends-01,,Pcs,1,720,0,0,TRUE,,active
+SMM-V169,HNK-01,,Pcs,1,250,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-01,,Pcs,1,70,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-02,,Pcs,1,70,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-03,,Pcs,1,70,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-04,,Pcs,1,65,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-05,,Pcs,1,70,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-06,,Pcs,1,65,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-07,,Pcs,1,65,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-08,,Pcs,1,55,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-09,,Pcs,1,55,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-10,,Pcs,1,55,0,0,TRUE,,active
+SMM-V169,WAH REH WAH-11,,Pcs,1,65,0,0,TRUE,,active
+SMM-V169,TUMLARE-01,,Pcs,1,625,0,0,TRUE,,active
+SMM-V169,TUMLARE-02,,Pcs,1,625,0,0,TRUE,,active
+SMM-V169,AIM,,Pcs,1,0,0,0,TRUE,,active
+SMM-V169,Heavy Duty-01,,Pcs,1,45,0,0,TRUE,,active
+SMM-V169,Pulses-01,,Pcs,1,232,0,0,TRUE,,active
+SMM-V169,Pulses-02,,Pcs,1,116,0,0,TRUE,,active
+SMM-V169,Pulses-03,,Pcs,1,230,0,0,TRUE,,active
+SMM-V169,Pulses-04,,Pcs,1,115,0,0,TRUE,,active
+SMM-V169,Pulses-05,,Pcs,1,450,0,0,TRUE,,active
+SMM-V169,Pulses-06,,Pcs,1,280,0,0,TRUE,,active
+SMM-V169,Pulses-07,,Pcs,1,115,0,0,TRUE,,active
+SMM-V169,Pulses-08,,Pcs,1,230,0,0,TRUE,,active
+SMM-V169,Pulses-09,,Pcs,1,226,0,0,TRUE,,active
+SMM-V169,Pulses-10,,Pcs,1,113,0,0,TRUE,,active
+SMM-V169,Pulses-11,,Pcs,1,328,0,0,TRUE,,active
+SMM-V169,Pulses-12,,Pcs,1,164,0,0,TRUE,,active
+SMM-V169,Pulses-13,,Pcs,1,215,0,0,TRUE,,active
+SMM-V169,Pulses-14,,Pcs,1,120,0,0,TRUE,,active
+SMM-V169,Pulses-15,,Pcs,1,230,0,0,TRUE,,active
+SMM-V169,Pulses-16,,Pcs,1,115,0,0,TRUE,,active
+SMM-V169,Pulses-17,,Pcs,1,70,0,0,TRUE,,active
+SMM-V169,Pulses-18,,Pcs,1,145,0,0,TRUE,,active
+SMM-V169,Pulses-19,,Pcs,1,54.5,0,0,TRUE,,active
+SMM-V169,Pulses-20,,Pcs,1,94,0,0,TRUE,,active
+SMM-V169,Pulses-21,,Pcs,1,226,0,0,TRUE,,active
+SMM-V169,Pulses-22,,Pcs,1,113,0,0,TRUE,,active
+SMM-V169,Pulses-23,,Pcs,1,163,0,0,TRUE,,active
+SMM-V169,Pulses-24,,Pcs,1,188,0,0,TRUE,,active
+SMM-V169,Pulses-25,,Pcs,1,132,0,0,TRUE,,active
+SMM-V169,Pulses-26,,Pcs,1,195,0,0,TRUE,,active
+SMM-V169,Pulses-27,,Pcs,1,82.5,0,0,TRUE,,active
+SMM-V169,Pulses-28,,Pcs,1,108,0,0,TRUE,,active
+SMM-V169,Pulses-29,,Pcs,1,690,0,0,TRUE,,active
+SMM-V169,Pulses-30,,Pcs,1,345,0,0,TRUE,,active
+SMM-V169,Pulses-31,,Pcs,1,345,0,0,TRUE,,active
+SMM-V169,Pulses-32,,Pcs,1,95,0,0,TRUE,,active
+SMM-V169,Spices-01,,Pcs,1,110,0,0,TRUE,,active
+SMM-V169,Spices-02,,Pcs,1,236,0,0,TRUE,,active
+SMM-V169,Spices-03,,Pcs,1,50,0,0,TRUE,,active
+SMM-V169,Spices-04,,Pcs,1,40,0,0,TRUE,,active
+SMM-V169,Spices-05,,Pcs,1,60,0,0,TRUE,,active
+SMM-V169,Spices-06,,Pcs,1,110,0,0,TRUE,,active
+SMM-V169,Spices-07,,Pcs,1,160,0,0,TRUE,,active
+SMM-V169,Spices-08,,Pcs,1,70,0,0,TRUE,,active
+SMM-V169,Spices-09,,Pcs,1,195,0,0,TRUE,,active
+SMM-V169,Spices-10,,Pcs,1,160,0,0,TRUE,,active
+SMM-V169,Spices-11,,Pcs,1,78,0,0,TRUE,,active
+SMM-V169,Spices-12,,Pcs,1,170,0,0,TRUE,,active
+SMM-V169,Spices-13,,Pcs,1,42,0,0,TRUE,,active
+SMM-V169,Spices-14,,Pcs,1,230,0,0,TRUE,,active
+SMM-V169,Spices-15,,Pcs,1,60,0,0,TRUE,,active
+SMM-V169,Spices-16,,Pcs,1,0,0,0,TRUE,,active
+SMM-V169,Spices-17,,Pcs,1,0,0,0,TRUE,,active
+SMM-V169,Spices-18,,Pcs,1,90,0,0,TRUE,,active
+SMM-V169,Spices-19,,Pcs,1,100,0,0,TRUE,,active
+SMM-V169,Spices-20,,Pcs,1,108.72,0,0,TRUE,,active
+SMM-V169,Spices-21,,Pcs,1,218,0,0,TRUE,,active
+SMM-V169,Spices-22,,Pcs,1,40,0,0,TRUE,,active
+SMM-V169,Spices-23,,Pcs,1,12,0,0,TRUE,,active
+SMM-V170,Al-Hashir-01,,Pcs,1,95,0,0,TRUE,,active
+SMM-V170,Al-Hashir-02,,Pcs,1,180,0,0,TRUE,,active
+SMM-V170,Al-Hashir-03,,Pcs,1,60,0,0,TRUE,,active
+SMM-V170,Al-Hashir-04,,Pcs,1,140,0,0,TRUE,,active
+SMM-V170,Al-Hashir-05,,Pcs,1,60,0,0,TRUE,,active
+SMM-V170,Al-Hashir-06,,Pcs,1,80,0,0,TRUE,,active
+SMM-V170,Al-Hashir-07,,Pcs,1,160,0,0,TRUE,,active
+SMM-V170,Al-Hashir-08,,Pcs,1,45,0,0,TRUE,,active
+SMM-V171,Omore-01,,Pcs,1,734.67,0,0,TRUE,,active
+SMM-V171,Omore-02,,Pcs,1,438.9,0,0,TRUE,,active
+SMM-V171,Omore-03,,Pcs,1,435,0,0,TRUE,,active
+SMM-V171,Omore-04,,Pcs,1,,0,0,TRUE,,active
+SMM-V171,Omore-05,,Pcs,1,24.86,0,0,TRUE,,active
+SMM-V171,Omore-06,,Pcs,1,43.2,0,0,TRUE,,active
+SMM-V171,Omore-07,,Pcs,1,33.78,0,0,TRUE,,active
+SMM-V171,Omore-08,,Pcs,1,16.88,0,0,TRUE,,active
+SMM-V171,Omore-09,,Pcs,1,33.76,0,0,TRUE,,active
+SMM-V171,Omore-10,,Pcs,1,42.19,0,0,TRUE,,active
+SMM-V171,Omore-11,,Pcs,1,42.19,0,0,TRUE,,active
+SMM-V172,Wall's-01,,Pcs,1,821,0,0,TRUE,,active
+SMM-V172,Wall's-02,,Pcs,1,777,0,0,TRUE,,active
+SMM-V172,Wall's-03,,Pcs,1,734.5,0,0,TRUE,,active
+SMM-V172,Wall's-04,,Pcs,1,821,0,0,TRUE,,active
+SMM-V172,Wall's-05,,Pcs,1,777,0,0,TRUE,,active
+SMM-V172,Wall's-06,,Pcs,1,993.5,0,0,TRUE,,active
+SMM-V172,Wall's-07,,Pcs,1,777.67,0,0,TRUE,,active
+SMM-V172,Wall's-08,,Pcs,1,421.25,0,0,TRUE,,active
+SMM-V172,Wall's-09,,Pcs,1,421.25,0,0,TRUE,,active
+SMM-V172,Wall's-10,,Pcs,1,421.25,0,0,TRUE,,active
+SMM-V172,Wall's-11,,Pcs,1,396.75,0,0,TRUE,,active
+SMM-V172,Wall's-12,,Pcs,1,506.5,0,0,TRUE,,active
+SMM-V172,Wall's-13,,Pcs,1,295.5,0,0,TRUE,,active
+SMM-V172,Wall's-14,,Pcs,1,249.39,0,0,TRUE,,active
+SMM-V172,Wall's-15,,Pcs,1,42.19,0,0,TRUE,,active
+SMM-V172,Wall's-16,,Pcs,1,86.42,0,0,TRUE,,active
+SMM-V172,Wall's-17,,Pcs,1,25.93,0,0,TRUE,,active
+SMM-V172,Wall's-18,,Pcs,1,33.76,0,0,TRUE,,active
+SMM-V172,Wall's-19,,Pcs,1,109.7,0,0,TRUE,,active
+SMM-V172,Wall's-20,,Pcs,1,25.92,0,0,TRUE,,active
+SMM-V172,Wall's-21,,Pcs,1,84.4,0,0,TRUE,,active
+SMM-V172,Wall's-22,,Pcs,1,125.13,0,0,TRUE,,active
+SMM-V172,Wall's-23,,Pcs,1,76,0,0,TRUE,,active
+SMM-V172,Wall's-24,,Pcs,1,125.13,0,0,TRUE,,active
+SMM-V172,Wall's-25,,Pcs,1,76,0,0,TRUE,,active
+SMM-V172,Wall's-26,,Pcs,1,125.13,0,0,TRUE,,active
+SMM-V172,Wall's-27,,Pcs,1,84.4,0,0,TRUE,,active
+SMM-V172,Wall's-28,,Pcs,1,43.22,0,0,TRUE,,active
+SMM-V173,Al-Sheer-01,,Pcs,1,55,0,0,TRUE,,active
+SMM-V173,Al-Sheer-02,,Pcs,1,80,0,0,TRUE,,active
+SMM-V174,sugar pops-01,,Pcs,1,128.29,0,0,TRUE,,active
+SMM-V174,sugar pops-02,,Pcs,1,273.75,0,0,TRUE,,active
+SMM-V174,sugar pops-03,,Pcs,1,128.29,0,0,TRUE,,active
+SMM-V174,sugar pops-04,,Pcs,1,188.17,0,0,TRUE,,active
+SMM-V174,sugar pops-05,,Pcs,1,43,0,0,TRUE,,active
+SMM-V174,sugar pops-06,,Pcs,1,42.77,0,0,TRUE,,active
+SMM-V175,Energizer-01,,Pcs,1,914.33,0,0,TRUE,,active
+SMM-V175,Energizer-02,,Pcs,1,474.83,0,0,TRUE,,active
+SMM-V175,Energizer-03,,Pcs,1,536.67,0,0,TRUE,,active
+SMM-V175,Energizer-04,,Pcs,1,270.75,0,0,TRUE,,active
+SMM-V175,Eveready-01,,Pcs,1,169.72,0,0,TRUE,,active
+SMM-V175,Eveready-02,,Pcs,1,169.72,0,0,TRUE,,active
+SMM-V176,CANDY CONNECTIONS-01,,Pcs,1,229.5,0,0,TRUE,,active
+SMM-V177,GOFY-01,,Pcs,1,43.33,0,0,TRUE,,active
+SMM-V178,SUGGA & SWIRLS-01,,Pcs,1,210,0,0,TRUE,,active
+SMM-V178,SUGGA & SWIRLS-02,,Pcs,1,210,0,0,TRUE,,active

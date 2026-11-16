@@ -229,6 +229,31 @@ export function saleBillTotalsFromInclusiveLines(
   return { subtotal, gstAmount, salesTaxAmount: 0, total };
 }
 
+/**
+ * Return voucher totals. Uses the same tax model as the original sale:
+ * - bill-level rates (gstRate / salesTaxRate > 0): GST added on top, as before;
+ * - Option A sales (rates 0, GST inside line prices): GST split out per line.
+ * The refund total is the same either way; only the GST share is reported correctly.
+ */
+export function saleReturnBillTotals(
+  lines: { lineTotal: number; gstPercent: number }[],
+  gstRate: number,
+  salesTaxRate: number,
+): {
+  subtotal: number;
+  gstAmount: number;
+  salesTaxAmount: number;
+  total: number;
+} {
+  if (gstRate > 0 || salesTaxRate > 0) {
+    const subtotal = round4(
+      lines.reduce((sum, line) => sum + line.lineTotal, 0),
+    );
+    return { subtotal, ...saleBillTotals(subtotal, gstRate, salesTaxRate) };
+  }
+  return saleBillTotalsFromInclusiveLines(lines);
+}
+
 export function saleLineTotal(quantity: number, unitPrice: number): number {
   return round4(quantity * unitPrice);
 }
@@ -252,6 +277,8 @@ export interface ReturnableSaleLine {
   unitPrice: number;
   discountPercent: number;
   sellUnit: SellUnit;
+  /** GST % inside the sale line price (Option A). Missing on old data = 0. */
+  gstPercent?: number;
 }
 
 export interface SaleReturnLineRow {

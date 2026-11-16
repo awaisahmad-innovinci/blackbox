@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import type {
   InventoryOutReturnDetail,
@@ -17,11 +18,16 @@ import {
   ListInventoryOutReturnsQueryDto,
 } from "./dto/inventory-out-return.dto";
 import { InventoryOutReturnsService } from "./inventory-out-returns.service";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../rbac/permissions.guard";
+import { RequirePermissions } from "../../rbac/require-permissions.decorator";
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("inventory-out-returns")
 export class InventoryOutReturnsController {
   constructor(private readonly returns: InventoryOutReturnsService) {}
 
+  @RequirePermissions("inventory.access")
   @Post()
   create(
     @Body() dto: CreateInventoryOutReturnDto,

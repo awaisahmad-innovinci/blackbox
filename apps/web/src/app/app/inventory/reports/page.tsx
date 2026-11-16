@@ -35,9 +35,8 @@ import {
 import { downloadTextFile } from "@/lib/download-file";
 import { listProducts, searchSkus } from "@/lib/inventory-catalog";
 import { getInventoryInOutReport } from "@/lib/inventory-reports";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
-const FILTER_SELECT_CLASS =
-  "border-input bg-background h-9 rounded-md border px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 function emptyReport(dateFrom: string, dateTo: string): InventoryInOutReport {
   return {
@@ -275,8 +274,7 @@ export default function InventoryReportsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          className={FILTER_SELECT_CLASS}
+        <NativeSelect
           value={filters.direction}
           onChange={(e) =>
             patchFilters({
@@ -287,7 +285,7 @@ export default function InventoryReportsPage() {
           <option value="both">In and out</option>
           <option value="in">In only</option>
           <option value="out">Out only</option>
-        </select>
+        </NativeSelect>
         <SearchableMultiSelect
           placeholder="SKU"
           selected={filters.productSkuIds}
@@ -326,8 +324,7 @@ export default function InventoryReportsPage() {
           onSelectedChange={(vendorIds) => patchFilters({ vendorIds })}
           options={vendorOptions}
         />
-        <select
-          className={FILTER_SELECT_CLASS}
+        <NativeSelect
           value={filters.warehouseId}
           onChange={(e) => patchFilters({ warehouseId: e.target.value })}
         >
@@ -337,7 +334,7 @@ export default function InventoryReportsPage() {
               {w.name}
             </option>
           ))}
-        </select>
+        </NativeSelect>
         <Input
           type="number"
           min={0}

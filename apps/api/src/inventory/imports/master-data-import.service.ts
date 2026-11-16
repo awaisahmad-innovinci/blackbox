@@ -2,6 +2,9 @@ import { Injectable, UnprocessableEntityException } from "@nestjs/common";
 import {
   ENTITY_STATUSES,
   formatMasterDataHeaderMismatchMessage,
+  importHeaderIndexes,
+  matchImportEnumValue,
+  normalizeImportHeader,
   LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
@@ -412,8 +415,21 @@ export class MasterDataImportService {
       });
       return [];
     }
-    const actual = records[0]!.record;
     const expected = HEADERS[file];
+    // Accept headers with stray spaces / different case ("HS Code", " variant_name")
+    // and extra columns, by mapping each column to the expected header by name.
+    const byName = importHeaderIndexes(records[0]!.record, expected);
+    if (byName) {
+      records = records.map(({ record, info }) => ({
+        record: byName.map((index) => record[index] ?? ""),
+        info,
+      }));
+    }
+    // Spreadsheet exports often end with rows of only commas; they carry no data.
+    records = records.filter(
+      (row, index) => index === 0 || row.record.some((cell) => cell.trim() !== ""),
+    );
+    const actual = records[0]!.record.map(normalizeImportHeader);
     const legacy07 =
       file === "07_product_skus.csv" &&
       !csvHeadersMatch(actual, expected) &&
@@ -1340,6 +1356,11 @@ export class MasterDataImportService {
   ): void {
     const value = row.values[column];
     if ((optional && !value) || !value) return;
+    const canonical = matchImportEnumValue(value, allowed);
+    if (canonical) {
+      row.values[column] = canonical;
+      return;
+    }
     if (!allowed.includes(value)) {
       if (optional) {
         row.values[column] = "";

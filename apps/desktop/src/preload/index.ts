@@ -730,6 +730,10 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("pos:listPrinters") as Promise<PosPrinterInfo[]>,
     openCashDrawer: () =>
       ipcRenderer.invoke("pos:openCashDrawer") as Promise<{ ok: true }>,
+    printSilently: () =>
+      ipcRenderer.invoke("pos:printSilently") as Promise<
+        { ok: true } | { ok: false; error: string }
+      >,
     testDrawer: () =>
       ipcRenderer.invoke("pos:testDrawer") as Promise<{ ok: true }>,
     getCardTerminalSettings: () =>

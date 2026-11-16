@@ -1,0 +1,5 @@
+abbreviation,name,type,status
+Pcs,Pieces,count,active
+Btl,Bottles,count,active
+Box,Box,count,active
+,,,active

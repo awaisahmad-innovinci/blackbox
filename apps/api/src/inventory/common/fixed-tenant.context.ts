@@ -1,31 +1,21 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { getRequestTenant } from "../../common/request-tenant";
 
 /**
- * Inventory tenant scope: JWT ALS when present, otherwise DEV_TENANT_ID.
+ * Tenant scope for the current request, read from the JWT via the request-tenant ALS.
+ * There is no fallback tenant: a request without a JWT tenant is rejected.
  */
 @Injectable()
-export class FixedTenantContext implements OnModuleInit {
-  private readonly logger = new Logger(FixedTenantContext.name);
-  private readonly fallbackTenantId: any;
-
-  constructor(config: ConfigService) {
-    this.fallbackTenantId = getRequestTenant()?.tenantId;
-  }
-
+export class FixedTenantContext {
   get tenantId(): string {
-    return getRequestTenant()?.tenantId ?? this.fallbackTenantId;
+    const tenantId = getRequestTenant()?.tenantId;
+    if (!tenantId) {
+      throw new UnauthorizedException("Authentication required");
+    }
+    return tenantId;
   }
 
   get deviceId(): string | null {
     return getRequestTenant()?.deviceId ?? null;
-  }
-
-  onModuleInit(): void {
-    this.logger.log(
-      `Inventory tenant fallback=${this.fallbackTenantId} (JWT overrides when present)`,
-    );
   }
 }

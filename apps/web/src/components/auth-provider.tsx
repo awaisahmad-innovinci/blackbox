@@ -10,7 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import type { AuthUser, Permission } from "@blackbox/shared";
-import { setOnSessionCleared, refreshAccessToken } from "@/lib/api-client";
+import { Button } from "@blackbox/ui/button";
+import { setOnSessionCleared, refreshAccessTokenDetailed } from "@/lib/api-client";
 import { loginRequest, logoutRequest, meRequest } from "@/lib/auth-api";
 import { getRefreshToken } from "@/lib/auth-storage";
 
@@ -29,6 +30,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
+  // Server/network down while restoring the session: show a retry screen, keep the session.
+  const [bootUnavailable, setBootUnavailable] = useState(false);
+  const [bootAttempt, setBootAttempt] = useState(0);
 
   const becomeAnonymous = useCallback(() => {
     setUser(null);
@@ -53,13 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const ok = await refreshAccessToken();
-      if (!ok) {
+      const refreshed = await refreshAccessTokenDetailed();
+      if (refreshed === "unavailable") {
+        if (!cancelled) setBootUnavailable(true);
+        return;
+      }
+      if (refreshed !== "ok") {
         if (!cancelled) {
           becomeAnonymous();
         }
         return;
       }
+      if (!cancelled) setBootUnavailable(false);
 
       try {
         const me = await meRequest();
@@ -78,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [becomeAnonymous]);
+  }, [becomeAnonymous, bootAttempt]);
 
   const login = useCallback(async (identifier: string, password: string) => {
     const res = await loginRequest(identifier, password);
@@ -112,6 +121,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [user, status, login, logout, hasPermission],
   );
+
+  if (bootUnavailable) {
+    return (
+      <div className="bg-background flex min-h-screen items-center justify-center p-6">
+        <div className="flex max-w-sm flex-col items-center gap-3 text-center text-sm">
+          <p className="text-base font-medium">Blackbox cannot be reached</p>
+          <p className="text-muted-foreground">
+            You are still signed in. Check your internet connection, then try again.
+          </p>
+          <Button
+            onClick={() => {
+              setBootUnavailable(false);
+              setBootAttempt((n) => n + 1);
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

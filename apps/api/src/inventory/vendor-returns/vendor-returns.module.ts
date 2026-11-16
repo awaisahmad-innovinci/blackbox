@@ -15,9 +15,11 @@ import {
 import { VendorReturnsController } from "./vendor-returns.controller";
 import { VendorReturnsService } from "./vendor-returns.service";
 import { ActivityLogModule } from "../../activity-log/activity-log.module";
+import { RbacModule } from "../../rbac/rbac.module";
 
 @Module({
   imports: [
+    RbacModule,
     ActivityLogModule,
     TypeOrmModule.forFeature([
       VendorReturn,

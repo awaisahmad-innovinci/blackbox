@@ -66,6 +66,7 @@ export function SaleThermalReceipt({
   cashierName,
   returnCredit,
   fbrEnabled = false,
+  duplicate = false,
 }: {
   detail: SaleDetail;
   businessName: string;
@@ -74,6 +75,8 @@ export function SaleThermalReceipt({
   cashierName: string;
   returnCredit?: SaleReturnCreditReceipt;
   fbrEnabled?: boolean;
+  /** Reprint copy: marked DUPLICATE so it cannot pass as a second original (BR-005). */
+  duplicate?: boolean;
 }) {
   const totalItems = detail.items.length;
   const totalQty = detail.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -129,6 +132,9 @@ export function SaleThermalReceipt({
         ) : null}
         {detail.status === "VOID" ? (
           <p className="pt-0.5 text-center text-sm font-bold">*** VOID ***</p>
+        ) : null}
+        {duplicate ? (
+          <p className="pt-0.5 text-center text-base font-bold">*** DUPLICATE ***</p>
         ) : null}
       </section>
 

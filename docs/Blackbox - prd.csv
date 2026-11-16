@@ -1,0 +1,255 @@
+Black Box — Product Requirements Document,,,,,,
+v0.3 — High-Level PRD for PM/BA Review,,,,,,
+,,,,,,
+Product Summary,,,,,,
+"Black Box is a modular, AI-powered POS platform for retail businesses of any vertical (apparel, grocery, convenience, general merchandise, F&B retail), operating single or multi-branch, with or without an online storefront. Beyond transaction handling, it turns sales data into operational decisions through AI-driven reordering, inventory redistribution, and pricing, while keeping offline and online inventory in sync.",,,,,,
+,,,,,,
+Problem Statement,,,,,,
+"Retailers are stuck between lightweight POS tools that only ring up sales, and enterprise ERPs that are unaffordable and over-engineered for SMBs. In between sits real pain — stockouts, overstock, inventory drift between branches and marketplaces, cash-handling errors, weak audit trails, and reactive pricing. Black Box targets that middle.",,,,,,
+,,,,,,
+Primary Goals,,,,,,
+"• Reliable offline-first POS at the counter, across verticals and store formats.
+• AI recommendations owners can act on in one click (reorder, shuffle, price).
+• Real-time inventory truth across branches and online channels.
+• Configurable depth — a boutique needs a fraction of what a hypermart needs; both feel native.
+• Pluggable regional fiscal/tax compliance.",,,,,,
+,,,,,,
+Non-Goals (v1),,,,,,
+"• Full accounting/ERP replacement.
+• Payroll, biometric attendance, or HR system.
+• Warehouse management at fulfillment-center scale.
+• Document management (licenses, contracts) beyond basic uploads.
+• Custom AI models per tenant.",,,,,,
+,,,,,,
+Target Users,,,,,,
+"Retailers running 1–20+ branches across apparel, grocery, convenience, F&B retail, and general merchandise. Primary buyers are owners; day-to-day users are branch managers and cashiers. Secondary: accountants, warehouse managers (where applicable).",,,,,,
+,,,,,,
+Pricing Model,,,,,,
+"Two-axis billing: modules enabled × number of branches. Unlimited cashiers/users per branch. Base tier = Core POS. Add-ons: each AI feature, Two-Tier Inventory, Expiry Module, Third-Party Concessions Module, each marketplace integration, Fiscal Adapter.",,,,,,
+,,,,,,
+Workbook Contents,,,,,,
+"Tab 1 — Overview (this tab)
+Tab 2 — Roadmap & Phasing
+Tab 3 — Modules Summary
+Tab 4 — Functional Requirements (grouped by module)
+Tab 5 — Non-Functional Requirements
+Tab 6 — Roles & Permissions
+Tab 7 — Business Rules & Authorization Codes
+Tab 8 — Risks & Open Questions
+Tab 9 — Out of Scope
+Tab 10 — Glossary",,,,,,
+,,,,,,
+,,,,,,
+Roadmap & Phasing,,,,,,
+Order of delivery; each phase assumes previous phases are live.,,,,,,
+,,,,,,
+Phase,Name,Scope,Goal / Definition of Done,Depends On,,
+Phase 1,Single-Store MVP,"Core POS (sales, returns, payments, receipts); cashier till depth (audit log, auth codes, cash drop, denomination breakdown, hold, duplicate print); single-tier inventory with basic receiving; barcode-driven billing; RBAC; offline-first with local sync.",A small retailer can fully replace their current POS with Black Box.,None,,
+Phase 2,Online + Multi-Branch,Multi-branch tenant support; centralized inventory across branches; branch-scoped reporting; manual inter-branch stock transfers; Online/Offline Inventory Sync engine; Shopify integrations.,A retailer with 2–10 stores and a Shopify site runs on Black Box as single source of truth.,Phase 1,,
+Phase 3,Grocery / Hypermart Depth,Two-tier inventory (warehouse → floor); full PO → PV workflow with variance control; vendor management; expiry module; returns overrides; shrinkage & loss accounting.,The partner-profile grocery mart runs end-to-end.,"Phase 1, Phase 2",,
+,,,,,,
+,,,,,,
+,,,,,,
+Modules Summary,,,,,,
+Each module is broken into functional requirements in Tab 4.,,,,,,
+,,,,,,
+Module ID,Code,Name,Summary,First Delivered In,,
+M1,POS,Core POS & Cashier Till,"Barcode billing, payments, receipts, till mgmt, holds, duplicate, cost-price discount.",Phase 1,,
+M2,AUD,Audit & Authorization,"Action logging, auth codes, code rotation, till lockout, immutable log.",Phase 1,,
+M3,INV,Inventory Management,Single-tier (P1); two-tier warehouse→floor (P3); zero-stock block; multi-supplier; barcode aliasing.,Phase 1 / Phase 3,,
+M4,RBAC,Roles & Permissions,"Owner, Manager, Cashier, Accountant, Warehouse Manager; tenant-configurable.",Phase 1,,
+M9,PRC,Pricing & Tax,"Price history, MRP flag, shelf tags, tax ledger, fiscal adapter (FBR first).",Phase 1 / Phase 3 / Phase 4,,
+,,,,,,
+,,,,,,
+Functional Requirements,,,,,,
+"FR-[MODULE]-[NUM] format. Priority is relative within Black Box scope, not vs. a specific tenant's wishlist.",,,,,,
+,,,,,,
+FR ID,Module,Title,Description,Priority,Phase,Business Rule / Notes
+FR-POS-001,M1 POS,Barcode-driven billing,"Cashier scans product barcodes to add line items. Manual search is a tenant policy — default off for high-throughput grocery, on for apparel/small retail.",High,Phase 1,Tenant policy toggle.
+FR-POS-002,M1 POS,Multiple payment methods,"Support cash, card (integrated bank terminal), split bill, digital wallets, store credit. Split bill: cashier enters cash portion; remainder routed to card terminal.",High,Phase 1,—
+FR-POS-003,M1 POS,Denomination breakdown on till open,Cashier enters count per note/coin denomination when opening the till. Configurable per tenant (small tenants may skip).,Medium,Phase 1,Tenant configurable.
+FR-POS-004,M1 POS,Denomination breakdown on till close,Cashier enters count per note/coin denomination at close; system reconciles vs. expected.,Medium,Phase 1,Tenant configurable.
+FR-POS-005,M1 POS,Cash drop when till exceeds ceiling,"When cash in till exceeds a configurable limit, cashier must perform a cash drop before further billing. Requires manager auth. Prints receipt.",High,Phase 1,Auth code required. Ceiling configurable per branch.
+FR-POS-006,M1 POS,Bill hold / pause with recall,Cashier can pause a bill (customer went for more items) and serve the next customer; held bills recallable by ID.,Medium,Phase 1,—
+FR-POS-007,M1 POS,Duplicate receipt print,Cashier can reprint a receipt; duplicate print does NOT open the cash drawer.,Medium,Phase 1,Business rule: drawer stays closed on duplicate.
+FR-POS-008,M1 POS,Cost-price / owner discount,Barcode-triggered discount applies cost price only (no margin). Requires authorized barcode.,Medium,Phase 1,Auth code required.
+FR-POS-009,M1 POS,Offline-first billing,POS operates fully at the counter with no network; syncs on reconnect. No data loss on power/network failure.,High,Phase 1,—
+FR-POS-010,M1 POS,Receipt printing + digital receipt,Physical receipt printer supported; optional digital (email/SMS) receipt.,High,Phase 1,—
+FR-POS-011,M1 POS,Shift management,"Cashier shifts with open/close, break, handover.",High,Phase 1,—
+FR-POS-012,M1 POS,Returns within window,Customer returns allowed within a tenant-configurable window (default 7 days).,High,Phase 1,Window configurable per tenant.
+FR-POS-013,M1 POS,Returns beyond window (override),Returns after window require admin/manager authorization code; reason captured.,High,Phase 1,Auth code required.
+FR-AUD-001,M2 AUD,Comprehensive action logging,"Every user action logged: scan, void, delete, discount, drawer open, override — with user, timestamp, branch, terminal.",High,Phase 1,—
+FR-AUD-002,M2 AUD,Authorization codes for sensitive actions,"Sensitive actions (line delete, cash removal, PV variance, return override, credit deferral) gated behind auth codes.",High,Phase 1,Codes are per-role.
+FR-AUD-003,M2 AUD,Auth code rotation,Codes auto-rotate on a configurable interval (default 7 days).,High,Phase 1,Rotation interval configurable.
+FR-AUD-004,M2 AUD,Auth code issuance & revocation,"Admin can issue, view, and revoke authorization codes.",High,Phase 1,Admin-only.
+FR-AUD-005,M2 AUD,Till lockout on unauthorized drawer open,"Attempts to open the drawer without proper trigger (sale, authorized cash drop) are logged and lock the till until manager unlock.",High,Phase 1,Auth code required to unlock.
+FR-AUD-006,M2 AUD,Immutable audit log with export,"Audit log is append-only, tamper-evident, and exportable (CSV/PDF) for review.",High,Phase 1,—
+FR-INV-001,M3 INV,Single-tier inventory (floor only),Default topology: stock lives at the floor. Simple receiving flow.,High,Phase 1,—
+FR-INV-002,M3 INV,Basic stock receiving,"Owner/manager receives stock into a location; captures qty, cost, supplier.",High,Phase 1,—
+FR-INV-003,M3 INV,Hard block on billing zero-stock,Cashier cannot complete a sale of an item with zero stock; clear error at POS.,High,Phase 1,—
+FR-INV-004,M3 INV,No negative inventory in reports,No report or query surfaces negative stock values; discrepancies flagged as adjustments instead.,High,Phase 1,—
+FR-INV-005,M3 INV,Barcode aliasing,New barcode can be linked to the same SKU; history preserved.,Medium,Phase 1,—
+FR-INV-012,M3 INV,Inter-branch stock transfers (manual),"Owner/manager can initiate a stock transfer between branches; source decrements, destination increments on receipt.",High,Phase 2,Depends on M5 multi-branch.
+FR-RBAC-001,M4 RBAC,Default roles ship out of the box,"Owner, Store Manager, Cashier, Accountant, Warehouse Manager — with sensible default permissions.",High,Phase 1,Warehouse Manager active in Phase 3.
+FR-RBAC-002,M4 RBAC,Roles configurable per tenant,Admin can add custom roles and edit permissions. Small tenants may collapse Owner + Manager + Cashier into one.,High,Phase 1,—
+FR-RBAC-003,M4 RBAC,Admin issues and revokes auth codes,Admin can manage authorization codes across all sensitive actions.,High,Phase 1,—
+FR-MB-001,M5 MB,Multi-branch tenant support,"One tenant, many branches; each branch has own users, till, stock.",High,Phase 2,—
+FR-MB-002,M5 MB,Branch-scoped reporting,Reports can be filtered per branch; consolidated view for owner.,High,Phase 2,—
+FR-MB-003,M5 MB,Centralized inventory across branches,Single inventory truth across all branches with per-branch balances.,High,Phase 2,—
+FR-SYNC-001,M6 SYNC,Single source of truth for stock,Sale on any channel (branch or online) decrements the shared balance.,High,Phase 2,—
+FR-SYNC-002,M6 SYNC,Near-real-time updates,Sync latency target: seconds. Queued on disconnect; drains on reconnect.,High,Phase 2,See NFR performance targets.
+FR-SYNC-003,M6 SYNC,Manual override & reconciliation,Tools to reconcile count discrepancies with reason codes.,Medium,Phase 2,—
+FR-INT-001,M7 INT,Shopify integration,Inventory sync + basic product mapping.,High,Phase 2,—
+FR-INT-002,M7 INT,WooCommerce integration,Inventory sync + basic product mapping.,High,Phase 2,—
+FR-PRC-001,M9 PRC,Price change history,Old vs. new price tracked with effective dates.,High,Phase 1,—
+FR-PRC-002,M9 PRC,Effective-date pricing,Scheduled price changes with future effective date.,Medium,Phase 1,—
+FR-ACC-001,M15 ACC,Daily till close with denomination reconciliation,Accountant / manager can close each till daily; petty cash balanced against denomination breakdown.,High,Phase 1,—
+,,,,,,
+,,,,,,
+Non-Functional Requirements,,,,,,
+,,,,,,
+,,,,,,
+NFR ID,Category,Requirement,Priority,,,
+NFR-001,Performance,"Sub-second barcode scan-to-line-item response at the counter, even in offline mode.",High,,,
+NFR-002,Performance,Online/offline sync latency: seconds under normal connectivity; queues drain within minutes of reconnect.,High,,,
+NFR-003,Reliability,Offline-first architecture; conflict resolution on reconnect. No data loss on power or network failure.,High,,,
+NFR-004,Security,Data encrypted at rest and in transit. RBAC enforced server-side. Authorization codes hashed; rotation enforced.,High,,,
+NFR-005,Security,"Immutable, tamper-evident audit log. All sensitive-action attempts (success and fail) logged.",High,,,
+NFR-006,Data Integrity,No negative inventory. All vouchers cross-linked to source vouchers. Recalculation of derived balances deterministic and repeatable.,High,,,
+NFR-007,Scalability,Scale from 1 branch to hundreds without architectural change. Per-branch pricing must not penalize scale.,High,,,
+NFR-008,Availability,Local branch operation continues during cloud outages. Cloud sync SLA target 99.9%.,High,,,
+NFR-009,Compliance,"Pluggable regional fiscal adapters. Audit-ready reports. PII handling per applicable local law (PDPB, GDPR, etc.).",High,,,
+NFR-010,Usability,Cashier UI operable one-handed; primary actions reachable within 2 taps. Owner AI recommendations show reasoning and expected impact.,High,,,
+NFR-011,Maintainability,Modules independently deployable. Feature flags for tenant-level enablement. Adapter pattern for integrations.,Medium,,,
+NFR-012,Observability,"Sync failures, integration errors, and auth-code anomalies alertable to tenant admin and internal ops.",Medium,,,
+NFR-013,Print / Hardware,"Support common receipt printers, barcode scanners, and bank card terminals. Print is optional (digital-first fallback).",High,,,
+NFR-014,Localization,"Multi-currency, multi-language support. Regional number/date formats.",Medium,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+Default Roles & Sensitive Actions,,,,,,
+✓ = allowed by default. ★ = allowed but requires authorization code. — = not allowed. Tenant-configurable.,,,,,,
+,,,,,,
+Action,Owner,Store Manager,Cashier,Warehouse Mgr,Accountant,
+Ring up sale,✓,✓,✓,—,—,
+Return within window,✓,✓,✓,—,—,
+Return beyond window,✓,★,—,—,—,
+Delete line from bill,✓,★,★,—,—,
+Manual discount,✓,★,★,—,—,
+Cost-price / owner discount,✓,★,★,—,—,
+Cash drop from till,✓,★,—,—,—,
+Open cash drawer without sale,✓,★,—,—,—,
+Receive stock,✓,✓,—,✓,—,
+Move stock warehouse → floor,✓,—,—,✓,—,
+Inter-branch transfer,✓,✓,—,✓,—,
+Create / edit product,✓,✓,—,✓,—,
+Change price,✓,★,—,—,—,
+Generate PO,✓,✓,—,✓,—,
+Enter PV (matches PO),✓,✓,—,✓,—,
+Override PO/PV variance,✓,★,—,—,—,
+Defer distributor credit,✓,★,—,—,—,
+Daily till close,✓,✓,✓,—,✓,
+Configure tax / fiscal settings,✓,—,—,—,★,
+Manage users / roles,✓,—,—,—,—,
+Issue / revoke auth codes,✓,—,—,—,—,
+View financial reports,✓,✓,—,—,✓,
+Export audit log,✓,★,—,—,★,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+Business Rules & Authorization Codes,,,,,,
+,,,,,,
+,,,,,,
+Rule ID,Category,Rule,Module(s),,,
+BR-001,Auth codes,All sensitive actions gated behind an authorization code (per role).,M2 AUD,,,
+BR-002,Auth codes,Authorization codes rotate on a configurable interval (default 7 days).,M2 AUD,,,
+BR-003,Auth codes,"Admin can issue, view, and revoke any authorization code.",M2 AUD,,,
+BR-004,Cash handling,Cashier cannot open drawer without a sale or an authorized cash drop.,M1 POS / M2 AUD,,,
+BR-005,Cash handling,Duplicate receipt print does NOT open the cash drawer.,M1 POS,,,
+BR-006,Cash handling,Cash drop is mandatory when till exceeds configured ceiling; requires manager auth; prints receipt.,M1 POS,,,
+BR-007,Cash handling,Denomination breakdown required at till open and close (configurable).,M1 POS,,,
+BR-008,Inventory,Cashier cannot bill an item with zero stock.,M3 INV,,,
+BR-009,Inventory,No report or query may surface negative inventory.,M3 INV,,,
+BR-010,Inventory,"In two-tier mode, cashier can only bill items already moved to floor.",M3 INV,,,
+BR-011,Purchasing,No PV can be entered without a preceding PO.,M8 PUR,,,
+BR-012,Purchasing,PO/PV variance requires admin authorization; both records preserved.,M8 PUR,,,
+BR-013,Purchasing,"Every voucher must be printable, numbered, and linked to its source voucher.",M8 PUR,,,
+BR-014,Purchasing,"Distributor credits (shelf rent, damage) can be netted at PV or deferred (deferral needs auth).",M8 PUR / M11 VEN,,,
+BR-015,Returns,Returns within configurable window (default 7 days) allowed without override.,M1 POS,,,
+BR-016,Returns,Returns beyond window require admin/manager authorization code.,M1 POS,,,
+BR-017,Pricing,Price changes must record old vs new with effective date.,M9 PRC,,,
+BR-018,Pricing,"If MRP is not printed on packaging, shelf tag + barcode label must auto-print at receiving.",M9 PRC,,,
+BR-019,Fiscal,"On fiscal-connection loss, cashier must see a warning; invoices queue for later submission.",M9 PRC / M1 POS,,,
+BR-020,Audit,Every user action is logged and appears in the immutable audit log.,M2 AUD,,,
+BR-021,Scope,Black Box does not model illegitimate payments (e.g. bribes) as a first-class ledger.,M14 SHR,,,
+BR-022,Scope,Black Box is not the general ledger; accounting integration is via export.,M15 ACC,,,
+,,,,,,
+,,,,,,
+,,,,,,
+Risks & Open Questions,,,,,,
+,,,,,,
+,,,,,,
+ID,Topic,Risk / Question,Proposed Mitigation / Direction,Status,,
+R-01,AI cold-start,AI needs 2–3+ months of clean data to be useful. First-tenant experience risks being underwhelming.,Rule-based fallbacks for first 60–90 days; vertical templates seed sensible defaults.,Open,,
+R-02,Vertical data model,"Grocery (perishables, weights) vs apparel (variants, sizes) have different data models. How much generalize vs specialize?","Design core schema with type extensions per vertical; ship vertical templates (Grocery, Apparel, Convenience, F&B Retail).",Open,,
+R-03,Integration reliability,"Marketplace APIs (esp. Daraz, Foodpanda) have rate limits and quirks. Sync SLAs need definition.",Adapter pattern; retry + backoff + reconciliation tools; document per-marketplace SLAs.,Open,,
+R-04,Recommendation trust,Owners may not act on AI recommendations if they don't understand or trust them.,"Show reasoning, confidence, expected impact; feedback loop into training.",Open,,
+R-05,Configuration overhead,Highly modular product risks painful setup. Onboarding could take days.,Ship vertical templates with sensible defaults; guided onboarding wizard.,Open,,
+R-06,Fiscal adapter cost,"Each country/regime is real engineering (FBR, ZATCA, GST e-invoice, EU printers).","Prioritize by market demand: Pakistan first, others as pipeline warrants.",Open,,
+R-07,Cash-handling depth,"Denomination breakdowns and cash drops make sense for hypermarts, feel absurd at boutiques.",Tenant profile toggles cash-handling depth.,Decision needed,,
+R-08,Print dependency,Partner's requirements assume printers everywhere. Not all target retailers have that.,Design print-optional (digital-first) with print as an integration.,Open,,
+R-09,Scope creep from partners,"Partner asked for payroll, biometric, license storage. All out of scope for POS.",Position these as future integration partners; don't build in-house.,Decided (out of scope),,
+R-10,Partner as design partner,Partner is a single-store operator who wants two-tier warehouse+floor. Two-tier is Phase 3.,"Decide: pull basic two-tier earlier, or set expectation that he's a Phase 3 customer.",Decision needed,,
+R-11,Vertical template priority,Grocery/Convenience template essentially described by partner. Should it be an explicit Phase 3 deliverable?,"Recommend: yes, ship 'Grocery/Convenience Template' as productized outcome of Phase 3.",Decision needed,,
+R-12,Pricing SKU granularity,Feature × branch billing is clean but may overwhelm buyers on the pricing page.,UX-test the pricing page; consider preset bundles per vertical.,Open,,
+R-13,Smart Reordering split,Smart Reordering can technically ship before Inventory Shuffle (single-store viable). Split or ship together?,Recommend split — Smart Reordering earlier if data allows.,Decision needed,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+Out of Scope,,,,,,
+"Explicitly not part of Black Box, at least for v1. Some may become integration partnerships later.",,,,,,
+,,,,,,
+Item,Notes,,,,,
+Full accounting / general ledger,"Black Box exports vouchers to QuickBooks, Xero, Zoho, Tally, SAP B1. It is not the GL.",,,,,
+Payroll,Not a POS concern. Integration partnership possible later.,,,,,
+Biometric attendance,Not a POS concern. Integration partnership possible later.,,,,,
+Employee resignation dues tracker,"HR system concern, not POS.",,,,,
+Business license / document storage,Basic file uploads possible; not a document management system.,,,,,
+Warehouse management (WMS) at scale,"Two-tier inventory is retail-warehouse-scale, not fulfillment-center WMS.",,,,,
+Custom AI models per tenant,v1 uses shared models with tenant-scoped training data.,,,,,
+Bribe / illegitimate payment ledger,Not built as a first-class feature. Legitimate shrinkage & loss accounting only.,,,,,
+Full CRM,"Basic customer records only. No campaigns, segmentation, or lifecycle marketing in v1.",,,,,
+E-commerce storefront builder,Integrate with Shopify / WooCommerce / etc.; do not build a storefront.,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+Glossary,,,,,,
+,,,,,,
+,,,,,,
+Term,Definition,,,,,
+Auth code,"Rotating short code required to perform a sensitive action (line delete, override, cash removal, etc.).",,,,,
+Bill hold / pause,"Temporarily saving an in-progress bill so the cashier can serve another customer, then recalling it.",,,,,
+Cash drop,Removing excess cash from a till mid-shift; requires authorization and prints a receipt.,,,,,
+Denomination breakdown,Count of notes/coins per denomination entered at till open/close for reconciliation.,,,,,
+FBR,Federal Board of Revenue (Pakistan). Requires real-time invoice reporting from POS.,,,,,
+FEFO,First-Expiry-First-Out. Picking hint for perishables.,,,,,
+Fiscal adapter,Pluggable module for a country's fiscal/tax invoice compliance regime.,,,,,
+Fresh items,"Perishables (milk, bread, eggs, dairy) received directly at floor (bypass warehouse).",,,,,
+HSN / HS code,Harmonized System Nomenclature — tax classification code for a product.,,,,,
+MRP,Maximum Retail Price. Some markets require MRP to be printed on packaging.,,,,,
+PO,Purchase Order — request to buy from a supplier.,,,,,
+PV,Purchase Voucher — record of goods actually received against a PO.,,,,,
+RBAC,Role-Based Access Control.,,,,,
+SKU,Stock Keeping Unit — unique identifier for a product variant.,,,,,
+Shelf rent,Income from distributors paying to place their product on your shelf.,,,,,
+Shrinkage,"Inventory lost to theft, damage, waste, or unknown causes.",,,,,
+Split bill,Bill paid partly in cash and partly by card.,,,,,
+Two-tier inventory,"Stock lives at warehouse first, then transferred to floor for sale.",,,,,
+Vertical template,Preconfigured Black Box setup (data model + defaults + roles) for a specific retail vertical.,,,,,

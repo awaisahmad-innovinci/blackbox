@@ -6,7 +6,7 @@ import { Badge } from "@blackbox/ui/badge";
 import { Button } from "@blackbox/ui/button";
 import { RequirePermission } from "@/components/require-permission";
 import { useAuth } from "@/components/auth-provider";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState, PageError, TableSkeleton } from "@/components/page-state";
 import {
@@ -17,7 +17,7 @@ import {
   Th,
   THead,
   Tr,
-} from "@/components/data-table";
+} from "@blackbox/ui/data-table";
 import { DeviceStatusBadge } from "@/components/status-badges";
 import { FormError, FormSuccess } from "@/components/section-card";
 import {
@@ -28,6 +28,7 @@ import {
   type DeviceDto,
 } from "@/lib/admin-api";
 import { toUserFacingError } from "@/lib/api-error";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
 export default function DevicesPage() {
   const { hasPermission } = useAuth();
@@ -127,15 +128,14 @@ export default function DevicesPage() {
         <FormError>{formError}</FormError>
 
         <div className="flex flex-wrap gap-3">
-          <select
-            className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+          <NativeSelect
             value={showDeleted ? "deleted" : "all"}
             onChange={(e) => setShowDeleted(e.target.value === "deleted")}
             aria-label="Filter devices"
           >
             <option value="all">All devices</option>
             <option value="deleted">Deleted</option>
-          </select>
+          </NativeSelect>
         </div>
 
         {loading ? <TableSkeleton /> : null}

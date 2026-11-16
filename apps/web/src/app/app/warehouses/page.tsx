@@ -16,7 +16,7 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { RequirePermission } from "@/components/require-permission";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState, PageError, TableSkeleton } from "@/components/page-state";
 import {
@@ -27,7 +27,7 @@ import {
   Th,
   THead,
   Tr,
-} from "@/components/data-table";
+} from "@blackbox/ui/data-table";
 import { ActiveBadge } from "@/components/status-badges";
 import { FormError } from "@/components/section-card";
 import {
@@ -41,6 +41,7 @@ import {
 } from "@/lib/admin-api";
 import { ApiError, toUserFacingError } from "@/lib/api-error";
 import { normalizeStoredText } from "@blackbox/shared";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
 const emptyDraft = {
   name: "",
@@ -282,8 +283,7 @@ export default function WarehousesPage() {
                   aria-label="Search warehouses"
                 />
               </div>
-              <select
-                className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+              <NativeSelect
                 value={status}
                 onChange={(e) =>
                   setStatus(
@@ -296,7 +296,7 @@ export default function WarehousesPage() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="deleted">Deleted</option>
-              </select>
+              </NativeSelect>
             </div>
             {filtered.length === 0 ? (
               <EmptyState
@@ -439,9 +439,9 @@ export default function WarehousesPage() {
               {editing ? (
                 <div className="space-y-1.5">
                   <Label htmlFor="warehouse-status">Status</Label>
-                  <select
+                  <NativeSelect
                     id="warehouse-status"
-                    className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                    className="w-full"
                     value={draft.status}
                     onChange={(e) =>
                       setDraft((d) => ({
@@ -452,7 +452,7 @@ export default function WarehousesPage() {
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
-                  </select>
+                  </NativeSelect>
                 </div>
               ) : null}
             </div>

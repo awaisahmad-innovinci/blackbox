@@ -175,6 +175,20 @@ export function PosPrinterSettingsDialog({
               Open drawer when printing sale/return receipts
             </label>
 
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={settings.silentReceiptPrint}
+                onChange={(event) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    silentReceiptPrint: event.target.checked,
+                  }))
+                }
+              />
+              Print receipts without the print dialog
+            </label>
+
             <p className="text-muted-foreground text-xs">
               The drawer must be wired to the receipt printer. Blackbox sends an
               ESC/POS kick command to the selected Windows printer queue after

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@blackbox/ui/button";
 import {
   Card,
@@ -170,48 +170,44 @@ export function AuthLanding() {
     <div className="bb-auth-canvas relative flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-6 py-5 md:px-10">
         <div className="flex items-center gap-2.5">
-          <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg text-xs font-bold">
-            Bx
+          <div
+            aria-hidden
+            className="bg-shelf-tag text-shelf-tag-foreground flex size-8 items-center justify-center rounded-md text-sm font-bold"
+          >
+            B
           </div>
-          <p className="font-display text-lg font-semibold tracking-tight">
-            Blackbox
-          </p>
+          <p className="font-display text-lg font-semibold tracking-tight">Blackbox</p>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col items-center justify-center gap-10 px-6 pb-16 lg:flex-row lg:items-stretch lg:gap-16">
-        <section className="flex max-w-lg flex-1 flex-col justify-center gap-6 text-center lg:text-left">
-          <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
-            Workspace administration
-          </p>
+      <main className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-12 px-6 pb-16 lg:grid-cols-[1fr_minmax(0,26rem)]">
+        <section className="max-w-md space-y-5">
           <h1 className="font-display text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-            Blackbox
+            Sign in to run your shop
           </h1>
           <p className="text-muted-foreground text-lg leading-relaxed text-pretty">
-            Sign in with the credentials for your workspace, invite your team,
-            and run the floor from desktop — online or offline once a device is
-            trusted.
+            Sales, stock, cash and staff for every till in your store, in one back office.
           </p>
-          <ul className="text-muted-foreground mx-auto flex max-w-md flex-col gap-3 text-sm lg:mx-0">
-            <li className="flex items-start gap-2.5">
-              <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" />
-              Permission-based access for users, roles, and devices
-            </li>
-            <li className="flex items-start gap-2.5">
-              <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" />
-              Tenant-isolated administration for every workspace
-            </li>
-            <li className="flex items-start gap-2.5">
-              <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" />
-              Secure session handling with short-lived access tokens
-            </li>
-          </ul>
+          <dl className="border-border grid max-w-sm grid-cols-2 gap-px overflow-hidden rounded-lg border text-sm">
+            <div className="bg-card px-4 py-3">
+              <dt className="text-muted-foreground text-xs">Tills keep selling</dt>
+              <dd className="font-medium">Even when offline</dd>
+            </div>
+            <div className="bg-card px-4 py-3">
+              <dt className="text-muted-foreground text-xs">FBR invoicing</dt>
+              <dd className="font-medium">Built in</dd>
+            </div>
+          </dl>
         </section>
 
-        <Card className="border-border/80 w-full max-w-md shadow-sm">
+        <Card className="w-full">
           <CardHeader className="space-y-1.5">
-            <CardTitle className="font-display text-xl">Welcome back</CardTitle>
-            <CardDescription>Sign in to your workspace</CardDescription>
+            <CardTitle className="font-display text-xl">
+              {forgotStep ? "Reset your password" : "Welcome back"}
+            </CardTitle>
+            <CardDescription>
+              {forgotStep ? "We will email you a 6-digit code." : "Use your email or username."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {forgotStep === "request" ? (

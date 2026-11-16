@@ -141,7 +141,6 @@ function applyCollectedTaxKind(
 ): TaxReportCollectedFromCustomers {
   if (taxKind === "all" || taxKind === "gst") return collected;
   if (taxKind === "sales_tax") {
-    const zero = { gst: 0, salesTax: 0, total: 0 };
     return {
       ...collected,
       gross: {

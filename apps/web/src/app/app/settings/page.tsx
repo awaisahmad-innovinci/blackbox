@@ -24,6 +24,7 @@ import {
 } from "@/lib/admin-api";
 import { toUserFacingError } from "@/lib/api-error";
 import { Badge } from "@blackbox/ui/badge";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
 export default function SettingsPage() {
   const { hasPermission } = useAuth();
@@ -298,9 +299,9 @@ export default function SettingsPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="fbrEnvironment">Environment</Label>
-                      <select
+                      <NativeSelect
                         id="fbrEnvironment"
-                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                        className="w-full"
                         value={fbrEnvironment}
                         onChange={(event) =>
                           setFbrEnvironment(
@@ -312,7 +313,7 @@ export default function SettingsPage() {
                       >
                         <option value="sandbox">Sandbox</option>
                         <option value="production">Production</option>
-                      </select>
+                      </NativeSelect>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="fbrScenarioId">Sandbox scenario</Label>
@@ -335,9 +336,9 @@ export default function SettingsPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="fbrSellerProvince">Seller province</Label>
-                      <select
+                      <NativeSelect
                         id="fbrSellerProvince"
-                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                        className="w-full"
                         value={fbrSellerProvince}
                         onChange={(event) =>
                           setFbrSellerProvince(event.target.value)
@@ -349,7 +350,7 @@ export default function SettingsPage() {
                             {province}
                           </option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="fbrSellerAddress">Seller address</Label>

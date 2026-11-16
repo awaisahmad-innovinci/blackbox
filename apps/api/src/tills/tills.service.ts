@@ -7,12 +7,9 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
-  OpenTillRequest,
-  ReopenTillRequest,
   TillListItem,
   TillNoteCounts,
   TillSessionDetail,
-  WithdrawTillRequest,
 } from "@blackbox/shared";
 import {
   computeTillDenominationTotal,

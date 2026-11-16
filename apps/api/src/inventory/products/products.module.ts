@@ -14,9 +14,11 @@ import {
 import { SkusModule } from "../skus/skus.module";
 import { ProductsController } from "./products.controller";
 import { ProductsService } from "./products.service";
+import { RbacModule } from "../../rbac/rbac.module";
 
 @Module({
   imports: [
+    RbacModule,
     TypeOrmModule.forFeature([
       Product,
       ProductSku,

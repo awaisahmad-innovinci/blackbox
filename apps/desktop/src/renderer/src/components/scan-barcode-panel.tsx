@@ -25,10 +25,6 @@ import {
   focusFormSelect,
   hasFocusTarget,
 } from "@renderer/lib/focus-form-select";
-import {
-  debugInputFreeze,
-  snapshotModalState,
-} from "@renderer/lib/debug-input-freeze";
 import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 
 export function ScanBarcodePanel({
@@ -224,14 +220,6 @@ export const BarcodeAssignRow = forwardRef<
   }, [scanOpen, value]);
 
   function closeScan(): void {
-    // #region agent log
-    debugInputFreeze(
-      "E",
-      "scan-barcode-panel.tsx:closeScan",
-      "inline barcode scan closed",
-      snapshotModalState(),
-    );
-    // #endregion
     resetBarcodeWedge();
     releaseStuckModalState();
     setScanOpen(false);

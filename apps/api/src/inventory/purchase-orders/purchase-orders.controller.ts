@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import type {
   GoodsReceiptDetail,
@@ -23,7 +24,11 @@ import {
   UpdatePurchaseOrderDto,
 } from "./dto/purchase-order.dto";
 import { PurchaseOrdersService } from "./purchase-orders.service";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../rbac/permissions.guard";
+import { RequirePermissions } from "../../rbac/require-permissions.decorator";
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("purchase-orders")
 export class PurchaseOrdersController {
   constructor(
@@ -38,6 +43,7 @@ export class PurchaseOrdersController {
     return this.purchaseOrders.list(query);
   }
 
+  @RequirePermissions("purchasing.access")
   @Post()
   create(@Body() dto: CreatePurchaseOrderDto): Promise<PurchaseOrderDetail> {
     return this.purchaseOrders.create(dto);
@@ -50,6 +56,7 @@ export class PurchaseOrdersController {
     return this.goodsReceipts.getReceivingDraft(id);
   }
 
+  @RequirePermissions("purchasing.access")
   @Post(":id/receipts")
   createReceipt(
     @Param("id", ParseUUIDPipe) id: string,
@@ -58,6 +65,7 @@ export class PurchaseOrdersController {
     return this.goodsReceipts.createReceipt(id, dto);
   }
 
+  @RequirePermissions("purchasing.access")
   @Patch(":id/items/:itemId/price")
   updateItemPrice(
     @Param("id", ParseUUIDPipe) id: string,
@@ -79,6 +87,7 @@ export class PurchaseOrdersController {
     return this.purchaseOrders.getById(id);
   }
 
+  @RequirePermissions("purchasing.access")
   @Patch(":id")
   update(
     @Param("id", ParseUUIDPipe) id: string,
@@ -87,6 +96,7 @@ export class PurchaseOrdersController {
     return this.purchaseOrders.update(id, dto);
   }
 
+  @RequirePermissions("purchasing.access")
   @Post(":id/submit")
   submit(
     @Param("id", ParseUUIDPipe) id: string,
@@ -94,6 +104,7 @@ export class PurchaseOrdersController {
     return this.purchaseOrders.submit(id);
   }
 
+  @RequirePermissions("purchasing.access")
   @Post(":id/cancel")
   cancel(
     @Param("id", ParseUUIDPipe) id: string,

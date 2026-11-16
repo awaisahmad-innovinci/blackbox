@@ -155,7 +155,7 @@ export function SaleReturnThermalReceipt({
         />
         {detail.gstAmount > 0 ? (
           <ThermalTotalsRow
-            label={`GST (${detail.gstRate}%)`}
+            label={detail.gstRate > 0 ? `GST (${detail.gstRate}%)` : "GST"}
             value={formatMoney(detail.gstAmount)}
           />
         ) : null}

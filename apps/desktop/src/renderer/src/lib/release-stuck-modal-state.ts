@@ -1,7 +1,3 @@
-import {
-  debugInputFreeze,
-  snapshotModalState,
-} from "@renderer/lib/debug-input-freeze";
 
 function hasOpenDialog(): boolean {
   return (
@@ -21,17 +17,8 @@ function clearElementLock(el: HTMLElement): void {
   }
 }
 
-function runCleanup(attemptLabel: string): boolean {
-  const before = snapshotModalState();
+function runCleanup(): boolean {
   if (hasOpenDialog()) {
-    // #region agent log
-    debugInputFreeze(
-      "B",
-      "release-stuck-modal-state.ts:skipped",
-      "cleanup skipped — dialog still open",
-      { attempt: attemptLabel, ...before },
-    );
-    // #endregion
     return false;
   }
 
@@ -68,14 +55,6 @@ function runCleanup(attemptLabel: string): boolean {
     el.removeAttribute("aria-hidden");
   }
 
-  // #region agent log
-  debugInputFreeze(
-    "C",
-    "release-stuck-modal-state.ts:done",
-    "cleanup ran",
-    { attempt: attemptLabel, before, after: snapshotModalState() },
-  );
-  // #endregion
   return true;
 }
 
@@ -84,35 +63,19 @@ function runCleanup(attemptLabel: string): boolean {
  * after nested or repeated dialog close. No-op while a dialog is still open.
  */
 export function releaseStuckModalState(options?: { retry?: boolean }): void {
-  // #region agent log
-  debugInputFreeze(
-    "B",
-    "release-stuck-modal-state.ts:entry",
-    "releaseStuckModalState scheduled",
-    { retry: options?.retry ?? false, ...snapshotModalState() },
-  );
-  // #endregion
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      if (runCleanup("immediate")) return;
+      if (runCleanup()) return;
       if (!options?.retry) return;
 
-      // #region agent log
-      debugInputFreeze(
-        "B",
-        "release-stuck-modal-state.ts:retryScheduled",
-        "cleanup retry scheduled",
-        snapshotModalState(),
-      );
-      // #endregion
 
       window.setTimeout(() => {
-        if (runCleanup("350ms")) return;
+        if (runCleanup()) return;
       }, 350);
 
       window.setTimeout(() => {
-        runCleanup("700ms");
+        runCleanup();
       }, 700);
     });
   });

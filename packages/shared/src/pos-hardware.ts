@@ -4,6 +4,8 @@ export interface PosPrinterSettings {
   printerName: string;
   drawerPin: 2 | 5;
   openDrawerOnReceiptPrint: boolean;
+  /** Print receipts straight to the printer, without the print dialog. Off by default. */
+  silentReceiptPrint: boolean;
 }
 
 export const DEFAULT_POS_PRINTER_SETTINGS: PosPrinterSettings = {
@@ -11,6 +13,7 @@ export const DEFAULT_POS_PRINTER_SETTINGS: PosPrinterSettings = {
   printerName: "",
   drawerPin: 2,
   openDrawerOnReceiptPrint: true,
+  silentReceiptPrint: false,
 };
 
 export interface PosPrinterInfo {

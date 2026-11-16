@@ -3,9 +3,11 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { Unit } from "../../db/entities";
 import { UnitsController } from "./units.controller";
 import { UnitsService } from "./units.service";
+import { RbacModule } from "../../rbac/rbac.module";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Unit])],
+  imports: [
+    RbacModule,TypeOrmModule.forFeature([Unit])],
   controllers: [UnitsController],
   providers: [UnitsService],
 })

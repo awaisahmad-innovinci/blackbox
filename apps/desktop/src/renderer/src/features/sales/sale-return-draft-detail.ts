@@ -5,7 +5,7 @@ import type {
   SaleReturnDetail,
   SaleReturnLineRow,
 } from "@blackbox/shared";
-import { lineTotalAfterDiscount, saleBillTotals } from "@blackbox/shared";
+import { lineTotalAfterDiscount, saleReturnBillTotals } from "@blackbox/shared";
 
 export type DraftReturnLine = ReturnableSaleLine & { returnQty: number };
 
@@ -42,6 +42,23 @@ export function buildReturnLineItems(
   return { items, subtotal };
 }
 
+/** Return totals using the same tax model as the original sale. */
+export function returnBillTotals(
+  activeLines: DraftReturnLine[],
+  sale: Pick<SaleDetail, "gstRate" | "salesTaxRate">,
+): ReturnType<typeof saleReturnBillTotals> & { items: SaleReturnLineRow[] } {
+  const { items } = buildReturnLineItems(activeLines);
+  const tax = saleReturnBillTotals(
+    items.map((item, i) => ({
+      lineTotal: item.lineTotal,
+      gstPercent: activeLines[i]?.gstPercent ?? 0,
+    })),
+    sale.gstRate,
+    sale.salesTaxRate,
+  );
+  return { ...tax, items };
+}
+
 export function buildDraftSaleReturnDetail(input: {
   sale: SaleDetail;
   activeLines: DraftReturnLine[];
@@ -52,12 +69,8 @@ export function buildDraftSaleReturnDetail(input: {
 }): SaleReturnDetail | null {
   if (input.activeLines.length === 0) return null;
 
-  const { items, subtotal } = buildReturnLineItems(input.activeLines);
-  const tax = saleBillTotals(
-    subtotal,
-    input.sale.gstRate,
-    input.sale.salesTaxRate,
-  );
+  const tax = returnBillTotals(input.activeLines, input.sale);
+  const { items, subtotal } = tax;
   const now = new Date().toISOString();
 
   return {

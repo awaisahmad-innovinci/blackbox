@@ -10,7 +10,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { useAuth } from "@/components/auth-provider";
 import { PageHeader } from "@/components/page-header";
 import { LoadingState, PageError } from "@/components/page-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
 import { DeviceStatusBadge } from "@/components/status-badges";
 import {
   FormError,

@@ -14,7 +14,6 @@ import {
   CASH_EXPENSE_CATEGORIES,
   expenseExceedsDrawer,
   expenseOverDrawerMessage,
-  formatMoney,
   type CashExpenseCategory,
   type OwnerBusinessOverview,
   type Permission,
@@ -37,6 +36,10 @@ import {
   type DrawerManager,
   type TenantDto,
 } from "@/lib/admin-api";
+import { useCurrency } from "@/lib/use-currency";
+import { MoneyInput } from "@blackbox/ui/money-input";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
 type Counts = {
   users: number | null;
@@ -80,9 +83,6 @@ const QUICK: {
   },
 ];
 
-function money(value: number): string {
-  return `Rs ${formatMoney(value)}`;
-}
 
 export default function DashboardPage() {
   const { user, hasPermission } = useAuth();
@@ -295,6 +295,15 @@ function OwnerOverview({
   onChanged: () => Promise<void>;
 }) {
   const today = new Date(`${overview.date}T12:00:00`).toLocaleDateString();
+  const { money, currency } = useCurrency();
+  const currencyPrefix = !currency || currency === "PKR" ? "Rs" : currency;
+  // Money moves only after the owner confirms the amount (review W14).
+  const [pendingMove, setPendingMove] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    run: () => void;
+  } | null>(null);
   const [cashAmount, setCashAmount] = useState("");
   const [cashSaving, setCashSaving] = useState(false);
   const [cashError, setCashError] = useState<string | null>(null);
@@ -364,9 +373,7 @@ function OwnerOverview({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {moneyCards.map((card) => (
           <div key={card.label} className="bb-surface px-5 py-4">
-            <p className="text-muted-foreground text-xs tracking-wide uppercase">
-              {card.label}
-            </p>
+            <p className="text-muted-foreground text-sm">{card.label}</p>
             <p className="font-display mt-1 text-2xl font-semibold tracking-tight tabular-nums">
               {card.value}
             </p>
@@ -377,9 +384,7 @@ function OwnerOverview({
       <div className="grid gap-4 sm:grid-cols-3">
         {inventoryCards.map((card) => (
           <div key={card.label} className="bb-surface px-5 py-4">
-            <p className="text-muted-foreground text-xs tracking-wide uppercase">
-              {card.label}
-            </p>
+            <p className="text-muted-foreground text-sm">{card.label}</p>
             <p className="font-display mt-1 text-3xl font-semibold tracking-tight tabular-nums">
               {card.value}
             </p>
@@ -431,24 +436,31 @@ function OwnerOverview({
               event.preventDefault();
               const amount = Number(cashAmount);
               if (!(amount > 0) || cashSaving) return;
-              setCashSaving(true);
-              setCashError(null);
-              void recordOwnerCash(amount)
-                .then(() => onChanged())
-                .then(() => setCashAmount(""))
-                .catch((err: unknown) => {
-                  setCashError(
-                    err instanceof Error ? err.message : "Could not add the cash",
-                  );
-                })
-                .finally(() => setCashSaving(false));
+              setPendingMove({
+                title: `Add ${money(amount)} to cash collected?`,
+                description: "This records cash the owner has on hand.",
+                confirmLabel: "Add cash",
+                run: () => {
+                  setCashSaving(true);
+                  setCashError(null);
+                  void recordOwnerCash(amount)
+                    .then(() => onChanged())
+                    .then(() => setCashAmount(""))
+                    .catch((err: unknown) => {
+                      setCashError(
+                        err instanceof Error ? err.message : "Could not add the cash",
+                      );
+                    })
+                    .finally(() => setCashSaving(false));
+                },
+              });
             }}
           >
-            <Input
-              inputMode="decimal"
+            <MoneyInput
               placeholder="Amount"
+              prefix={currencyPrefix}
               value={cashAmount}
-              onChange={(event) => setCashAmount(event.target.value)}
+              onValueChange={setCashAmount}
               aria-label="Cash to add"
             />
             <Button type="submit" disabled={cashSaving || !(Number(cashAmount) > 0)}>
@@ -488,25 +500,32 @@ function OwnerOverview({
             event.preventDefault();
             const amount = Number(fundAmount);
             if (!managerId || !(amount > 0) || fundSaving) return;
-            setFundSaving(true);
-            setFundError(null);
-            void fundManagerDrawer(managerId, amount)
-              .then(() => onChanged())
-              .then(() => setFundAmount(""))
-              .catch((err: unknown) => {
-                setFundError(
-                  err instanceof Error ? err.message : "Could not fund the drawer",
-                );
-              })
-              .finally(() => setFundSaving(false));
+            const manager = managers.find((m) => m.id === managerId);
+            setPendingMove({
+              title: `Give ${money(amount)} to ${manager?.fullName.trim() || manager?.username || "this manager"}?`,
+              description: "The amount moves from cash collected into the manager drawer.",
+              confirmLabel: "Fund drawer",
+              run: () => {
+                setFundSaving(true);
+                setFundError(null);
+                void fundManagerDrawer(managerId, amount)
+                  .then(() => onChanged())
+                  .then(() => setFundAmount(""))
+                  .catch((err: unknown) => {
+                    setFundError(
+                      err instanceof Error ? err.message : "Could not fund the drawer",
+                    );
+                  })
+                  .finally(() => setFundSaving(false));
+              },
+            });
           }}
         >
           <p className="text-sm font-medium">Fund a manager drawer</p>
           <div className="flex flex-wrap items-end gap-2">
             <label className="grid gap-1 text-sm">
               Manager
-              <select
-                className="border-input bg-background h-9 rounded-md border px-2"
+              <NativeSelect
                 value={managerId}
                 onChange={(event) => setManagerId(event.target.value)}
                 aria-label="Manager"
@@ -519,15 +538,15 @@ function OwnerOverview({
                     {manager.fullName.trim() || manager.username}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
             <label className="grid gap-1 text-sm">
               Amount
-              <Input
-                inputMode="decimal"
-                className="w-36"
+              <MoneyInput
+                className="w-40"
+                prefix={currencyPrefix}
                 value={fundAmount}
-                onChange={(event) => setFundAmount(event.target.value)}
+                onValueChange={setFundAmount}
                 aria-label="Amount to fund"
               />
             </label>
@@ -559,32 +578,38 @@ function OwnerOverview({
               setExpenseError(expenseOverDrawerMessage(overview.ownerCashBalance));
               return;
             }
-            setExpenseSaving(true);
-            setExpenseError(null);
-            void recordCashExpense({
-              category: expenseCategory,
-              amount,
-              note: expenseNote.trim() || undefined,
-            })
-              .then(() => onChanged())
-              .then(() => {
-                setExpenseAmount("");
-                setExpenseNote("");
-              })
-              .catch((err: unknown) => {
-                setExpenseError(
-                  err instanceof Error
-                    ? err.message
-                    : "Could not record the expense",
-                );
-              })
-              .finally(() => setExpenseSaving(false));
+            setPendingMove({
+              title: `Record a ${money(amount)} ${expenseCategory.toLowerCase()} expense?`,
+              description: "The amount is taken out of cash collected.",
+              confirmLabel: "Record expense",
+              run: () => {
+                setExpenseSaving(true);
+                setExpenseError(null);
+                void recordCashExpense({
+                  category: expenseCategory,
+                  amount,
+                  note: expenseNote.trim() || undefined,
+                })
+                  .then(() => onChanged())
+                  .then(() => {
+                    setExpenseAmount("");
+                    setExpenseNote("");
+                  })
+                  .catch((err: unknown) => {
+                    setExpenseError(
+                      err instanceof Error
+                        ? err.message
+                        : "Could not record the expense",
+                    );
+                  })
+                  .finally(() => setExpenseSaving(false));
+              },
+            });
           }}
         >
           <label className="grid gap-1 text-sm">
             Category
-            <select
-              className="border-input bg-background h-9 rounded-md border px-2"
+            <NativeSelect
               value={expenseCategory}
               onChange={(event) =>
                 setExpenseCategory(event.target.value as CashExpenseCategory)
@@ -598,15 +623,15 @@ function OwnerOverview({
                   {item}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <label className="grid gap-1 text-sm">
             Amount
-            <Input
-              inputMode="decimal"
-              className="w-36"
+            <MoneyInput
+              className="w-40"
+              prefix={currencyPrefix}
               value={expenseAmount}
-              onChange={(event) => setExpenseAmount(event.target.value)}
+              onValueChange={setExpenseAmount}
               aria-label="Expense amount"
             />
           </label>
@@ -636,6 +661,19 @@ function OwnerOverview({
           )}
         </form>
       </SectionCard>
+      <ConfirmDialog
+        open={pendingMove != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingMove(null);
+        }}
+        title={pendingMove?.title ?? ""}
+        description={pendingMove?.description ?? ""}
+        confirmLabel={pendingMove?.confirmLabel ?? "Confirm"}
+        onConfirm={() => {
+          pendingMove?.run();
+          setPendingMove(null);
+        }}
+      />
     </div>
   );
 }

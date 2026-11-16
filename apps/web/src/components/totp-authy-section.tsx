@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
 import {
   FieldStatus,
   FormError,

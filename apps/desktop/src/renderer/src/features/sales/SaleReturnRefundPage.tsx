@@ -219,7 +219,7 @@ export function SaleReturnRefundPage() {
         <p
           className={
             completedLookupMessage
-              ? "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 rounded-lg border px-4 py-3 text-sm"
+              ? "border-warning/40 bg-warning/10 text-foreground rounded-lg border px-4 py-3 text-sm"
               : "text-destructive text-sm"
           }
           role={completedLookupMessage ? "status" : "alert"}

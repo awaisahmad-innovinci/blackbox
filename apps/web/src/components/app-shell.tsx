@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Permission } from "@blackbox/shared";
 import {
   LayoutDashboard,
@@ -11,15 +11,16 @@ import {
   Settings,
   LogOut,
   Menu,
-  PanelLeftClose,
   BarChart3,
   Warehouse,
   ScrollText,
   Receipt,
   Wallet,
+  ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@blackbox/ui/button";
-import { Separator } from "@blackbox/ui/separator";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
 import {
   Sheet,
   SheetContent,
@@ -27,98 +28,96 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@blackbox/ui/sheet";
+import { ThemeToggle } from "@blackbox/ui/theme-toggle";
 import { cn } from "@blackbox/ui/lib/utils";
 import { useAuth } from "@/components/auth-provider";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getCurrentTenant } from "@/lib/admin-api";
 
-const NAV: {
+type NavItem = {
   href: string;
   label: string;
   permission: Permission | null;
   icon: typeof LayoutDashboard;
-}[] = [
-  { href: "/app", label: "Dashboard", permission: null, icon: LayoutDashboard },
-  { href: "/app/users", label: "Users", permission: "users.read", icon: Users },
+};
+
+/** Grouped by what the owner is trying to do, not by system module. */
+const NAV_GROUPS: { label: string | null; items: NavItem[] }[] = [
   {
-    href: "/app/devices",
-    label: "Devices",
-    permission: "devices.read",
-    icon: MonitorSmartphone,
+    label: null,
+    items: [{ href: "/app", label: "Dashboard", permission: null, icon: LayoutDashboard }],
   },
   {
-    href: "/app/warehouses",
-    label: "Warehouses",
-    permission: "warehouses.write",
-    icon: Warehouse,
+    label: "Money and stock",
+    items: [
+      { href: "/app/vendors/payments", label: "Vendor payments", permission: "vendors.access", icon: Wallet },
+      { href: "/app/inventory/reports", label: "Inventory report", permission: "inventory.access", icon: BarChart3 },
+      { href: "/app/reports/taxes", label: "Tax report", permission: "tax.reports.read", icon: Receipt },
+      { href: "/app/warehouses", label: "Warehouses", permission: "warehouses.read", icon: Warehouse },
+    ],
   },
   {
-    href: "/app/inventory/reports",
-    label: "Inventory report",
-    permission: "inventory.access",
-    icon: BarChart3,
+    label: "People and devices",
+    items: [
+      { href: "/app/users", label: "Users", permission: "users.read", icon: Users },
+      { href: "/app/roles", label: "Roles", permission: "roles.read", icon: ShieldCheck },
+      { href: "/app/permissions", label: "Permissions", permission: "permissions.read", icon: KeyRound },
+      { href: "/app/devices", label: "Devices", permission: "devices.read", icon: MonitorSmartphone },
+    ],
   },
   {
-    href: "/app/reports/taxes",
-    label: "Tax report",
-    permission: "tax.reports.read",
-    icon: Receipt,
-  },
-  {
-    href: "/app/vendors/payments",
-    label: "Vendor payments",
-    permission: "vendors.access",
-    icon: Wallet,
-  },
-  {
-    href: "/app/activity",
-    label: "Activity log",
-    permission: "activity.read",
-    icon: ScrollText,
-  },
-  {
-    href: "/app/settings",
-    label: "Settings",
-    permission: "tenant.settings.read",
-    icon: Settings,
+    label: "Records",
+    items: [
+      { href: "/app/activity", label: "Activity log", permission: "activity.read", icon: ScrollText },
+      { href: "/app/settings", label: "Settings", permission: "tenant.settings.read", icon: Settings },
+    ],
   },
 ];
 
+function isActive(pathname: string, href: string): boolean {
+  return href === "/app"
+    ? pathname === "/app"
+    : pathname === href || pathname.startsWith(`${href}/`);
+}
+
 function NavItems({
-  items,
+  groups,
   pathname,
   onNavigate,
 }: {
-  items: typeof NAV;
+  groups: typeof NAV_GROUPS;
   pathname: string;
   onNavigate?: () => void;
 }) {
   return (
-    <nav className="flex flex-1 flex-col gap-1" aria-label="Main">
-      {items.map((item) => {
-        const active =
-          item.href === "/app"
-            ? pathname === "/app"
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const Icon = item.icon;
-        return (
-          <Button
-            key={item.href}
-            asChild
-            variant={active ? "secondary" : "ghost"}
-            className={cn(
-              "h-10 justify-start gap-2.5 px-3 font-medium",
-              active &&
-                "bg-sidebar-accent text-sidebar-accent-foreground shadow-none",
-            )}
-          >
-            <Link href={item.href} onClick={onNavigate}>
-              <Icon className="size-4 opacity-80" aria-hidden />
-              {item.label}
-            </Link>
-          </Button>
-        );
-      })}
+    <nav className="flex flex-1 flex-col gap-5 overflow-y-auto" aria-label="Main">
+      {groups.map((group, gi) => (
+        <div key={group.label ?? gi} className="space-y-1">
+          {group.label ? (
+            <p className="text-muted-foreground px-3 pb-1 text-xs font-medium">{group.label}</p>
+          ) : null}
+          {group.items.map((item) => {
+            const active = isActive(pathname, item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex h-9 items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4 shrink-0" aria-hidden />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -127,18 +126,14 @@ function BrandMark() {
   return (
     <div className="flex items-center gap-2.5 px-2">
       <div
-        className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg text-xs font-bold tracking-tight"
+        className="bg-shelf-tag text-shelf-tag-foreground flex size-8 items-center justify-center rounded-md text-sm font-bold"
         aria-hidden
       >
-        Bx
+        B
       </div>
       <div className="min-w-0">
-        <p className="font-display truncate text-base font-semibold tracking-tight">
-          Blackbox
-        </p>
-        <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
-          Workspace admin
-        </p>
+        <p className="font-display truncate text-base font-semibold tracking-tight">Blackbox</p>
+        <p className="text-muted-foreground text-xs">Back office</p>
       </div>
     </div>
   );
@@ -156,21 +151,30 @@ function UserFooter({
   onLogout: () => void;
 }) {
   return (
-    <div className="space-y-3 px-1">
-      <div className="px-2">
-        <p className="truncate text-sm font-medium">{fullName}</p>
-        <p className="text-muted-foreground truncate text-xs">{email}</p>
+    <div className="border-sidebar-border space-y-3 border-t px-1 pt-4">
+      <div className="flex items-center justify-between gap-2 px-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{fullName}</p>
+          <p className="text-muted-foreground truncate text-xs">{email}</p>
+        </div>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full justify-start gap-2"
-        disabled={loggingOut}
-        onClick={onLogout}
-      >
-        <LogOut className="size-3.5" aria-hidden />
-        {loggingOut ? "Signing out…" : "Log out"}
-      </Button>
+      <div className="flex items-center justify-between gap-2 px-2">
+        <ThemeToggle />
+        <Button variant="ghost" size="sm" className="gap-2" disabled={loggingOut} onClick={onLogout}>
+          <LogOut className="size-3.5" aria-hidden />
+          {loggingOut ? "Signing out…" : "Sign out"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FullScreenMessage({ children }: { children: ReactNode }) {
+  return (
+    <div className="bg-background flex min-h-screen items-center justify-center p-6">
+      <div className="text-muted-foreground flex max-w-sm flex-col items-center gap-3 text-center text-sm">
+        {children}
+      </div>
     </div>
   );
 }
@@ -181,7 +185,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboarding, setOnboarding] = useState<"checking" | "ok" | "error">("checking");
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -190,57 +194,61 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [status, router]);
 
-  useEffect(() => {
-    if (status !== "authenticated" || !user) {
-      return;
-    }
-    if (!hasPermission("tenant.settings.read")) {
-      setOnboardingChecked(true);
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
+  const checkOnboarding = useCallback(
+    async (isCancelled: () => boolean = () => false) => {
+      if (!hasPermission("tenant.settings.read")) {
+        setOnboarding("ok");
+        return;
+      }
+      setOnboarding("checking");
       try {
         const tenant = await getCurrentTenant();
-        if (cancelled) return;
+        if (isCancelled()) return;
         if (!tenant.onboardingCompleted) {
           router.replace("/onboarding/business");
           return;
         }
-        setOnboardingChecked(true);
+        setOnboarding("ok");
       } catch {
-        if (!cancelled) {
-          setOnboardingChecked(true);
-        }
+        // Do not open the workspace on a failed check (review W5); offer a retry instead.
+        if (!isCancelled()) setOnboarding("error");
       }
-    })();
+    },
+    [hasPermission, router],
+  );
 
+  useEffect(() => {
+    if (status !== "authenticated" || !user) return;
+    let cancelled = false;
+    void checkOnboarding(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [status, user, hasPermission, router]);
+  }, [status, user, checkOnboarding]);
 
-  if (
-    status === "loading" ||
-    status === "anonymous" ||
-    !user ||
-    !onboardingChecked
-  ) {
+  if (onboarding === "error" && status === "authenticated") {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <div className="text-muted-foreground flex flex-col items-center gap-3 text-sm">
-          <div className="border-border border-t-primary size-8 animate-spin rounded-full border-2" />
-          <p>Preparing workspace…</p>
-        </div>
-      </div>
+      <FullScreenMessage>
+        <p className="text-foreground text-base font-medium">Could not load your business</p>
+        <p>Check your internet connection, then try again.</p>
+        <Button onClick={() => void checkOnboarding()}>Try again</Button>
+      </FullScreenMessage>
     );
   }
 
-  const items = NAV.filter((item) => {
-    if (!item.permission) return true;
-    return hasPermission(item.permission);
-  });
+  if (status === "loading" || status === "anonymous" || !user || onboarding !== "ok") {
+    return (
+      <FullScreenMessage>
+        <div className="border-border border-t-primary size-8 animate-spin rounded-full border-2" />
+        <p>Opening your workspace…</p>
+      </FullScreenMessage>
+    );
+  }
+
+  const groups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.permission || hasPermission(item.permission)),
+  })).filter((group) => group.items.length > 0);
 
   async function onLogout() {
     setLoggingOut(true);
@@ -253,20 +261,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const currentLabel =
-    items.find((item) =>
-      item.href === "/app"
-        ? pathname === "/app"
-        : pathname === item.href || pathname.startsWith(`${item.href}/`),
-    )?.label ?? "Admin";
+    groups.flatMap((g) => g.items).find((item) => isActive(pathname, item.href))?.label ??
+    "Back office";
 
   return (
     <div className="bg-background flex min-h-screen">
-      <aside className="border-sidebar-border bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r px-3 py-4 md:flex">
-        <div className="pb-5">
-          <BrandMark />
-        </div>
-        <NavItems items={items} pathname={pathname} />
-        <Separator className="my-3" />
+      <aside className="border-sidebar-border bg-sidebar text-sidebar-foreground sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 border-r px-3 py-5 md:flex">
+        <BrandMark />
+        <NavItems groups={groups} pathname={pathname} />
         <UserFooter
           fullName={user.fullName}
           email={user.email}
@@ -276,7 +278,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-border/80 bg-background/80 supports-[backdrop-filter]:bg-background/70 sticky top-0 z-20 flex h-14 items-center gap-3 border-b px-4 backdrop-blur md:hidden">
+        <header className="border-border bg-card sticky top-0 z-20 flex h-14 items-center gap-3 border-b px-4 md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon-sm" aria-label="Open menu">
@@ -288,13 +290,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <BrandMark />
               </SheetHeader>
-              <div className="flex h-[calc(100%-5rem)] flex-col px-3 py-4">
-                <NavItems
-                  items={items}
-                  pathname={pathname}
-                  onNavigate={() => setMobileOpen(false)}
-                />
-                <Separator className="my-3" />
+              <div className="flex h-[calc(100%-5rem)] flex-col gap-4 px-3 py-4">
+                <NavItems groups={groups} pathname={pathname} onNavigate={() => setMobileOpen(false)} />
                 <UserFooter
                   fullName={user.fullName}
                   email={user.email}
@@ -304,27 +301,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             </SheetContent>
           </Sheet>
-          <div className="min-w-0 flex-1">
-            <p className="font-display truncate text-sm font-semibold">
-              Blackbox
-            </p>
-            <p className="text-muted-foreground truncate text-xs">
-              {currentLabel}
-            </p>
-          </div>
-          <PanelLeftClose className="text-muted-foreground size-4 opacity-40" aria-hidden />
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold">{currentLabel}</p>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
+        <main className="flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">{children}</main>
       </div>
 
       <ConfirmDialog
         open={logoutOpen}
         onOpenChange={setLogoutOpen}
-        title="Are you sure you want to logout?"
-        description="Are you sure you want to logout?"
-        confirmLabel="Yes"
-        cancelLabel="Cancel"
+        title="Sign out?"
+        description="You will be signed out on this browser. Other devices stay signed in."
+        confirmLabel="Sign out"
         loading={loggingOut}
         onConfirm={onLogout}
       />

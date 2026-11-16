@@ -7,17 +7,18 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  debugInputFreeze,
-  installInputFreezeProbe,
-  snapshotModalState,
-} from "@renderer/lib/debug-input-freeze";
 import { releaseStuckModalState } from "@renderer/lib/release-stuck-modal-state";
 
 const SCAN_GAP_MS = 40;
 const MIN_SCAN_LEN = 3;
 
 export const BARCODE_SCAN_INPUT = "data-barcode-scan-input";
+
+/**
+ * Enter key events the scan hook already turned into a scan. Input onKeyDown handlers
+ * check this so one Enter never adds the item twice (review U2).
+ */
+export const handledScanEnterEvents = new WeakSet<Event>();
 
 export function barcodeScanInputProps(): { [BARCODE_SCAN_INPUT]: true } {
   return { [BARCODE_SCAN_INPUT]: true };
@@ -187,8 +188,6 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    installInputFreezeProbe();
-
     let buffer = "";
     let lastAt = 0;
     let wedgeActive = false;
@@ -264,18 +263,6 @@ export function BarcodeScanProvider({ children }: { children: ReactNode }) {
       wedgeActive = true;
       buffer += event.key;
       lastAt = now;
-      // #region agent log
-      debugInputFreeze(
-        "D",
-        "barcode-scan.tsx:wedgePreventDefault",
-        "wedge swallowing printable key",
-        {
-          key: event.key,
-          buffer,
-          ...snapshotModalState(),
-        },
-      );
-      // #endregion
       event.preventDefault();
       event.stopPropagation();
     }
@@ -371,6 +358,7 @@ export function useBarcodeScanTarget({
       }
       const code = event.target.value.trim();
       if (code.length < MIN_SCAN_LEN) return;
+      handledScanEnterEvents.add(event);
       onScanRef.current(code);
       onCompleteRef.current?.(code);
     }

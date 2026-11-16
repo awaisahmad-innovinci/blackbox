@@ -19,9 +19,8 @@ import { RequirePermission } from "@/components/require-permission";
 import { listVendors, type VendorListItemDto } from "@/lib/admin-api";
 import { downloadTextFile } from "@/lib/download-file";
 import { getTaxReportSummary } from "@/lib/tax-reports";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
-const FILTER_SELECT_CLASS =
-  "border-input bg-background h-9 rounded-md border px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 const TAX_KIND_LABELS: Record<TaxReportKind, string> = {
   all: "All taxes",
@@ -231,9 +230,8 @@ export default function TaxReportsPage() {
 
           <div className="space-y-1">
             <Label htmlFor="taxVendor">Vendor (paid side)</Label>
-            <select
+            <NativeSelect
               id="taxVendor"
-              className={FILTER_SELECT_CLASS}
               value={vendorId}
               onChange={(e) => setVendorId(e.target.value)}
             >
@@ -243,14 +241,13 @@ export default function TaxReportsPage() {
                   {v.name}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <div className="space-y-1">
             <Label htmlFor="taxKind">Tax type</Label>
-            <select
+            <NativeSelect
               id="taxKind"
-              className={FILTER_SELECT_CLASS}
               value={taxKind}
               onChange={(e) => setTaxKind(e.target.value as TaxReportKind)}
             >
@@ -259,7 +256,7 @@ export default function TaxReportsPage() {
                   {TAX_KIND_LABELS[k]}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
         </div>
 

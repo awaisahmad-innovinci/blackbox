@@ -4,13 +4,20 @@ export function downloadTextFile(
   mime = "text/csv;charset=utf-8",
 ): Promise<void> {
   return new Promise((resolve) => {
-    const blob = new Blob([content], { type: mime });
+    // BOM so Excel opens UTF-8 (Urdu names) correctly.
+    const body = mime.startsWith("text/csv") ? `\uFEFF${content}` : content;
+    const blob = new Blob([body], { type: mime });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = filename;
+    document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
-    window.setTimeout(resolve, 150);
+    anchor.remove();
+    // Revoke later: Safari/Firefox may still be reading the blob right after click().
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+      resolve();
+    }, 1000);
   });
 }

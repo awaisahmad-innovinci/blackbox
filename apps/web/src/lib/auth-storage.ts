@@ -33,7 +33,11 @@ export function setRefreshToken(token: string): void {
   if (typeof window === "undefined") {
     return;
   }
-  localStorage.setItem(REFRESH_KEY, token);
+  try {
+    localStorage.setItem(REFRESH_KEY, token);
+  } catch {
+    // Storage blocked (e.g. Safari private mode): stay signed in for this tab only.
+  }
 }
 
 export function clearRefreshToken(): void {

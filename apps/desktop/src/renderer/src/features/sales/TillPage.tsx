@@ -397,7 +397,7 @@ export function TillPage() {
                   : "Cash limit reached. Tap Withdraw cash to remove enough cash; the till reopens for sales when below the limit."}
               </p>
             ) : isTillNearLimit(session) ? (
-              <p className="text-amber-700 text-sm dark:text-amber-400">
+              <p className="text-warning text-sm ">
                 Till is near the cash limit. Tap Withdraw cash and ask a manager
                 to authorize.
               </p>

@@ -7,7 +7,7 @@ import type {
   SalePaymentMethod,
   SaleReturnDetail,
 } from "@blackbox/shared";
-import { lineTotalAfterDiscount, saleBillTotals } from "@blackbox/shared";
+import { lineTotalAfterDiscount } from "@blackbox/shared";
 import { cn } from "@blackbox/ui/lib/utils";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
@@ -41,7 +41,7 @@ import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import {
   buildDraftSaleReturnDetail,
-  buildReturnLineItems,
+  returnBillTotals,
   type DraftReturnLine,
 } from "./sale-return-draft-detail";
 import { SaleReturnThermalReceipt } from "./sale-return-thermal-receipt";
@@ -237,8 +237,8 @@ export function SaleReturnFormPage() {
     setError(null);
     try {
       const refundMethod = primaryRefundMethod(sale.payments);
-      const { items: builtItems, subtotal } = buildReturnLineItems(activeLines);
-      const tax = saleBillTotals(subtotal, sale.gstRate, sale.salesTaxRate);
+      const tax = returnBillTotals(activeLines, sale);
+      const { items: builtItems, subtotal } = tax;
       const processorName = user.fullName?.trim() || user.username;
 
       if (await isDeviceBound()) {
@@ -410,11 +410,7 @@ export function SaleReturnFormPage() {
   const activeLines = lines.filter((l) => l.returnQty > 0);
   const refundPreview =
     activeLines.length > 0
-      ? saleBillTotals(
-          buildReturnLineItems(activeLines).subtotal,
-          sale.gstRate,
-          sale.salesTaxRate,
-        )
+      ? returnBillTotals(activeLines, sale)
       : null;
 
   const processorName =
@@ -638,12 +634,12 @@ export function SaleReturnFormPage() {
           <div className="flex justify-between gap-2">
             <span>Refund subtotal</span>
             <span className="tabular-nums">
-              {formatMoney(buildReturnLineItems(activeLines).subtotal)}
+              {formatMoney(refundPreview.subtotal)}
             </span>
           </div>
           {refundPreview.gstAmount > 0 ? (
             <div className="flex justify-between gap-2">
-              <span>GST ({sale.gstRate}%)</span>
+              <span>{sale.gstRate > 0 ? `GST (${sale.gstRate}%)` : "GST (included)"}</span>
               <span className="tabular-nums">{formatMoney(refundPreview.gstAmount)}</span>
             </div>
           ) : null}

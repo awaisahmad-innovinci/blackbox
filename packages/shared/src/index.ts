@@ -426,6 +426,7 @@ export {
   maxCashTender,
   saleBillTotals,
   saleBillTotalsFromInclusiveLines,
+  saleReturnBillTotals,
   saleLineTotal,
 } from "./sales";
 export type {
@@ -492,12 +493,16 @@ export {
 export {
   MASTER_DATA_IMPORT_FILES,
   MASTER_DATA_07_PRODUCT_SKU_HEADERS,
+  normalizeImportHeader,
+  importHeaderIndexes,
+  matchImportEnumValue,
   PREVIOUS_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   LEGACY_MASTER_DATA_07_PRODUCT_SKU_HEADERS,
   formatMasterDataHeaderMismatchMessage,
   nextSkuCode,
   roundMoney4,
   formatMoney,
+  formatCurrency,
   pieceCostFromPurchase,
   vendorPurchasePriceFromSku,
   sellingPriceFromCostMargin,

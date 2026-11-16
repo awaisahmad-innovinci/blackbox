@@ -399,44 +399,33 @@ export class CashFlowService {
     const signedInName = managerName.trim()
       ? managerName.trim()
       : await this.managerName(tenantId, userId);
-    let collected: {
+    const collected: {
       manager_user_id: string;
       manager_name: string;
       named_at: string | Date | null;
       collected: string;
-    }[];
-    try {
-      collected = await this.dataSource.query(
-        `select w.withdrawn_by_user_id as manager_user_id,
-                max(coalesce(nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Manager')) as manager_name,
-                max(w.created_at) as named_at,
-                coalesce(sum(w.withdrawal_total), 0) as collected
-         from till_withdrawals w
-         left join users u
-           on u.id = w.withdrawn_by_user_id
-          and u.tenant_id = w.tenant_id
-         where w.tenant_id = $1
-           and ($2::boolean or w.withdrawn_by_user_id = $3)
-           and (
-             $2::boolean = false
-             or not exists (
-               select 1 from till_sessions ts
-               where ts.tenant_id = w.tenant_id
-                 and ts.user_id = w.withdrawn_by_user_id
-             )
+    }[] = await this.dataSource.query(
+      `select w.withdrawn_by_user_id as manager_user_id,
+              max(coalesce(nullif(trim(u.full_name), ''), nullif(trim(u.username), ''), 'Manager')) as manager_name,
+              max(w.created_at) as named_at,
+              coalesce(sum(w.withdrawal_total), 0) as collected
+       from till_withdrawals w
+       left join users u
+         on u.id = w.withdrawn_by_user_id
+        and u.tenant_id = w.tenant_id
+       where w.tenant_id = $1
+         and ($2::boolean or w.withdrawn_by_user_id = $3)
+         and (
+           $2::boolean = false
+           or not exists (
+             select 1 from till_sessions ts
+             where ts.tenant_id = w.tenant_id
+               and ts.user_id = w.withdrawn_by_user_id
            )
-         group by w.withdrawn_by_user_id`,
-        [tenantId, seeAll, userId],
-      );
-      // #region agent log
-      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"5b973a"},body:JSON.stringify({sessionId:"5b973a",runId:"post-fix",hypothesisId:"A",location:"cash-flow.service.ts:drawerBalances",message:"collected query used users.full_name",data:{rowCount:collected.length,seeAll},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-    } catch (err) {
-      // #region agent log
-      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"5b973a"},body:JSON.stringify({sessionId:"5b973a",runId:"post-fix",hypothesisId:"A",location:"cash-flow.service.ts:drawerBalances",message:"collected query failed",data:{error:err instanceof Error?err.message:"unknown"},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      throw err;
-    }
+         )
+       group by w.withdrawn_by_user_id`,
+      [tenantId, seeAll, userId],
+    );
     const spent = await this.dataSource.query<
       {
         manager_user_id: string;
@@ -548,9 +537,6 @@ export class CashFlowService {
        group by s.manager_user_id`,
       [tenantId, seeAll, userId],
     );
-    // #region agent log
-    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"5b973a"},body:JSON.stringify({sessionId:"5b973a",runId:"post-fix",hypothesisId:"B",location:"cash-flow.service.ts:drawerBalances",message:"expense opening and submission queries finished",data:{expenses:spent.length,openings:openings.length,tillFloats:tillFloats.length,submissions:submissions.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const map = new Map<
       string,
       {

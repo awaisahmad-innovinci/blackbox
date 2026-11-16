@@ -566,7 +566,7 @@ export function AddProductSkuDialog({
         </DialogHeader>
 
         {duplicateMessage ? (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-950 dark:text-amber-200">
+          <div className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-warning ">
             {duplicateMessage}
           </div>
         ) : null}

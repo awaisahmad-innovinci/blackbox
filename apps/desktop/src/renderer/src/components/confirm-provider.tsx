@@ -7,10 +7,6 @@ import {
   type ReactNode,
 } from "react";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
-import {
-  debugInputFreeze,
-  snapshotModalState,
-} from "@renderer/lib/debug-input-freeze";
 import { afterDialogClosed } from "@renderer/lib/on-dialog-open-change";
 
 export type ConfirmOptions = {
@@ -34,14 +30,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
 
   const confirm = useCallback((options: ConfirmOptions) => {
-    // #region agent log
-    debugInputFreeze(
-      "A",
-      "confirm-provider.tsx:open",
-      "custom confirm opened",
-      { title: options.title, ...snapshotModalState() },
-    );
-    // #endregion
     return new Promise<boolean>((resolve) => {
       setPending({ ...options, resolve });
     });
@@ -52,14 +40,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       current?.resolve(confirmed);
       return null;
     });
-    // #region agent log
-    debugInputFreeze(
-      "A",
-      "confirm-provider.tsx:closed",
-      "custom confirm closed",
-      { confirmed, ...snapshotModalState() },
-    );
-    // #endregion
     afterDialogClosed();
   }, []);
 

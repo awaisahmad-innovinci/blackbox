@@ -6,7 +6,11 @@ import type {
 import { inventoryMovementTypeLabel } from "./inventory";
 
 export function escapeCsvField(value: string | number): string {
-  const text = String(value);
+  let text = String(value);
+  // A text cell starting with = + - @ runs as a formula in Excel; prefix ' so it stays text.
+  if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) {
+    text = `'${text}`;
+  }
   if (/[",\r\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }

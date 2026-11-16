@@ -51,6 +51,7 @@ import { TillsService } from "../tills/tills.service";
 import { ActivityLogService } from "../activity-log/activity-log.service";
 import { SaleReturnsService } from "./sale-returns/sale-returns.service";
 import { SaleReturn } from "../db/entities";
+import { warnIfUnitPriceDiffers } from "./sale-price-check";
 
 function toNum(value: string | null | undefined): number {
   if (value == null || value === "") return 0;
@@ -569,6 +570,13 @@ export class SalesService {
             `Product SKU ${line.productSkuId} not found or inactive`,
           );
         }
+        warnIfUnitPriceDiffers({
+          tenantId,
+          saleNumber: header.saleNumber,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          sku: productSku,
+        });
 
         const balanceQty = await getInventoryOutBalanceQty(
           manager,

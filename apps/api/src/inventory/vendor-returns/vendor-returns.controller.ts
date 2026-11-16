@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import type {
   PaginatedVendorReturns,
@@ -20,11 +21,16 @@ import {
   ReturnableQuantityQueryDto,
 } from "./dto/vendor-return.dto";
 import { VendorReturnsService } from "./vendor-returns.service";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../rbac/permissions.guard";
+import { RequirePermissions } from "../../rbac/require-permissions.decorator";
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("vendor-returns")
 export class VendorReturnsController {
   constructor(private readonly vendorReturns: VendorReturnsService) {}
 
+  @RequirePermissions("inventory.access")
   @Post()
   create(@Body() dto: CreateVendorReturnDto): Promise<VendorReturnDetail> {
     return this.vendorReturns.create(dto);

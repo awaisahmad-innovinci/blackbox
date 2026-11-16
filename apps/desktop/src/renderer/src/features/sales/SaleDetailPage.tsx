@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { SaleDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
-import { PrintButton } from "@renderer/components/print-button";
+import { printReceipt, PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
@@ -20,6 +20,8 @@ export function SaleDetailPage() {
   const printBill = Boolean(
     (location.state as { printBill?: boolean } | null)?.printBill,
   );
+  // True only while a reprint is printing, so that copy says DUPLICATE.
+  const [duplicateCopy, setDuplicateCopy] = useState(false);
   const printedBillFor = useRef<string | null>(null);
   const confirm = useConfirm();
   const { user } = useSession();
@@ -77,7 +79,8 @@ export function SaleDetailPage() {
     if (detail.status !== "POSTED") return;
     if (printedBillFor.current === detail.id) return;
     printedBillFor.current = detail.id;
-    window.print();
+    // First receipt right after posting opens the drawer. Reprints never do (BR-005).
+    void printReceipt({ openDrawer: true });
   }, [loading, detail, printBill]);
 
   async function onDiscardDraft() {
@@ -163,7 +166,13 @@ export function SaleDetailPage() {
                 {submittingFbr ? "Sending to FBR…" : "Retry FBR invoice"}
               </Button>
             ) : null}
-            {!isDraft ? <PrintButton openDrawerOnPrint /> : null}
+            {!isDraft ? (
+              <PrintButton
+                label="Reprint"
+                onBeforePrint={() => setDuplicateCopy(true)}
+                onAfterPrint={() => setDuplicateCopy(false)}
+              />
+            ) : null}
             {isDraft && canWrite ? (
               <>
                 <Button onClick={() => navigate(`/sales/new/${detail.id}`)}>
@@ -221,6 +230,7 @@ export function SaleDetailPage() {
             }
             returnCredit={returnCredit ?? undefined}
             fbrEnabled={fbrEnabled}
+            duplicate={duplicateCopy}
           />
         </PrintDocument>
       ) : null}

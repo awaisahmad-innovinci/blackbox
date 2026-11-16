@@ -444,7 +444,7 @@ export function ProductProfilePage() {
                         {s.variantName || "—"}
                       </ListTableLink>
                       {skusMissingSupplier.has(s.id) ? (
-                        <div className="text-amber-700 dark:text-amber-400 mt-1 text-xs">
+                        <div className="text-warning mt-1 text-xs">
                           Needs supplier
                         </div>
                       ) : null}

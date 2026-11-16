@@ -15,7 +15,6 @@ import {
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { RequirePermission } from "@/components/require-permission";
-import { useAuth } from "@/components/auth-provider";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState, PageError, TableSkeleton } from "@/components/page-state";
 import {
@@ -26,14 +25,16 @@ import {
   Th,
   THead,
   Tr,
-} from "@/components/data-table";
+} from "@blackbox/ui/data-table";
 import { RoleTypeBadge } from "@/components/status-badges";
 import { FieldHint, FormError } from "@/components/section-card";
 import { createRole, listRoles, type RoleDto } from "@/lib/admin-api";
 import { toUserFacingError } from "@/lib/api-error";
 
+/** Roles are shared by all shops; only the platform console edits them. */
+const CAN_EDIT_ROLES = false;
+
 export default function RolesPage() {
-  const { hasPermission } = useAuth();
   const [roles, setRoles] = useState<RoleDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -83,7 +84,7 @@ export default function RolesPage() {
           title="Roles"
           description="Roles group permission keys. Authorization checks permissions, not role names."
           actions={
-            hasPermission("roles.write") ? (
+            CAN_EDIT_ROLES ? (
               <Button onClick={() => setOpen(true)}>
                 <Plus className="size-4" />
                 Create role
@@ -99,7 +100,7 @@ export default function RolesPage() {
             title="No roles yet"
             message="Create a custom role to group permissions for your team."
             action={
-              hasPermission("roles.write") ? (
+              CAN_EDIT_ROLES ? (
                 <Button onClick={() => setOpen(true)}>
                   <Plus className="size-4" />
                   Create role

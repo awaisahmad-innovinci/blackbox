@@ -7,12 +7,16 @@ import {
   UploadedFiles,
   UseFilters,
   UseInterceptors,
+  UseGuards,
 } from "@nestjs/common";
 import { AnyFilesInterceptor } from "@nestjs/platform-express";
 import type { MasterDataImportResult } from "@blackbox/shared";
 import type { Response } from "express";
 import { memoryStorage, MulterError } from "multer";
 import { MasterDataImportService } from "./master-data-import.service";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../rbac/permissions.guard";
+import { RequirePermissions } from "../../rbac/require-permissions.decorator";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_UPLOAD_FILES = 1;
@@ -52,11 +56,13 @@ class MasterDataUploadExceptionFilter implements ExceptionFilter {
   }
 }
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("inventory-imports")
 @UseFilters(MasterDataUploadExceptionFilter)
 export class MasterDataImportController {
   constructor(private readonly service: MasterDataImportService) {}
 
+  @RequirePermissions("inventory.access")
   @Post("master-data")
   @UseInterceptors(
     AnyFilesInterceptor({

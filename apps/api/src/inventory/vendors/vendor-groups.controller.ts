@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import type { VendorGroup } from "@blackbox/shared";
 import {
@@ -15,7 +16,11 @@ import {
   UpdateVendorGroupDto,
 } from "../common/dto/taxonomy.dto";
 import { VendorGroupsService } from "./vendor-groups.service";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../rbac/permissions.guard";
+import { RequirePermissions } from "../../rbac/require-permissions.decorator";
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("vendor-groups")
 export class VendorGroupsController {
   constructor(private readonly service: VendorGroupsService) {}
@@ -30,11 +35,13 @@ export class VendorGroupsController {
     return this.service.getById(id);
   }
 
+  @RequirePermissions("vendors.access")
   @Post()
   create(@Body() dto: CreateVendorGroupDto): Promise<VendorGroup> {
     return this.service.create(dto);
   }
 
+  @RequirePermissions("vendors.access")
   @Patch(":id")
   update(
     @Param("id", ParseUUIDPipe) id: string,
@@ -43,16 +50,19 @@ export class VendorGroupsController {
     return this.service.update(id, dto);
   }
 
+  @RequirePermissions("vendors.access")
   @Post(":id/deactivate")
   deactivate(@Param("id", ParseUUIDPipe) id: string): Promise<VendorGroup> {
     return this.service.deactivate(id);
   }
 
+  @RequirePermissions("vendors.access")
   @Post(":id/delete")
   softDelete(@Param("id", ParseUUIDPipe) id: string): Promise<VendorGroup> {
     return this.service.softDelete(id);
   }
 
+  @RequirePermissions("vendors.access")
   @Post(":id/restore")
   restore(@Param("id", ParseUUIDPipe) id: string): Promise<VendorGroup> {
     return this.service.restore(id);

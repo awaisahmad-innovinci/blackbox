@@ -1,81 +1,94 @@
 @import "tailwindcss";
+@import "@fontsource-variable/instrument-sans";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Blackbox Phase 1 — cool ink + teal accent (light-first admin) */
+/*
+ * Blackbox — "Ledger Green + Shelf-tag".
+ * Calm slate ledger for the back office; the shelf-tag yellow (the aisle price sticker)
+ * is reserved for prices, bill totals and amount due — nothing else.
+ */
 :root {
-  --background: oklch(0.985 0.004 240);
-  --foreground: oklch(0.22 0.025 250);
-  --card: oklch(0.995 0.002 240);
-  --card-foreground: oklch(0.22 0.025 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.025 250);
-  --primary: oklch(0.34 0.055 235);
-  --primary-foreground: oklch(0.99 0.005 240);
-  --secondary: oklch(0.955 0.01 240);
-  --secondary-foreground: oklch(0.28 0.03 250);
-  --muted: oklch(0.96 0.008 240);
-  --muted-foreground: oklch(0.5 0.02 250);
-  --accent: oklch(0.95 0.02 210);
-  --accent-foreground: oklch(0.28 0.05 220);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.52 0.12 155);
-  --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.72 0.12 75);
-  --warning-foreground: oklch(0.28 0.04 75);
-  --info: oklch(0.55 0.1 230);
-  --info-foreground: oklch(0.99 0 0);
-  --border: oklch(0.9 0.01 240);
-  --input: oklch(0.9 0.01 240);
-  --ring: oklch(0.55 0.09 210);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.975 0.006 240);
-  --sidebar-foreground: oklch(0.32 0.03 250);
-  --sidebar-primary: oklch(0.34 0.055 235);
-  --sidebar-primary-foreground: oklch(0.99 0.005 240);
-  --sidebar-accent: oklch(0.94 0.02 210);
-  --sidebar-accent-foreground: oklch(0.28 0.05 220);
-  --sidebar-border: oklch(0.9 0.01 240);
-  --sidebar-ring: oklch(0.55 0.09 210);
-  --surface-elevated: oklch(1 0 0);
+  --background: #f8fafc; /* slate-50 canvas */
+  --foreground: #0f172a; /* slate-900 ink */
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f5132; /* ledger green */
+  --primary-hover: #0b3d26;
+  --primary-foreground: #f8fafc;
+  --secondary: #f1f5f9; /* slate-100 */
+  --secondary-foreground: #1e293b;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b; /* slate-500 */
+  --accent: #e8f3ee; /* ledger tint for hover/active rows */
+  --accent-foreground: #0f5132;
+  --destructive: #e11d48; /* rose-600 */
+  --destructive-foreground: #ffffff;
+  --success: #047857; /* emerald-700, 5.5:1 on white */
+  --success-foreground: #ffffff;
+  --warning: #b45309; /* amber-700, 5:1 on white */
+  --warning-foreground: #ffffff;
+  --info: #0369a1; /* sky-700, 5.9:1 on white */
+  --info-foreground: #ffffff;
+  --shelf-tag: #fde047; /* yellow-300 */
+  --shelf-tag-foreground: #0f172a;
+  --border: #e2e8f0; /* slate-200 */
+  --input: #cbd5e1; /* slate-300 */
+  --ring: #0f5132;
+  --radius: 0.625rem; /* panels 10px; inputs/buttons 6px; dialogs 14px */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #334155;
+  --sidebar-primary: #0f5132;
+  --sidebar-primary-foreground: #f8fafc;
+  --sidebar-accent: #e8f3ee;
+  --sidebar-accent-foreground: #0f5132;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #0f5132;
+  --surface-elevated: #ffffff;
+  color-scheme: light;
 }
 
 .dark {
-  --background: oklch(0.17 0.02 250);
-  --foreground: oklch(0.97 0.005 240);
-  --card: oklch(0.2 0.02 250);
-  --card-foreground: oklch(0.97 0.005 240);
-  --popover: oklch(0.2 0.02 250);
-  --popover-foreground: oklch(0.97 0.005 240);
-  --primary: oklch(0.78 0.08 210);
-  --primary-foreground: oklch(0.2 0.03 250);
-  --secondary: oklch(0.26 0.02 250);
-  --secondary-foreground: oklch(0.97 0.005 240);
-  --muted: oklch(0.26 0.02 250);
-  --muted-foreground: oklch(0.7 0.02 240);
-  --accent: oklch(0.28 0.03 220);
-  --accent-foreground: oklch(0.97 0.005 240);
-  --destructive: oklch(0.6 0.18 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.62 0.12 155);
-  --success-foreground: oklch(0.15 0.03 155);
-  --warning: oklch(0.75 0.12 75);
-  --warning-foreground: oklch(0.25 0.04 75);
-  --info: oklch(0.65 0.1 230);
-  --info-foreground: oklch(0.18 0.03 230);
-  --border: oklch(0.3 0.02 250);
-  --input: oklch(0.3 0.02 250);
-  --ring: oklch(0.65 0.08 210);
-  --sidebar: oklch(0.15 0.02 250);
-  --sidebar-foreground: oklch(0.94 0.005 240);
-  --sidebar-primary: oklch(0.78 0.08 210);
-  --sidebar-primary-foreground: oklch(0.18 0.03 250);
-  --sidebar-accent: oklch(0.24 0.03 220);
-  --sidebar-accent-foreground: oklch(0.97 0.005 240);
-  --sidebar-border: oklch(0.28 0.02 250);
-  --sidebar-ring: oklch(0.65 0.08 210);
-  --surface-elevated: oklch(0.22 0.02 250);
+  --background: #020617; /* slate-950 */
+  --foreground: #f1f5f9;
+  --card: #0f172a; /* slate-900 */
+  --card-foreground: #f1f5f9;
+  --popover: #0f172a;
+  --popover-foreground: #f1f5f9;
+  --primary: #34d399; /* emerald-400 */
+  --primary-hover: #6ee7b7;
+  --primary-foreground: #022c22;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8; /* slate-400 */
+  --accent: #10291f;
+  --accent-foreground: #6ee7b7;
+  --destructive: #fb7185; /* rose-400 */
+  --destructive-foreground: #1c0a10;
+  --success: #34d399;
+  --success-foreground: #022c22;
+  --warning: #fbbf24; /* amber-400 */
+  --warning-foreground: #1c1203;
+  --info: #38bdf8; /* sky-400 */
+  --info-foreground: #04131c;
+  --shelf-tag: #fde047;
+  --shelf-tag-foreground: #020617;
+  --border: #1e293b; /* slate-800 */
+  --input: #334155;
+  --ring: #34d399;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #34d399;
+  --sidebar-primary-foreground: #022c22;
+  --sidebar-accent: #10291f;
+  --sidebar-accent-foreground: #6ee7b7;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #34d399;
+  --surface-elevated: #111c33;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -87,6 +100,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-shelf-tag: var(--shelf-tag);
+  --color-shelf-tag-foreground: var(--shelf-tag-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -117,8 +133,8 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display), var(--font-sans), ui-sans-serif, sans-serif;
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-display: "Instrument Sans Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
 }
 
 @layer base {
@@ -147,7 +163,6 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "ss01" on, "cv11" on;
   }
 
   :focus-visible {
@@ -157,5 +172,34 @@
   select:focus-visible,
   textarea:not([data-slot="textarea"]):focus-visible {
     @apply border-ring ring-[3px] ring-ring/50 outline-none;
+  }
+}
+
+@layer utilities {
+  /* Shared page layout helpers (moved here from web/platform so they cannot drift). */
+  .bb-page {
+    @apply mx-auto w-full max-w-6xl space-y-6;
+  }
+
+  .bb-page-narrow {
+    @apply mx-auto w-full max-w-2xl space-y-6;
+  }
+
+  .bb-surface {
+    @apply rounded-xl border border-border bg-card;
+  }
+
+  /* Sign-in canvas: plain ledger canvas, no gradient wash. */
+  .bb-auth-canvas {
+    @apply bg-background;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  /* Every number in tables, totals and inputs lines up. */
+  .bb-num {
+    font-variant-numeric: tabular-nums;
   }
 }

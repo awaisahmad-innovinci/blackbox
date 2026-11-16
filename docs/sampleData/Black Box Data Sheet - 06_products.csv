@@ -1,0 +1,365 @@
+import_key,name,brand_name,category_name,product_type,description,status
+1,SHAHQAM,SHAHQAM,DATES,Stock Item,SHAHQAM,active
+2,National,National Foods,Spices & Masalas,Stock Item,National,active
+3,Shan Foods,Shan Foods,Spices & Masalas,Stock Item,Shan Foods,active
+4,Olper's,Olper's,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,Olper's,active
+5,Sufi,Sufi,Laundry & Fabric Care,Stock Item,Sufi,active
+6,Dalda,Dalda,Cooking Oil,Stock Item,Dalda,active
+7,Canolive,Canolive,Ghee & Banaspati,Stock Item,Canolive,active
+8,Kashmir,Kashmir,Cooking Oil,Stock Item,Kashmir,active
+9,Eva,Eva,Cooking Oil,Stock Item,Eva,active
+10,Sasso,Sasso,Cooking Oil (Specialty / Olive),Stock Item,Sasso,active
+11,Pons,Pons,Cooking Oil (Specialty / Olive),Stock Item,Pons,active
+12,Borges,Borges,Cooking Oil (Specialty / Olive),Stock Item,Borges,active
+13,Mundial,Mundial,Cooking Oil (Specialty / Olive),Stock Item,Mundial,active
+14,Pak Pure,Pak Pure,Ghee & Banaspati,Stock Item,Pak Pure,active
+15,Pak Desi,Pak Desi,Ghee & Banaspati,Stock Item,Pak Desi,active
+16,Youngs,Young's,"Sauces, Condiments & Spreads",Stock Item,Youngs,active
+17,Punjab,Punjab,Ghee & Banaspati,Stock Item,Punjab,active
+18,Hamdard,Hamdard,Spices & Masalas,Stock Item,Hamdard,active
+19,Oreal,Oreal,Spices & Masalas,Stock Item,Oreal,active
+20,Meezan,Meezan,Cooking Oil,Stock Item,Meezan,active
+21,Laziza,Laziza,Baking Ingredients,Stock Item,Laziza,active
+22,Rafhan,Rafhan,Baking Ingredients,Stock Item,Rafhan,active
+23,Bakea,Bakea,Baking Ingredients,Stock Item,Bakea,active
+24,SATANAJ,Satanaj,"Flour, Grains, Spices & Seasonings",Stock Item,SATANAJ,active
+25,Hassan,Hassan,DATES,Stock Item,Hassan,active
+26,IQBAL FOODS,Iqbal Foods,"Flour, Grains, Spices & Seasonings",Stock Item,IQBAL FOODS,active
+27,Sugarie,Sugarie,Baking Ingredients,Stock Item,Sugarie,active
+28,Rossmoor,Rossmoor,Baking Ingredients,Stock Item,Rossmoor,active
+29,Salman's,Salman's,Baking Ingredients,Stock Item,Salman's,active
+30,FALAK,Falak,Spices & Masalas,Stock Item,FALAK,active
+31,FAUJI,Fauji,"Flour, Grains, Spices & Seasonings",Stock Item,FAUJI,active
+32,NAYA FOODS,Naya Foods,"Sauces, Condiments & Spreads",Stock Item,NAYA FOODS,active
+33,GOLD PEAK,Gold Peak,Spices & Masalas,Stock Item,GOLD PEAK,active
+34,My Cook,My Cook,Baking Ingredients,Stock Item,My Cook,active
+35,MARHABA,Marhaba,Herbal & Health Products,Stock Item,MARHABA,active
+36,SUNRISE,Sunrise,Spices & Masalas,Stock Item,SUNRISE,active
+37,BAKEWELL,Bakewell,Baking Ingredients,Stock Item,BAKEWELL,active
+38,PAKEATO,Pakeato,Baking Ingredients,Stock Item,PAKEATO,active
+39,FOODNET,Foodnet,Baking Ingredients,Stock Item,FOODNET,active
+40,Klim,Klim,Baking Ingredients,Stock Item,Klim,active
+41,Mother Choice,Mother Choice,Baking Ingredients,Stock Item,Mother Choice,active
+42,Milkyz Food,Milkyz Food,Baking Ingredients,Stock Item,Milkyz Food,active
+43,RITE,Rite,Spices & Masalas,Stock Item,RITE,active
+44,Nayab,Nayab,Spices & Masalas,Stock Item,Nayab,active
+45,KNORR,Knorr,Spices & Masalas,Stock Item,KNORR,active
+46,BAKE PALOR,Bake Parlor,Pasta & Noodles,Stock Item,BAKE PALOR,active
+47,TANG,Tang,Beverages & Juices,Stock Item,TANG,active
+48,Tapal,Tapal,Tea & Coffee,Stock Item,Tapal,active
+49,SUNSIP,SunSip,Beverages & Juices,Stock Item,SUNSIP,active
+50,Vital Tea,Vital,Tea & Coffee,Stock Item,Vital Tea,active
+51,QARSHI,Qarshi,Herbal & Health Products,Stock Item,QARSHI,active
+52,Brooke Bond Supreme,Brooke Bond,Tea & Coffee,Stock Item,Brooke Bond Supreme,active
+53,Lipton Yellow Label,Lipton,Tea & Coffee,Stock Item,Lipton Yellow Label,active
+54,Life Style,Lifestyle,Herbal & Health Products,Stock Item,Life Style,active
+55,Sucral,Sucral,Health & Specialty Food,Stock Item,Sucral,active
+56,Meetha,Meetha,Health & Specialty Food,Stock Item,Meetha,active
+57,Nawabganic,Nawabganic,Health & Specialty Food,Stock Item,Nawabganic,active
+58,Guard,Guard,"Flour, Grains, Spices & Seasonings",Stock Item,Guard,active
+59,SHEZAN,Shezan,"Sauces, Condiments & Spreads",Stock Item,SHEZAN,active
+60,MITCHELL'S,Mitchell's,"Sauces, Condiments & Spreads",Stock Item,MITCHELL'S,active
+61,Fresher,Fresher,Beverages & Juices,Stock Item,Fresher,active
+62,NEXT,Next,Beverages & Juices,Stock Item,NEXT,active
+63,PepsiCo,PepsiCo,Beverages & Juices,Stock Item,PepsiCo,active
+64,FRUITI-O,Fruiti-O,Beverages & Juices,Stock Item,FRUITI-O,active
+65,TROPICO,Tropico,Beverages & Juices,Stock Item,TROPICO,active
+66,Smile,Smile,Beverages & Juices,Stock Item,Smile,active
+67,COCA COLA,Coca Cola,Beverages & Juices,Stock Item,COCA COLA,active
+68,Gourmet,Gourmet,Beverages & Juices,Stock Item,Gourmet,active
+69,Murree Brewery,Murree Brewery,Beverages & Juices,Stock Item,Murree Brewery,active
+70,Nestle,Nestle,Baby Food & Formula,Stock Item,Nestle,active
+71,SATEEN SOFT,Sateen Soft,Tissue & Paper Products,Stock Item,SATEEN SOFT,active
+72,Molfix,Molfix,Baby Diapers & Wipes,Stock Item,Molfix,active
+73,XTRA CLEEN,Xtra Cleen,Tissue & Paper Products,Stock Item,XTRA CLEEN,active
+74,TULIP,Tulip,Tissue & Paper Products,Stock Item,TULIP,active
+75,COOL&COOL,Cool & Cool,Tissue & Paper Products,Stock Item,COOL&COOL,active
+76,ROSE PETAL,Rose Petal,Tissue & Paper Products,Stock Item,ROSE PETAL,active
+77,Carebaby,Carebaby,Baby Diapers & Wipes,Stock Item,Carebaby,active
+78,Bona Papa,Bona Papa,Baby Diapers & Wipes,Stock Item,Bona Papa,active
+79,Good Care,Good Care,Baby Diapers & Wipes,Stock Item,Good Care,active
+80,TRIBULUS,Tribulus,Tissue & Paper Products,Stock Item,TRIBULUS,active
+81,TUX,TUX,Tissue & Paper Products,Stock Item,TUX,active
+82,PRIME,Prime,"Foil, Wraps & Garbage Bags",Stock Item,PRIME,active
+83,SAFNIC,Safnic,Tissue & Paper Products,Stock Item,SAFNIC,active
+84,SILKEASE,Silkease,Tissue & Paper Products,Stock Item,SILKEASE,active
+85,BEJAAN,Bejaan,Tissue & Paper Products,Stock Item,BEJAAN,active
+86,Bello,Bello,Baby Diapers & Wipes,Stock Item,Bello,active
+87,Momse,Momse,Baby Diapers & Wipes,Stock Item,Momse,active
+88,Canbebe,Canbebe,Baby Diapers & Wipes,Stock Item,Canbebe,active
+89,Wcare,Wcare,Tissue & Paper Products,Stock Item,Wcare,active
+90,Sofnic,Sofnic,Tissue & Paper Products,Stock Item,Sofnic,active
+91,LUXURY SOFT,Luxury Soft,Tissue & Paper Products,Stock Item,LUXURY SOFT,active
+92,NAQOOSH,Naqoosh,Tissue & Paper Products,Stock Item,NAQOOSH,active
+93,Familia,Familia,Tissue & Paper Products,Stock Item,Familia,active
+94,Papia,Papia,Tissue & Paper Products,Stock Item,Papia,active
+95,Mortein,Mortein,Insecticides & Air Fresheners,Stock Item,Mortein,active
+96,Paradise,Paradise,Insecticides & Air Fresheners,Stock Item,Paradise,active
+97,POWERPLUS,Power Plus,Insecticides & Air Fresheners,Stock Item,POWERPLUS,active
+98,KINGTOX,Kingtox,Insecticides & Air Fresheners,Stock Item,KINGTOX,active
+99,OVERKILL,Overkill,Insecticides & Air Fresheners,Stock Item,OVERKILL,active
+100,Fast Action,Fast Action,Dishwash & Household Cleaners,Stock Item,Fast Action,active
+101,Inse Guard,Inse Guard,Insecticides & Air Fresheners,Stock Item,Inse Guard,active
+102,Frey,Frey,Insecticides & Air Fresheners,Stock Item,Frey,active
+103,Sc Johnson,SC Johnson,Insecticides & Air Fresheners,Stock Item,Sc Johnson,active
+104,HAppy,Happy,Soaps & Body Wash,Stock Item,HAppy,active
+105,Air Wicker,Air Wicker,Insecticides & Air Fresheners,Stock Item,Air Wicker,active
+106,KIWI,Kiwi,Shoe Care & Household Accessories,Stock Item,KIWI,active
+107,Nexton,Nexton,Baby Skin & Hair Care,Stock Item,Nexton,active
+108,CHERRY,Cherry,Shoe Care & Household Accessories,Stock Item,CHERRY,active
+109,FUJIAN GOODS,Fujian Goods,Shoe Care & Household Accessories,Stock Item,FUJIAN GOODS,active
+110,STARA,Stara,Shoe Care & Household Accessories,Stock Item,STARA,active
+111,HMD,HMD,Shoe Care & Household Accessories,Stock Item,HMD,active
+112,MOTHERCARE,Mothercare,Baby Skin & Hair Care,Stock Item,MOTHERCARE,active
+113,JOHNSON's,Johnson's,Baby Skin & Hair Care,Stock Item,JOHNSON's,active
+114,SHIELD,Shield,Baby Feeding & Accessories,Stock Item,SHIELD,active
+115,Care,Care,Skin Care & Talc,Stock Item,Care,active
+116,English,English,Oral Care,Stock Item,English,active
+117,BUTTERFLY,Butterfly,Feminine Hygiene,Stock Item,BUTTERFLY,active
+118,Doctor,Doctor,Oral Care,Stock Item,Doctor,active
+119,EDENROC,Edenroc,Baby Skin & Hair Care,Stock Item,EDENROC,active
+120,FORHAN'S,Forhan's,Hair Care,Stock Item,FORHAN'S,active
+121,BLACK CAT,Black Cat,Skin Care & Talc,Stock Item,BLACK CAT,active
+122,NAZUK,Nazuk,Baby Diapers & Wipes,Stock Item,NAZUK,active
+123,PREDO,Predo,Baby Diapers & Wipes,Stock Item,PREDO,active
+124,DOVE,Dove,Hair Care,Stock Item,DOVE,active
+125,IPSA,Ipsa,Baby Feeding & Accessories,Stock Item,IPSA,active
+126,PROBENT,Probent,Baby Feeding & Accessories,Stock Item,PROBENT,active
+127,SHEED,Sheed,Insecticides & Air Fresheners,Stock Item,SHEED,active
+128,Pur,Pur,Baby Feeding & Accessories,Stock Item,Pur,active
+129,ENCHANTEUR,Enchanteur,Skin Care & Talc,Stock Item,ENCHANTEUR,active
+130,SUAVE,Suave,Hair Care,Stock Item,SUAVE,active
+131,NOFEA,Nofea,Feminine Hygiene,Stock Item,NOFEA,active
+132,Trust,Trust,Feminine Hygiene,Stock Item,Trust,active
+133,MOLPED,Molped,Feminine Hygiene,Stock Item,MOLPED,active
+134,Always,Always,Feminine Hygiene,Stock Item,Always,active
+135,Veet,Veet,Hair Removal & Shaving,Stock Item,Veet,active
+136,Nair,Nair,Hair Removal & Shaving,Stock Item,Nair,active
+137,Anne Fresh,Anne Fresh,Hair Removal & Shaving,Stock Item,Anne Fresh,active
+138,Join Beauty,Join Beauty,Hair Removal & Shaving,Stock Item,Join Beauty,active
+139,BONUS,Bonus,Laundry & Fabric Care,Stock Item,BONUS,active
+140,BRITE,Brite,Laundry & Fabric Care,Stock Item,BRITE,active
+141,Lubna's,Lubna's,Hair Removal & Shaving,Stock Item,Lubna's,active
+142,EXPRESS,Express,Laundry & Fabric Care,Stock Item,EXPRESS,active
+143,Rivaj,Rivaj,Hair Removal & Shaving,Stock Item,Rivaj,active
+144,SURF EXCEL,Surf Excel,Laundry & Fabric Care,Stock Item,SURF EXCEL,active
+145,Kahf Cosmetic,Kahf Cosmetic,Hair Removal & Shaving,Stock Item,Kahf Cosmetic,active
+146,Dermacos,Dermacos,Skin Care & Talc,Stock Item,Dermacos,active
+147,Robin,Robin,Laundry & Fabric Care,Stock Item,Robin,active
+148,SUNLIGHT,Sunlight,Dishwash & Household Cleaners,Stock Item,SUNLIGHT,active
+149,DETTOL,Dettol,Soaps & Body Wash,Stock Item,DETTOL,active
+150,Finex,Finex,Hair Removal & Shaving,Stock Item,Finex,active
+151,Rabbit,Rabbit,Laundry & Fabric Care,Stock Item,Rabbit,active
+152,Hero,Hero,Laundry & Fabric Care,Stock Item,Hero,active
+153,Finco,Finco,Laundry & Fabric Care,Stock Item,Finco,active
+154,Vanish,Vanish,Laundry & Fabric Care,Stock Item,Vanish,active
+155,SUNSTONE,Sunstone,Laundry & Fabric Care,Stock Item,SUNSTONE,active
+156,Max,Max,Dishwash & Household Cleaners,Stock Item,Max,active
+157,Vim,Vim,Dishwash & Household Cleaners,Stock Item,Vim,active
+158,ARIEL,Ariel,Laundry & Fabric Care,Stock Item,ARIEL,active
+159,SUN BRITE,Sun Brite,Dishwash & Household Cleaners,Stock Item,SUN BRITE,active
+160,ME&ME,Me & Me,Dishwash & Household Cleaners,Stock Item,ME&ME,active
+161,DOMEX,Domex,Dishwash & Household Cleaners,Stock Item,DOMEX,active
+162,Comfort,Comfort,Laundry & Fabric Care,Stock Item,Comfort,active
+163,Harpic,Harpic,Dishwash & Household Cleaners,Stock Item,Harpic,active
+164,Softlan,Softlan,Laundry & Fabric Care,Stock Item,Softlan,active
+165,Capri,Capri,Soaps & Body Wash,Stock Item,Capri,active
+166,SUNSILK,Sunsilk,Hair Care,Stock Item,SUNSILK,active
+167,LIFEBUOY,Lifebuoy,Soaps & Body Wash,Stock Item,LIFEBUOY,active
+168,Protex,Protex,Soaps & Body Wash,Stock Item,Protex,active
+169,PALMOLIVE,Palmolive,Soaps & Body Wash,Stock Item,PALMOLIVE,active
+170,HEAD & SHOULDERS,Head & Shoulders,Hair Care,Stock Item,HEAD & SHOULDERS,active
+171,SANSOL,Sansol,Hair Care,Stock Item,SANSOL,active
+172,CLEAR,Clear,Hair Care,Stock Item,CLEAR,active
+173,PANTENE,Pantene,Hair Care,Stock Item,PANTENE,active
+174,Vital Soap,Vital,Soaps & Body Wash,Stock Item,Vital Soap,active
+175,TRESEMME,Tresemme,Hair Care,Stock Item,TRESEMME,active
+176,LUX,Lux,Soaps & Body Wash,Stock Item,LUX,active
+177,PERT,Pert,Hair Care,Stock Item,PERT,active
+178,Saeed Ghani,Saeed Ghani,Soaps & Body Wash,Stock Item,Saeed Ghani,active
+179,Golden Prearl,Golden Pearl,Soaps & Body Wash,Stock Item,Golden Prearl,active
+180,Safeguard,Safeguard,Soaps & Body Wash,Stock Item,Safeguard,active
+181,BNB,BNB,Soaps & Body Wash,Stock Item,BNB,active
+182,Meclay London,Meclay London,Hair Care,Stock Item,Meclay London,active
+183,Garnier Fructis,Garnier Fructis,Hair Care,Stock Item,Garnier Fructis,active
+184,Tyfon,Tyfon,Hair Care,Stock Item,Tyfon,active
+185,Bio Amla,Bio Amla,Hair Care,Stock Item,Bio Amla,active
+186,Revlon,Revlon,Hair Care,Stock Item,Revlon,active
+187,Finesse,Finesse,Hair Care,Stock Item,Finesse,active
+188,Vince,Vince,Hair Care,Stock Item,Vince,active
+189,Nyle,Nyle,Hair Care,Stock Item,Nyle,active
+190,XHC,XHC,Hair Care,Stock Item,XHC,active
+191,Schwarzkopf,Schwarzkopf,Hair Care,Stock Item,Schwarzkopf,active
+192,Loreal,L'Oreal,Hair Care,Stock Item,Loreal,active
+193,KEUNE,Keune,Hair Care,Stock Item,KEUNE,active
+194,LAQUILA,Laquila,Soaps & Body Wash,Stock Item,LAQUILA,active
+195,LANA,Lana,Soaps & Body Wash,Stock Item,LANA,active
+196,Yardlie,Yardlie,Hair Care,Stock Item,Yardlie,active
+197,TIMOTEI,Timotei,Hair Care,Stock Item,TIMOTEI,active
+198,Yardley,Yardley,Soaps & Body Wash,Stock Item,Yardley,active
+199,DARI MOOCH,Dari Mooch,Hair Removal & Shaving,Stock Item,DARI MOOCH,active
+200,FAIR&LOVELY,Fair & Lovely,Soaps & Body Wash,Stock Item,FAIR&LOVELY,active
+201,SHANGRILA,Shangrila,"Sauces, Condiments & Spreads",Stock Item,SHANGRILA,active
+202,Haut Notch,Haut Notch,"Sauces, Condiments & Spreads",Stock Item,Haut Notch,active
+203,Fruitamins,Fruitamins,Canned & Preserved Foods,Stock Item,Fruitamins,active
+204,Figaro,Figaro,Canned & Preserved Foods,Stock Item,Figaro,active
+205,Coopoliva,Coopoliva,Canned & Preserved Foods,Stock Item,Coopoliva,active
+206,DIPITT,Dipitt,"Sauces, Condiments & Spreads",Stock Item,DIPITT,active
+207,NANDOS,Nandos,"Sauces, Condiments & Spreads",Stock Item,NANDOS,active
+208,Zia,Zia,"Sauces, Condiments & Spreads",Stock Item,Zia,active
+209,Nutella,Nutella,"Sauces, Condiments & Spreads",Stock Item,Nutella,active
+210,Nur,Nur,Health & Specialty Food,Stock Item,Nur,active
+211,Alshifa,Alshifa,Health & Specialty Food,Stock Item,Alshifa,active
+212,MARIO'S,Mario's,"Sauces, Condiments & Spreads",Stock Item,MARIO'S,active
+213,American Kuisine,American Kuisine,"Sauces, Condiments & Spreads",Stock Item,American Kuisine,active
+214,Hellmann's,Hellmann's,"Sauces, Condiments & Spreads",Stock Item,Hellmann's,active
+215,Drizalle,Drizalle,"Sauces, Condiments & Spreads",Stock Item,Drizalle,active
+216,INDOMIE,Indomie,Pasta & Noodles,Stock Item,INDOMIE,active
+217,KOLSON,Kolson,Pasta & Noodles,Stock Item,KOLSON,active
+218,TREET,Treet,Hair Removal & Shaving,Stock Item,TREET,active
+219,GILLETTE,Gillette,Hair Removal & Shaving,Stock Item,GILLETTE,active
+220,DORCO,Dorco,Hair Removal & Shaving,Stock Item,DORCO,active
+221,Colgate,Colgate,Oral Care,Stock Item,Colgate,active
+222,Braavo,Braavo,Oral Care,Stock Item,Braavo,active
+223,GELLEME,Gelleme,Hair Removal & Shaving,Stock Item,GELLEME,active
+224,Medicam,Medicam,Oral Care,Stock Item,Medicam,active
+225,SENSODYNE,Sensodyne,Oral Care,Stock Item,SENSODYNE,active
+226,Closeup,Closeup,Oral Care,Stock Item,Closeup,active
+227,NIVEA,Nivea,Hair Removal & Shaving,Stock Item,NIVEA,active
+228,DABUR,Dabur,Oral Care,Stock Item,DABUR,active
+229,Nexera,Nexera,Oral Care,Stock Item,Nexera,active
+230,Mr. White,Mr. White,Oral Care,Stock Item,Mr. White,active
+231,Oral-B,Oral-B,Oral Care,Stock Item,Oral-B,active
+232,LISTERINE,Listerine,Oral Care,Stock Item,LISTERINE,active
+233,JOLLY,Jolly,Hair Removal & Shaving,Stock Item,JOLLY,active
+234,PEPSODENT,Pepsodent,Oral Care,Stock Item,PEPSODENT,active
+235,NecLins,NecLins,Oral Care,Stock Item,NecLins,active
+236,KODOMO,Kodomo,Oral Care,Stock Item,KODOMO,active
+237,AXE,Axe,Hair Removal & Shaving,Stock Item,AXE,active
+238,4ME,4ME,Hair Removal & Shaving,Stock Item,4ME,active
+239,ABAAN,Abaan,Oral Care,Stock Item,ABAAN,active
+240,LAYS,Lays,Snacks & Namkeen,Stock Item,LAYS,active
+241,POP NOSH,Pop Nosh,Snacks & Namkeen,Stock Item,POP NOSH,active
+242,CORNTOON,Corntoon,Snacks & Namkeen,Stock Item,CORNTOON,active
+243,SHAHI,Shahi,Snacks & Namkeen,Stock Item,SHAHI,active
+244,SUPER CRISP,Super Crisp,Snacks & Namkeen,Stock Item,SUPER CRISP,active
+245,Festival,Festival,Canned & Preserved Foods,Stock Item,Festival,active
+246,Fruitends,Fruitends,Canned & Preserved Foods,Stock Item,Fruitends,active
+247,Polac,Polac,Canned & Preserved Foods,Stock Item,Polac,active
+248,KORNEEZ,Korneez,Snacks & Namkeen,Stock Item,KORNEEZ,active
+249,Hilal,Hilal,"Biscuits, Cakes & Cookies",Stock Item,Hilal,active
+250,DORITOS,Doritos,Snacks & Namkeen,Stock Item,DORITOS,active
+251,MUNCH OH,Munch Oh,Snacks & Namkeen,Stock Item,MUNCH OH,active
+252,NIMORA,Nimora,Snacks & Namkeen,Stock Item,NIMORA,active
+253,JOJO,Jojo,Chocolates & Confectionery,Stock Item,JOJO,active
+254,MAYFAIR,Mayfair,"Biscuits, Cakes & Cookies",Stock Item,MAYFAIR,active
+255,HNK,HNK,Snacks & Namkeen,Stock Item,HNK,active
+256,WAH REH WAH,Wah Reh Wah,Snacks & Namkeen,Stock Item,WAH REH WAH,active
+257,Peek Freans,Peek Freans,"Biscuits, Cakes & Cookies",Stock Item,Peek Freans,active
+258,LU,LU,"Biscuits, Cakes & Cookies",Stock Item,LU,active
+259,KERNEL POP,Kernel Pop,Snacks & Namkeen,Stock Item,KERNEL POP,active
+260,SWEETZONE,Sweetzone,Chocolates & Confectionery,Stock Item,SWEETZONE,active
+261,HOOPIX,Hoopix,Chocolates & Confectionery,Stock Item,HOOPIX,active
+262,Kraving,Kraving,Chocolates & Confectionery,Stock Item,Kraving,active
+263,Mondelez,Mondelez,Chocolates & Confectionery,Stock Item,Mondelez,active
+264,Bisconni,Bisconni,"Biscuits, Cakes & Cookies",Stock Item,Bisconni,active
+265,Giggly,Giggly,Chocolates & Confectionery,Stock Item,Giggly,active
+266,COOKANIA,Cookania,"Biscuits, Cakes & Cookies",Stock Item,COOKANIA,active
+267,Pick Fit,Pick Fit,Health & Specialty Food,Stock Item,Pick Fit,active
+268,Dr-Talbeena,Dr-Talbeena,Health & Specialty Food,Stock Item,Dr-Talbeena,active
+269,Quaker,Quaker,Health & Specialty Food,Stock Item,Quaker,active
+270,Nature's Home,Nature's Home,Health & Specialty Food,Stock Item,Nature's Home,active
+271,MEIJI,Meiji,Baby Food & Formula,Stock Item,MEIJI,active
+272,MORINAGA,Morinaga,Baby Food & Formula,Stock Item,MORINAGA,active
+273,HORLICKS,Horlicks,Beverages & Juices,Stock Item,HORLICKS,active
+274,OVALTINE,Ovaltine,Beverages & Juices,Stock Item,OVALTINE,active
+275,COMPLAN,Complan,Beverages & Juices,Stock Item,COMPLAN,active
+276,Haleeb,Haleeb,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,Haleeb,active
+277,Nurpur,Nurpur,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,Nurpur,active
+278,MilkFields,MilkFields,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,MilkFields,active
+279,Dairy Omung,Dairy Omung,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,Dairy Omung,active
+280,DayFresh,DayFresh,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,DayFresh,active
+281,COW&GATE,Cow & gate,Baby Food & Formula,Stock Item,COW&GATE,active
+282,ABBOTT,Abbott,Baby Food & Formula,Stock Item,ABBOTT,active
+283,PRINGLES,Pringles,Snacks & Namkeen,Stock Item,PRINGLES,active
+284,Dawn,Dawn,Bakery & Bread,Stock Item,Dawn,active
+285,KITCHEN CUISINE,Kitchen Cuisine,"Sauces, Condiments & Spreads",Stock Item,KITCHEN CUISINE,active
+286,BREAD & BEYOND,Bread & Beyond,Bakery & Bread,Stock Item,BREAD & BEYOND,active
+287,Bunny's,Bunny's,Bakery & Bread,Stock Item,Bunny's,active
+288,ANHAAR,Anhaar,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,ANHAAR,active
+289,PREMA,Prema,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,PREMA,active
+290,ADAM'S,Adam's,"Dairy (UHT Milk, Milk powder, Flavoured Milk)",Stock Item,ADAM'S,active
+291,MARS,Mars,Chocolates & Confectionery,Stock Item,MARS,active
+292,TWIX,Twix,Chocolates & Confectionery,Stock Item,TWIX,active
+293,BOUNTY,Bounty,Chocolates & Confectionery,Stock Item,BOUNTY,active
+294,SNICKERS,Snickers,Chocolates & Confectionery,Stock Item,SNICKERS,active
+295,MASS,Mass,Chocolates & Confectionery,Stock Item,MASS,active
+296,DARK CROWN,Dark Crown,Chocolates & Confectionery,Stock Item,DARK CROWN,active
+297,GALAXY,Galaxy,Chocolates & Confectionery,Stock Item,GALAXY,active
+298,Tops,Tops,Beverages & Juices,Stock Item,Tops,active
+299,HISS,Hiss,"Biscuits, Cakes & Cookies",Stock Item,HISS,active
+300,SHIRIN ASAL,Shirin Asal,Chocolates & Confectionery,Stock Item,SHIRIN ASAL,active
+301,REDBULL,Redbull,Beverages & Juices,Stock Item,REDBULL,active
+302,Markhor,Markhor,Beverages & Juices,Stock Item,Markhor,active
+303,BARBICAN,Barbican,Beverages & Juices,Stock Item,BARBICAN,active
+304,Sabroso,Sabroso,Frozen & Processed Foods,Stock Item,Sabroso,active
+305,Opa,Opa,Frozen & Processed Foods,Stock Item,Opa,active
+306,Menu,Menu,Frozen & Processed Foods,Stock Item,Menu,active
+307,K&N's,K&N's,Frozen & Processed Foods,Stock Item,K&N's,active
+308,Blue Band,Blue Band,Ghee & Banaspati,Stock Item,Blue Band,active
+309,HAMME,Hamme,Hair Care,Stock Item,HAMME,active
+310,FORMULA1,Formula 1,Auto Care,Stock Item,FORMULA1,active
+311,SHINEX,Shinex,Auto Care,Stock Item,SHINEX,active
+312,7CF,7CF,Auto Care,Stock Item,7CF,active
+313,FLAMINGO,Flamingo,Auto Care,Stock Item,FLAMINGO,active
+314,PRATO,Prato,Auto Care,Stock Item,PRATO,active
+315,WZ,WZ,Auto Care,Stock Item,WZ,active
+316,TONYIN,Tonyin,Auto Care,Stock Item,TONYIN,active
+317,LIBAINA,Libaina,Auto Care,Stock Item,LIBAINA,active
+318,TUMLARE,Tumlare,Auto Care,Stock Item,TUMLARE,active
+319,KANGAROO,Kangaroo,Auto Care,Stock Item,KANGAROO,active
+320,AIM,AIM,Auto Care,Stock Item,AIM,active
+321,WD,WD,Auto Care,Stock Item,WD,active
+322,AREON,Areon,Auto Care,Stock Item,AREON,active
+323,GLEDE,Glede,Auto Care,Stock Item,GLEDE,active
+324,E WORLD,E World,Auto Care,Stock Item,E WORLD,active
+325,AIRPRO,Airpro,Auto Care,Stock Item,AIRPRO,active
+326,DTR,DTR,Auto Care,Stock Item,DTR,active
+327,DRIVE,Drive,Auto Care,Stock Item,DRIVE,active
+328,BIG PAW,Big Paw,Pet Care,Stock Item,BIG PAW,active
+329,BENTONITE,Bentonite,Pet Care,Stock Item,BENTONITE,active
+330,MEAOON,Meaoon,Pet Care,Stock Item,MEAOON,active
+331,ROYAL HEART,Royal Heart,Pet Care,Stock Item,ROYAL HEART,active
+332,WHISKAS,Whiskas,Pet Care,Stock Item,WHISKAS,active
+333,TIDEAZ,Tid Eaz,"Foil, Wraps & Garbage Bags",Stock Item,TIDEAZ,active
+334,MYWRAP,My Wrap,"Foil, Wraps & Garbage Bags",Stock Item,MYWRAP,active
+335,DIAMOND,Diamond,"Foil, Wraps & Garbage Bags",Stock Item,DIAMOND,active
+336,SMART,Smart,"Foil, Wraps & Garbage Bags",Stock Item,SMART,active
+337,SOHNI'S,Sohni's,"Foil, Wraps & Garbage Bags",Stock Item,SOHNI'S,active
+338,DASTARKHWAN,Dastarkhwan,"Foil, Wraps & Garbage Bags",Stock Item,DASTARKHWAN,active
+339,Wipes,Wipes,"Foil, Wraps & Garbage Bags",Stock Item,Wipes,active
+340,Smart Bin Roll,Smart,"Foil, Wraps & Garbage Bags",Stock Item,Smart Bin Roll,active
+341,Triox,Triox,Dishwash & Household Cleaners,Stock Item,Triox,active
+342,Heavy Duty,Heavy Duty,Dishwash & Household Cleaners,Stock Item,Heavy Duty,active
+343,Favourite,Favourite,Tissue & Paper Products,Stock Item,Favourite,active
+344,Pulses,SHEWAR,"Flour, Grains, Spices & Seasonings",Stock Item,Pulses,active
+345,Al-Hashir,Al-Hashir,Spices & Masalas,Stock Item,Al-Hashir,active
+346,Spices,SHEWAR,Spices & Masalas,Stock Item,Spices,active
+347,Hico,Hico,Ice Cream & Desserts,Stock Item,Hico,active
+348,Omore,Omore,Ice Cream & Desserts,Stock Item,Omore,active
+349,Wall's,Wall's,Ice Cream & Desserts,Stock Item,Wall's,active
+350,Al-Sheer,Al-Sheer,Ice Cream & Desserts,Stock Item,Al-Sheer,active
+351,sugar pops,Sugar Pops,Chocolates & Confectionery,Stock Item,sugar pops,active
+352,Energizer,Energizer,Batteries,Stock Item,Energizer,active
+353,VIENNA,Vienna,Chocolates & Confectionery,Stock Item,VIENNA,active
+354,Kinder Joy-01,Kinder Joy,Chocolates & Confectionery,Stock Item,Kinder Joy-01,active
+355,Eveready,Eveready,Batteries,Stock Item,Eveready,active
+356,CHOCOLATE B&B,Chocolate B&B,Chocolates & Confectionery,Stock Item,CHOCOLATE B&B,active
+357,SAVORIA,Savoria,Chocolates & Confectionery,Stock Item,SAVORIA,active
+358,TRIDENT,Trident,Chocolates & Confectionery,Stock Item,TRIDENT,active
+359,CHOCI TOKI,Choci Toki,Chocolates & Confectionery,Stock Item,CHOCI TOKI,active
+360,CANDY CONNECTIONS,Candy Connections,Chocolates & Confectionery,Stock Item,CANDY CONNECTIONS,active
+361,GOFY,Gofy,Chocolates & Confectionery,Stock Item,GOFY,active
+362,CANDY SHANDY,Candy Shandy,Chocolates & Confectionery,Stock Item,CANDY SHANDY,active
+363,HAQ HALAL FOOD,Haq Halal Food,Health & Specialty Food,Stock Item,HAQ HALAL FOOD,active
+364,SUGGA & SWIRLS,Sugga & Swirls,Chocolates & Confectionery,Stock Item,SUGGA & SWIRLS,active

@@ -8,7 +8,11 @@ import type {
 import {
   ACTIVITY_LOG_EVENT_LABELS,
   ACTIVITY_LOG_EVENT_TYPES,
+  escapeCsvField,
 } from "@blackbox/shared";
+import { Download } from "lucide-react";
+import { toast } from "@blackbox/ui/sonner";
+import { downloadTextFile } from "@/lib/download-file";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -23,12 +27,18 @@ import {
   Th,
   THead,
   Tr,
-} from "@/components/data-table";
+} from "@blackbox/ui/data-table";
 import { listActivityLogs } from "@/lib/activity-logs-api";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
 function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString();
 }
+
+// ponytail: client-side export through the paged list API, capped at 5,000 rows.
+// Move to a server CSV/PDF endpoint (PRD FR-AUD-006) if logs grow past that.
+const EXPORT_PAGE_SIZE = 100;
+const EXPORT_MAX_ROWS = 5000;
 
 export default function ActivityPage() {
   const [items, setItems] = useState<ActivityLogItem[]>([]);
@@ -65,6 +75,49 @@ export default function ActivityPage() {
   }, [load]);
 
   const pageCount = Math.max(1, Math.ceil(total / 25));
+  const [exporting, setExporting] = useState(false);
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const rows: ActivityLogItem[] = [];
+      for (let p = 1; rows.length < EXPORT_MAX_ROWS; p += 1) {
+        const result = await listActivityLogs({
+          page: p,
+          pageSize: EXPORT_PAGE_SIZE,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          eventType: eventType || undefined,
+        });
+        rows.push(...result.items);
+        if (result.items.length < EXPORT_PAGE_SIZE || rows.length >= result.total) break;
+      }
+      const lines = [
+        ["When", "Event", "Actor", "Supervisor", "Subject", "Summary"].join(","),
+        ...rows.slice(0, EXPORT_MAX_ROWS).map((row) =>
+          [
+            formatWhen(row.createdAt),
+            ACTIVITY_LOG_EVENT_LABELS[row.eventType],
+            row.actorName,
+            row.supervisorName ?? "",
+            row.subjectName ?? "",
+            row.summary,
+          ]
+            .map(escapeCsvField)
+            .join(","),
+        ),
+      ];
+      await downloadTextFile(
+        `activity-log-${new Date().toISOString().slice(0, 10)}.csv`,
+        lines.join("\r\n"),
+      );
+      toast.success(`Exported ${Math.min(rows.length, EXPORT_MAX_ROWS)} events`);
+    } catch {
+      toast.error("Could not export the activity log. Try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <RequirePermission permissions={["activity.read"]}>
@@ -72,6 +125,16 @@ export default function ActivityPage() {
         <PageHeader
           title="Activity log"
           description="POS actions that required manager approval and till events."
+          actions={
+            <Button
+              variant="outline"
+              disabled={exporting || total === 0}
+              onClick={() => void exportCsv()}
+            >
+              <Download className="size-4" aria-hidden />
+              {exporting ? "Exporting…" : "Export CSV"}
+            </Button>
+          }
         />
 
         <div className="mb-6 grid gap-4 sm:grid-cols-4">
@@ -101,9 +164,9 @@ export default function ActivityPage() {
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="activityEventType">Event type</Label>
-            <select
+            <NativeSelect
               id="activityEventType"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              className="w-full"
               value={eventType}
               onChange={(e) => {
                 setPage(1);
@@ -116,7 +179,7 @@ export default function ActivityPage() {
                   {ACTIVITY_LOG_EVENT_LABELS[type]}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
         </div>
 

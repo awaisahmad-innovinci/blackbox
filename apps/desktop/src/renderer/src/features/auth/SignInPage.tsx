@@ -40,10 +40,19 @@ export function SignInPage() {
   }
 
   return (
-    <div className="bg-background text-foreground flex min-h-screen items-center justify-center px-6">
+    <div className="bg-background text-foreground flex min-h-screen flex-col items-center justify-center gap-6 px-6">
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden
+          className="bg-shelf-tag text-shelf-tag-foreground flex size-9 items-center justify-center rounded-md text-base font-bold"
+        >
+          B
+        </span>
+        <span className="text-xl font-semibold tracking-tight">Blackbox</span>
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Sign in to Blackbox</CardTitle>
+          <CardTitle className="text-xl">Sign in</CardTitle>
           <p className="text-muted-foreground text-sm">
             Use the credentials your owner created for you. This machine is
             registered as a device on first sign in.

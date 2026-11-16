@@ -491,6 +491,7 @@ declare global {
         ) => Promise<{ ok: true }>;
         listPrinters: () => Promise<PosPrinterInfo[]>;
         openCashDrawer: () => Promise<{ ok: true }>;
+        printSilently?: () => Promise<{ ok: true } | { ok: false; error: string }>;
         testDrawer: () => Promise<{ ok: true }>;
         getCardTerminalSettings: () => Promise<PosCardTerminalSettings>;
         saveCardTerminalSettings: (

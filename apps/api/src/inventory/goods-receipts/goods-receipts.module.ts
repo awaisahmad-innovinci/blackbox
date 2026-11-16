@@ -17,9 +17,11 @@ import {
 import { GoodsReceiptsController } from "./goods-receipts.controller";
 import { GoodsReceiptsService } from "./goods-receipts.service";
 import { ActivityLogModule } from "../../activity-log/activity-log.module";
+import { RbacModule } from "../../rbac/rbac.module";
 
 @Module({
   imports: [
+    RbacModule,
     ActivityLogModule,
     TypeOrmModule.forFeature([
       GoodsReceipt,

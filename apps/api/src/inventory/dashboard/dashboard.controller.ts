@@ -29,6 +29,7 @@ function parseOptionalNonNegativeNumber(
 }
 
 /** Phase A: public (no JWT). Scoped via FixedTenantContext / DEV_TENANT_ID. */
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("dashboard")
 export class DashboardController {
   constructor(

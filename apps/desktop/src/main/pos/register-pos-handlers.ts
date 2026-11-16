@@ -37,6 +37,24 @@ export function registerPosHandlers(
     return listOsPrinters(window);
   });
 
+  // Silent receipt print (opt-in setting). Prints the current page to the saved printer.
+  ipcMain.handle("pos:printSilently", async () => {
+    const window = getMainWindow();
+    if (!window) return { ok: false as const, error: "No window" };
+    const settings = loadPosPrinterSettings();
+    return new Promise<{ ok: true } | { ok: false; error: string }>((resolve) => {
+      window.webContents.print(
+        {
+          silent: true,
+          printBackground: true,
+          ...(settings.printerName ? { deviceName: settings.printerName } : {}),
+        },
+        (success, failureReason) =>
+          resolve(success ? { ok: true } : { ok: false, error: failureReason || "Print failed" }),
+      );
+    });
+  });
+
   ipcMain.handle("pos:openCashDrawer", async () => {
     await openCashDrawer();
     return { ok: true as const };

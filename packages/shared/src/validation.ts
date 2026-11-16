@@ -1,10 +1,11 @@
-export const PERSON_NAME_PATTERN = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
+/** Letters in any script (Urdu, accents), with single spaces, apostrophes, dots or hyphens between. */
+export const PERSON_NAME_PATTERN = /^\p{L}+(?:[ '.-]\p{L}+)*\.?$/u;
 export const USERNAME_PATTERN = /^[A-Za-z0-9!@#$%^&*()_+=.-]+$/;
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const PHONE_11_DIGIT_PATTERN = /^[0-9]{11}$/;
 
 export const PERSON_NAME_MESSAGE =
-  "Name may only contain letters and spaces (no numbers or special characters)";
+  "Name may only contain letters, spaces, apostrophes, dots and hyphens";
 export const USERNAME_MESSAGE =
   "Username may contain letters, numbers, and special characters, without spaces";
 export const EMAIL_MESSAGE = "Enter a valid email address";

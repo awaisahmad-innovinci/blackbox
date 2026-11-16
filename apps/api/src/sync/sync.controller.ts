@@ -97,7 +97,7 @@ export class SyncController {
 
   @Post("retain")
   @RequirePermissions("devices.manage")
-  retain() {
-    return this.sync.retainHistory();
+  retain(@CurrentUser() user: TenantContext) {
+    return this.sync.retainHistory(user.tenantId);
   }
 }

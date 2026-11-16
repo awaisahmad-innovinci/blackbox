@@ -33,6 +33,9 @@ import {
   setPlatformToken,
   setTenantActive,
 } from "@/lib/api";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
+import { PageHeader } from "@blackbox/ui/page-header";
+import { PlatformNav } from "@/components/platform-nav";
 
 type IssuedCredentials = {
   name: string;
@@ -81,6 +84,10 @@ export function TenantManagement() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [issued, setIssued] = useState<IssuedCredentials | null>(null);
+  // Deactivating locks a whole shop out, so the operator types its name first (review PL2).
+  const [confirmTenant, setConfirmTenant] = useState<PlatformTenantSummary | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async (accessToken: string) => {
     setLoading(true);
@@ -239,6 +246,15 @@ export function TenantManagement() {
     setPasswordSaveError(null);
   }
 
+  const searchQuery = search.trim().toLowerCase();
+  const visibleTenants = searchQuery
+    ? tenants.filter((t) =>
+        [t.name, t.owner?.fullName, t.owner?.email, t.owner?.username].some((v) =>
+          v?.toLowerCase().includes(searchQuery),
+        ),
+      )
+    : tenants;
+
   const ownerPasswordErr = passwordAttempted
     ? ownerPassword.length < 8
       ? "Password must be at least 8 characters"
@@ -350,20 +366,11 @@ export function TenantManagement() {
 
   return (
     <div className="bb-page px-6 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
-            Tenant management
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Create a workspace and give the owner these credentials. They sign
-            in on the tenant site.
-          </p>
-        </div>
-        <Button type="button" variant="outline" onClick={signOut}>
-          Sign out
-        </Button>
-      </header>
+      <PlatformNav onSignOut={signOut} />
+      <PageHeader
+        title="Tenants"
+        description="Create a shop and give the owner their sign-in details. They sign in on the back office site."
+      />
 
       <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
         <Card>
@@ -560,6 +567,14 @@ export function TenantManagement() {
               ) : tenants.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No tenants yet.</p>
               ) : (
+                <div className="space-y-3">
+                <Input
+                  type="search"
+                  placeholder="Search by business, owner, email or username"
+                  aria-label="Search tenants"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="text-muted-foreground border-b text-xs">
@@ -573,7 +588,14 @@ export function TenantManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tenants.map((tenant) => (
+                      {visibleTenants.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-muted-foreground py-6 text-center">
+                            No tenants match “{search}”.
+                          </td>
+                        </tr>
+                      ) : null}
+                      {visibleTenants.map((tenant) => (
                         <Fragment key={tenant.id}>
                           <tr
                             className={`cursor-pointer border-b ${
@@ -581,7 +603,19 @@ export function TenantManagement() {
                             }`}
                             onClick={() => selectTenant(tenant)}
                           >
-                            <td className="py-3 pr-3 font-medium">{tenant.name}</td>
+                            <td className="py-3 pr-3 font-medium">
+                              <button
+                                type="button"
+                                aria-expanded={selectedId === tenant.id}
+                                className="rounded text-left outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  selectTenant(tenant);
+                                }}
+                              >
+                                {tenant.name}
+                              </button>
+                            </td>
                             <td className="py-3 pr-3">
                               {tenant.owner?.fullName ?? "—"}
                             </td>
@@ -605,7 +639,11 @@ export function TenantManagement() {
                                 disabled={
                                   busyId === tenant.id || savingPasswordId === tenant.id
                                 }
-                                onClick={() => void toggleActive(tenant)}
+                                onClick={() =>
+                                  tenant.isActive
+                                    ? (setConfirmTenant(tenant), setConfirmText(""))
+                                    : void toggleActive(tenant)
+                                }
                               >
                                 {tenant.isActive ? "Deactivate" : "Activate"}
                               </Button>
@@ -686,11 +724,37 @@ export function TenantManagement() {
                     </tbody>
                   </table>
                 </div>
+                </div>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmTenant != null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmTenant(null);
+        }}
+        destructive
+        title={`Deactivate ${confirmTenant?.name ?? "this shop"}?`}
+        description="Everyone in this shop is signed out and cannot sign in until you activate it again. Type the shop name to confirm."
+        confirmLabel="Deactivate shop"
+        confirmDisabled={confirmText.trim() !== (confirmTenant?.name ?? "").trim()}
+        loading={confirmTenant != null && busyId === confirmTenant.id}
+        onConfirm={async () => {
+          if (!confirmTenant) return;
+          await toggleActive(confirmTenant);
+          setConfirmTenant(null);
+        }}
+      >
+        <Input
+          aria-label="Shop name"
+          placeholder={confirmTenant?.name}
+          value={confirmText}
+          onChange={(event) => setConfirmText(event.target.value)}
+        />
+      </ConfirmDialog>
     </div>
   );
 }

@@ -20,6 +20,9 @@ import { ReplaceRolePermissionsDto } from "./dto/replace-role-permissions.dto";
 import { UpdateRoleDto } from "./dto/update-role.dto";
 import { RolesService } from "./roles.service";
 
+const ROLES_PLATFORM_ONLY =
+  "Roles are shared by all shops and are managed by Blackbox support";
+
 @Controller("roles")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RolesController {
@@ -40,28 +43,30 @@ export class RolesController {
     return this.rolesService.getById(id);
   }
 
+  // Roles are one shared catalog for every shop (migration 20261112150000_global_roles).
+  // A tenant edit would change every shop, so only the platform console may write roles.
   @Post()
   @RequirePermissions("roles.write")
-  create(@Body() dto: CreateRoleDto) {
-    return this.rolesService.create(dto);
+  create(@Body() _dto: CreateRoleDto): never {
+    throw new ForbiddenException(ROLES_PLATFORM_ONLY);
   }
 
   @Patch(":id")
   @RequirePermissions("roles.write")
   update(
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body() dto: UpdateRoleDto,
-  ) {
-    return this.rolesService.update(id, dto);
+    @Param("id", ParseUUIDPipe) _id: string,
+    @Body() _dto: UpdateRoleDto,
+  ): never {
+    throw new ForbiddenException(ROLES_PLATFORM_ONLY);
   }
 
   @Put(":id/permissions")
   @RequirePermissions("roles.write")
   replacePermissions(
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body() dto: ReplaceRolePermissionsDto,
-  ) {
-    return this.rolesService.replacePermissions(id, dto);
+    @Param("id", ParseUUIDPipe) _id: string,
+    @Body() _dto: ReplaceRolePermissionsDto,
+  ): never {
+    throw new ForbiddenException(ROLES_PLATFORM_ONLY);
   }
 
   private assertCanRead(user: TenantContext): void {

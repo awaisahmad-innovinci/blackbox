@@ -17,7 +17,6 @@ type ApiFetchOptions = RequestInit & {
 
 type JsonBody = object | unknown[] | null;
 
-let refreshInFlight: Promise<boolean> | null = null;
 let onSessionCleared: (() => void) | null = null;
 
 export function setOnSessionCleared(handler: (() => void) | null): void {
@@ -68,16 +67,24 @@ function messageFromBody(status: number, body: unknown): string {
  * Single-flight refresh: concurrent 401s share one refresh call.
  * On success, atomically replaces bb_refresh with the rotated token.
  */
-export async function refreshAccessToken(): Promise<boolean> {
-  if (refreshInFlight) {
-    return refreshInFlight;
+/**
+ * "invalid" = the refresh token was refused (signed out for real);
+ * "unavailable" = network or server error — keep the session and let the user retry (review W2).
+ */
+export type RefreshResult = "ok" | "invalid" | "unavailable";
+
+let refreshDetailedInFlight: Promise<RefreshResult> | null = null;
+
+export async function refreshAccessTokenDetailed(): Promise<RefreshResult> {
+  if (refreshDetailedInFlight) {
+    return refreshDetailedInFlight;
   }
 
-  refreshInFlight = (async () => {
+  refreshDetailedInFlight = (async (): Promise<RefreshResult> => {
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
       clearSessionTokens();
-      return false;
+      return "invalid";
     }
 
     try {
@@ -87,33 +94,38 @@ export async function refreshAccessToken(): Promise<boolean> {
         body: JSON.stringify({ refreshToken }),
       });
 
+      if (res.status >= 500) return "unavailable";
+
       const body = await parseJsonSafe(res);
       if (!res.ok) {
         clearSessionTokens();
-        return false;
+        return "invalid";
       }
 
       const tokens = (body as { tokens?: { accessToken?: string; refreshToken?: string } })
         ?.tokens;
       if (!tokens?.accessToken || !tokens.refreshToken) {
         clearSessionTokens();
-        return false;
+        return "invalid";
       }
 
       applyAuthTokens({
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       });
-      return true;
+      return "ok";
     } catch {
-      clearSessionTokens();
-      return false;
+      return "unavailable";
     } finally {
-      refreshInFlight = null;
+      refreshDetailedInFlight = null;
     }
   })();
 
-  return refreshInFlight;
+  return refreshDetailedInFlight;
+}
+
+export async function refreshAccessToken(): Promise<boolean> {
+  return (await refreshAccessTokenDetailed()) === "ok";
 }
 
 export async function apiFetch<T = unknown>(
@@ -148,14 +160,17 @@ export async function apiFetch<T = unknown>(
   }
 
   if (res.status === 401 && !skipAuth && !_isRetry) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
+    const refreshed = await refreshAccessTokenDetailed();
+    if (refreshed === "ok") {
       // Retry original request exactly once — no recursive refresh.
       return apiFetch<T>(path, { ...options, _isRetry: true });
     }
+    if (refreshed === "unavailable") {
+      throw new TypeError("Network request failed");
+    }
     clearSessionTokens();
     notifySessionCleared();
-    throw new ApiError(401, friendlyMessage(401));
+    throw new ApiError(401, "Your session has expired. Please sign in again.");
   }
 
   const body = await parseJsonSafe(res);

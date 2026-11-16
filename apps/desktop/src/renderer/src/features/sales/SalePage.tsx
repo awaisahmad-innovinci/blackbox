@@ -27,17 +27,15 @@ import { ScanBarcodePanel } from "@renderer/components/scan-barcode-panel";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
-import {
-  KEYBOARD_HINT_ENTER,
-  KEYBOARD_HINT_SAVE,
-  KEYBOARD_HINT_SCAN,
-  KeyboardHints,
-} from "@renderer/components/keyboard-hints";
+import { Kbd } from "@blackbox/ui/kbd";
+import { PriceTag } from "@blackbox/ui/price-tag";
+import { ScanLine } from "lucide-react";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { removeTableLineConfirmOptions } from "@renderer/lib/confirm-remove-line";
 import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
 import {
   barcodeScanInputProps,
+  handledScanEnterEvents,
   useBarcodeScanTarget,
 } from "@renderer/lib/barcode-scan";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
@@ -63,6 +61,12 @@ import {
   loadCurrentTill,
 } from "@renderer/lib/local-db/till-source";
 import { AddSaleItemDialog } from "./AddSaleItemDialog";
+import { SaleKeyHintBar } from "./sale-key-hint-bar";
+import {
+  matchSaleKey,
+  playScanErrorBeep,
+  SALE_KEYS,
+} from "./sale-keymap";
 import { AdjustSaleQtyDialog } from "./AdjustSaleQtyDialog";
 import { CollectCashDialog } from "./CollectCashDialog";
 import { allocateHoldNumber, allocateSaleNumber } from "@renderer/lib/document-numbers";
@@ -211,6 +215,9 @@ export function SalePage() {
   const [customerName, setCustomerName] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<DraftSaleLine[]>([]);
+  // Latest rendered lines, so scan errors are decided outside setState updaters (review U7).
+  const linesRef = useRef<DraftSaleLine[]>(lines);
+  linesRef.current = lines;
   const [payments, setPayments] = useState<DraftPayment[]>([]);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const [scanDraft, setScanDraft] = useState("");
@@ -223,6 +230,7 @@ export function SalePage() {
   const [adjustingQty, setAdjustingQty] = useState(false);
   const [showCustomerField, setShowCustomerField] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
+  const [scanFlash, setScanFlash] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [holding, setHolding] = useState(false);
@@ -284,9 +292,6 @@ export function SalePage() {
         setWarehouses(rows);
         if (rows.length > 0) {
           setWarehouseId((current) => current || rows[0]!.id);
-          // #region agent log
-          fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"post-fix",hypothesisId:"E",location:"SalePage.tsx:warehouses",message:"default warehouse",data:{firstId:rows[0]!.id,firstName:rows[0]!.name,count:rows.length},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
         }
       })
       .catch(() => undefined);
@@ -710,16 +715,21 @@ export function SalePage() {
     const sellUnit: SellUnit =
       multiplier > 1 && multiplier >= unitsPerPurchaseUnit ? "box" : "pc";
 
-    let scanError: string | null = null;
+    const current = linesRef.current.find((line) => line.productSkuId === row.id);
+    const scanError =
+      (current
+        ? round4(current.quantity + multiplier) + current.focQuantity > available
+        : multiplier > available)
+        ? `Cannot exceed POS balance (${available}) for ${row.sku}`
+        : null;
+    if (scanError) return scanError;
 
     setLines((prev) => {
       const existing = prev.find((line) => line.productSkuId === row.id);
       if (existing) {
         const nextQty = round4(existing.quantity + multiplier);
-        if (nextQty + existing.focQuantity > available) {
-          scanError = `Cannot exceed POS balance (${available}) for ${row.sku}`;
-          return prev;
-        }
+        // Still guarded here for several scans landing in one render.
+        if (nextQty + existing.focQuantity > available) return prev;
         return prev.map((line) =>
           line.productSkuId === row.id
             ? {
@@ -732,10 +742,7 @@ export function SalePage() {
         );
       }
 
-      if (multiplier > available) {
-        scanError = `Cannot exceed POS balance (${available}) for ${row.sku}`;
-        return prev;
-      }
+      if (multiplier > available) return prev;
 
       return [
         ...prev,
@@ -760,10 +767,8 @@ export function SalePage() {
       ];
     });
 
-    if (!scanError) {
-      focusScanInput();
-    }
-    return scanError;
+    focusScanInput();
+    return null;
   }
 
   function onAddManyFromDialog(rows: SkuSearchResult[]) {
@@ -795,16 +800,16 @@ export function SalePage() {
       return `No POS balance for ${row.sku}`;
     }
 
-    let focError: string | null = null;
+    const current = linesRef.current.find((line) => line.productSkuId === row.id);
+    if (current && round4(current.quantity + current.focQuantity + 1) > available) {
+      return `Cannot exceed POS balance (${available}) for ${row.sku}`;
+    }
 
     setLines((prev) => {
       const existing = prev.find((line) => line.productSkuId === row.id);
       if (existing) {
         const nextFoc = existing.focQuantity + 1;
-        if (round4(existing.quantity + nextFoc) > available) {
-          focError = `Cannot exceed POS balance (${available}) for ${row.sku}`;
-          return prev;
-        }
+        if (round4(existing.quantity + nextFoc) > available) return prev;
         return prev.map((line) =>
           line.productSkuId === row.id
             ? { ...line, focQuantity: nextFoc }
@@ -835,7 +840,7 @@ export function SalePage() {
       ];
     });
 
-    return focError;
+    return null;
   }
 
   function onAddManyFocFromDialog(rows: SkuSearchResult[]) {
@@ -850,6 +855,12 @@ export function SalePage() {
     }
     setError(lastError);
     setFocItemOpen(false);
+  }
+
+  function signalScanError(): void {
+    playScanErrorBeep();
+    setScanFlash(true);
+    window.setTimeout(() => setScanFlash(false), 700);
   }
 
   async function processScanQueue(): Promise<void> {
@@ -870,15 +881,19 @@ export function SalePage() {
             excludeDraftSaleId: editingDraftId,
           });
           const err = upsertScannedLine(row);
-          if (err) setError(err);
+          if (err) {
+            setError(err);
+            signalScanError();
+          }
         } catch (err: unknown) {
           setError(getApiErrorMessage(err, "SKU not found for barcode"));
+          signalScanError();
         }
       }
     } finally {
       scanProcessingRef.current = false;
       setScanBusy(false);
-      setScanDraft("");
+      // Draft is already cleared on Enter; clearing here would drop a scan typed meanwhile.
       focusScanInput();
     }
   }
@@ -1594,60 +1609,45 @@ export function SalePage() {
     if (loadingDraft) return;
 
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
-        return;
-      }
-      if (event.key === "F1") {
-        event.preventDefault();
-        if (lines.length > 0) setRemoveScanOpen(true);
-        return;
-      }
-      if (event.key === "F8") {
-        event.preventDefault();
-        if (lines.length > 0) setAdjustScanOpen(true);
-        return;
-      }
-      if (event.key === "F6") {
-        event.preventDefault();
-        if (canHold && !holding) void onHoldBill();
-        return;
-      }
-      if (event.key === "F7") {
-        event.preventDefault();
-        navigate("/sales/held");
-        return;
-      }
-      if (event.key === "F10") {
-        event.preventDefault();
-        if (warehouseId && !itemOpen && !focItemOpen && !scanBusy) {
-          setFocItemOpen(true);
-        }
-        return;
-      }
-      if (event.key === "F4") {
-        event.preventDefault();
-        if (isSplitPayment) {
-          splitCashAmountRef.current?.focus();
-          splitCashAmountRef.current?.select();
-        } else {
-          paymentAmountRef.current?.focus();
-          paymentAmountRef.current?.select();
-        }
-        return;
-      }
-      if (event.key === "F2") {
-        event.preventDefault();
-        if (amountDue > 0) selectPaymentMode("split");
-        return;
-      }
-      if (event.key === "F5") {
-        event.preventDefault();
-        if (amountDue > 0) selectPaymentMode("cash");
-        return;
-      }
-      if (event.key === "F9") {
-        event.preventDefault();
-        if (amountDue > 0) selectPaymentMode("card");
+      const action = matchSaleKey(event);
+      if (!action) return;
+      event.preventDefault();
+      switch (action) {
+        case "remove":
+          if (lines.length > 0) setRemoveScanOpen(true);
+          return;
+        case "adjust":
+          if (lines.length > 0) setAdjustScanOpen(true);
+          return;
+        case "hold":
+          if (canHold && !holding) void onHoldBill();
+          return;
+        case "held":
+          navigate("/sales/held");
+          return;
+        case "foc":
+          if (warehouseId && !itemOpen && !focItemOpen && !scanBusy) {
+            setFocItemOpen(true);
+          }
+          return;
+        case "tender":
+          if (isSplitPayment) {
+            splitCashAmountRef.current?.focus();
+            splitCashAmountRef.current?.select();
+          } else {
+            paymentAmountRef.current?.focus();
+            paymentAmountRef.current?.select();
+          }
+          return;
+        case "split":
+          if (amountDue > 0) selectPaymentMode("split");
+          return;
+        case "cash":
+          if (amountDue > 0) selectPaymentMode("cash");
+          return;
+        case "card":
+          if (amountDue > 0) selectPaymentMode("card");
+          return;
       }
     }
 
@@ -1680,36 +1680,57 @@ export function SalePage() {
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
-      <div className="border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2 text-sm">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-semibold">
-            {user?.tenantName?.trim() || "Store"}
-          </span>
-          <span className="text-muted-foreground">·</span>
-          <span>{user?.fullName?.trim() || user?.username || "Cashier"}</span>
+      <div className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2 text-sm">
+        <dl className="flex flex-wrap items-center gap-x-5 gap-y-1">
+          <div className="flex items-center gap-1.5">
+            <dt className="sr-only">Store</dt>
+            <dd className="font-semibold">{user?.tenantName?.trim() || "Store"}</dd>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="text-muted-foreground">Cashier</dt>
+            <dd>{user?.fullName?.trim() || user?.username || "Cashier"}</dd>
+          </div>
           {tillStatusLabel ? (
-            <>
-              <span className="text-muted-foreground">·</span>
-              <span
+            <div className="flex items-center gap-1.5">
+              <dt className="sr-only">Till</dt>
+              <dd
                 className={cn(
-                  tillBlocked && "text-destructive font-medium",
-                  tillNearLimit && !tillBlocked && "text-amber-700 dark:text-amber-300",
+                  "font-medium",
+                  tillBlocked && "text-destructive",
+                  tillNearLimit && !tillBlocked && "text-warning",
                 )}
               >
                 {tillStatusLabel}
-              </span>
-            </>
+              </dd>
+            </div>
           ) : null}
-          <span className="text-muted-foreground">·</span>
-          <span
-            className={cn(
-              sync.lastError && "text-destructive",
-              offline && !sync.lastError && "text-amber-700 dark:text-amber-300",
-            )}
-          >
-            {syncLabel}
-          </span>
-        </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="sr-only">Sync</dt>
+            <dd className="flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className={cn(
+                  "size-2 rounded-full",
+                  sync.lastError
+                    ? "bg-destructive"
+                    : offline
+                      ? "bg-warning"
+                      : sync.syncing
+                        ? "bg-info animate-pulse"
+                        : "bg-success",
+                )}
+              />
+              <span
+                className={cn(
+                  sync.lastError && "text-destructive",
+                  offline && !sync.lastError && "text-warning",
+                )}
+              >
+                {syncLabel}
+              </span>
+            </dd>
+          </div>
+        </dl>
         <div className="flex flex-wrap items-center gap-2">
           {editingDraftId ? (
             <span className="text-muted-foreground text-xs">
@@ -1774,7 +1795,7 @@ export function SalePage() {
       {tillNearLimit ? (
         <div
           role="status"
-          className="border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100 rounded-lg border px-4 py-3 text-sm"
+          className="border-warning/40 bg-warning/10 text-foreground rounded-lg border px-4 py-3 text-sm"
         >
           Till is near the cash limit — Rs{" "}
           {formatMoney(tillRemainingHeadroom(tillSession!))} headroom left.
@@ -1785,23 +1806,31 @@ export function SalePage() {
       ) : null}
 
       {error ? (
-        <p className="text-destructive text-sm" role="alert">
+        <p
+          className="border-destructive/30 bg-destructive/5 text-destructive rounded-lg border px-4 py-2.5 text-sm font-medium"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr]">
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(22rem,2fr)]">
         <div className="flex min-h-0 flex-col gap-3">
           <div className="space-y-2">
             <Label htmlFor="saleScanInput" className="sr-only">
               Scan barcode
             </Label>
+            <div className="relative">
+            <ScanLine
+              aria-hidden
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2"
+            />
             <Input
               ref={scanInputRef}
               id="saleScanInput"
               {...barcodeScanInputProps()}
               autoComplete="off"
-              disabled={!warehouseId || scanBusy}
+              disabled={!warehouseId}
               placeholder={
                 scanBusy
                   ? "Looking up barcode…"
@@ -1813,12 +1842,20 @@ export function SalePage() {
                 if (event.key !== "Enter") return;
                 event.preventDefault();
                 event.stopPropagation();
+                // The scan hook already handled this Enter (codes of 3+ chars).
+                if (handledScanEnterEvents.has(event.nativeEvent)) return;
                 handleScanFieldEnter();
               }}
-              className="h-11 text-base"
+              aria-invalid={scanFlash || undefined}
+              className={cn(
+                "bg-card h-14 pl-11 text-lg transition-shadow",
+                scanFlash && "border-destructive ring-destructive/40 ring-4",
+              )}
             />
+            </div>
             <p className="text-muted-foreground text-xs">
-              Rescanning the same SKU adds quantity. F2 focuses this field.
+              Scanning the same item again adds one more. Press{" "}
+              <Kbd>{SALE_KEYS.scan.key}</Kbd> to come back to this field.
             </p>
           </div>
 
@@ -1830,7 +1867,7 @@ export function SalePage() {
               disabled={!warehouseId || itemOpen || scanBusy}
               onClick={() => setItemOpen(true)}
             >
-              Add item (F3)
+              {SALE_KEYS.addItem.label} <Kbd>{SALE_KEYS.addItem.key}</Kbd>
             </Button>
             <Button
               type="button"
@@ -1839,7 +1876,7 @@ export function SalePage() {
               disabled={!warehouseId || itemOpen || focItemOpen || scanBusy}
               onClick={() => setFocItemOpen(true)}
             >
-              Add FOC (F10)
+              {SALE_KEYS.foc.label} <Kbd>{SALE_KEYS.foc.key}</Kbd>
             </Button>
             <Button
               type="button"
@@ -1848,7 +1885,7 @@ export function SalePage() {
               disabled={lines.length === 0}
               onClick={() => setRemoveScanOpen(true)}
             >
-              Remove item (F1)
+              {SALE_KEYS.remove.label} <Kbd>{SALE_KEYS.remove.key}</Kbd>
             </Button>
             <Button
               type="button"
@@ -1857,7 +1894,7 @@ export function SalePage() {
               disabled={lines.length === 0}
               onClick={() => setAdjustScanOpen(true)}
             >
-              Adjust qty (F8)
+              {SALE_KEYS.adjust.label} <Kbd>{SALE_KEYS.adjust.key}</Kbd>
             </Button>
             <Button
               type="button"
@@ -1866,7 +1903,8 @@ export function SalePage() {
               disabled={!canHold || holding}
               onClick={() => void onHoldBill()}
             >
-              {holding ? "Holding…" : "Hold (F6)"}
+              {holding ? "Holding…" : SALE_KEYS.hold.label}{" "}
+              <Kbd>{SALE_KEYS.hold.key}</Kbd>
             </Button>
             <Button
               type="button"
@@ -1890,17 +1928,17 @@ export function SalePage() {
             </div>
           ) : null}
 
-          <div className="border-border min-h-0 flex-1 overflow-auto rounded-lg border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
+          <div className="border-border bg-card min-h-0 flex-1 overflow-auto rounded-lg border">
+            <table className="w-full text-left text-sm tabular-nums">
+              <thead className="bg-muted text-muted-foreground sticky top-0 z-10 text-xs">
                 <tr>
                   <th className="px-3 py-2 font-medium">Product</th>
                   <th className="px-3 py-2 font-medium">Qty</th>
                   <th className="px-3 py-2 font-medium">Disc %</th>
                   <th className="px-3 py-2 font-medium">FOC</th>
-                  <th className="px-3 py-2 font-medium">Price</th>
-                  <th className="px-3 py-2 font-medium">GST</th>
-                  <th className="px-3 py-2 font-medium">Total</th>
+                  <th className="px-3 py-2 text-right font-medium">Price</th>
+                  <th className="px-3 py-2 text-right font-medium">GST</th>
+                  <th className="px-3 py-2 text-right font-medium">Total</th>
                   <th className="px-3 py-2 w-10" />
                 </tr>
               </thead>
@@ -1909,9 +1947,9 @@ export function SalePage() {
                   <tr>
                     <td
                       colSpan={8}
-                      className="text-muted-foreground px-3 py-8 text-center"
+                      className="text-muted-foreground px-3 py-16 text-center"
                     >
-                      Scan or add items to start a sale
+                      Scan a barcode to start the sale
                     </td>
                   </tr>
                 ) : (
@@ -1980,13 +2018,13 @@ export function SalePage() {
                           }
                         />
                       </td>
-                      <td className="px-3 py-2 tabular-nums">
+                      <td className="px-3 py-2 text-right">
                         {formatMoney(split.exGstUnit)}
                       </td>
-                      <td className="px-3 py-2 tabular-nums">
+                      <td className="text-muted-foreground px-3 py-2 text-right">
                         {formatMoney(split.gstAmount)}
                       </td>
-                      <td className="px-3 py-2 tabular-nums font-medium">
+                      <td className="px-3 py-2 text-right text-base font-semibold">
                         {formatMoney(split.inclusiveTotal)}
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -2012,11 +2050,9 @@ export function SalePage() {
           </div>
         </div>
 
-        <aside className="border-border lg:sticky lg:top-20 lg:self-start space-y-4 rounded-lg border p-4">
+        <aside className="border-border bg-card lg:sticky lg:top-20 lg:self-start space-y-5 rounded-lg border p-5">
           <div>
-            <p className="text-muted-foreground text-xs uppercase tracking-wide">
-              Invoice
-            </p>
+            <p className="text-muted-foreground text-xs">Invoice</p>
             <p className="text-lg font-semibold">
               {editingDraftId
                 ? holdNumberRef.current ?? "Held bill"
@@ -2035,11 +2071,11 @@ export function SalePage() {
                 {formatMoney(billGstAmount)}
               </span>
             </div>
-            <div className="border-border flex justify-between gap-4 border-t pt-3">
+            <div className="border-border flex items-end justify-between gap-4 border-t pt-4">
               <span className="text-base font-semibold">Total</span>
-              <span className="text-3xl font-bold tabular-nums tracking-tight">
+              <PriceTag size={appliedReturn ? "lg" : "xl"} aria-live="polite">
                 {formatMoney(billTotal)}
-              </span>
+              </PriceTag>
             </div>
             {appliedReturn ? (
               <>
@@ -2047,7 +2083,7 @@ export function SalePage() {
                   <span className="text-muted-foreground">
                     Return credit ({appliedReturn.returnNumber})
                   </span>
-                  <span className="font-medium tabular-nums text-green-700 dark:text-green-400">
+                  <span className="text-success font-medium tabular-nums">
                     −{formatMoney(returnCredit)}
                   </span>
                 </div>
@@ -2059,11 +2095,11 @@ export function SalePage() {
                     </span>
                   </div>
                 ) : null}
-                <div className="border-border flex justify-between gap-4 border-t pt-3">
+                <div className="border-border flex items-end justify-between gap-4 border-t pt-4">
                   <span className="text-base font-semibold">Amount due</span>
-                  <span className="text-2xl font-bold tabular-nums tracking-tight">
+                  <PriceTag size="xl" aria-live="polite">
                     {formatMoney(amountDue)}
-                  </span>
+                  </PriceTag>
                 </div>
               </>
             ) : null}
@@ -2126,36 +2162,39 @@ export function SalePage() {
                 <>
                   <div className="space-y-2">
                     <Label>Method</Label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Button
                         type="button"
                         variant={
                           paymentMode === "cash" ? "default" : "outline"
                         }
-                        size="sm"
+                        className="h-auto flex-col gap-0.5 py-2"
                         onClick={() => selectPaymentMode("cash")}
                       >
-                        Cash (F5)
+                        <span>{SALE_KEYS.cash.label}</span>
+                        <span className="text-[0.7rem] opacity-70">{SALE_KEYS.cash.key}</span>
                       </Button>
                       <Button
                         type="button"
                         variant={
                           paymentMode === "card" ? "default" : "outline"
                         }
-                        size="sm"
+                        className="h-auto flex-col gap-0.5 py-2"
                         onClick={() => selectPaymentMode("card")}
                       >
-                        Card (F9)
+                        <span>{SALE_KEYS.card.label}</span>
+                        <span className="text-[0.7rem] opacity-70">{SALE_KEYS.card.key}</span>
                       </Button>
                       <Button
                         type="button"
                         variant={
                           paymentMode === "split" ? "default" : "outline"
                         }
-                        size="sm"
+                        className="h-auto flex-col gap-0.5 py-2"
                         onClick={() => selectPaymentMode("split")}
                       >
-                        Split (F2)
+                        <span>Split</span>
+                        <span className="text-[0.7rem] opacity-70">{SALE_KEYS.split.key}</span>
                       </Button>
                     </div>
                   </div>
@@ -2265,7 +2304,7 @@ export function SalePage() {
                         </div>
                       ) : null}
                       {isCashPayment ? (
-                        <div className="rounded-md bg-muted/50 px-3 py-3 text-lg">
+                        <div className="bg-muted rounded-md px-4 py-3 text-lg">
                           {amountDue === 0 && appliedReturn ? (
                             <div className="flex justify-between gap-4 font-semibold">
                               <span>Cash back from credit</span>
@@ -2276,21 +2315,21 @@ export function SalePage() {
                           ) : tendered >= amountDue ? (
                             <div className="flex justify-between gap-4 font-semibold">
                               <span>Change</span>
-                              <span className="text-xl text-green-700 tabular-nums dark:text-green-400">
+                              <span className="text-success text-2xl tabular-nums">
                                 {formatMoney(cashChange)}
                               </span>
                             </div>
                           ) : (
                             <div className="flex justify-between gap-4 font-semibold">
                               <span>Short</span>
-                              <span className="text-xl text-amber-700 tabular-nums dark:text-amber-300">
+                              <span className="text-warning text-2xl tabular-nums">
                                 {formatMoney(cashShortfall)}
                               </span>
                             </div>
                           )}
                         </div>
                       ) : cardRemaining !== 0 ? (
-                        <p className="text-amber-700 text-sm dark:text-amber-300">
+                        <p className="text-warning text-sm">
                           Remaining: {formatMoney(cardRemaining)}
                         </p>
                       ) : null}
@@ -2309,24 +2348,26 @@ export function SalePage() {
             <Button
               type="button"
               size="lg"
-              className="w-full"
+              className="h-14 w-full text-base"
               disabled={saving || !canPost}
               onClick={() => void onConfirm()}
             >
-              {saving ? "Posting…" : "Post sale (F10)"}
+              {saving ? (
+                user?.fbrEnabled && !nonFbrSale ? "Posting and sending to FBR…" : "Posting…"
+              ) : (
+                <>
+                  {SALE_KEYS.post.label}
+                  <Kbd className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground">
+                    {SALE_KEYS.post.key}
+                  </Kbd>
+                </>
+              )}
             </Button>
           </div>
         </aside>
       </div>
 
-      <KeyboardHints
-        hints={[
-          KEYBOARD_HINT_SCAN,
-          KEYBOARD_HINT_SAVE,
-          "F1 remove · F8 adjust qty · F4 tender · F5 cash · F2 split · F9 card · F6 hold · F7 held bills",
-          KEYBOARD_HINT_ENTER,
-        ]}
-      />
+      <SaleKeyHintBar />
 
       <ScanBarcodePanel
         open={removeScanOpen}

@@ -24,7 +24,7 @@ export async function applyInventoryOutBalanceDelta(
   if (!(delta !== 0)) return null;
 
   const repo = manager.getRepository(InventoryOutItem);
-  let balance = await repo.findOne({
+  const balance = await repo.findOne({
     where: { tenantId, warehouseId, productSkuId },
     lock: { mode: "pessimistic_write" },
   });

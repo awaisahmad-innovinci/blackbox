@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   expenseExceedsDrawer,
   expenseOverDrawerMessage,
-  formatMoney,
   roundMoney4,
   type VendorCreditLedger,
   type VendorPaymentListItem,
@@ -21,7 +20,7 @@ import {
   Th,
   THead,
   Tr,
-} from "@/components/data-table";
+} from "@blackbox/ui/data-table";
 import { PageHeader } from "@/components/page-header";
 import { LoadingState, PageError } from "@/components/page-state";
 import { RequirePermission } from "@/components/require-permission";
@@ -33,13 +32,12 @@ import {
   listVendorPayments,
   recordVendorPayment,
 } from "@/lib/admin-api";
+import { useCurrency } from "@/lib/use-currency";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
-const SELECT_CLASS =
-  "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
-function money(value: number): string {
-  return `Rs ${formatMoney(value)}`;
-}
+
+const PAYMENTS_PAGE_SIZE = 20;
 
 function methodLabel(method: VendorPaymentMethod | null): string {
   if (method === "CASH") return "Cash";
@@ -56,6 +54,7 @@ export default function VendorPaymentsPage() {
 }
 
 function VendorPayments() {
+  const { money } = useCurrency();
   const [credits, setCredits] = useState<VendorCreditLedger | null>(null);
   const [payments, setPayments] = useState<VendorPaymentListItem[]>([]);
   const [ownerCash, setOwnerCash] = useState<number | null>(null);
@@ -68,6 +67,8 @@ function VendorPayments() {
   const [note, setNote] = useState("");
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,11 +76,12 @@ function VendorPayments() {
     try {
       const [creditRows, paymentRows, overview] = await Promise.all([
         listVendorCredits(),
-        listVendorPayments(),
+        listVendorPayments(paymentsPage, PAYMENTS_PAGE_SIZE),
         getOwnerOverview(),
       ]);
       setCredits(creditRows);
       setPayments(paymentRows.items);
+      setPaymentsTotal(paymentRows.total);
       setOwnerCash(overview.ownerCashBalance);
       setVendorId((current) => {
         if (current && creditRows.vendors.some((row) => row.vendorId === current)) {
@@ -96,7 +98,7 @@ function VendorPayments() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [paymentsPage]);
 
   useEffect(() => {
     void load();
@@ -167,9 +169,8 @@ function VendorPayments() {
         <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => void onPay(event)}>
           <Label className="grid gap-1 text-sm" htmlFor="vendor-pay-vendor">
             Vendor
-            <select
+            <NativeSelect
               id="vendor-pay-vendor"
-              className={SELECT_CLASS}
               value={vendorId}
               onChange={(event) => setVendorId(event.target.value)}
             >
@@ -181,13 +182,12 @@ function VendorPayments() {
                   {row.vendorName || "Vendor"} · {money(row.credit)}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </Label>
           <Label className="grid gap-1 text-sm" htmlFor="vendor-pay-method">
             Method
-            <select
+            <NativeSelect
               id="vendor-pay-method"
-              className={SELECT_CLASS}
               value={method}
               onChange={(event) =>
                 setMethod(event.target.value as VendorPaymentMethod)
@@ -195,7 +195,7 @@ function VendorPayments() {
             >
               <option value="CASH">Cash</option>
               <option value="BANK">Bank transfer</option>
-            </select>
+            </NativeSelect>
           </Label>
           {method === "BANK" ? (
             <Label className="grid gap-1 text-sm" htmlFor="vendor-pay-reference">
@@ -318,6 +318,31 @@ function VendorPayments() {
             </TBody>
           </Table>
         </DataTable>
+        {paymentsTotal > PAYMENTS_PAGE_SIZE ? (
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-muted-foreground text-sm">
+              Page {paymentsPage} of {Math.ceil(paymentsTotal / PAYMENTS_PAGE_SIZE)} ({paymentsTotal} payments)
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={paymentsPage <= 1 || loading}
+                onClick={() => setPaymentsPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={paymentsPage >= Math.ceil(paymentsTotal / PAYMENTS_PAGE_SIZE) || loading}
+                onClick={() => setPaymentsPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </SectionCard>
     </div>
   );

@@ -941,6 +941,15 @@ export function formatMoney(value: number): string {
   });
 }
 
+/**
+ * Money with the shop's currency in front ("Rs 1,250" for PKR, "AED 1,250" otherwise).
+ * Display only; use formatMoney on receipts and wherever the currency is implied.
+ */
+export function formatCurrency(value: number, currency?: string | null): string {
+  const code = currency?.trim().toUpperCase() || "PKR";
+  return `${code === "PKR" ? "Rs" : code} ${formatMoney(value)}`;
+}
+
 export function pieceCostFromPurchase(
   purchasePrice: number,
   unitsPerPurchaseUnit: number,
@@ -1808,6 +1817,42 @@ export const MASTER_DATA_IMPORT_FILES = [
 ] as const;
 
 export type MasterDataImportFile = (typeof MASTER_DATA_IMPORT_FILES)[number];
+
+/** Import header as the importer compares it: trimmed, lower case, spaces/dashes → "_". */
+export function normalizeImportHeader(header: string): string {
+  return header
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+/**
+ * Column index in `actual` for each `expected` header (after normalizing), or null when
+ * any expected header is missing. Extra columns in `actual` are ignored.
+ */
+export function importHeaderIndexes(
+  actual: readonly string[],
+  expected: readonly string[],
+): number[] | null {
+  const normalized = actual.map(normalizeImportHeader);
+  const indexes = expected.map((header) => normalized.indexOf(header));
+  return indexes.every((index) => index >= 0) ? indexes : null;
+}
+
+/**
+ * Canonical enum value for an import cell, ignoring case, spaces, "-" and "_"
+ * (e.g. "Stock Item" → STOCK_ITEM, "Bill to bill" → BILL_TO_BILL). Null when no match.
+ */
+export function matchImportEnumValue<T extends string>(
+  raw: string,
+  allowed: readonly T[],
+): T | null {
+  const key = (value: string) => value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const wanted = key(raw);
+  if (!wanted) return null;
+  return allowed.find((value) => key(value) === wanted) ?? null;
+}
 
 /** Canonical header row for 07_product_skus.csv (keep in sync with docs template). */
 export const MASTER_DATA_07_PRODUCT_SKU_HEADERS = [

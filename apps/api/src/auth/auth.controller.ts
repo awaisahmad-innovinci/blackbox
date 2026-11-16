@@ -14,6 +14,7 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { LogoutDto, RefreshDto } from "./dto/refresh.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { AuthThrottlerGuard } from "./auth-throttler.guard";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { PasswordResetService } from "./password-reset.service";
 
@@ -26,6 +27,7 @@ export class AuthController {
 
   @Post("login")
   @HttpCode(200)
+  @UseGuards(AuthThrottlerGuard)
   login(@Body() dto: LoginDto): Promise<AuthResponse> {
     return this.authService.login(dto);
   }
@@ -44,6 +46,7 @@ export class AuthController {
 
   @Post("forgot-password")
   @HttpCode(200)
+  @UseGuards(AuthThrottlerGuard)
   forgotPassword(
     @Body() dto: ForgotPasswordDto,
   ): Promise<{ message: string }> {
@@ -52,6 +55,7 @@ export class AuthController {
 
   @Post("reset-password")
   @HttpCode(200)
+  @UseGuards(AuthThrottlerGuard)
   resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
     return this.passwordReset.resetPassword(dto);
   }

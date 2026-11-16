@@ -16,7 +16,7 @@ import type {
   VendorListItem,
 } from "@blackbox/shared";
 import { VENDOR_CONTACT_TYPES } from "@blackbox/shared";
-import { normalizeOptionalStoredText, normalizeStoredText } from "@blackbox/shared";
+import { normalizeStoredText } from "@blackbox/shared";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import {
   Vendor,

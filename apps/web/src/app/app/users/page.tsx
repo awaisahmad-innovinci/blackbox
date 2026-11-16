@@ -30,7 +30,9 @@ import {
   Th,
   THead,
   Tr,
-} from "@/components/data-table";
+  SortableTh,
+  useSortedRows,
+} from "@blackbox/ui/data-table";
 import { ActiveBadge } from "@/components/status-badges";
 import { FieldHint, FieldStatus, FormError } from "@/components/section-card";
 import {
@@ -50,6 +52,7 @@ import {
   personNameError,
   usernameError,
 } from "@blackbox/shared";
+import { NativeSelect } from "@blackbox/ui/native-select";
 
 const emptyCreate = {
   fullName: "",
@@ -126,6 +129,21 @@ export default function UsersPage() {
         u.username.toLowerCase().includes(q),
     );
   }, [users, query]);
+
+  const getUserSortValue = useCallback(
+    (u: UserDto, key: "name" | "username" | "email" | "status") =>
+      key === "name"
+        ? u.fullName
+        : key === "username"
+          ? u.username
+          : key === "email"
+            ? u.email
+            : u.isActive
+              ? "active"
+              : "inactive",
+    [],
+  );
+  const { sorted: sortedUsers, thProps } = useSortedRows(filtered, getUserSortValue);
 
   const createNameErr = createAttempted
     ? personNameError(createDraft.fullName)
@@ -285,8 +303,7 @@ export default function UsersPage() {
                   aria-label="Search users"
                 />
               </div>
-              <select
-                className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+              <NativeSelect
                 value={status}
                 onChange={(e) =>
                   setStatus(
@@ -299,7 +316,7 @@ export default function UsersPage() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="deleted">Deleted</option>
-              </select>
+              </NativeSelect>
             </div>
             {filtered.length === 0 ? (
               <EmptyState
@@ -311,16 +328,16 @@ export default function UsersPage() {
                 <Table>
                   <THead>
                     <tr>
-                      <Th>Name</Th>
-                      <Th>Username</Th>
-                      <Th>Email</Th>
+                      <SortableTh label="Name" {...thProps("name")} />
+                      <SortableTh label="Username" {...thProps("username")} />
+                      <SortableTh label="Email" {...thProps("email")} />
                       <Th>Roles</Th>
-                      <Th>Status</Th>
+                      <SortableTh label="Status" {...thProps("status")} />
                       <Th className="text-right">Actions</Th>
                     </tr>
                   </THead>
                   <TBody>
-                    {filtered.map((u) => {
+                    {sortedUsers.map((u) => {
                       const userRoles = u.roleIds
                         .map((id) => roleById.get(id))
                         .filter((r): r is RoleDto => Boolean(r));

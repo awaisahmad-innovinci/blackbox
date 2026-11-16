@@ -9,7 +9,6 @@ import { Checkbox } from "@blackbox/ui/checkbox";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { RequirePermission } from "@/components/require-permission";
-import { useAuth } from "@/components/auth-provider";
 import { PageHeader } from "@/components/page-header";
 import { LoadingState, PageError } from "@/components/page-state";
 import { RoleTypeBadge } from "@/components/status-badges";
@@ -29,6 +28,9 @@ import {
 } from "@/lib/admin-api";
 import { toUserFacingError } from "@/lib/api-error";
 
+/** Roles are shared by all shops; only the platform console edits them. */
+const CAN_EDIT_ROLES = false;
+
 function groupKey(key: string): string {
   const prefix = key.split(".")[0] ?? "other";
   const labels: Record<string, string> = {
@@ -45,7 +47,6 @@ function groupKey(key: string): string {
 
 export default function RoleDetailPage() {
   const params = useParams<{ id: string }>();
-  const { hasPermission } = useAuth();
   const [role, setRole] = useState<RoleDto | null>(null);
   const [catalog, setCatalog] = useState<PermissionDto[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -159,7 +160,7 @@ export default function RoleDetailPage() {
             <FormError>{formError}</FormError>
 
             <SectionCard title="Details">
-              {hasPermission("roles.write") ? (
+              {CAN_EDIT_ROLES ? (
                 <form className="space-y-4" onSubmit={(e) => void onSaveMeta(e)}>
                   <div className="space-y-2">
                     <Label htmlFor="name">Name</Label>
@@ -206,7 +207,7 @@ export default function RoleDetailPage() {
               title="Permissions"
               description={`${selected.length} selected of ${catalog.length}`}
               footer={
-                hasPermission("roles.write") ? (
+                CAN_EDIT_ROLES ? (
                   <Button disabled={busy} onClick={() => void onSavePermissions()}>
                     Save permissions
                   </Button>
@@ -228,7 +229,7 @@ export default function RoleDetailPage() {
                           <Checkbox
                             className="mt-0.5"
                             checked={selected.includes(perm.id)}
-                            disabled={!hasPermission("roles.write")}
+                            disabled={!CAN_EDIT_ROLES}
                             onCheckedChange={(checked) => {
                               setSelected((prev) =>
                                 checked

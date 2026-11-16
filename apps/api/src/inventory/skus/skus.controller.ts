@@ -91,6 +91,7 @@ class CreateSkuBarcodeBodyDto implements CreateSkuBarcodeRequest {
   quantityMultiplier?: number;
 }
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("skus")
 export class SkusController {
   constructor(
@@ -127,6 +128,7 @@ export class SkusController {
     return this.skus.getById(id);
   }
 
+  @RequirePermissions("inventory.access")
   @Patch(":id")
   update(
     @Param("id", ParseUUIDPipe) id: string,
@@ -135,16 +137,19 @@ export class SkusController {
     return this.skus.update(id, dto);
   }
 
+  @RequirePermissions("inventory.access")
   @Post(":id/deactivate")
   deactivate(@Param("id", ParseUUIDPipe) id: string): Promise<SkuDetail> {
     return this.skus.deactivate(id);
   }
 
+  @RequirePermissions("inventory.access")
   @Post(":id/delete")
   softDelete(@Param("id", ParseUUIDPipe) id: string): Promise<SkuDetail> {
     return this.skus.softDelete(id);
   }
 
+  @RequirePermissions("inventory.access")
   @Post(":id/restore")
   restore(@Param("id", ParseUUIDPipe) id: string): Promise<SkuDetail> {
     return this.skus.restore(id);
@@ -179,6 +184,7 @@ export class SkusController {
     return this.skuBarcodes.listBySku(id);
   }
 
+  @RequirePermissions("inventory.access")
   @Post(":id/barcodes")
   addBarcode(
     @Param("id", ParseUUIDPipe) id: string,
@@ -191,6 +197,7 @@ export class SkusController {
     );
   }
 
+  @RequirePermissions("inventory.access")
   @Delete(":id/barcodes/:barcodeId")
   removeBarcode(
     @Param("id", ParseUUIDPipe) id: string,

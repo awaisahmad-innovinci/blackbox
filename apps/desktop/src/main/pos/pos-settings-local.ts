@@ -17,6 +17,7 @@ export function getPosPrinterSettingsLocal(): PosPrinterSettings {
       printerName: typeof parsed.printerName === "string" ? parsed.printerName : "",
       drawerPin: parsed.drawerPin === 5 ? 5 : 2,
       openDrawerOnReceiptPrint: parsed.openDrawerOnReceiptPrint !== false,
+      silentReceiptPrint: parsed.silentReceiptPrint === true,
     };
   } catch {
     return { ...DEFAULT_POS_PRINTER_SETTINGS };
@@ -31,6 +32,7 @@ export function savePosPrinterSettingsLocal(settings: PosPrinterSettings): void 
       printerName: settings.printerName.trim(),
       drawerPin: settings.drawerPin === 5 ? 5 : 2,
       openDrawerOnReceiptPrint: settings.openDrawerOnReceiptPrint,
+      silentReceiptPrint: settings.silentReceiptPrint === true,
     }),
   );
 }

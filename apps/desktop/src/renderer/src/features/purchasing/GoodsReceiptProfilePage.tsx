@@ -202,13 +202,13 @@ export function GoodsReceiptProfilePage() {
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Incentive</span>
-          <span className="tabular-nums text-green-700 dark:text-green-400">
+          <span className="tabular-nums text-success ">
             −{formatMoney(receipt.incentive)}
           </span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted-foreground">Shelf rent</span>
-          <span className="tabular-nums text-green-700 dark:text-green-400">
+          <span className="tabular-nums text-success ">
             −{formatMoney(receipt.shelfRent)}
           </span>
         </div>

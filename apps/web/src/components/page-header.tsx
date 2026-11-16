@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { cn } from "@blackbox/ui/lib/utils";
+import { useEffect, type ReactNode } from "react";
+import { PageHeader as SharedPageHeader } from "@blackbox/ui/page-header";
 
+/** Shared page header; also names the browser tab after the page (review W23). */
 export function PageHeader({
   title,
   description,
@@ -16,29 +17,19 @@ export function PageHeader({
   breadcrumb?: ReactNode;
   className?: string;
 }) {
+  useEffect(() => {
+    if (typeof title === "string" && title.trim()) {
+      document.title = `${title} · Blackbox`;
+    }
+  }, [title]);
+
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
-        className,
-      )}
-    >
-      <div className="min-w-0 space-y-1.5">
-        {breadcrumb}
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground md:text-[1.75rem]">
-          {title}
-        </h1>
-        {description ? (
-          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-            {description}
-          </p>
-        ) : null}
-      </div>
-      {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {actions}
-        </div>
-      ) : null}
-    </div>
+    <SharedPageHeader
+      title={title}
+      description={description}
+      actions={actions}
+      back={breadcrumb}
+      className={className}
+    />
   );
 }

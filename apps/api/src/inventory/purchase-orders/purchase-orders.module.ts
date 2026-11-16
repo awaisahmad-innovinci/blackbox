@@ -13,9 +13,11 @@ import { GoodsReceiptsModule } from "../goods-receipts/goods-receipts.module";
 import { ActivityLogModule } from "../../activity-log/activity-log.module";
 import { PurchaseOrdersController } from "./purchase-orders.controller";
 import { PurchaseOrdersService } from "./purchase-orders.service";
+import { RbacModule } from "../../rbac/rbac.module";
 
 @Module({
   imports: [
+    RbacModule,
     ActivityLogModule,
     TypeOrmModule.forFeature([
       PurchaseOrder,

@@ -19,7 +19,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo",
+    "test": "tsc -p tsconfig.json && node --test test/*.test.mjs"
   },
   "devDependencies": {
     "@blackbox/eslint-config": "workspace:*",

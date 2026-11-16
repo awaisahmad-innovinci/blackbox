@@ -58,6 +58,12 @@ async function platformFetch<T>(
     throw new PlatformApiError(0, "Unable to reach Blackbox. Check your connection and try again.");
   }
 
+  // Expired operator session on any signed-in call: back to sign-in (review PL6).
+  if (response.status === 401 && token && typeof window !== "undefined") {
+    clearPlatformToken();
+    if (window.location.pathname !== "/") window.location.href = "/";
+  }
+
   if (!response.ok) {
     let message = "Request failed. Please try again.";
     try {

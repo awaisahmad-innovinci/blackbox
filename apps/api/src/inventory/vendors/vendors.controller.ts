@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import type { TenantContext } from "../../common/tenant-context";
 import { CurrentUser } from "../../common/current-user.decorator";
@@ -28,7 +29,11 @@ import {
 import { VendorLedgerService } from "./vendor-ledger.service";
 import { VendorSkusService } from "./vendor-skus.service";
 import { VendorsService } from "./vendors.service";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../rbac/permissions.guard";
+import { RequirePermissions } from "../../rbac/require-permissions.decorator";
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("vendors")
 export class VendorsController {
   constructor(
@@ -42,6 +47,7 @@ export class VendorsController {
     return this.vendors.list(query);
   }
 
+  @RequirePermissions("vendors.access")
   @Post()
   create(@Body() dto: CreateVendorDto): Promise<VendorDetail> {
     return this.vendors.create(dto);
@@ -68,6 +74,7 @@ export class VendorsController {
     return this.vendors.getById(id);
   }
 
+  @RequirePermissions("vendors.access")
   @Patch(":id")
   update(
     @Param("id", ParseUUIDPipe) id: string,
@@ -76,6 +83,7 @@ export class VendorsController {
     return this.vendors.update(id, dto);
   }
 
+  @RequirePermissions("vendors.access")
   @Post(":id/delete")
   softDelete(
     @Param("id", ParseUUIDPipe) id: string,
@@ -83,6 +91,7 @@ export class VendorsController {
     return this.vendors.softDelete(id);
   }
 
+  @RequirePermissions("vendors.access")
   @Post(":id/restore")
   restore(
     @Param("id", ParseUUIDPipe) id: string,
@@ -97,6 +106,7 @@ export class VendorsController {
     return this.ledger.getLedger(id);
   }
 
+  @RequirePermissions("vendors.access")
   @Post(":id/ledger-payments")
   recordPayment(
     @CurrentUser() user: TenantContext,

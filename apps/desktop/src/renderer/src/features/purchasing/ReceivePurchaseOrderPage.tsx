@@ -1300,7 +1300,7 @@ export function ReceivePurchaseOrderPage() {
         {returnCredit > 0 ? (
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Return credit</span>
-            <span className="tabular-nums text-green-700 dark:text-green-400">
+            <span className="tabular-nums text-success ">
               −{formatMoney(returnCredit)}
             </span>
           </div>

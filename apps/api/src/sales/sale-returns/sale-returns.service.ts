@@ -11,7 +11,6 @@ import { InjectRepository } from "@nestjs/typeorm";
 import type {
   PaginatedSaleReturns,
   ReturnableSaleLine,
-  SaleDetail,
   SalePaymentMethod,
   SaleReturnCompletionMode,
   SaleReturnDetail,
@@ -23,7 +22,7 @@ import type {
 import {
   lineTotalAfterDiscount,
   nextSaleReturnNumber,
-  saleBillTotals,
+  saleReturnBillTotals,
 } from "@blackbox/shared";
 import { randomUUID } from "node:crypto";
 import { DataSource, EntityManager, Repository } from "typeorm";
@@ -31,7 +30,6 @@ import type { TenantContext } from "../../common/tenant-context";
 import {
   InventoryMovement,
   InventoryOutItem,
-  ProductSku,
   Sale,
   SaleLine,
   SalePayment,
@@ -39,7 +37,6 @@ import {
   SaleReturnLine,
   Tenant,
   User,
-  Warehouse,
 } from "../../db/entities";
 import { FixedTenantContext } from "../../inventory/common/fixed-tenant.context";
 import { applyInventoryOutBalanceDelta } from "../../inventory/inventory-out/inventory-out-balance";
@@ -115,6 +112,7 @@ export class SaleReturnsService {
           unitPrice: toNum(line.unitPrice),
           discountPercent: toNum(line.discountPercent),
           sellUnit: (line.sellUnit as "pc" | "box") ?? "pc",
+          gstPercent: toNum(line.gstPercent),
         };
       })
       .filter((line) => line.returnableQuantity > 0);
@@ -302,6 +300,7 @@ export class SaleReturnsService {
         unitPrice: number;
         discountPercent: number;
         lineTotal: number;
+        gstPercent: number;
         sellUnit: "pc" | "box";
         barcode: string | null;
         productName: string;
@@ -310,7 +309,6 @@ export class SaleReturnsService {
       };
 
       const builtLines: BuiltLine[] = [];
-      let subtotal = 0;
 
       for (const item of dto.items) {
         const saleLine = saleLineById.get(item.saleLineId);
@@ -338,7 +336,6 @@ export class SaleReturnsService {
         const unitPrice = toNum(saleLine.unitPrice);
         const discountPercent = toNum(saleLine.discountPercent);
         const lineTotal = lineTotalAfterDiscount(qty, unitPrice, discountPercent);
-        subtotal = round4(subtotal + lineTotal);
 
         builtLines.push({
           saleLineId: saleLine.id,
@@ -347,6 +344,7 @@ export class SaleReturnsService {
           unitPrice,
           discountPercent,
           lineTotal,
+          gstPercent: toNum(saleLine.gstPercent),
           sellUnit: (saleLine.sellUnit as "pc" | "box") ?? "pc",
           barcode: saleLine.barcode ?? saleLine.productSku?.barcode ?? null,
           productName: saleLine.productSku?.product?.name ?? "—",
@@ -355,7 +353,7 @@ export class SaleReturnsService {
         });
       }
 
-      const tax = saleBillTotals(subtotal, gstRate, salesTaxRate);
+      const tax = saleReturnBillTotals(builtLines, gstRate, salesTaxRate);
       const headerId = randomUUID();
       const issuer = await manager.getRepository(User).findOne({
         where: { id: user.userId, tenantId },
@@ -371,7 +369,7 @@ export class SaleReturnsService {
           warehouseId: sale.warehouseId,
           returnDate,
           status: "PENDING",
-          subtotal: String(subtotal),
+          subtotal: String(tax.subtotal),
           gstRate: String(gstRate),
           gstAmount: String(tax.gstAmount),
           salesTaxRate: String(salesTaxRate),

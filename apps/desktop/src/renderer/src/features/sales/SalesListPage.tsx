@@ -48,7 +48,7 @@ function SaleBillBadge({ status }: { status?: FbrInvoiceStatus | null }) {
   }
   if (status === "pending" || status === "submitted" || status === "failed") {
     return (
-      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">
+      <span className="rounded bg-success/15 px-1.5 py-0.5 text-xs font-medium text-success ">
         FBR
       </span>
     );

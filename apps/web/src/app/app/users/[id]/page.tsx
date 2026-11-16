@@ -16,7 +16,7 @@ import { PageHeader } from "@/components/page-header";
 import { PasswordInput } from "@/components/password-input";
 import { RoleChecklist } from "@/components/role-checklist";
 import { LoadingState, PageError } from "@/components/page-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ConfirmDialog } from "@blackbox/ui/confirm-dialog";
 import { ActiveBadge } from "@/components/status-badges";
 import {
   FieldStatus,

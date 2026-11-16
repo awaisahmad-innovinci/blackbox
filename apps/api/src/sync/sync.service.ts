@@ -80,6 +80,7 @@ import {
 } from "../db/entities";
 import { applyInventoryOutBalanceDelta } from "../inventory/inventory-out/inventory-out-balance";
 import type { SyncChangeInputDto, SyncPushDto } from "./dto/sync.dto";
+import { warnIfUnitPriceDiffers } from "../sales/sale-price-check";
 
 const RETENTION_DAYS = 90;
 const STALE_DEVICE_DAYS = 30;
@@ -418,12 +419,13 @@ export class SyncService {
     });
   }
 
-  async retainHistory(): Promise<{ deleted: number }> {
+  /** Prunes old sync history for one tenant only (cursors are per tenant). */
+  async retainHistory(tenantId: string): Promise<{ deleted: number }> {
     const staleBefore = new Date(
       Date.now() - STALE_DEVICE_DAYS * 24 * 60 * 60 * 1000,
     );
     const active = await this.devices.find({
-      where: { status: "trusted" },
+      where: { tenantId, status: "trusted" },
     });
     const live: Device[] = [];
     for (const device of active) {
@@ -454,7 +456,8 @@ export class SyncService {
     const result = await this.changes
       .createQueryBuilder()
       .delete()
-      .where("created_at < :cutoffDate", { cutoffDate })
+      .where("tenant_id = :tenantId", { tenantId })
+      .andWhere("created_at < :cutoffDate", { cutoffDate })
       .andWhere("seq < :minCursor", {
         minCursor: Number.isFinite(minCursor) ? minCursor : 0,
       })
@@ -2038,10 +2041,6 @@ export class SyncService {
     const existing = await manager.findOne(Sale, {
       where: { id: entityId, tenantId },
     });
-    const byId = await manager.findOne(Sale, { where: { id: entityId } });
-    // #region agent log
-    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"B",location:"sync.service.ts:upsertSale",message:"sale lookup before save",data:{entityId,tenantId,foundForTenant:Boolean(existing),foundById:Boolean(byId),existingTenantId:byId?.tenantId??null,sameTenant:byId?byId.tenantId===tenantId:null,incomingStatus:p.status??null,incomingSaleNumber:p.saleNumber??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const row = existing ?? manager.create(Sale, { id: entityId, tenantId });
     const prevStatus = row.status;
     Object.assign(row, {
@@ -2111,23 +2110,7 @@ export class SyncService {
       if (incomingNtn) row.fbrSellerNtn = incomingNtn;
     }
     if (!row.warehouseId) throw new Error("warehouse not found");
-    try {
-      await manager.save(row);
-    } catch (error: unknown) {
-      const driverCode =
-        error &&
-        typeof error === "object" &&
-        "driverError" in error &&
-        (error as { driverError?: { code?: string } }).driverError?.code
-          ? String(
-              (error as { driverError?: { code?: string } }).driverError?.code,
-            )
-          : "";
-      // #region agent log
-      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"C",location:"sync.service.ts:upsertSale:save",message:"sale save failed",data:{entityId,tenantId,wasInsert:!existing,pgCode:driverCode},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      throw error;
-    }
+    await manager.save(row);
 
     if (Array.isArray(p.items)) {
       await manager.delete(SaleLine, { saleId: entityId, tenantId });
@@ -2143,12 +2126,27 @@ export class SyncService {
           item.hsCode != null && String(item.hsCode).trim() !== ""
             ? String(item.hsCode).trim()
             : null;
-        if (!hsCode && productSkuId) {
+        if (productSkuId) {
           const sku = await manager.findOne(ProductSku, {
             where: { id: productSkuId, tenantId },
-            select: { id: true, hsCode: true },
+            select: {
+              id: true,
+              hsCode: true,
+              sku: true,
+              sellingPrice: true,
+              sellingPricePerPurchaseUnit: true,
+            },
           });
-          hsCode = sku?.hsCode ?? null;
+          if (!hsCode) hsCode = sku?.hsCode ?? null;
+          if (sku) {
+            warnIfUnitPriceDiffers({
+              tenantId,
+              saleNumber: String(p.saleNumber ?? entityId),
+              quantity: qty,
+              unitPrice,
+              sku,
+            });
+          }
         }
         await manager.save(
           manager.create(SaleLine, {

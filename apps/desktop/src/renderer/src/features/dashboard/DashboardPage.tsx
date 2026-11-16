@@ -426,7 +426,7 @@ export function DashboardPage() {
       {!localDbLoading && localDbStatus && !localDbStatus.connected ? (
         <div
           role="alert"
-          className="border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200 rounded-lg border px-4 py-3 text-sm"
+          className="border-warning/40 bg-warning/5 text-foreground rounded-lg border px-4 py-3 text-sm"
         >
           <p className="font-medium">Local database not available</p>
           <p className="mt-1 text-xs opacity-90">
