@@ -26,7 +26,7 @@ import {
   saleBillTotals,
 } from "@blackbox/shared";
 import { randomUUID } from "node:crypto";
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager, Raw, Repository } from "typeorm";
 import type { TenantContext } from "../../common/tenant-context";
 import {
   InventoryMovement,
@@ -498,7 +498,12 @@ export class SaleReturnsService {
     if (!trimmed) throw new BadRequestException("Return number is required");
 
     const header = await this.saleReturns.findOne({
-      where: { tenantId, returnNumber: trimmed },
+      where: {
+        tenantId,
+        returnNumber: Raw((alias) => `LOWER(${alias}) = LOWER(:returnNumber)`, {
+          returnNumber: trimmed,
+        }),
+      },
       relations: { sale: true, issuedByUser: true, refundedByUser: true },
     });
     if (!header) throw new NotFoundException("Return voucher not found");

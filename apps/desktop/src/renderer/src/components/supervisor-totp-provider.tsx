@@ -24,12 +24,20 @@ export type SupervisorTotpPromptResult =
   | { approved: false }
   | { approved: true; supervisorUserId: string; supervisorDisplayName: string };
 
+export type SupervisorTotpPromptOptions = {
+  /** Only accept a Manager's code (used for till open/close). */
+  managerOnly?: boolean;
+};
+
 type PendingPrompt = {
   resolve: (result: SupervisorTotpPromptResult) => void;
+  managerOnly: boolean;
 };
 
 type SupervisorTotpContextValue = {
-  promptSupervisorTotp: () => Promise<SupervisorTotpPromptResult>;
+  promptSupervisorTotp: (
+    options?: SupervisorTotpPromptOptions,
+  ) => Promise<SupervisorTotpPromptResult>;
 };
 
 const SupervisorTotpContext = createContext<SupervisorTotpContextValue | null>(
@@ -53,13 +61,16 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
     afterDialogClosed();
   }, []);
 
-  const promptSupervisorTotp = useCallback(() => {
-    return new Promise<SupervisorTotpPromptResult>((resolve) => {
-      setCode("");
-      setError(null);
-      setPending({ resolve });
-    });
-  }, []);
+  const promptSupervisorTotp = useCallback(
+    (options?: SupervisorTotpPromptOptions) => {
+      return new Promise<SupervisorTotpPromptResult>((resolve) => {
+        setCode("");
+        setError(null);
+        setPending({ resolve, managerOnly: options?.managerOnly ?? false });
+      });
+    },
+    [],
+  );
 
   async function onSubmit() {
     if (!window.blackbox?.totp) {
@@ -71,6 +82,7 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
     try {
       const result = await window.blackbox.totp.verifySupervisorCode(
         code.trim(),
+        { managerOnly: pending?.managerOnly ?? false },
       );
       if (result.ok) {
         finish({
@@ -100,9 +112,15 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
         <Dialog open onOpenChange={(next) => !next && finish({ approved: false })}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle>Supervisor authentication code</DialogTitle>
+              <DialogTitle>
+                {pending?.managerOnly
+                  ? "Manager authentication code"
+                  : "Supervisor authentication code"}
+              </DialogTitle>
               <DialogDescription>
-                Enter a valid Manager or Owner authentication code to continue.
+                {pending?.managerOnly
+                  ? "Enter a valid Manager authentication code to continue."
+                  : "Enter a valid Manager or Owner authentication code to continue."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">

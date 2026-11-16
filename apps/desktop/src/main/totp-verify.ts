@@ -19,6 +19,7 @@ function recordFailure(): void {
 
 export function verifySupervisorTotpCode(
   code: string,
+  options?: { managerOnly?: boolean },
 ): { ok: true; userId: string; displayName: string } | { ok: false; error: string } {
   const trimmed = code.trim();
   if (!/^\d{6}$/.test(trimmed)) {
@@ -32,12 +33,17 @@ export function verifySupervisorTotpCode(
     };
   }
 
-  const secrets = getSupervisorTotpSecretsLocal();
+  const allSecrets = getSupervisorTotpSecretsLocal();
+  // Till open/close may only be authorised by a Manager — never an Owner.
+  const secrets = options?.managerOnly
+    ? allSecrets.filter((row) => row.isManager)
+    : allSecrets;
   if (secrets.length === 0) {
     return {
       ok: false,
-      error:
-        "No supervisor authentication codes on this device. Go online and complete authentication code setup for a Manager or Owner.",
+      error: options?.managerOnly
+        ? "No Manager authentication codes on this device. Only a Manager's code can open or close a till — ask a Manager to set up their authenticator while online."
+        : "No supervisor authentication codes on this device. Go online and complete authentication code setup for a Manager or Owner.",
     };
   }
 

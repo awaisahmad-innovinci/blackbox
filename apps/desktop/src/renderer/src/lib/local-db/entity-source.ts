@@ -270,6 +270,21 @@ export async function loadInventoryOutReturn(
 export async function loadSales(
   query: SaleListQuery = {},
 ): Promise<PaginatedSales> {
+  // Held bills (DRAFT) live only in this device's SQLite. They are never
+  // pushed to the cloud, so falling back to the API would wrongly show an
+  // empty list. Always read them locally.
+  if (query.status === "DRAFT") {
+    const listSales = window.blackbox?.localDb?.listSales;
+    if (!listSales) {
+      return {
+        items: [],
+        total: 0,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 20,
+      };
+    }
+    return listSales(query);
+  }
   try {
     const local = await window.blackbox?.localDb?.listSales?.(query);
     if (local) return local;
@@ -281,7 +296,18 @@ export async function loadSales(
 
 export async function loadSaleRegister(
   query: SaleRegisterQuery = {},
+  options: { preferApi?: boolean } = {},
 ): Promise<PaginatedSaleRegister> {
+  // Owner/manager views want tenant-wide sales (every cashier's bills), which
+  // only the cloud has in full. Prefer the API when online and fall back to
+  // local SQLite when the call fails (offline).
+  if (options.preferApi) {
+    try {
+      return await salesApi.register(query);
+    } catch {
+      /* offline — fall back to local */
+    }
+  }
   try {
     const local = await window.blackbox?.localDb?.listSaleRegister?.(query);
     if (local) return local;

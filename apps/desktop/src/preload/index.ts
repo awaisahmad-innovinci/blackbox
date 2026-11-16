@@ -314,7 +314,12 @@ contextBridge.exposeInMainWorld("blackbox", {
       collectedByName?: string;
     }) =>
       ipcRenderer.invoke("localDb:collectCashByAmount", input) as Promise<TillSessionDetail>,
-    closeTill: (input: { userId: string; userName: string }) =>
+    closeTill: (input: {
+      userId: string;
+      userName: string;
+      supervisorUserId?: string;
+      supervisorName?: string;
+    }) =>
       ipcRenderer.invoke("localDb:closeTill", input) as Promise<TillSessionDetail>,
     reopenTill: (input: {
       id: string;
@@ -796,15 +801,21 @@ contextBridge.exposeInMainWorld("blackbox", {
       }>,
   },
   totp: {
-    verifySupervisorCode: (code: string) =>
-      ipcRenderer.invoke("totp:verifySupervisorCode", code) as Promise<
-        import("@blackbox/shared").TotpVerifySupervisorCodeResult
-      >,
+    verifySupervisorCode: (
+      code: string,
+      options?: { managerOnly?: boolean },
+    ) =>
+      ipcRenderer.invoke(
+        "totp:verifySupervisorCode",
+        code,
+        options,
+      ) as Promise<import("@blackbox/shared").TotpVerifySupervisorCodeResult>,
     replaceSupervisorCache: (
       entries: Array<{
         userId: string;
         secretBase32: string;
         displayName: string;
+        isManager: boolean;
       }>,
     ) =>
       ipcRenderer.invoke("localDb:replaceSupervisorTotp", entries) as Promise<{

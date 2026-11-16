@@ -676,6 +676,8 @@ function registerIpc(): void {
       input: {
         userId: string;
         userName: string;
+        supervisorUserId?: string;
+        supervisorName?: string;
       },
     ) => closeTillLocal(input),
   );
@@ -1207,14 +1209,21 @@ function registerIpc(): void {
       resolveCanonicalEntityId(input),
   );
 
-  ipcMain.handle("totp:verifySupervisorCode", (_event, code: string) =>
-    verifySupervisorTotpCode(code),
+  ipcMain.handle(
+    "totp:verifySupervisorCode",
+    (_event, code: string, options?: { managerOnly?: boolean }) =>
+      verifySupervisorTotpCode(code, options),
   );
   ipcMain.handle(
     "localDb:replaceSupervisorTotp",
     (
       _event,
-      entries: Array<{ userId: string; secretBase32: string; displayName: string }>,
+      entries: Array<{
+        userId: string;
+        secretBase32: string;
+        displayName: string;
+        isManager: boolean;
+      }>,
     ) => {
       replaceSupervisorTotpLocal(entries);
       return { ok: true as const };

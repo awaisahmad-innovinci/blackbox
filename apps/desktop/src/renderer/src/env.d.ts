@@ -292,6 +292,8 @@ declare global {
         closeTill: (input: {
           userId: string;
           userName: string;
+          supervisorUserId?: string;
+          supervisorName?: string;
         }) => Promise<TillSessionDetail>;
         reopenTill: (input: {
           id: string;
@@ -541,12 +543,14 @@ declare global {
       totp?: {
         verifySupervisorCode: (
           code: string,
+          options?: { managerOnly?: boolean },
         ) => Promise<import("@blackbox/shared").TotpVerifySupervisorCodeResult>;
         replaceSupervisorCache: (
           entries: Array<{
             userId: string;
             secretBase32: string;
             displayName: string;
+            isManager: boolean;
           }>,
         ) => Promise<{ ok: true }>;
         listSupervisorUsers: () => Promise<string[]>;

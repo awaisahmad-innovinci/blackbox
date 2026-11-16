@@ -87,7 +87,7 @@ export class AuthService {
     dto: SignupTenantDto,
   ): Promise<PlatformTenantSummary> {
     const email = dto.email.trim().toLowerCase();
-    const username = dto.username.trim();
+    const username = dto.username.trim().toLowerCase();
 
     const activeEmailCount = await this.users.count({
       where: { email, isActive: true },
@@ -428,14 +428,14 @@ export class AuthService {
   /**
    * Email and username are unique only inside one business. When several
    * active accounts share the typed name, the password picks the account.
-   * Email is case-insensitive. Username must match the stored capitalization.
+   * Email and username are both case-insensitive.
    */
   private async resolveLoginUser(
     identifier: string,
     password: string,
   ): Promise<User> {
     const username = identifier.trim();
-    const email = username.toLowerCase();
+    const identifierLower = username.toLowerCase();
     if (!username) {
       throw new UnauthorizedException("Invalid credentials");
     }
@@ -444,10 +444,12 @@ export class AuthService {
       .createQueryBuilder("u")
       .where("u.is_active = true")
       .andWhere("u.deleted_at IS NULL")
-      .andWhere("(LOWER(u.email) = :email OR u.username = :username)", {
-        email,
-        username,
-      })
+      .andWhere(
+        "(LOWER(u.email) = :identifierLower OR LOWER(u.username) = :identifierLower)",
+        {
+          identifierLower,
+        },
+      )
       .getMany();
 
     const matched: User[] = [];

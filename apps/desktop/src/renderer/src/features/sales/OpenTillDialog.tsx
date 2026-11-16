@@ -56,7 +56,7 @@ export function OpenTillDialog({
 
   async function onManagerAuthorize(): Promise<void> {
     setError(null);
-    const totp = await promptSupervisorTotp();
+    const totp = await promptSupervisorTotp({ managerOnly: true });
     if (!totp.approved) return;
     setSupervisorUserId(totp.supervisorUserId);
     setSupervisorDisplayName(totp.supervisorDisplayName);
@@ -109,7 +109,7 @@ export function OpenTillDialog({
           <DialogTitle>Open till</DialogTitle>
           <DialogDescription>
             {step === "authorize"
-              ? "Ask a manager or owner to enter their authentication code to authorize opening this till."
+              ? "Ask a manager to enter their authentication code to authorize opening this till."
               : "Manager: enter the opening cash balance for this till."}
           </DialogDescription>
         </DialogHeader>

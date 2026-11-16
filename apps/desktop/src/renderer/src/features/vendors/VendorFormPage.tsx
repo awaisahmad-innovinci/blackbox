@@ -244,15 +244,6 @@ export function VendorFormPage() {
   }, []);
 
   useEffect(() => {
-    if (isEdit) return;
-    const tenantName = user?.tenantName?.trim() ?? "";
-    if (!tenantName) return;
-    void allocateVendorCode(tenantName).then((code) => {
-      setForm((prev) => ({ ...prev, vendorCode: code }));
-    });
-  }, [isEdit, user?.tenantName]);
-
-  useEffect(() => {
     if (loading || isEdit) return;
     requestAnimationFrame(() => {
       nameRef.current?.focus();
@@ -305,9 +296,6 @@ export function VendorFormPage() {
   function validate(): boolean {
     const next: Record<string, string> = {};
     if (!form.name.trim()) next.name = "Vendor name is required";
-    if (!isEdit && !form.vendorCode.trim()) {
-      next.vendorCode = "Vendor code is being assigned…";
-    }
 
     const requiredContacts = [
       ["primaryContact", form.primaryContact, "Primary contact"],
@@ -553,7 +541,8 @@ export function VendorFormPage() {
           <div className="space-y-1.5">
             <Label>Vendor Code</Label>
             <Input
-              value={form.vendorCode}
+              value={isEdit ? form.vendorCode : ""}
+              placeholder={isEdit ? undefined : "Assigned on save"}
               readOnly={!isEdit}
               disabled={!isEdit}
               onChange={(e) =>
@@ -564,7 +553,7 @@ export function VendorFormPage() {
             />
             {!isEdit ? (
               <p className="text-muted-foreground text-xs">
-                Assigned automatically from your business name.
+                Assigned automatically from your business name when you save.
               </p>
             ) : null}
             {fieldErrors.vendorCode ? (

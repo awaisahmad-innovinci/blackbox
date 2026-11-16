@@ -6,8 +6,6 @@ import {
   emptyTillNotes,
   formatMoney,
   isTillNearLimit,
-  TILL_MAX_CASH_BALANCE_TO_CLOSE,
-  validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -172,8 +170,11 @@ export function TillPage() {
       setFundError(validationError);
       return;
     }
-    setBusy(true);
     setFundError(null);
+    // Only a Manager authentication code may open a till.
+    const totp = await promptSupervisorTotp({ managerOnly: true });
+    if (!totp.approved) return;
+    setBusy(true);
     try {
       await openTill({
         userId: cashier.id,
@@ -182,10 +183,11 @@ export function TillPage() {
         body: {
           ...emptyTillNotes(),
           openingBalance: balance,
+          supervisorUserId: totp.supervisorUserId,
         },
-        requireApproval: false,
-        funderUserId: user.id,
-        funderName: user.fullName?.trim() || user.username,
+        requireApproval: true,
+        funderUserId: totp.supervisorUserId,
+        funderName: totp.supervisorDisplayName,
       });
       setFundOpen(false);
       setFundAmount("");
@@ -290,12 +292,16 @@ export function TillPage() {
 
   async function onCloseTill(): Promise<void> {
     if (!user) return;
-    setBusy(true);
     setError(null);
+    const totp = await promptSupervisorTotp({ managerOnly: true });
+    if (!totp.approved) return;
+    setBusy(true);
     try {
       await closeTill({
         userId: user.id,
         userName: user.fullName?.trim() || user.username,
+        supervisorUserId: totp.supervisorUserId,
+        supervisorName: totp.supervisorDisplayName,
       });
       setCloseDialogOpen(false);
       await refresh();
@@ -310,10 +316,6 @@ export function TillPage() {
     session && session.maxCashLimit > 0
       ? Math.min(100, (session.currentCashBalance / session.maxCashLimit) * 100)
       : 0;
-
-  const closeBalanceError = session
-    ? validateTillCanCloseBalance(session.currentCashBalance)
-    : null;
 
   async function onOpenDrawer(): Promise<void> {
     setOpeningDrawer(true);
@@ -645,7 +647,8 @@ export function TillPage() {
           </DialogHeader>
           <p className="text-muted-foreground text-sm">
             Close your till for this shift? You will not be able to post sales
-            until a manager reopens your till.
+            until a manager reopens your till. A manager must enter their
+            authentication code to close.
           </p>
           {session ? (
             <>
@@ -653,14 +656,11 @@ export function TillPage() {
                 Current cash in till: Rs{" "}
                 {formatMoney(session.currentCashBalance)}
               </p>
-              {closeBalanceError ? (
-                <p className="text-destructive text-sm" role="alert">
-                  {closeBalanceError} Use Withdraw cash first, then try again.
-                </p>
-              ) : session.currentCashBalance <= TILL_MAX_CASH_BALANCE_TO_CLOSE ? (
+              {session.currentCashBalance > 0 ? (
                 <p className="text-muted-foreground text-sm">
-                  Till balance is Rs {TILL_MAX_CASH_BALANCE_TO_CLOSE} or less. You
-                  can close now.
+                  The remaining Rs {formatMoney(session.currentCashBalance)} will
+                  be moved into the approving manager&apos;s drawer and the till
+                  set to Rs 0.
                 </p>
               ) : null}
             </>
@@ -674,7 +674,7 @@ export function TillPage() {
               Cancel
             </Button>
             <Button
-              disabled={busy || Boolean(closeBalanceError)}
+              disabled={busy}
               onClick={() => void onCloseTill()}
             >
               {busy ? "Closing…" : "Close till"}

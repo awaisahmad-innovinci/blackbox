@@ -104,6 +104,26 @@ type DraftPayment = {
 
 type PaymentMode = "cash" | "card" | "split";
 
+/**
+ * In-progress new sale, stashed when the cashier navigates to another module
+ * mid-bill so their items are not lost. Held in module scope (survives the
+ * SalePage unmount within a session) because the app uses a non-data HashRouter
+ * where `useBlocker` is unavailable. Restored when returning to a fresh sale.
+ */
+type StashedNewSale = {
+  customerName: string;
+  warehouseId: string;
+  lines: DraftSaleLine[];
+  payments: DraftPayment[];
+  paymentMode: PaymentMode;
+};
+
+let stashedNewSale: StashedNewSale | null = null;
+
+function clearStashedNewSale(): void {
+  stashedNewSale = null;
+}
+
 const NO_WAREHOUSE_ERROR = "No active warehouse configured";
 const NOT_ON_BILL_ERROR = "This item is not on the current bill.";
 
@@ -242,6 +262,27 @@ export function SalePage() {
   const scanInputRef = useRef<HTMLInputElement>(null);
   const paymentAmountRef = useRef<HTMLInputElement>(null);
   const splitCashAmountRef = useRef<HTMLInputElement>(null);
+  // Snapshot of the current bill so it can be stashed on unmount (issue: items
+  // lost when switching module mid-sale). Kept current on every render.
+  const saleStashRef = useRef<{
+    customerName: string;
+    warehouseId: string;
+    lines: DraftSaleLine[];
+    payments: DraftPayment[];
+    paymentMode: PaymentMode;
+    editingDraftId: string | null;
+    saving: boolean;
+    holding: boolean;
+  }>({
+    customerName,
+    warehouseId,
+    lines,
+    payments,
+    paymentMode,
+    editingDraftId: null,
+    saving: false,
+    holding: false,
+  });
 
   const nonFbrSale =
     user?.fbrEnabled === true &&
@@ -263,6 +304,52 @@ export function SalePage() {
     holdNumberRef.current = null;
     setError(null);
   }
+
+  saleStashRef.current = {
+    customerName,
+    warehouseId,
+    lines,
+    payments,
+    paymentMode,
+    editingDraftId,
+    saving,
+    holding,
+  };
+
+  // Stash an in-progress fresh sale when leaving the page (switching module),
+  // then restore it when a new sale is opened again, so items are not lost.
+  useEffect(() => {
+    return () => {
+      const snapshot = saleStashRef.current;
+      if (
+        !snapshot.editingDraftId &&
+        !snapshot.saving &&
+        !snapshot.holding &&
+        snapshot.lines.length > 0
+      ) {
+        stashedNewSale = {
+          customerName: snapshot.customerName,
+          warehouseId: snapshot.warehouseId,
+          lines: snapshot.lines,
+          payments: snapshot.payments,
+          paymentMode: snapshot.paymentMode,
+        };
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (routeDraftId) return;
+    const stashed = stashedNewSale;
+    if (!stashed || stashed.lines.length === 0) return;
+    stashedNewSale = null;
+    setLines(stashed.lines);
+    setPayments(stashed.payments);
+    setPaymentMode(stashed.paymentMode);
+    setCustomerName(stashed.customerName);
+    if (stashed.customerName.trim()) setShowCustomerField(true);
+    if (stashed.warehouseId) setWarehouseId(stashed.warehouseId);
+  }, [routeDraftId]);
 
   useEffect(() => {
     if (!canWrite) navigate("/", { replace: true });
@@ -287,9 +374,6 @@ export function SalePage() {
         setWarehouses(rows);
         if (rows.length > 0) {
           setWarehouseId((current) => current || rows[0]!.id);
-          // #region agent log
-          fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"post-fix",hypothesisId:"E",location:"SalePage.tsx:warehouses",message:"default warehouse",data:{firstId:rows[0]!.id,firstName:rows[0]!.name,count:rows.length},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
         }
       })
       .catch(() => undefined);
@@ -1054,7 +1138,7 @@ export function SalePage() {
       setError(NOT_ON_BILL_ERROR);
       return;
     }
-    const removed = await removeBillLine(line, { confirm: false });
+    const removed = await removeBillLine(line, { confirm: true });
     if (removed) {
       setRemoveScanOpen(false);
       focusScanInput();
@@ -1208,7 +1292,12 @@ export function SalePage() {
         saleNumber: holdNumber,
         status: "DRAFT",
       });
-      await window.blackbox?.localDb?.upsertSaleDraft?.(detail);
+      const upsertSaleDraft = window.blackbox?.localDb?.upsertSaleDraft;
+      if (!upsertSaleDraft) {
+        throw new Error("Holding bills is only available in the desktop app.");
+      }
+      await upsertSaleDraft(detail);
+      clearStashedNewSale();
       bumpDataVersion();
       resetForNewSale();
       navigate("/sales/new", { replace: true });
@@ -1512,6 +1601,7 @@ export function SalePage() {
             { actorName: user.fullName?.trim() || user.username },
           );
         }
+        clearStashedNewSale();
         navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
         void syncNow();
         return;
@@ -1575,6 +1665,7 @@ export function SalePage() {
           ? await submitPostedSaleToFbr(detail)
           : detail;
       bumpDataVersion();
+      clearStashedNewSale();
       navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
       void syncNow();
     } catch (err: unknown) {

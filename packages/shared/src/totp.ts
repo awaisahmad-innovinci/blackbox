@@ -12,6 +12,8 @@ export type TotpSupervisorCacheEntry = {
   userId: string;
   secret: string;
   fullName: string;
+  /** True when the user holds the MANAGER role (used to gate till open/close). */
+  isManager: boolean;
 };
 
 export type TotpSupervisorCacheResponse = {
