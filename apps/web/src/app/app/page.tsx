@@ -11,20 +11,30 @@ import {
   Loader2,
 } from "lucide-react";
 import {
+  CASH_EXPENSE_CATEGORIES,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
   formatMoney,
+  type CashExpenseCategory,
   type OwnerBusinessOverview,
   type Permission,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Badge } from "@blackbox/ui/badge";
+import { Input } from "@blackbox/ui/input";
 import { useAuth } from "@/components/auth-provider";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import {
   getCurrentTenant,
   getOwnerOverview,
+  fundManagerDrawer,
+  listDrawerManagers,
   listDevices,
   listUsers,
+  recordCashExpense,
+  recordOwnerCash,
+  type DrawerManager,
   type TenantDto,
 } from "@/lib/admin-api";
 
@@ -146,6 +156,12 @@ export default function DashboardPage() {
     };
   }, []);
 
+  async function refreshOverview() {
+    const next = await getOwnerOverview();
+    setOverview(next);
+    setOverviewError(null);
+  }
+
   const actions = QUICK.filter((item) => hasPermission(item.permission));
 
   return (
@@ -167,7 +183,7 @@ export default function DashboardPage() {
           Loading today&apos;s overview…
         </p>
       ) : overview ? (
-        <OwnerOverview overview={overview} />
+        <OwnerOverview overview={overview} onChanged={refreshOverview} />
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -271,8 +287,47 @@ export default function DashboardPage() {
   );
 }
 
-function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
+function OwnerOverview({
+  overview,
+  onChanged,
+}: {
+  overview: OwnerBusinessOverview;
+  onChanged: () => Promise<void>;
+}) {
   const today = new Date(`${overview.date}T12:00:00`).toLocaleDateString();
+  const [cashAmount, setCashAmount] = useState("");
+  const [cashSaving, setCashSaving] = useState(false);
+  const [cashError, setCashError] = useState<string | null>(null);
+  const [managers, setManagers] = useState<DrawerManager[]>([]);
+  const [managerId, setManagerId] = useState("");
+  const [fundAmount, setFundAmount] = useState("");
+  const [fundSaving, setFundSaving] = useState(false);
+  const [fundError, setFundError] = useState<string | null>(null);
+  const [expenseCategory, setExpenseCategory] =
+    useState<CashExpenseCategory>("Rent");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseNote, setExpenseNote] = useState("");
+  const [expenseSaving, setExpenseSaving] = useState(false);
+  const [expenseError, setExpenseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listDrawerManagers()
+      .then((rows) => {
+        if (cancelled) return;
+        setManagers(rows);
+        setManagerId((current) => current || rows[0]?.id || "");
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setFundError(
+          err instanceof Error ? err.message : "Could not load managers",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const moneyCards = [
     {
       label: "Sales",
@@ -288,11 +343,6 @@ function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
       label: "Card payments",
       value: money(overview.cardPayments),
       hint: "Card taken on posted sales",
-    },
-    {
-      label: "Credit payments",
-      value: money(overview.creditPayments),
-      hint: "Credit taken on posted sales",
     },
     {
       label: "Refunds",
@@ -311,7 +361,7 @@ function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
       <p className="text-muted-foreground text-sm">
         {today}. Sales appear here after the desktop syncs them.
       </p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {moneyCards.map((card) => (
           <div key={card.label} className="bb-surface px-5 py-4">
             <p className="text-muted-foreground text-xs tracking-wide uppercase">
@@ -375,30 +425,216 @@ function OwnerOverview({ overview }: { overview: OwnerBusinessOverview }) {
           <p className="font-display text-3xl font-semibold tracking-tight tabular-nums">
             {money(overview.ownerCashBalance)}
           </p>
+          <form
+            className="mt-4 flex items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const amount = Number(cashAmount);
+              if (!(amount > 0) || cashSaving) return;
+              setCashSaving(true);
+              setCashError(null);
+              void recordOwnerCash(amount)
+                .then(() => onChanged())
+                .then(() => setCashAmount(""))
+                .catch((err: unknown) => {
+                  setCashError(
+                    err instanceof Error ? err.message : "Could not add the cash",
+                  );
+                })
+                .finally(() => setCashSaving(false));
+            }}
+          >
+            <Input
+              inputMode="decimal"
+              placeholder="Amount"
+              value={cashAmount}
+              onChange={(event) => setCashAmount(event.target.value)}
+              aria-label="Cash to add"
+            />
+            <Button type="submit" disabled={cashSaving || !(Number(cashAmount) > 0)}>
+              {cashSaving ? "Adding…" : "Add"}
+            </Button>
+          </form>
+          {cashError ? (
+            <p className="text-destructive mt-2 text-sm" role="alert">
+              {cashError}
+            </p>
+          ) : null}
         </SectionCard>
       </div>
       <SectionCard title="Cash in manager drawers">
-        {overview.drawers.filter((drawer) => drawer.balance > 0).length === 0 ? (
+        {overview.drawers.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No cash in manager drawers.
           </p>
         ) : (
           <ul className="divide-y text-base">
-            {overview.drawers
-              .filter((drawer) => drawer.balance > 0)
-              .map((drawer) => (
-                <li
-                  key={drawer.managerUserId}
-                  className="flex items-center justify-between gap-4 py-2.5"
-                >
-                  <span className="font-medium">{drawer.managerName}</span>
-                  <span className="text-lg font-bold tabular-nums">
-                    {money(drawer.balance)}
-                  </span>
-                </li>
-              ))}
+            {overview.drawers.map((drawer) => (
+              <li
+                key={drawer.managerUserId}
+                className="flex items-center justify-between gap-4 py-2.5"
+              >
+                <span className="font-medium">{drawer.managerName}</span>
+                <span className="text-lg font-bold tabular-nums">
+                  {money(drawer.balance)}
+                </span>
+              </li>
+            ))}
           </ul>
         )}
+        <form
+          className="mt-4 space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const amount = Number(fundAmount);
+            if (!managerId || !(amount > 0) || fundSaving) return;
+            setFundSaving(true);
+            setFundError(null);
+            void fundManagerDrawer(managerId, amount)
+              .then(() => onChanged())
+              .then(() => setFundAmount(""))
+              .catch((err: unknown) => {
+                setFundError(
+                  err instanceof Error ? err.message : "Could not fund the drawer",
+                );
+              })
+              .finally(() => setFundSaving(false));
+          }}
+        >
+          <p className="text-sm font-medium">Fund a manager drawer</p>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="grid gap-1 text-sm">
+              Manager
+              <select
+                className="border-input bg-background h-9 rounded-md border px-2"
+                value={managerId}
+                onChange={(event) => setManagerId(event.target.value)}
+                aria-label="Manager"
+              >
+                {managers.length === 0 ? (
+                  <option value="">No managers</option>
+                ) : null}
+                {managers.map((manager) => (
+                  <option key={manager.id} value={manager.id}>
+                    {manager.fullName.trim() || manager.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              Amount
+              <Input
+                inputMode="decimal"
+                className="w-36"
+                value={fundAmount}
+                onChange={(event) => setFundAmount(event.target.value)}
+                aria-label="Amount to fund"
+              />
+            </label>
+            <Button
+              type="submit"
+              disabled={fundSaving || !managerId || !(Number(fundAmount) > 0)}
+            >
+              {fundSaving ? "Saving…" : "Fund drawer"}
+            </Button>
+          </div>
+          {fundError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {fundError}
+            </p>
+          ) : null}
+        </form>
+      </SectionCard>
+      <SectionCard
+        title="Expenses"
+        description="This expense is deducted from the owner drawer."
+      >
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const amount = Number(expenseAmount);
+            if (!(amount > 0) || expenseSaving) return;
+            if (expenseExceedsDrawer(amount, overview.ownerCashBalance)) {
+              setExpenseError(expenseOverDrawerMessage(overview.ownerCashBalance));
+              return;
+            }
+            setExpenseSaving(true);
+            setExpenseError(null);
+            void recordCashExpense({
+              category: expenseCategory,
+              amount,
+              note: expenseNote.trim() || undefined,
+            })
+              .then(() => onChanged())
+              .then(() => {
+                setExpenseAmount("");
+                setExpenseNote("");
+              })
+              .catch((err: unknown) => {
+                setExpenseError(
+                  err instanceof Error
+                    ? err.message
+                    : "Could not record the expense",
+                );
+              })
+              .finally(() => setExpenseSaving(false));
+          }}
+        >
+          <label className="grid gap-1 text-sm">
+            Category
+            <select
+              className="border-input bg-background h-9 rounded-md border px-2"
+              value={expenseCategory}
+              onChange={(event) =>
+                setExpenseCategory(event.target.value as CashExpenseCategory)
+              }
+              aria-label="Expense category"
+            >
+              {CASH_EXPENSE_CATEGORIES.filter(
+                (item) => item !== "Vendor payment",
+              ).map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">
+            Amount
+            <Input
+              inputMode="decimal"
+              className="w-36"
+              value={expenseAmount}
+              onChange={(event) => setExpenseAmount(event.target.value)}
+              aria-label="Expense amount"
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            Note
+            <Input
+              className="w-56"
+              value={expenseNote}
+              onChange={(event) => setExpenseNote(event.target.value)}
+              aria-label="Expense note"
+            />
+          </label>
+          <Button
+            type="submit"
+            disabled={expenseSaving || !(Number(expenseAmount) > 0)}
+          >
+            {expenseSaving ? "Saving…" : "Add expense"}
+          </Button>
+          {expenseError ? (
+            <p className="text-destructive w-full text-sm" role="alert">
+              {expenseError}
+            </p>
+          ) : (
+            <p className="text-muted-foreground w-full text-xs">
+              Maximum {money(overview.ownerCashBalance)}.
+            </p>
+          )}
+        </form>
       </SectionCard>
     </div>
   );

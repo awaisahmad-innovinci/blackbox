@@ -469,6 +469,7 @@ declare global {
         ) => Promise<InventoryInOutReport>;
       };
       identity?: {
+        getComputerName: () => Promise<string>;
         getFingerprint: () => Promise<string>;
         getStableFingerprint: () => Promise<string | null>;
         persistFingerprint: (fingerprint: string) => Promise<{ ok: true }>;

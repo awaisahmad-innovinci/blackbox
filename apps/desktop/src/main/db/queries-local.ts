@@ -752,7 +752,7 @@ export function getManagerDashboardSummaryLocal(
        from till_withdrawals
        where tenant_id = @tenantId
          and withdrawn_by_user_id = @userId
-         and date(created_at) = date('now', 'localtime')`,
+         and date(created_at, 'localtime') = date('now', 'localtime')`,
     )
     .get({ tenantId, userId }) as { amount: number };
 
@@ -779,15 +779,22 @@ export function getManagerDashboardSummaryLocal(
   );
   const cashierTillRows = db
     .prepare(
-      `select user_id as userId,
-              user_name as userName,
-              till_name as tillName,
-              status,
-              current_cash_balance as currentCashBalance
-       from till_sessions
-       where tenant_id = @tenantId
-         and status in ('OPEN', 'CLOSED_LIMIT', 'PENDING_APPROVAL')
-       order by user_name asc, till_name asc`,
+      `select userId, userName, tillName, status, currentCashBalance
+       from (
+         select user_id as userId,
+                user_name as userName,
+                till_name as tillName,
+                status,
+                current_cash_balance as currentCashBalance,
+                row_number() over (
+                  partition by user_id
+                  order by coalesce(opened_at, created_at) desc
+                ) as rn
+         from till_sessions
+         where tenant_id = @tenantId
+       )
+       where rn = 1
+       order by userName asc, tillName asc`,
     )
     .all({ tenantId }) as {
     userId: string;
@@ -811,7 +818,12 @@ export function getManagerDashboardSummaryLocal(
       userName: row.userName?.trim() || "Cashier",
       tillName: row.tillName?.trim() || "till",
       status: row.status,
-      currentCashBalance: roundMoney(Number(row.currentCashBalance)),
+      currentCashBalance:
+        row.status === "OPEN" ||
+        row.status === "CLOSED_LIMIT" ||
+        row.status === "PENDING_APPROVAL"
+          ? roundMoney(Number(row.currentCashBalance))
+          : 0,
     })),
   };
 }

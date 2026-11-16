@@ -5,7 +5,7 @@ import type { DefaultRole } from "./roles";
 /**
  * Phase 1 default role → permission seeds.
  * OWNER is the tenant administrator (all Phase 1 permissions except POS sales.write).
- * MANAGER: desktop sales supervision only — no web.access or inventory modules.
+ * MANAGER: desktop sales supervision and vendors — no web.access or other inventory modules.
  * WAREHOUSE_MANAGER: desktop inventory modules only — no sales or web.access.
  */
 /** Owner gets all Phase 1 permissions except POS sale creation (cashier-only). */
@@ -36,6 +36,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "till.manage",
     "activity.read",
     "tax.reports.read",
+    "vendors.access",
   ],
   WAREHOUSE_MANAGER: [
     "desktop.access",

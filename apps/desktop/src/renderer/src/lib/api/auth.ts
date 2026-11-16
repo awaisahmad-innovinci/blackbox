@@ -26,12 +26,14 @@ export async function desktopLogin(
   const fingerprint = await window.blackbox?.identity?.getFingerprint();
   const stableFingerprint =
     await window.blackbox?.identity?.getStableFingerprint();
+  const deviceName =
+    (await window.blackbox?.identity?.getComputerName())?.trim() || "Desktop";
   const payload: LoginRequest = {
     identifier,
     password,
     client: "desktop",
     fingerprint,
-    deviceName: "Desktop",
+    deviceName,
   };
   if (
     stableFingerprint &&
@@ -112,9 +114,12 @@ export async function desktopLogout(): Promise<void> {
   const refreshToken = getRefreshToken();
   try {
     if (refreshToken) {
+      const computerName =
+        (await window.blackbox?.identity?.getComputerName())?.trim() ||
+        "Desktop";
       await apiFetch<{ success: true }>("/auth/logout", {
         method: "POST",
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({ refreshToken, computerName }),
         skipAuth: true,
       });
     }

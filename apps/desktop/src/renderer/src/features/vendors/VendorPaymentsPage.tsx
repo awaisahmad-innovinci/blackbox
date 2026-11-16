@@ -166,7 +166,7 @@ export function VendorPaymentsPage() {
           ref={searchRef}
           {...barcodeScanInputProps()}
           className="max-w-xs"
-          placeholder="Vendor, receipt, or note"
+          placeholder="Vendor, reference, or note"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -258,6 +258,8 @@ export function VendorPaymentsPage() {
               <th className="px-4 py-3 font-medium">When</th>
               <th className="px-4 py-3 font-medium">Vendor</th>
               <th className="px-4 py-3 font-medium">Amount</th>
+              <th className="px-4 py-3 font-medium">Method</th>
+              <th className="px-4 py-3 font-medium">Reference</th>
               <th className="px-4 py-3 font-medium">Receipt</th>
               <th className="px-4 py-3 font-medium">Note</th>
               <th className="no-print px-4 py-3 font-medium">Print</th>
@@ -266,13 +268,13 @@ export function VendorPaymentsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-muted-foreground px-4 py-6">
+                <td colSpan={8} className="text-muted-foreground px-4 py-6">
                   Loading…
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-muted-foreground px-4 py-6">
+                <td colSpan={8} className="text-muted-foreground px-4 py-6">
                   No vendor payments found.
                 </td>
               </tr>
@@ -296,6 +298,14 @@ export function VendorPaymentsPage() {
                   <td className="px-4 py-3 tabular-nums">
                     {formatMoney(row.amount)}
                   </td>
+                  <td className="px-4 py-3">
+                    {row.paymentMethod === "CASH"
+                      ? "Cash"
+                      : row.paymentMethod === "BANK"
+                        ? "Bank transfer"
+                        : "—"}
+                  </td>
+                  <td className="px-4 py-3">{row.referenceNumber || "—"}</td>
                   <td className="px-4 py-3">{row.receiptNumber || "—"}</td>
                   <td className="px-4 py-3">{row.note || "—"}</td>
                   <td className="no-print px-4 py-3">

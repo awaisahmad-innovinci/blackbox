@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatMoney } from "@blackbox/shared";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   ProductDetail,
@@ -8,7 +7,14 @@ import type {
   VendorLedger,
   VendorSku,
 } from "@blackbox/shared";
-import { PAYMENT_TERMS_LABELS, roundMoney4 } from "@blackbox/shared";
+import {
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
+  formatMoney,
+  PAYMENT_TERMS_LABELS,
+  roundMoney4,
+  type VendorPaymentMethod,
+} from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
@@ -18,9 +24,10 @@ import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
 import { vendorsApi } from "@renderer/lib/api/vendors";
 import { loadVendorLedger, loadVendorProfile } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
+import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { useConfirm } from "@renderer/components/confirm-provider";
-import { canAccessPurchasingModule } from "@renderer/lib/sales-access";
+import { canAccessVendorsModule } from "@renderer/lib/sales-access";
 import { useSession } from "@renderer/lib/session/context";
 import { AddProductDialog } from "@renderer/features/products/AddProductDialog";
 import { AddProductSkuDialog } from "@renderer/features/products/AddProductSkuDialog";
@@ -57,10 +64,15 @@ export function VendorProfilePage() {
     location.state as { vendor?: VendorDetail } | null
   )?.vendor;
   const { user } = useSession();
-  const canRecordPayment = canAccessPurchasingModule(user?.permissions ?? []);
+  const permissions = user?.permissions ?? [];
+  const canRecordPayment =
+    canAccessVendorsModule(permissions) &&
+    (permissions.includes("web.access") || permissions.includes("till.manage"));
   const [vendor, setVendor] = useState<VendorDetail | null>(seeded ?? null);
   const [ledger, setLedger] = useState<VendorLedger | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<VendorPaymentMethod>("CASH");
+  const [paymentReference, setPaymentReference] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
   const [paying, setPaying] = useState(false);
   const [paymentReceipt, setPaymentReceipt] =
@@ -99,7 +111,7 @@ export function VendorProfilePage() {
   }
 
   async function recordPayment() {
-    if (!id) return;
+    if (!id || !user) return;
     const amount = roundMoney4(Number(paymentAmount));
     if (!(amount > 0)) {
       setError("Payment amount must be greater than zero");
@@ -109,13 +121,34 @@ export function VendorProfilePage() {
       setError(`Payment cannot exceed vendor credit (${ledger.credit})`);
       return;
     }
+    const reference = paymentReference.trim();
+    if (paymentMethod === "BANK" && !reference) {
+      setError("Enter the transaction id");
+      return;
+    }
     const note = paymentNote.trim();
     const occurredAt = new Date().toISOString();
     const creditBefore = ledger?.credit;
+    const owner = user.permissions.includes("web.access");
     setPaying(true);
     setError(null);
     try {
       if (await isDeviceBound()) {
+        if (paymentMethod === "CASH") {
+          const summary =
+            await window.blackbox?.localDb?.getManagerDashboardSummary?.(
+              user.id,
+              owner,
+              user.fullName || user.username,
+            );
+          const available = owner
+            ? (summary?.ownerCashBalance ?? 0)
+            : (summary?.drawerBalance ?? 0);
+          if (expenseExceedsDrawer(amount, available)) {
+            setError(expenseOverDrawerMessage(available));
+            return;
+          }
+        }
         const entryId = crypto.randomUUID();
         await commitLocalChange({
           entityType: "vendor_ledger_entry",
@@ -128,19 +161,64 @@ export function VendorProfilePage() {
             amount,
             goodsReceiptId: null,
             receiptNumber: null,
+            paymentMethod,
+            referenceNumber: paymentMethod === "BANK" ? reference : null,
             note,
             occurredAt,
             createdAt: occurredAt,
             updatedAt: occurredAt,
           },
         });
+        const expenseId =
+          paymentMethod === "CASH" ? crypto.randomUUID() : null;
+        if (expenseId) {
+          await commitLocalChange({
+            entityType: "cash_expense",
+            entityId: expenseId,
+            operation: "UPSERT",
+            payload: {
+              recordedByUserId: user.id,
+              recordedByName: user.fullName || user.username,
+              category: "Vendor payment",
+              amount,
+              note: note || `Vendor payment to ${vendor?.name ?? "vendor"}`,
+              occurredAt,
+              ...(owner ? { ownerCash: true } : {}),
+              createdAt: occurredAt,
+              updatedAt: occurredAt,
+            },
+          });
+        }
+        const methodLabel =
+          paymentMethod === "BANK" ? "bank transfer" : "cash";
+        const referenceLabel =
+          paymentMethod === "BANK" ? ` (ref ${reference})` : "";
+        await logActivityEvent(
+          {
+            eventType: "vendor.paid",
+            actorUserId: user.id,
+            summary: `${user.fullName?.trim() || user.username} paid Rs ${formatMoney(amount)} by ${methodLabel} to ${vendor?.name ?? "vendor"}${referenceLabel}`,
+            metadata: {
+              vendorId: id,
+              entryId,
+              expenseId,
+              amount,
+              method: paymentMethod,
+              referenceNumber: paymentMethod === "BANK" ? reference : null,
+            },
+          },
+          { actorName: user.fullName?.trim() || user.username },
+        );
       } else {
         await vendorsApi.recordPayment(id, {
           amount,
+          method: paymentMethod,
+          referenceNumber: paymentMethod === "BANK" ? reference : undefined,
           note: note || undefined,
         });
       }
       setPaymentAmount("");
+      setPaymentReference("");
       setPaymentNote("");
       let creditRemaining =
         creditBefore == null
@@ -447,6 +525,31 @@ export function VendorProfilePage() {
               }}
             >
               <div className="space-y-1">
+                <Label htmlFor="vendor-payment-method">Method</Label>
+                <select
+                  id="vendor-payment-method"
+                  className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                  value={paymentMethod}
+                  onChange={(event) =>
+                    setPaymentMethod(event.target.value as VendorPaymentMethod)
+                  }
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="BANK">Bank transfer</option>
+                </select>
+              </div>
+              {paymentMethod === "BANK" ? (
+                <div className="space-y-1">
+                  <Label htmlFor="vendor-payment-reference">Transaction id</Label>
+                  <Input
+                    id="vendor-payment-reference"
+                    className="h-8 w-40"
+                    value={paymentReference}
+                    onChange={(event) => setPaymentReference(event.target.value)}
+                  />
+                </div>
+              ) : null}
+              <div className="space-y-1">
                 <Label htmlFor="vendor-payment-amount">Amount</Label>
                 <Input
                   id="vendor-payment-amount"
@@ -478,6 +581,8 @@ export function VendorProfilePage() {
                 <th className="px-4 py-3 font-medium">When</th>
                 <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Method</th>
+                <th className="px-4 py-3 font-medium">Reference</th>
                 <th className="px-4 py-3 font-medium">Receipt</th>
                 <th className="px-4 py-3 font-medium">Note</th>
               </tr>
@@ -486,7 +591,7 @@ export function VendorProfilePage() {
               {(ledger?.entries.length ?? 0) === 0 ? (
                 <tr className="border-border border-t">
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="text-muted-foreground px-4 py-6 text-center"
                   >
                     No ledger entries yet.
@@ -504,6 +609,14 @@ export function VendorProfilePage() {
                     <td className="px-4 py-3 tabular-nums">
                       {formatMoney(entry.amount)}
                     </td>
+                    <td className="px-4 py-3">
+                      {entry.paymentMethod === "CASH"
+                        ? "Cash"
+                        : entry.paymentMethod === "BANK"
+                          ? "Bank transfer"
+                          : "—"}
+                    </td>
+                    <td className="px-4 py-3">{entry.referenceNumber || "—"}</td>
                     <td className="px-4 py-3">{entry.receiptNumber || "—"}</td>
                     <td className="px-4 py-3">{entry.note || "—"}</td>
                   </tr>

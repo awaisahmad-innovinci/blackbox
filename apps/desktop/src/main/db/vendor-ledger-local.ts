@@ -7,21 +7,26 @@ import type {
   VendorLedgerEntry,
   VendorPaymentListItem,
   VendorPaymentListQuery,
+  VendorPaymentMethod,
 } from "@blackbox/shared";
 import { DEMO_STORE_TENANT_ID, roundMoney4 } from "@blackbox/shared";
 import { getLocalDb } from "./index";
+
+function paymentMethodOf(value: string | null): VendorPaymentMethod | null {
+  return value === "CASH" || value === "BANK" ? value : null;
+}
 
 export function upsertVendorLedgerEntryLocal(entry: VendorLedgerEntry): void {
   const db = getLocalDb();
   db.prepare(
     `insert into vendor_ledger_entries (
       id, tenant_id, vendor_id, entry_type, amount, goods_receipt_id,
-      receipt_number, note, occurred_at, created_at, updated_at,
-      sync_status, server_updated_at
+      receipt_number, payment_method, reference_number, note, occurred_at,
+      created_at, updated_at, sync_status, server_updated_at
     ) values (
       @id, @tenantId, @vendorId, @entryType, @amount, @goodsReceiptId,
-      @receiptNumber, @note, @occurredAt, @createdAt, @updatedAt,
-      'synced', @serverUpdatedAt
+      @receiptNumber, @paymentMethod, @referenceNumber, @note, @occurredAt,
+      @createdAt, @updatedAt, 'synced', @serverUpdatedAt
     )
     on conflict(id) do update set
       vendor_id = excluded.vendor_id,
@@ -29,6 +34,8 @@ export function upsertVendorLedgerEntryLocal(entry: VendorLedgerEntry): void {
       amount = excluded.amount,
       goods_receipt_id = excluded.goods_receipt_id,
       receipt_number = excluded.receipt_number,
+      payment_method = excluded.payment_method,
+      reference_number = excluded.reference_number,
       note = excluded.note,
       occurred_at = excluded.occurred_at,
       updated_at = excluded.updated_at,
@@ -42,6 +49,8 @@ export function upsertVendorLedgerEntryLocal(entry: VendorLedgerEntry): void {
     amount: entry.amount,
     goodsReceiptId: entry.goodsReceiptId,
     receiptNumber: entry.receiptNumber,
+    paymentMethod: entry.paymentMethod,
+    referenceNumber: entry.referenceNumber,
     note: entry.note,
     occurredAt: entry.occurredAt,
     createdAt: entry.createdAt,
@@ -87,7 +96,7 @@ export function listVendorCreditsLocal(
         vendorName: row.vendorName,
         charges,
         payments,
-        credit: roundMoney4(charges - payments),
+        credit: roundMoney4(Math.max(0, charges - payments)),
       };
     })
     .sort(
@@ -122,7 +131,7 @@ export function listVendorPaymentsLocal(
   const search = query.search?.trim();
   if (search) {
     where.push(
-      "(lower(coalesce(v.name, '')) like @search or lower(coalesce(e.note, '')) like @search or lower(coalesce(e.receipt_number, '')) like @search)",
+      "(lower(coalesce(v.name, '')) like @search or lower(coalesce(e.note, '')) like @search or lower(coalesce(e.receipt_number, '')) like @search or lower(coalesce(e.reference_number, '')) like @search)",
     );
     params.search = `%${search.toLowerCase()}%`;
   }
@@ -145,6 +154,8 @@ export function listVendorPaymentsLocal(
          coalesce(v.name, '') as vendorName,
          e.amount as amount,
          e.receipt_number as receiptNumber,
+         e.payment_method as paymentMethod,
+         e.reference_number as referenceNumber,
          e.note as note,
          e.occurred_at as occurredAt
        ${fromSql}
@@ -161,6 +172,8 @@ export function listVendorPaymentsLocal(
     vendorName: string;
     amount: number;
     receiptNumber: string | null;
+    paymentMethod: string | null;
+    referenceNumber: string | null;
     note: string | null;
     occurredAt: string;
   }>;
@@ -170,6 +183,8 @@ export function listVendorPaymentsLocal(
     vendorName: row.vendorName,
     amount: Number(row.amount),
     receiptNumber: row.receiptNumber,
+    paymentMethod: paymentMethodOf(row.paymentMethod),
+    referenceNumber: row.referenceNumber,
     note: row.note ?? "",
     occurredAt: row.occurredAt,
   }));
@@ -187,6 +202,8 @@ export function getVendorLedgerLocal(vendorId: string): VendorLedger {
          amount,
          goods_receipt_id as goodsReceiptId,
          receipt_number as receiptNumber,
+         payment_method as paymentMethod,
+         reference_number as referenceNumber,
          note,
          occurred_at as occurredAt,
          created_at as createdAt,
@@ -202,6 +219,8 @@ export function getVendorLedgerLocal(vendorId: string): VendorLedger {
     amount: number;
     goodsReceiptId: string | null;
     receiptNumber: string | null;
+    paymentMethod: string | null;
+    referenceNumber: string | null;
     note: string;
     occurredAt: string;
     createdAt: string;
@@ -215,6 +234,8 @@ export function getVendorLedgerLocal(vendorId: string): VendorLedger {
     amount: Number(row.amount),
     goodsReceiptId: row.goodsReceiptId,
     receiptNumber: row.receiptNumber,
+    paymentMethod: paymentMethodOf(row.paymentMethod),
+    referenceNumber: row.referenceNumber,
     note: row.note ?? "",
     occurredAt: row.occurredAt,
     createdAt: row.createdAt,
@@ -222,10 +243,13 @@ export function getVendorLedgerLocal(vendorId: string): VendorLedger {
   }));
 
   const credit = roundMoney4(
-    entries.reduce(
-      (sum, entry) =>
-        sum + (entry.entryType === "CHARGE" ? entry.amount : -entry.amount),
+    Math.max(
       0,
+      entries.reduce(
+        (sum, entry) =>
+          sum + (entry.entryType === "CHARGE" ? entry.amount : -entry.amount),
+        0,
+      ),
     ),
   );
 

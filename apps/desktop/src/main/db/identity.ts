@@ -44,6 +44,10 @@ export function persistFingerprint(fingerprint: string): void {
   writeFileSync(join(dir(), FINGERPRINT_FILE), fingerprint, "utf8");
 }
 
+export function getComputerName(): string {
+  return hostname().trim() || "Desktop";
+}
+
 export function getOrCreateFingerprint(): string {
   const path = join(dir(), FINGERPRINT_FILE);
   if (existsSync(path)) {

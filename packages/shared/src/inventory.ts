@@ -104,6 +104,9 @@ export type GoodsReceiptStatus = (typeof GOODS_RECEIPT_STATUSES)[number];
 export const VENDOR_LEDGER_ENTRY_TYPES = ["CHARGE", "PAYMENT"] as const;
 export type VendorLedgerEntryType = (typeof VENDOR_LEDGER_ENTRY_TYPES)[number];
 
+export const VENDOR_PAYMENT_METHODS = ["CASH", "BANK"] as const;
+export type VendorPaymentMethod = (typeof VENDOR_PAYMENT_METHODS)[number];
+
 /** One charge or payment on a vendor's account. Credit owed is charges minus payments. */
 export interface VendorLedgerEntry {
   id: string;
@@ -112,6 +115,8 @@ export interface VendorLedgerEntry {
   amount: number;
   goodsReceiptId: string | null;
   receiptNumber: string | null;
+  paymentMethod: VendorPaymentMethod | null;
+  referenceNumber: string | null;
   note: string;
   occurredAt: string;
   createdAt: string;
@@ -125,6 +130,8 @@ export interface VendorLedger {
 
 export interface RecordVendorPaymentRequest {
   amount: number;
+  method: VendorPaymentMethod;
+  referenceNumber?: string;
   note?: string;
 }
 
@@ -134,6 +141,8 @@ export interface VendorPaymentListItem {
   vendorName: string;
   amount: number;
   receiptNumber: string | null;
+  paymentMethod: VendorPaymentMethod | null;
+  referenceNumber: string | null;
   note: string;
   occurredAt: string;
 }
