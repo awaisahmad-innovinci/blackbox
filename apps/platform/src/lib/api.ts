@@ -98,6 +98,18 @@ export function listTenants(token: string): Promise<PlatformTenantSummary[]> {
   );
 }
 
+export function sendEmailVerification(
+  token: string,
+  email: string,
+): Promise<{ message: string }> {
+  return platformFetch<{ message: string }>(
+    "/platform/email-verifications",
+    "POST",
+    { email },
+    token,
+  );
+}
+
 export function createTenant(
   token: string,
   payload: SignupTenantRequest,

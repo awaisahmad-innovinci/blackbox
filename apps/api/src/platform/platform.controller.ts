@@ -15,6 +15,7 @@ import type {
   ResetPlatformOwnerPasswordResponse,
 } from "@blackbox/shared";
 import { SignupTenantDto } from "../auth/dto/signup-tenant.dto";
+import { SendEmailVerificationDto } from "./dto/send-email-verification.dto";
 import { PlatformLoginDto } from "./dto/platform-login.dto";
 import { ResetPlatformOwnerPasswordDto } from "./dto/reset-platform-owner-password.dto";
 import { UpdatePlatformTenantDto } from "./dto/update-platform-tenant.dto";
@@ -35,6 +36,15 @@ export class PlatformController {
   @UseGuards(PlatformAuthGuard)
   listTenants(): Promise<PlatformTenantSummary[]> {
     return this.platform.listTenants();
+  }
+
+  @Post("email-verifications")
+  @HttpCode(200)
+  @UseGuards(PlatformAuthGuard)
+  sendEmailVerification(
+    @Body() dto: SendEmailVerificationDto,
+  ): Promise<{ message: string }> {
+    return this.platform.sendEmailVerification(dto.email);
   }
 
   @Post("tenants")

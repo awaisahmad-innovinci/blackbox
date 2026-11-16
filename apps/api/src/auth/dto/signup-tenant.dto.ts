@@ -27,4 +27,8 @@ export class SignupTenantDto {
   @IsString()
   @MinLength(8)
   password!: string;
+
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "Code must be a 6-digit number" })
+  verificationCode!: string;
 }

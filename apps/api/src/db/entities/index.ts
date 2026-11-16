@@ -48,6 +48,7 @@ import { ManagerDrawerOpening } from "./manager-drawer-opening.entity";
 import { ManagerDrawerSubmission } from "./manager-drawer-submission.entity";
 import { VendorReturn } from "./vendor-return.entity";
 import { VendorReturnItem } from "./vendor-return-item.entity";
+import { EmailVerificationCode } from "./email-verification-code.entity";
 import { PasswordResetCode } from "./password-reset-code.entity";
 import { UserTotp } from "./user-totp.entity";
 
@@ -103,6 +104,7 @@ export const entities = [
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,
+  EmailVerificationCode,
   UserTotp,
 ] as const;
 
@@ -158,5 +160,6 @@ export {
   VendorReturn,
   VendorReturnItem,
   PasswordResetCode,
+  EmailVerificationCode,
   UserTotp,
 };

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -24,6 +25,7 @@ import {
   type PlatformTenantSummary,
 } from "@blackbox/shared";
 import { DataSource, IsNull, Not, QueryFailedError, Repository } from "typeorm";
+import { EmailVerificationCode } from "../db/entities/email-verification-code.entity";
 import { DeviceUser } from "../db/entities/device-user.entity";
 import { Device } from "../db/entities/device.entity";
 import { Permission as PermissionEntity } from "../db/entities/permission.entity";
@@ -97,6 +99,9 @@ export class AuthService {
     }
 
     const passwordHash = await argon2.hash(dto.password);
+    const verificationHash = createHash("sha256")
+      .update(dto.verificationCode.trim())
+      .digest("hex");
 
     // Resolve catalog rows by stable permission key — never hard-coded UUIDs.
     const allPermissions = await this.permissions.find();
@@ -115,6 +120,16 @@ export class AuthService {
     let createdTenant: { tenant: Tenant; user: User };
     try {
       createdTenant = await this.dataSource.transaction(async (manager) => {
+        const verification = await manager.findOne(EmailVerificationCode, {
+          where: { email, codeHash: verificationHash, usedAt: IsNull() },
+          order: { createdAt: "DESC" },
+        });
+        if (!verification || verification.expiresAt.getTime() <= Date.now()) {
+          throw new BadRequestException("Invalid or expired verification code");
+        }
+        verification.usedAt = new Date();
+        await manager.save(verification);
+
         const tenant = manager.create(Tenant, {
           name: dto.businessName.trim(),
         });
