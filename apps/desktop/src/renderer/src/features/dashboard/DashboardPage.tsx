@@ -4,6 +4,7 @@ import type {
   CashierDashboardSummary,
   DashboardSummary,
   ManagerDashboardSummary,
+  OwnerBusinessOverview,
 } from "@blackbox/shared";
 import { formatMoney } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -152,6 +153,8 @@ export function DashboardPage() {
     useState<CashierDashboardSummary | null>(null);
   const [managerSummary, setManagerSummary] =
     useState<ManagerDashboardSummary | null>(null);
+  const [ownerOverview, setOwnerOverview] =
+    useState<OwnerBusinessOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
@@ -216,9 +219,15 @@ export function DashboardPage() {
                 user.fullName || user.username,
               ),
             );
+            setOwnerOverview(null);
           } else {
             try {
-              setManagerSummary(await dashboardApi.getManagerSummary());
+              const [manager, overview] = await Promise.all([
+                dashboardApi.getManagerSummary(),
+                dashboardApi.getOwnerOverview().catch(() => null),
+              ]);
+              setManagerSummary(manager);
+              setOwnerOverview(overview);
             } catch {
               setManagerSummary({
                 date: new Date().toISOString().slice(0, 10),
@@ -231,10 +240,12 @@ export function DashboardPage() {
                 cashSubmissionsToday: [],
                 ownerCashBalance: 0,
               });
+              setOwnerOverview(null);
             }
           }
         } else {
           setManagerSummary(null);
+          setOwnerOverview(null);
         }
 
         if (showInventoryDashboard) {
@@ -466,6 +477,67 @@ export function DashboardPage() {
         <div className="space-y-8">
           {showManagerDashboard ? (
             <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      Sales today
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        Rs {formatMoney(ownerOverview?.salesTotal ?? 0)}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {ownerOverview
+                        ? `${ownerOverview.salesCount} posted ${ownerOverview.salesCount === 1 ? "bill" : "bills"} (all cashiers)`
+                        : "Cloud sales totals when online"}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      Cash payments
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        Rs {formatMoney(ownerOverview?.cashPayments ?? 0)}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Cash paid on posted bills today
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      Card payments
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        Rs {formatMoney(ownerOverview?.cardPayments ?? 0)}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Card paid on posted bills today
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
               {isOwner ? null : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {MANAGER_CARDS.map((card) => (

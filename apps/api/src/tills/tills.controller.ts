@@ -15,6 +15,7 @@ import type { TenantContext } from "../common/tenant-context";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
 import {
+  CloseTillDto,
   CollectTillCashByAmountDto,
   ListTillsQueryDto,
   OpenTillDto,
@@ -71,8 +72,8 @@ export class TillsController {
 
   @Post("current/close")
   @RequirePermissions("till.read", "sales.write")
-  closeCurrent(): Promise<TillSessionDetail> {
-    return this.tills.closeCurrent();
+  closeCurrent(@Body() dto: CloseTillDto): Promise<TillSessionDetail> {
+    return this.tills.closeCurrent(dto);
   }
 
   @Post(":id/approve")

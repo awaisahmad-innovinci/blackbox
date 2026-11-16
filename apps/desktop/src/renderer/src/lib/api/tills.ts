@@ -70,9 +70,12 @@ export const tillsApi = {
       body: JSON.stringify(body),
     });
   },
-  closeCurrent(): Promise<TillSessionDetail> {
+  closeCurrent(body?: {
+    supervisorUserId?: string;
+  }): Promise<TillSessionDetail> {
     return apiFetch<TillSessionDetail>("/tills/current/close", {
       method: "POST",
+      body: JSON.stringify(body ?? {}),
     });
   },
 };

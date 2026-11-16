@@ -15,7 +15,7 @@ function removeStaleSaleReturnByNumber(
     .prepare(
       `select id, status, warehouse_id as warehouseId
        from sale_returns
-       where tenant_id = @tenantId and return_number = @returnNumber and id != @keepId
+       where tenant_id = @tenantId and lower(return_number) = lower(@returnNumber) and id != @keepId
        limit 1`,
     )
     .get({ tenantId, returnNumber, keepId }) as
@@ -203,7 +203,7 @@ export function lookupSaleReturnLocal(
          ) as lineCount
        from sale_returns r
        left join sales s on s.id = r.sale_id
-       where r.tenant_id = @tenantId and r.return_number = @returnNumber`,
+       where r.tenant_id = @tenantId and lower(r.return_number) = lower(@returnNumber)`,
     )
     .get({ tenantId: DEMO_STORE_TENANT_ID, returnNumber: trimmed }) as
     | Record<string, unknown>

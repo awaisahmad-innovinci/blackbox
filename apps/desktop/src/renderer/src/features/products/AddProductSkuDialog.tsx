@@ -800,14 +800,6 @@ export function AddProductSkuDialog({
               <option value="inactive">Inactive</option>
             </select>
           </div>
-          <label className={`flex items-center gap-2 text-sm ${FORM_DIALOG_FIELD_FULL}`}>
-            <input
-              type="checkbox"
-              checked={form.trackInventory}
-              onChange={(e) => setField("trackInventory", e.target.checked)}
-            />
-            Track inventory
-          </label>
         </FormEnterNav>
 
         <KeyboardHints

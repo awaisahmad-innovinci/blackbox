@@ -186,18 +186,35 @@ export class TotpService {
 
   async listSupervisorSecretsForDevice(
     tenantId: string,
-  ): Promise<Array<{ userId: string; secret: string; fullName: string }>> {
+  ): Promise<
+    Array<{
+      userId: string;
+      secret: string;
+      fullName: string;
+      isManager: boolean;
+    }>
+  > {
     const supervisorRoles = await this.roles.find({
       where: { key: In([...SUPERVISOR_ROLE_KEYS]) },
     });
     if (supervisorRoles.length === 0) return [];
 
     const roleIds = supervisorRoles.map((r) => r.id);
+    const managerRoleIds = new Set(
+      supervisorRoles.filter((r) => r.key === "MANAGER").map((r) => r.id),
+    );
     const userRoleRows = await this.userRoles.find({
       where: { tenantId, roleId: In(roleIds) },
     });
     const supervisorUserIds = [...new Set(userRoleRows.map((r) => r.userId))];
     if (supervisorUserIds.length === 0) return [];
+
+    // Users who hold the MANAGER role (only these may approve till open/close).
+    const managerUserIds = new Set(
+      userRoleRows
+        .filter((r) => managerRoleIds.has(r.roleId))
+        .map((r) => r.userId),
+    );
 
     const rows = await this.userTotp.find({
       where: {
@@ -222,6 +239,7 @@ export class TotpService {
       userId: row.userId,
       secret: decryptTotpSecret(row.secretCiphertext, key),
       fullName: nameById.get(row.userId) ?? "Manager",
+      isManager: managerUserIds.has(row.userId),
     }));
   }
 }

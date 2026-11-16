@@ -43,7 +43,9 @@ export class DashboardController {
 
   @Get("owner-overview")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("web.access")
+  // Owner and Manager both hold sales.read; used by web and desktop dashboards
+  // to show every cashier's posted sales for today.
+  @RequirePermissions("sales.read")
   getOwnerOverview(
     @CurrentUser() user: TenantContext,
   ): Promise<OwnerBusinessOverview> {

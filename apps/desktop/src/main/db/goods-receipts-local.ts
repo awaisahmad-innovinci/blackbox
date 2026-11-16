@@ -132,7 +132,7 @@ function findReceiptNumberConflict(
          (select count(*) from local_sync_outbox o
           where o.entity_id = goods_receipts.id and o.status != 'acked') as pendingOutbox
        from goods_receipts
-       where tenant_id = @tenantId and receipt_number = @receiptNumber and id != @id`,
+       where tenant_id = @tenantId and lower(receipt_number) = lower(@receiptNumber) and id != @id`,
     )
     .get({
       tenantId: DEMO_STORE_TENANT_ID,

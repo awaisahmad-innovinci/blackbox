@@ -67,7 +67,7 @@ export class UsersService {
 
   async create(tenantId: string, dto: CreateUserDto): Promise<UserResponse> {
     const email = dto.email.trim().toLowerCase();
-    const username = dto.username.trim();
+    const username = dto.username.trim().toLowerCase();
     const passwordHash = await argon2.hash(dto.password);
     const roleIds = dto.roleIds ?? [];
 
@@ -121,7 +121,7 @@ export class UsersService {
       user.email = dto.email.trim().toLowerCase();
     }
     if (dto.username !== undefined) {
-      user.username = dto.username.trim();
+      user.username = dto.username.trim().toLowerCase();
     }
     if (dto.fullName !== undefined) {
       user.fullName = dto.fullName.trim();

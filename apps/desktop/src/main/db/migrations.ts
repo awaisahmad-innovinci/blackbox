@@ -1570,6 +1570,12 @@ where units_per_purchase_unit > 0;
       }
     },
   },
+  {
+    id: "049_supervisor_totp_is_manager",
+    sql: `
+      alter table supervisor_totp add column is_manager integer not null default 0;
+    `,
+  },
 ];
 
 export function runLocalMigrations(db: Database.Database): void {
