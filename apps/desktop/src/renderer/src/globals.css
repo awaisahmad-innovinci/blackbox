@@ -40,6 +40,10 @@
     display: none !important;
   }
 
+  [data-thermal-receipt] header {
+    display: block !important;
+  }
+
   main {
     max-width: none !important;
     padding: 0 !important;
@@ -80,7 +84,7 @@
 
   [data-thermal-receipt] .thermal-rule {
     border: none !important;
-    border-top: 1px solid #000 !important;
+    border-top: 1px dashed #000 !important;
     margin-top: 4px !important;
     margin-bottom: 4px !important;
   }

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@blackbox/ui/card";
 import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
+import { BrandLogo } from "@renderer/components/brand-logo";
 import { useSession } from "@renderer/lib/session/context";
 
 const REINSTALL_HINT =
@@ -43,6 +44,7 @@ export function SignInPage() {
     <div className="bg-background text-foreground flex min-h-screen items-center justify-center px-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
+          <BrandLogo />
           <CardTitle className="text-xl">Sign in to Blackbox</CardTitle>
           <p className="text-muted-foreground text-sm">
             Use the credentials your owner created for you. This machine is
