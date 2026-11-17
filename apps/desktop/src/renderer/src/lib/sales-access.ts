@@ -75,6 +75,13 @@ export function canManageTill(permissions: string[]): boolean {
   return permissions.includes("till.manage");
 }
 
+/** Owner web admin or store manager — may pay vendors on receive or from vendor ledger. */
+export function canRecordVendorPayment(permissions: string[]): boolean {
+  return (
+    permissions.includes("web.access") || permissions.includes("till.manage")
+  );
+}
+
 export function canAccessActivity(permissions: string[]): boolean {
   return permissions.includes("activity.read");
 }

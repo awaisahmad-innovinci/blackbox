@@ -243,6 +243,8 @@ export function DashboardPage() {
                 salesTotal: 0,
                 cashPayments: 0,
                 cardPayments: 0,
+                refundCount: 0,
+                refundTotal: 0,
               });
               setOwnerOverview(null);
             }
@@ -481,7 +483,7 @@ export function DashboardPage() {
         <div className="space-y-8">
           {showManagerDashboard ? (
             <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Card className="gap-3 py-5">
                   <CardHeader className="px-5 pb-0">
                     <CardTitle className="text-muted-foreground text-sm font-medium">
@@ -538,6 +540,27 @@ export function DashboardPage() {
                     )}
                     <p className="text-muted-foreground mt-1 text-xs">
                       Card taken on posted sales
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      Refunds
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        Rs {formatMoney(managerSummary?.refundTotal ?? 0)}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {(managerSummary?.refundCount ?? 0) === 1
+                        ? "1 completed refund today, all cashiers"
+                        : `${managerSummary?.refundCount ?? 0} completed refunds today, all cashiers`}
                     </p>
                   </CardContent>
                 </Card>

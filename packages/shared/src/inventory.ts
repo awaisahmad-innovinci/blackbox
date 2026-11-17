@@ -601,11 +601,12 @@ export function lineTotalForPurchase(input: {
     orderUnit,
     input.unitsPerPurchaseUnit,
   );
+  const displayQuantity = round4(input.displayQuantity);
   return {
     purchaseQuantity,
-    displayQuantity: round4(input.displayQuantity),
+    displayQuantity,
     displayUnitCost,
-    lineTotal: round4(purchaseQuantity * input.purchasePrice),
+    lineTotal: roundMoney4(displayQuantity * displayUnitCost),
   };
 }
 
@@ -1052,6 +1053,36 @@ export function goodsReceiptLineTotal(
   );
 }
 
+/** GR line total from receive qty in the PO line order unit (pc or box). */
+export function goodsReceiptLineTotalForDisplay(input: {
+  displayQuantity: number;
+  receivingUnitCost: number;
+  unitsPerPurchaseUnit: number;
+  orderUnit?: OrderUnit;
+  discountPercent: number;
+  saleTax?: number;
+  advTax?: number;
+  gst?: number;
+}): number {
+  const orderUnit = input.orderUnit ?? "box";
+  const displayUnitCost = displayPurchaseUnitCost(
+    input.receivingUnitCost,
+    orderUnit,
+    input.unitsPerPurchaseUnit,
+  );
+  const base = lineTotalAfterDiscount(
+    round4(input.displayQuantity),
+    displayUnitCost,
+    input.discountPercent,
+  );
+  return roundMoney4(
+    base +
+      Number(input.saleTax ?? 0) +
+      Number(input.advTax ?? 0) +
+      Number(input.gst ?? 0),
+  );
+}
+
 /** Net purchase-unit cost after line % and a header discount rate (0–1). */
 export function netUnitAfterDiscounts(
   qty: number,
@@ -1360,6 +1391,8 @@ export interface ReceivingDraft {
 export interface CreateGoodsReceiptItemRequest {
   purchaseOrderItemId: string;
   receivedQuantity: number;
+  /** Qty in PO line order unit; used for money when present. */
+  displayReceiveQuantity?: number;
   bonusQuantity?: number;
   receivingUnitCost: number;
   discountPercent?: number;

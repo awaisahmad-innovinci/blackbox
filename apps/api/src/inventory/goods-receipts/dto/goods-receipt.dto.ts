@@ -23,6 +23,13 @@ export class CreateGoodsReceiptItemDto {
   @Min(0)
   receivedQuantity!: number;
 
+  /** Qty in PO line order unit; used for money when present. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  displayReceiveQuantity?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

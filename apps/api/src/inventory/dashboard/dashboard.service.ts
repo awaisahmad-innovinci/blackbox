@@ -119,8 +119,8 @@ export class DashboardService {
     tenantId: string,
     seeAll: boolean,
   ): Promise<ManagerDashboardSummary> {
-    const today = new Date().toISOString().slice(0, 10);
-    const bounds = businessPeriodBounds(businessToday(), businessToday());
+    const today = businessToday();
+    const bounds = businessPeriodBounds(today, today);
 
     const tillRow = await this.tillWithdrawals
       .createQueryBuilder("w")
@@ -140,7 +140,7 @@ export class DashboardService {
       .andWhere("r.return_date = :today", { today })
       .getCount();
 
-    const [salesRow, paymentRows] = await Promise.all([
+    const [salesRow, paymentRows, refundRow] = await Promise.all([
       this.sales
         .createQueryBuilder("s")
         .select("COUNT(*)", "count")
@@ -161,6 +161,14 @@ export class DashboardService {
         .andWhere("s.posted_at < :end", { end: bounds.endIso })
         .groupBy("p.method")
         .getRawMany<{ method: string; amount: string }>(),
+      this.saleReturns
+        .createQueryBuilder("r")
+        .select("COUNT(*)", "count")
+        .addSelect("COALESCE(SUM(r.refund_total), 0)", "total")
+        .where("r.tenant_id = :tenantId", { tenantId })
+        .andWhere("r.status = :status", { status: "COMPLETED" })
+        .andWhere("r.return_date = :today", { today })
+        .getRawOne<{ count: string; total: string }>(),
     ]);
     const payments = new Map(
       paymentRows.map((row) => [row.method, roundMoney(toNum(row.amount))]),
@@ -193,6 +201,8 @@ export class DashboardService {
       cardPayments: payments.get("CARD") ?? 0,
       tillCashCollectedAmount,
       customerReturnCount: returnCount,
+      refundCount: toNum(refundRow?.count),
+      refundTotal: roundMoney(toNum(refundRow?.total)),
       drawerBalance: own?.balance ?? 0,
       drawers,
       cashSubmittedToday,
