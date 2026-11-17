@@ -1663,6 +1663,7 @@ export function listSalesLocal(query: SaleListQuery = {}): PaginatedSales {
     s.tenant_id = @tenantId
     and (@warehouseId = '' or s.warehouse_id = @warehouseId)
     and (@status = '' or s.status = @status)
+    and (s.status <> 'DRAFT' or s.sync_status = 'local')
     and (@dateFrom = '' or s.posted_at >= @dateFrom)
     and (@dateTo = '' or s.posted_at <= @dateTo || 'T23:59:59.999Z')
     and (@search = '' or lower(s.sale_number) like '%' || @search || '%')

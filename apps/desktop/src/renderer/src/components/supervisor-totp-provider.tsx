@@ -112,7 +112,11 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
         <Dialog open onOpenChange={(next) => !next && finish({ approved: false })}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle>Supervisor authentication code</DialogTitle>
+              <DialogTitle>
+                {pending?.managerOnly
+                  ? "Manager authentication code"
+                  : "Supervisor authentication code"}
+              </DialogTitle>
               <DialogDescription>
                 {pending.audience === "manager"
                   ? "Enter a manager authentication code to continue."

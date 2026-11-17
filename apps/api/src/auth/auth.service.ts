@@ -87,7 +87,7 @@ export class AuthService {
     dto: SignupTenantDto,
   ): Promise<PlatformTenantSummary> {
     const email = dto.email.trim().toLowerCase();
-    const username = dto.username.trim();
+    const username = dto.username.trim().toLowerCase();
 
     const activeEmailCount = await this.users.count({
       where: { email, isActive: true },
@@ -435,7 +435,7 @@ export class AuthService {
     password: string,
   ): Promise<User> {
     const username = identifier.trim();
-    const email = username.toLowerCase();
+    const identifierLower = username.toLowerCase();
     if (!username) {
       throw new UnauthorizedException("Invalid credentials");
     }

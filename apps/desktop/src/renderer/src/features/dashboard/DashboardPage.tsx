@@ -4,6 +4,7 @@ import type {
   CashierDashboardSummary,
   DashboardSummary,
   ManagerDashboardSummary,
+  OwnerBusinessOverview,
 } from "@blackbox/shared";
 import { formatMoney } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
@@ -152,6 +153,8 @@ export function DashboardPage() {
     useState<CashierDashboardSummary | null>(null);
   const [managerSummary, setManagerSummary] =
     useState<ManagerDashboardSummary | null>(null);
+  const [ownerOverview, setOwnerOverview] =
+    useState<OwnerBusinessOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState<DataSourceMode>("api");
@@ -216,9 +219,15 @@ export function DashboardPage() {
                 user.fullName || user.username,
               ),
             );
+            setOwnerOverview(null);
           } else {
             try {
-              setManagerSummary(await dashboardApi.getManagerSummary());
+              const [manager, overview] = await Promise.all([
+                dashboardApi.getManagerSummary(),
+                dashboardApi.getOwnerOverview().catch(() => null),
+              ]);
+              setManagerSummary(manager);
+              setOwnerOverview(overview);
             } catch {
               setManagerSummary({
                 date: new Date().toISOString().slice(0, 10),
@@ -235,10 +244,12 @@ export function DashboardPage() {
                 cashPayments: 0,
                 cardPayments: 0,
               });
+              setOwnerOverview(null);
             }
           }
         } else {
           setManagerSummary(null);
+          setOwnerOverview(null);
         }
 
         if (showInventoryDashboard) {

@@ -15,7 +15,7 @@ function removeStaleSaleReturnByNumber(
     .prepare(
       `select id, status, warehouse_id as warehouseId
        from sale_returns
-       where tenant_id = @tenantId and return_number = @returnNumber and id != @keepId
+       where tenant_id = @tenantId and lower(return_number) = lower(@returnNumber) and id != @keepId
        limit 1`,
     )
     .get({ tenantId, returnNumber, keepId }) as

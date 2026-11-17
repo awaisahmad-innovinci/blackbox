@@ -26,7 +26,7 @@ import {
   saleBillTotals,
 } from "@blackbox/shared";
 import { randomUUID } from "node:crypto";
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager, Raw, Repository } from "typeorm";
 import type { TenantContext } from "../../common/tenant-context";
 import {
   InventoryMovement,

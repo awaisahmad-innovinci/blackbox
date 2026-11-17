@@ -320,7 +320,12 @@ contextBridge.exposeInMainWorld("blackbox", {
       collectedByName?: string;
     }) =>
       ipcRenderer.invoke("localDb:collectCashByAmount", input) as Promise<TillSessionDetail>,
-    closeTill: (input: { userId: string; userName: string }) =>
+    closeTill: (input: {
+      userId: string;
+      userName: string;
+      supervisorUserId?: string;
+      supervisorName?: string;
+    }) =>
       ipcRenderer.invoke("localDb:closeTill", input) as Promise<TillSessionDetail>,
     reopenTill: (input: {
       id: string;

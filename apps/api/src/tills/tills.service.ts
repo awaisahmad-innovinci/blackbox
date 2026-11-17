@@ -21,7 +21,6 @@ import {
   tillMaxLimit,
   tillOpeningExceedsDrawer,
   tillOpeningExceedsDrawerMessage,
-  validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -31,7 +30,14 @@ import { getRequestTenant } from "../common/request-tenant";
 import { ActivityLogService } from "../activity-log/activity-log.service";
 import { CashFlowService } from "../cash-flow/cash-flow.service";
 import { TillSession, TillWithdrawal, User } from "../db/entities";
-import type { ListTillsQueryDto, CollectTillCashByAmountDto, OpenTillDto, ReopenTillDto, WithdrawTillDto } from "./dto/till.dto";
+import type {
+  CloseTillDto,
+  ListTillsQueryDto,
+  CollectTillCashByAmountDto,
+  OpenTillDto,
+  ReopenTillDto,
+  WithdrawTillDto,
+} from "./dto/till.dto";
 
 const ACTIVE_STATUSES = ["PENDING_APPROVAL", "OPEN", "CLOSED_LIMIT"] as const;
 
@@ -314,11 +320,12 @@ export class TillsService {
     }
 
     const detail = await this.loadSession(id, ctx.tenantId);
+    const withdrawnByUserId = dto.supervisorUserId ?? ctx.userId;
     return this.applyPartialCashCollection({
       tenantId: ctx.tenantId,
       row,
       withdrawalTotal: round4(withdrawalTotal),
-      withdrawnByUserId: ctx.userId,
+      withdrawnByUserId,
       notes: notesFromDto(dto),
       actorUserId: ctx.userId,
       supervisorUserId: dto.supervisorUserId ?? ctx.userId,
@@ -390,7 +397,7 @@ export class TillsService {
     });
   }
 
-  async closeCurrent(): Promise<TillSessionDetail> {
+  async closeCurrent(dto: CloseTillDto = {}): Promise<TillSessionDetail> {
     const ctx = getRequestTenant();
     if (!ctx?.userId) {
       throw new ForbiddenException("Authentication required");
@@ -409,10 +416,34 @@ export class TillsService {
 
     const now = new Date();
     const currentBalance = round4(toNum(row.currentCashBalance));
-    const closeBalanceError = validateTillCanCloseBalance(currentBalance);
-    if (closeBalanceError) {
-      throw new BadRequestException(closeBalanceError);
+    // Remaining cash goes to the approving manager's drawer, then the till is zeroed.
+    const withdrawnByUserId =
+      dto.supervisorUserId ??
+      row.approvedByUserId ??
+      row.fundedByUserId ??
+      ctx.userId;
+    if (currentBalance > 0) {
+      await this.assertCanFundDrawer(ctx.tenantId, withdrawnByUserId);
+      await this.withdrawals.save(
+        this.withdrawals.create({
+          id: randomUUID(),
+          tenantId: ctx.tenantId,
+          tillSessionId: row.id,
+          withdrawnByUserId,
+          note10: row.note10,
+          note20: row.note20,
+          note50: row.note50,
+          note100: row.note100,
+          note500: row.note500,
+          note1000: row.note1000,
+          note5000: row.note5000,
+          withdrawalTotal: String(currentBalance),
+          kind: "full",
+        }),
+      );
     }
+
+    row.currentCashBalance = "0";
     row.status = "CLOSED";
     row.closedAt = now;
     row.closeReason = TILL_CLOSE_REASON_CASHIER_CLOSED;
@@ -426,11 +457,14 @@ export class TillsService {
       tenantId: ctx.tenantId,
       eventType: "till.closed",
       actorUserId: ctx.userId,
+      supervisorUserId: dto.supervisorUserId ?? null,
       subjectUserId: ctx.userId,
-      summary: `${userName} closed till on ${closedAtLabel} — current cash Rs ${currentBalance.toLocaleString()}`,
+      summary: `${userName} closed till on ${closedAtLabel} — Rs ${currentBalance.toLocaleString()} moved to manager drawer`,
       metadata: {
         tillSessionId: row.id,
-        currentCashBalance: currentBalance,
+        currentCashBalance: 0,
+        movedToManager: currentBalance,
+        withdrawnByUserId,
         closeReason: TILL_CLOSE_REASON_CASHIER_CLOSED,
       },
     });

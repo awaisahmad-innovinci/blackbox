@@ -172,17 +172,21 @@ export function SalesListPage() {
       )
         ? status
         : undefined;
-      void loadSaleRegister({
-        warehouseId: warehouseId || undefined,
-        search: search.trim() || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        kind: kindFilter,
-        status: statusQuery,
-        hasFoc: hasFoc === "" ? undefined : hasFoc === "yes",
-        page,
-        pageSize,
-      })
+      void loadSaleRegister(
+        {
+          warehouseId: warehouseId || undefined,
+          search: search.trim() || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          kind: kindFilter,
+          status: statusQuery,
+          hasFoc: hasFoc === "" ? undefined : hasFoc === "yes",
+          page,
+          pageSize,
+        },
+        // Owner/manager (sales.read) see every cashier's bills from the cloud.
+        { preferApi: canReadList },
+      )
         .then((res) => {
           if (!cancelled) {
             setItems(res.items);
@@ -214,6 +218,7 @@ export function SalesListPage() {
     hasFoc,
     page,
     pageSize,
+    canReadList,
   ]);
 
   return (

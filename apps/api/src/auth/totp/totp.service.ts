@@ -201,6 +201,9 @@ export class TotpService {
       supervisorRoles.filter((role) => role.key === "MANAGER").map((role) => role.id),
     );
     const roleIds = supervisorRoles.map((r) => r.id);
+    const managerRoleIds = new Set(
+      supervisorRoles.filter((r) => r.key === "MANAGER").map((r) => r.id),
+    );
     const userRoleRows = await this.userRoles.find({
       where: { tenantId, roleId: In(roleIds) },
     });
@@ -216,6 +219,13 @@ export class TotpService {
     }
     const supervisorUserIds = [...roleKeyByUserId.keys()];
     if (supervisorUserIds.length === 0) return [];
+
+    // Users who hold the MANAGER role (only these may approve till open/close).
+    const managerUserIds = new Set(
+      userRoleRows
+        .filter((r) => managerRoleIds.has(r.roleId))
+        .map((r) => r.userId),
+    );
 
     const rows = await this.userTotp.find({
       where: {

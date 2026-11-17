@@ -45,7 +45,7 @@ export function getSupervisorTotpSecretsLocal(): SupervisorTotpRow[] {
   if (!identity?.tenantId) return [];
 
   const db = getLocalDb();
-  return db
+  const rows = db
     .prepare(
       `select user_id as userId, secret_base32 as secretBase32,
               coalesce(display_name, '') as displayName,
@@ -53,7 +53,18 @@ export function getSupervisorTotpSecretsLocal(): SupervisorTotpRow[] {
        from supervisor_totp
        where tenant_id = ?`,
     )
-    .all(identity.tenantId) as SupervisorTotpRow[];
+    .all(identity.tenantId) as Array<{
+    userId: string;
+    secretBase32: string;
+    displayName: string;
+    isManager: number;
+  }>;
+  return rows.map((row) => ({
+    userId: row.userId,
+    secretBase32: row.secretBase32,
+    displayName: row.displayName,
+    isManager: row.isManager === 1,
+  }));
 }
 
 export function listSupervisorTotpUsersLocal(): string[] {

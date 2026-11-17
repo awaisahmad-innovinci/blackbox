@@ -1,4 +1,10 @@
-import type { DashboardSummary, ManagerDashboardSummary, ManagerStockOverviewQuery, PaginatedManagerStockOverview } from "@blackbox/shared";
+import type {
+  DashboardSummary,
+  ManagerDashboardSummary,
+  ManagerStockOverviewQuery,
+  OwnerBusinessOverview,
+  PaginatedManagerStockOverview,
+} from "@blackbox/shared";
 import { apiFetch } from "./client";
 
 export const dashboardApi = {
@@ -7,6 +13,9 @@ export const dashboardApi = {
   },
   getManagerSummary(): Promise<ManagerDashboardSummary> {
     return apiFetch<ManagerDashboardSummary>("/dashboard/manager-summary");
+  },
+  getOwnerOverview(): Promise<OwnerBusinessOverview> {
+    return apiFetch<OwnerBusinessOverview>("/dashboard/owner-overview");
   },
   listManagerStockOverview(
     query: ManagerStockOverviewQuery = {},

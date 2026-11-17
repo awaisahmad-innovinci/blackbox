@@ -17,7 +17,6 @@ import {
   tillMaxLimit,
   tillOpeningExceedsDrawer,
   tillOpeningExceedsDrawerMessage,
-  validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -560,6 +559,10 @@ export function collectCashLocal(input: {
     throw new Error("Collection total exceeds current till cash balance");
   }
 
+  // Credit the approving supervisor when present, else the logged-in manager.
+  const withdrawnByUserId = input.body.supervisorUserId ?? input.managerId;
+  const withdrawnByName = input.managerName;
+
   const db = getLocalDb();
   const now = new Date().toISOString();
   const withdrawalId = randomUUID();
@@ -579,8 +582,8 @@ export function collectCashLocal(input: {
     id: withdrawalId,
     tenantId: DEMO_STORE_TENANT_ID,
     tillSessionId: input.id,
-    withdrawnByUserId: input.managerId,
-    withdrawnByName: input.managerName,
+    withdrawnByUserId,
+    withdrawnByName,
     note_10: input.body.note10,
     note_20: input.body.note20,
     note_50: input.body.note50,
@@ -622,8 +625,8 @@ export function collectCashLocal(input: {
   publishWithdrawal({
     id: withdrawalId,
     tillSessionId: input.id,
-    withdrawnByUserId: input.managerId,
-    withdrawnByName: input.managerName,
+    withdrawnByUserId,
+    withdrawnByName,
     note10: input.body.note10,
     note20: input.body.note20,
     note50: input.body.note50,
@@ -736,36 +739,102 @@ export function collectCashByAmountLocal(input: {
 export function closeTillLocal(input: {
   userId: string;
   userName: string;
+  supervisorUserId?: string;
+  supervisorName?: string;
 }): TillSessionDetail {
   const row = findActiveSession(input.userId);
   if (!row) throw new Error("No active till session");
   if (row.status !== "OPEN") {
     throw new Error("Till must be open to close");
   }
-
-  const closeBalanceError = validateTillCanCloseBalance(row.current_cash_balance);
-  if (closeBalanceError) throw new Error(closeBalanceError);
+  if (!input.supervisorUserId) {
+    throw new Error(
+      "A Manager authentication code is required to close the till",
+    );
+  }
 
   const db = getLocalDb();
   const now = new Date().toISOString();
-  db.prepare(
-    `
-    update till_sessions
-    set status = 'CLOSED',
-        closed_at = @closedAt,
-        close_reason = @closeReason,
-        updated_at = @now
-    where id = @id and tenant_id = @tenantId
-  `,
-  ).run({
-    id: row.id,
-    tenantId: DEMO_STORE_TENANT_ID,
-    closedAt: now,
-    closeReason: TILL_CLOSE_REASON_CASHIER_CLOSED,
-    now,
-  });
+  const remaining = row.current_cash_balance;
+  const managerId = input.supervisorUserId;
+  const managerName = input.supervisorName ?? "Manager";
+  const withdrawalId = remaining > 0 ? randomUUID() : null;
 
-  return publishSavedSession(row.id);
+  // Move remaining cash to the approving manager's drawer, zero the till, and
+  // close — atomically so a crash cannot leave cash stranded.
+  const run = db.transaction(() => {
+    if (withdrawalId && remaining > 0) {
+      db.prepare(
+        `
+        insert into till_withdrawals (
+          id, tenant_id, till_session_id, withdrawn_by_user_id, withdrawn_by_name,
+          note_10, note_20, note_50, note_100, note_500, note_1000, note_5000,
+          withdrawal_total, kind, created_at
+        ) values (
+          @id, @tenantId, @tillSessionId, @withdrawnByUserId, @withdrawnByName,
+          @note_10, @note_20, @note_50, @note_100, @note_500, @note_1000, @note_5000,
+          @withdrawalTotal, @kind, @createdAt
+        )
+      `,
+      ).run({
+        id: withdrawalId,
+        tenantId: DEMO_STORE_TENANT_ID,
+        tillSessionId: row.id,
+        withdrawnByUserId: managerId,
+        withdrawnByName: managerName,
+        note_10: row.note_10,
+        note_20: row.note_20,
+        note_50: row.note_50,
+        note_100: row.note_100,
+        note_500: row.note_500,
+        note_1000: row.note_1000,
+        note_5000: row.note_5000,
+        withdrawalTotal: remaining,
+        kind: "full",
+        createdAt: now,
+      });
+    }
+
+    db.prepare(
+      `
+      update till_sessions
+      set status = 'CLOSED',
+          current_cash_balance = 0,
+          closed_at = @closedAt,
+          close_reason = @closeReason,
+          updated_at = @now
+      where id = @id and tenant_id = @tenantId
+    `,
+    ).run({
+      id: row.id,
+      tenantId: DEMO_STORE_TENANT_ID,
+      closedAt: now,
+      closeReason: TILL_CLOSE_REASON_CASHIER_CLOSED,
+      now,
+    });
+  });
+  run();
+
+  const detail = publishSavedSession(row.id);
+  if (withdrawalId && remaining > 0) {
+    publishWithdrawal({
+      id: withdrawalId,
+      tillSessionId: row.id,
+      withdrawnByUserId: managerId,
+      withdrawnByName: managerName,
+      note10: row.note_10,
+      note20: row.note_20,
+      note50: row.note_50,
+      note100: row.note_100,
+      note500: row.note_500,
+      note1000: row.note_1000,
+      note5000: row.note_5000,
+      withdrawalTotal: remaining,
+      kind: "full",
+      createdAt: now,
+    });
+  }
+  return detail;
 }
 
 export function reopenTillLocal(input: {

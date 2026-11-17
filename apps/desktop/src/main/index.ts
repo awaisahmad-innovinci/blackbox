@@ -690,6 +690,8 @@ function registerIpc(): void {
       input: {
         userId: string;
         userName: string;
+        supervisorUserId?: string;
+        supervisorName?: string;
       },
     ) => closeTillLocal(input),
   );

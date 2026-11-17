@@ -1,4 +1,3 @@
-import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsInt,
@@ -84,6 +83,12 @@ export class CollectTillCashByAmountDto {
   @Min(0.0001)
   amount!: number;
 
+  @IsOptional()
+  @IsUUID()
+  supervisorUserId?: string;
+}
+
+export class CloseTillDto {
   @IsOptional()
   @IsUUID()
   supervisorUserId?: string;
