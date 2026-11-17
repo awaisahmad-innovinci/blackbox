@@ -497,10 +497,16 @@ export class SaleReturnsService {
     const trimmed = returnNumber.trim();
     if (!trimmed) throw new BadRequestException("Return number is required");
 
-    const header = await this.saleReturns.findOne({
-      where: { tenantId, returnNumber: trimmed },
-      relations: { sale: true, issuedByUser: true, refundedByUser: true },
-    });
+    const header = await this.saleReturns
+      .createQueryBuilder("r")
+      .leftJoinAndSelect("r.sale", "sale")
+      .leftJoinAndSelect("r.issuedByUser", "issuedByUser")
+      .leftJoinAndSelect("r.refundedByUser", "refundedByUser")
+      .where("r.tenantId = :tenantId", { tenantId })
+      .andWhere("LOWER(r.returnNumber) = LOWER(:returnNumber)", {
+        returnNumber: trimmed,
+      })
+      .getOne();
     if (!header) throw new NotFoundException("Return voucher not found");
 
     if (header.status === "COMPLETED") {

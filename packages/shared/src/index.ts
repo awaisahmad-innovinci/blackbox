@@ -102,6 +102,7 @@ export type {
 } from "./auth";
 export { SESSION_ALREADY_ACTIVE_ON_OTHER_DEVICE_MESSAGE } from "./auth";
 export type {
+  SupervisorRoleKey,
   TotpEnrollStartResponse,
   TotpStatusResponse,
   TotpSupervisorCacheEntry,

@@ -66,6 +66,7 @@ import { AddSaleItemDialog } from "./AddSaleItemDialog";
 import { AdjustSaleQtyDialog } from "./AdjustSaleQtyDialog";
 import { CollectCashDialog } from "./CollectCashDialog";
 import { allocateHoldNumber, allocateSaleNumber } from "@renderer/lib/document-numbers";
+import { readOpenSaleId, writeOpenSaleId } from "@renderer/lib/open-sale";
 import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import {
@@ -226,7 +227,8 @@ export function SalePage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [holding, setHolding] = useState(false);
-  const [loadingDraft, setLoadingDraft] = useState(Boolean(routeDraftId));
+  const [loadingDraft, setLoadingDraft] = useState(true);
+  const [openSaleId, setOpenSaleId] = useState<string | null>(null);
   const [tillSession, setTillSession] = useState<TillSessionDetail | null>(null);
   const [collectDialogOpen, setCollectDialogOpen] = useState(false);
   const [appliedReturn, setAppliedReturn] =
@@ -236,6 +238,14 @@ export function SalePage() {
   const editingDraftId = routeDraftId ?? null;
   const holdNumberRef = useRef<string | null>(null);
   const holdInFlightRef = useRef(false);
+  const openSaleIdRef = useRef<string | null>(null);
+  const openSaleReadyRef = useRef(false);
+  const skipOpenSalePersistRef = useRef(false);
+  const openSaleEpochRef = useRef(0);
+  const persistOpenSaleRef = useRef<(force?: boolean) => Promise<void>>(
+    async () => undefined,
+  );
+  const activeDraftId = editingDraftId ?? openSaleId;
   const scanQueueRef = useRef<string[]>([]);
   const scanProcessingRef = useRef(false);
   const paymentsTouchedRef = useRef(false);
@@ -301,90 +311,111 @@ export function SalePage() {
   }, [loadingDraft, warehouseId, itemOpen, focItemOpen, removeScanOpen, adjustScanOpen, adjustQtyOpen, focusScanInput]);
 
   useEffect(() => {
-    if (!routeDraftId) {
-      holdNumberRef.current = null;
-      setLoadingDraft(false);
-      return;
-    }
-
     let cancelled = false;
+    const shouldFlush =
+      openSaleReadyRef.current && openSaleIdRef.current != null;
+    openSaleReadyRef.current = false;
     setLoadingDraft(true);
     setError(null);
 
-    void loadSale(routeDraftId)
-      .then(async (detail) => {
+    async function hydrateDraft(detail: SaleDetail) {
+      holdNumberRef.current = detail.saleNumber;
+      setCustomerName(
+        detail.customerName === DEFAULT_SALE_CUSTOMER_NAME
+          ? ""
+          : detail.customerName,
+      );
+      setWarehouseId(detail.warehouseId);
+
+      const draftLines: DraftSaleLine[] = await Promise.all(
+        detail.items.map(async (item) => {
+          let quantityAvailable = item.quantity + (item.focQuantity ?? 0);
+          try {
+            quantityAvailable = await loadPosAvailableForSale(
+              detail.warehouseId,
+              item.productSkuId,
+              detail.id,
+            );
+          } catch {
+            /* keep line qty as fallback */
+          }
+          return {
+            productSkuId: item.productSkuId,
+            productName: item.productName,
+            variantName: item.variantName,
+            sku: item.sku,
+            barcode: item.barcode,
+            quantity: item.quantity,
+            quantityAvailable,
+            sellUnit: item.sellUnit,
+            unitsPerPurchaseUnit: 1,
+            sellingPrice: item.unitPrice,
+            sellingPricePerPurchaseUnit: null,
+            gstPercent: item.gstPercent ?? 0,
+            hsCode: item.hsCode ?? null,
+            discountPercent: item.discountPercent ?? 0,
+            focQuantity: item.focQuantity ?? 0,
+            quantityCorrected: item.quantityCorrected ?? false,
+          };
+        }),
+      );
+      if (cancelled) return;
+      setLines(draftLines);
+
+      if (detail.payments.length > 0) {
+        const draftPayments = detail.payments.map((row) => ({
+          id: row.id,
+          method: row.method,
+          amount: row.amount,
+          reference: row.reference,
+        }));
+        paymentsTouchedRef.current = true;
+        setPaymentMode(inferPaymentMode(draftPayments));
+        setPayments(draftPayments);
+      } else {
+        setPayments([]);
+        setPaymentMode("cash");
+        paymentsTouchedRef.current = false;
+      }
+    }
+
+    void (async () => {
+      try {
+        if (shouldFlush) await persistOpenSaleRef.current(true);
+        if (cancelled) return;
+
+        const draftId = routeDraftId ?? (await readOpenSaleId());
+        if (cancelled) return;
+        if (!draftId) return;
+
+        const detail = await loadSale(draftId);
         if (cancelled) return;
         if (detail.status !== "DRAFT") {
-          navigate(`/sales/${detail.id}`, { replace: true });
+          if (!routeDraftId) await writeOpenSaleId(null);
+          if (routeDraftId) navigate(`/sales/${detail.id}`, { replace: true });
           return;
         }
 
-        holdNumberRef.current = detail.saleNumber;
-        setCustomerName(
-          detail.customerName === DEFAULT_SALE_CUSTOMER_NAME
-            ? ""
-            : detail.customerName,
-        );
-        setWarehouseId(detail.warehouseId);
-
-        const draftLines: DraftSaleLine[] = await Promise.all(
-          detail.items.map(async (item) => {
-            let quantityAvailable = item.quantity + (item.focQuantity ?? 0);
-            try {
-              quantityAvailable = await loadPosAvailableForSale(
-                detail.warehouseId,
-                item.productSkuId,
-                detail.id,
-              );
-            } catch {
-              /* keep line qty as fallback */
-            }
-            return {
-              productSkuId: item.productSkuId,
-              productName: item.productName,
-              variantName: item.variantName,
-              sku: item.sku,
-              barcode: item.barcode,
-              quantity: item.quantity,
-              quantityAvailable,
-              sellUnit: item.sellUnit,
-              unitsPerPurchaseUnit: 1,
-              sellingPrice: item.unitPrice,
-              sellingPricePerPurchaseUnit: null,
-              gstPercent: item.gstPercent ?? 0,
-              hsCode: item.hsCode ?? null,
-              discountPercent: item.discountPercent ?? 0,
-              focQuantity: item.focQuantity ?? 0,
-              quantityCorrected: item.quantityCorrected ?? false,
-            };
-          }),
-        );
-        setLines(draftLines);
-
-        if (detail.payments.length > 0) {
-          const draftPayments = detail.payments.map((row) => ({
-            id: row.id,
-            method: row.method,
-            amount: row.amount,
-            reference: row.reference,
-          }));
-          paymentsTouchedRef.current = true;
-          setPaymentMode(inferPaymentMode(draftPayments));
-          setPayments(draftPayments);
-        } else {
-          setPayments([]);
-          setPaymentMode("cash");
-          paymentsTouchedRef.current = false;
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
+        openSaleIdRef.current = detail.id;
+        setOpenSaleId(detail.id);
+        await writeOpenSaleId(detail.id);
+        await hydrateDraft(detail);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        if (routeDraftId) {
           setError(getApiErrorMessage(err, "Held bill not found"));
+        } else {
+          await writeOpenSaleId(null);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingDraft(false);
-      });
+      } finally {
+        if (!cancelled) {
+          if (!routeDraftId || openSaleIdRef.current) {
+            openSaleReadyRef.current = true;
+          }
+          setLoadingDraft(false);
+        }
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -651,6 +682,85 @@ export function SalePage() {
     };
   }
 
+  persistOpenSaleRef.current = async (force = false) => {
+    const epoch = openSaleEpochRef.current;
+    const onOpenSaleScreen =
+      !routeDraftId || routeDraftId === openSaleIdRef.current;
+    const stillCurrent = () =>
+      force ||
+      (epoch === openSaleEpochRef.current &&
+        !skipOpenSalePersistRef.current &&
+        !holdInFlightRef.current &&
+        openSaleReadyRef.current &&
+        onOpenSaleScreen);
+    if (!stillCurrent() || !warehouseId) return;
+
+    if (lines.length === 0) {
+      const id = openSaleIdRef.current;
+      if (!id) return;
+      openSaleEpochRef.current += 1;
+      const clearEpoch = openSaleEpochRef.current;
+      openSaleIdRef.current = null;
+      setOpenSaleId(null);
+      holdNumberRef.current = null;
+      await writeOpenSaleId(null);
+      if (openSaleEpochRef.current !== clearEpoch) return;
+      try {
+        await window.blackbox?.localDb?.deleteSaleDraft?.(id);
+      } catch {
+        /* draft cleanup is best-effort */
+      }
+      return;
+    }
+
+    const id = openSaleIdRef.current ?? crypto.randomUUID();
+    openSaleIdRef.current = id;
+    if (openSaleId !== id) setOpenSaleId(id);
+    if (!holdNumberRef.current) {
+      holdNumberRef.current = await allocateHoldNumber(user?.tenantName ?? "");
+    }
+    if (!stillCurrent()) return;
+    const detail = buildDetailFromForm({
+      id,
+      saleNumber: holdNumberRef.current,
+      status: "DRAFT",
+    });
+    await window.blackbox?.localDb?.upsertSaleDraft?.(detail);
+    if (!stillCurrent() || openSaleIdRef.current !== id) return;
+    await writeOpenSaleId(id);
+  };
+
+  useEffect(() => {
+    if (lines.length === 0 && !holdInFlightRef.current) {
+      skipOpenSalePersistRef.current = false;
+    }
+  }, [lines]);
+
+  useEffect(() => {
+    const onOpenSaleScreen =
+      !routeDraftId || routeDraftId === openSaleIdRef.current;
+    if (!onOpenSaleScreen || loadingDraft || !openSaleReadyRef.current) return;
+    const timer = window.setTimeout(() => {
+      void persistOpenSaleRef.current();
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [
+    lines,
+    payments,
+    customerName,
+    warehouseId,
+    loadingDraft,
+    routeDraftId,
+    billTotal,
+    paymentMode,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      void persistOpenSaleRef.current();
+    };
+  }, []);
+
   function postedPaymentRows(): SaleDetail["payments"] {
     if (amountDue <= 0) return [];
     if (isSplitPayment && splitAmounts) {
@@ -687,6 +797,10 @@ export function SalePage() {
   async function lookupReturnVoucher(code: string) {
     const trimmed = code.trim();
     if (!trimmed) return;
+    if (lines.length === 0) {
+      setError("Add items before applying a return voucher.");
+      return;
+    }
     setReturnLookupBusy(true);
     setError(null);
     try {
@@ -873,7 +987,7 @@ export function SalePage() {
         try {
           const row = await loadSkuByBarcode(code, warehouseId, {
             balance: "pos",
-            excludeDraftSaleId: editingDraftId,
+            excludeDraftSaleId: activeDraftId,
           });
           const err = upsertScannedLine(row);
           if (err) setError(err);
@@ -1028,9 +1142,12 @@ export function SalePage() {
   }
 
   function findLineByBarcodeOnBill(code: string): DraftSaleLine | null {
-    const trimmed = code.trim();
+    const trimmed = code.trim().toLowerCase();
     if (!trimmed) return null;
-    return lines.find((line) => line.barcode === trimmed) ?? null;
+    return (
+      lines.find((line) => line.barcode?.trim().toLowerCase() === trimmed) ??
+      null
+    );
   }
 
   async function resolveLineForRemoveScan(
@@ -1118,6 +1235,10 @@ export function SalePage() {
     setError(null);
     const code = scannedCode.trim();
     if (!code) return;
+    if (lines.length === 0) {
+      setError("Add items before adjusting quantities.");
+      return;
+    }
 
     const line = await resolveLineForRemoveScan(code);
     if (!line) {
@@ -1196,10 +1317,16 @@ export function SalePage() {
     if (!warehouseId || lines.length === 0) return;
     if (holdInFlightRef.current) return;
     holdInFlightRef.current = true;
+    const parkingOpenSale =
+      !editingDraftId || editingDraftId === openSaleIdRef.current;
+    if (parkingOpenSale) {
+      openSaleEpochRef.current += 1;
+      skipOpenSalePersistRef.current = true;
+    }
     setError(null);
     setHolding(true);
     try {
-      const draftId = editingDraftId ?? crypto.randomUUID();
+      const draftId = editingDraftId ?? openSaleIdRef.current ?? crypto.randomUUID();
       const holdNumber =
         holdNumberRef.current ??
         (await allocateHoldNumber(user?.tenantName ?? ""));
@@ -1209,6 +1336,12 @@ export function SalePage() {
         status: "DRAFT",
       });
       await window.blackbox?.localDb?.upsertSaleDraft?.(detail);
+      if (parkingOpenSale) {
+        openSaleIdRef.current = null;
+        setOpenSaleId(null);
+        holdNumberRef.current = null;
+        await writeOpenSaleId(null);
+      }
       bumpDataVersion();
       resetForNewSale();
       navigate("/sales/new", { replace: true });
@@ -1216,6 +1349,7 @@ export function SalePage() {
       holdInFlightRef.current = false;
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to hold bill"));
+      if (parkingOpenSale) skipOpenSalePersistRef.current = false;
       setHolding(false);
       holdInFlightRef.current = false;
     }
@@ -1301,13 +1435,16 @@ export function SalePage() {
     }
 
     setSaving(true);
+    openSaleEpochRef.current += 1;
+    skipOpenSalePersistRef.current = true;
+    const openIdAtPost = openSaleIdRef.current;
     try {
       const resolvedCustomerName =
         customerName.trim() || DEFAULT_SALE_CUSTOMER_NAME;
       const resolvedCashierName = user?.fullName?.trim() || "—";
 
       if (await isDeviceBound()) {
-        const localId = editingDraftId ?? crypto.randomUUID();
+        const localId = editingDraftId ?? openSaleIdRef.current ?? crypto.randomUUID();
         const now = new Date().toISOString();
         const saleNumber = await allocateSaleNumber(user?.tenantName ?? "");
         const items = lines.map((line) => {
@@ -1482,9 +1619,19 @@ export function SalePage() {
             );
           }
         }
-        if (editingDraftId) {
+        if (editingDraftId && editingDraftId !== localId) {
           try {
             await window.blackbox?.localDb?.deleteSaleDraft?.(editingDraftId);
+          } catch {
+            /* draft cleanup is best-effort */
+          }
+        }
+        openSaleIdRef.current = null;
+        setOpenSaleId(null);
+        await writeOpenSaleId(null);
+        if (openIdAtPost && openIdAtPost !== localId) {
+          try {
+            await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
           } catch {
             /* draft cleanup is best-effort */
           }
@@ -1569,6 +1716,16 @@ export function SalePage() {
           /* draft cleanup is best-effort */
         }
       }
+      openSaleIdRef.current = null;
+      setOpenSaleId(null);
+      await writeOpenSaleId(null);
+      if (openIdAtPost && openIdAtPost !== editingDraftId) {
+        try {
+          await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
+        } catch {
+          /* draft cleanup is best-effort */
+        }
+      }
 
       const withFbr =
         user?.fbrEnabled && !nonFbrSale
@@ -1578,6 +1735,7 @@ export function SalePage() {
       navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
       void syncNow();
     } catch (err: unknown) {
+      skipOpenSalePersistRef.current = false;
       setError(getApiErrorMessage(err, "Failed to post sale"));
     } finally {
       setSaving(false);
@@ -2092,7 +2250,7 @@ export function SalePage() {
                 id="returnVoucherEntry"
                 placeholder="Scan or enter return #"
                 value={returnEntry}
-                disabled={returnLookupBusy}
+                disabled={returnLookupBusy || lines.length === 0}
                 onChange={(event) => setReturnEntry(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -2104,7 +2262,11 @@ export function SalePage() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={returnLookupBusy || !returnEntry.trim()}
+                disabled={
+                  returnLookupBusy ||
+                  lines.length === 0 ||
+                  !returnEntry.trim()
+                }
                 onClick={() => void lookupReturnVoucher(returnEntry)}
               >
                 Apply
@@ -2394,7 +2556,7 @@ export function SalePage() {
       <AddSaleItemDialog
         open={itemOpen}
         warehouseId={warehouseId}
-        excludeDraftSaleId={editingDraftId}
+        excludeDraftSaleId={activeDraftId}
         onClose={() => {
           setItemOpen(false);
           focusScanInput();
@@ -2406,7 +2568,7 @@ export function SalePage() {
         mode="foc"
         open={focItemOpen}
         warehouseId={warehouseId}
-        excludeDraftSaleId={editingDraftId}
+        excludeDraftSaleId={activeDraftId}
         onClose={() => {
           setFocItemOpen(false);
           focusScanInput();

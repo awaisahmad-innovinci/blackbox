@@ -5,6 +5,7 @@ export type SupervisorTotpRow = {
   userId: string;
   secretBase32: string;
   displayName: string;
+  roleKey: string;
 };
 
 export function replaceSupervisorTotpLocal(
@@ -19,8 +20,12 @@ export function replaceSupervisorTotpLocal(
       identity.tenantId,
     );
     const insert = db.prepare(`
-      insert into supervisor_totp (user_id, tenant_id, secret_base32, display_name, updated_at)
-      values (@userId, @tenantId, @secretBase32, @displayName, datetime('now'))
+      insert into supervisor_totp (
+        user_id, tenant_id, secret_base32, display_name, role_key, updated_at
+      )
+      values (
+        @userId, @tenantId, @secretBase32, @displayName, @roleKey, datetime('now')
+      )
     `);
     for (const entry of entries) {
       insert.run({
@@ -28,6 +33,7 @@ export function replaceSupervisorTotpLocal(
         tenantId: identity.tenantId,
         secretBase32: entry.secretBase32,
         displayName: entry.displayName,
+        roleKey: entry.roleKey,
       });
     }
   });
@@ -42,7 +48,8 @@ export function getSupervisorTotpSecretsLocal(): SupervisorTotpRow[] {
   return db
     .prepare(
       `select user_id as userId, secret_base32 as secretBase32,
-              coalesce(display_name, '') as displayName
+              coalesce(display_name, '') as displayName,
+              coalesce(role_key, '') as roleKey
        from supervisor_totp
        where tenant_id = ?`,
     )

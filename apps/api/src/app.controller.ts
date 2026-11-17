@@ -15,7 +15,12 @@ export class AppController {
   }
 
   @Get("health")
-  getHealth(): { status: string } {
+  getHealth(): Promise<{
+    status: string;
+    db?: string;
+    dbMs?: number;
+    dbError?: string;
+  }> {
     return this.appService.getHealth();
   }
 

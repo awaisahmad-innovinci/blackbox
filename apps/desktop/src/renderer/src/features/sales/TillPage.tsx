@@ -6,7 +6,6 @@ import {
   emptyTillNotes,
   formatMoney,
   isTillNearLimit,
-  TILL_MAX_CASH_BALANCE_TO_CLOSE,
   validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
@@ -240,7 +239,7 @@ export function TillPage() {
         let supervisorUserId: string | undefined;
         let supervisorDisplayName: string | undefined;
         if (requireTillWithdrawApproval) {
-          const totp = await promptSupervisorTotp();
+          const totp = await promptSupervisorTotp({ audience: "manager" });
           if (!totp.approved) return;
           supervisorUserId = totp.supervisorUserId;
           supervisorDisplayName = totp.supervisorDisplayName;
@@ -257,7 +256,7 @@ export function TillPage() {
         });
       } else if (managerDialog.kind === "withdraw") {
         if (requireTillWithdrawApproval) {
-          const totp = await promptSupervisorTotp();
+          const totp = await promptSupervisorTotp({ audience: "manager" });
           if (!totp.approved) return;
         }
         await withdrawTill({
@@ -657,12 +656,11 @@ export function TillPage() {
                 <p className="text-destructive text-sm" role="alert">
                   {closeBalanceError} Use Withdraw cash first, then try again.
                 </p>
-              ) : session.currentCashBalance <= TILL_MAX_CASH_BALANCE_TO_CLOSE ? (
+              ) : (
                 <p className="text-muted-foreground text-sm">
-                  Till balance is Rs {TILL_MAX_CASH_BALANCE_TO_CLOSE} or less. You
-                  can close now.
+                  Till balance is Rs 0. You can close now.
                 </p>
-              ) : null}
+              )}
             </>
           ) : null}
           <DialogFooter>

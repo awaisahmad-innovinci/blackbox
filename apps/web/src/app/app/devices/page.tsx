@@ -216,7 +216,7 @@ export default function DevicesPage() {
                             Trust again
                           </Button>
                         ) : null}
-                        {canManage && !d.deletedAt ? (
+                        {canManage && !d.deletedAt && d.fingerprint !== "cloud-hub" ? (
                           <Button
                             variant="ghost"
                             size="sm"

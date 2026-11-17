@@ -230,6 +230,10 @@ export function DashboardPage() {
                 cashSubmittedToday: 0,
                 cashSubmissionsToday: [],
                 ownerCashBalance: 0,
+                salesCount: 0,
+                salesTotal: 0,
+                cashPayments: 0,
+                cardPayments: 0,
               });
             }
           }
@@ -466,6 +470,67 @@ export function DashboardPage() {
         <div className="space-y-8">
           {showManagerDashboard ? (
             <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      Sales
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        Rs {formatMoney(managerSummary?.salesTotal ?? 0)}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {(managerSummary?.salesCount ?? 0) === 1
+                        ? "1 posted bill today, all cashiers"
+                        : `${managerSummary?.salesCount ?? 0} posted bills today, all cashiers`}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      Cash payments
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        Rs {formatMoney(managerSummary?.cashPayments ?? 0)}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Cash taken on posted sales
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="gap-3 py-5">
+                  <CardHeader className="px-5 pb-0">
+                    <CardTitle className="text-muted-foreground text-sm font-medium">
+                      Card payments
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5">
+                    {loading ? (
+                      <Skeleton className="h-9 w-24" />
+                    ) : (
+                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                        Rs {formatMoney(managerSummary?.cardPayments ?? 0)}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Card taken on posted sales
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
               {isOwner ? null : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {MANAGER_CARDS.map((card) => (

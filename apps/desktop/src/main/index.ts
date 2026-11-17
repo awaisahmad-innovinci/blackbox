@@ -225,7 +225,10 @@ import {
   vendorReturnableQuantityLocal,
   inventoryOutReturnableQuantityLocal,
 } from "./db/queries-local";
-import { allocateDocumentNumberLocal } from "./db/document-counters-local";
+import {
+  allocateDocumentNumberLocal,
+  peekDocumentNumberLocal,
+} from "./db/document-counters-local";
 import {
   getComputerName,
   getOrCreateFingerprint,
@@ -578,6 +581,17 @@ function registerIpc(): void {
         deviceCode: string;
       },
     ) => allocateDocumentNumberLocal(input),
+  );
+  ipcMain.handle(
+    "localDb:peekDocumentNumber",
+    (
+      _event,
+      input: {
+        documentType: DocumentCounterType;
+        tenantName: string;
+        deviceCode: string;
+      },
+    ) => peekDocumentNumberLocal(input),
   );
   ipcMain.handle(
     "localDb:listInventoryOuts",
@@ -1207,14 +1221,21 @@ function registerIpc(): void {
       resolveCanonicalEntityId(input),
   );
 
-  ipcMain.handle("totp:verifySupervisorCode", (_event, code: string) =>
-    verifySupervisorTotpCode(code),
+  ipcMain.handle(
+    "totp:verifySupervisorCode",
+    (_event, code: string, options?: { managerOnly?: boolean }) =>
+      verifySupervisorTotpCode(code, options),
   );
   ipcMain.handle(
     "localDb:replaceSupervisorTotp",
     (
       _event,
-      entries: Array<{ userId: string; secretBase32: string; displayName: string }>,
+      entries: Array<{
+        userId: string;
+        secretBase32: string;
+        displayName: string;
+        roleKey: string;
+      }>,
     ) => {
       replaceSupervisorTotpLocal(entries);
       return { ok: true as const };

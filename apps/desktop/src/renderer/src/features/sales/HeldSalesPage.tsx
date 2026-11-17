@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { loadSales } from "@renderer/lib/local-db/entity-source";
+import { readOpenSaleId } from "@renderer/lib/open-sale";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
 import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
@@ -29,8 +30,13 @@ export function HeldSalesPage() {
   async function refreshHeldBills() {
     setLoading(true);
     try {
-      const res = await loadSales({ status: "DRAFT", pageSize: 100 });
-      setItems(res.items);
+      const [res, openSaleId] = await Promise.all([
+        loadSales({ status: "DRAFT", pageSize: 100 }),
+        readOpenSaleId(),
+      ]);
+      setItems(
+        openSaleId ? res.items.filter((row) => row.id !== openSaleId) : res.items,
+      );
       setError(null);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to load held bills"));

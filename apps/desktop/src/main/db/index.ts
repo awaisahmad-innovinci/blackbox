@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { rmSync } from "node:fs";
+import { readdirSync, readlinkSync, rmSync } from "node:fs";
 import { sqlitePathFor, readIdentity } from "./identity";
 import { runLocalMigrations } from "./migrations";
 import { resetStalePushing } from "./outbox-local";
@@ -46,6 +46,33 @@ function sleepMs(ms: number): void {
   }
 }
 
+function debugDbLock(dbFile: string): {
+  selfPid: number;
+  holders: number[];
+} {
+  const selfPid = process.pid;
+  const holders: number[] = [];
+  try {
+    for (const pid of readdirSync("/proc")) {
+      if (!/^\d+$/.test(pid)) continue;
+      try {
+        for (const fd of readdirSync(`/proc/${pid}/fd`)) {
+          const target = readlinkSync(`/proc/${pid}/fd/${fd}`);
+          if (target === dbFile || target.startsWith(`${dbFile}-`)) {
+            holders.push(Number(pid));
+            break;
+          }
+        }
+      } catch {
+        /* process exited or fd not readable */
+      }
+    }
+  } catch {
+    /* /proc unavailable */
+  }
+  return { selfPid, holders };
+}
+
 function openLocalDbConnection(path: string): Database.Database {
   const conn = new Database(path);
   conn.pragma("busy_timeout = 5000");
@@ -88,9 +115,20 @@ export function initLocalDb(): Database.Database {
     try {
       conn = openLocalDbConnection(path);
       runLocalMigrations(conn);
+      const resetStarted = Date.now();
       try {
         resetStalePushing(conn);
+        // #region agent log
+        fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"e34b00"},body:JSON.stringify({sessionId:"e34b00",runId:"pre-fix",hypothesisId:"B",location:"apps/desktop/src/main/db/index.ts:initLocalDb",message:"resetStalePushing succeeded",data:{attempt,elapsedMs:Date.now()-resetStarted,busyTimeout:conn.pragma("busy_timeout",{simple:true}),journalMode:conn.pragma("journal_mode",{simple:true}),locks:debugDbLock(path)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       } catch (err) {
+        const code =
+          err && typeof err === "object" && "code" in err
+            ? String((err as { code?: string }).code ?? "")
+            : "";
+        // #region agent log
+        fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"e34b00"},body:JSON.stringify({sessionId:"e34b00",runId:"pre-fix",hypothesisId:"A",location:"apps/desktop/src/main/db/index.ts:initLocalDb",message:"resetStalePushing failed",data:{attempt,elapsedMs:Date.now()-resetStarted,code,busyTimeout:conn.pragma("busy_timeout",{simple:true}),journalMode:conn.pragma("journal_mode",{simple:true}),locks:debugDbLock(path),error:err instanceof Error?err.message:String(err)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         console.warn("[localDb] resetStalePushing skipped during init:", err);
       }
       db = conn;

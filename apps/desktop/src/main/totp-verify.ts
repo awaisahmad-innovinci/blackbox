@@ -19,6 +19,7 @@ function recordFailure(): void {
 
 export function verifySupervisorTotpCode(
   code: string,
+  options?: { managerOnly?: boolean },
 ): { ok: true; userId: string; displayName: string } | { ok: false; error: string } {
   const trimmed = code.trim();
   if (!/^\d{6}$/.test(trimmed)) {
@@ -41,6 +42,10 @@ export function verifySupervisorTotpCode(
     };
   }
 
+  const managerOnly = options?.managerOnly === true;
+  let matchedOwner = false;
+  let matchedUnknownRole = false;
+
   for (const row of secrets) {
     const totp = new TOTP({
       secret: Secret.fromBase32(row.secretBase32),
@@ -49,14 +54,34 @@ export function verifySupervisorTotpCode(
       period: 30,
     });
     const delta = totp.validate({ token: trimmed, window: 1 });
-    if (delta !== null) {
-      recentFailures.length = 0;
-      return {
-        ok: true,
-        userId: row.userId,
-        displayName: row.displayName.trim() || "Manager",
-      };
+    if (delta === null) continue;
+
+    if (managerOnly && row.roleKey !== "MANAGER") {
+      if (row.roleKey === "OWNER") matchedOwner = true;
+      else matchedUnknownRole = true;
+      continue;
     }
+
+    recentFailures.length = 0;
+    return {
+      ok: true,
+      userId: row.userId,
+      displayName: row.displayName.trim() || "Manager",
+    };
+  }
+
+  if (managerOnly && matchedOwner) {
+    recordFailure();
+    return { ok: false, error: "A manager authentication code is required." };
+  }
+
+  if (managerOnly && matchedUnknownRole) {
+    recordFailure();
+    return {
+      ok: false,
+      error:
+        "Connect so manager authentication codes can refresh, then try again.",
+    };
   }
 
   recordFailure();

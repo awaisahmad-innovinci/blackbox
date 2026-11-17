@@ -24,12 +24,17 @@ export type SupervisorTotpPromptResult =
   | { approved: false }
   | { approved: true; supervisorUserId: string; supervisorDisplayName: string };
 
+type SupervisorTotpAudience = "manager" | "supervisor";
+
 type PendingPrompt = {
   resolve: (result: SupervisorTotpPromptResult) => void;
+  audience: SupervisorTotpAudience;
 };
 
 type SupervisorTotpContextValue = {
-  promptSupervisorTotp: () => Promise<SupervisorTotpPromptResult>;
+  promptSupervisorTotp: (options?: {
+    audience?: SupervisorTotpAudience;
+  }) => Promise<SupervisorTotpPromptResult>;
 };
 
 const SupervisorTotpContext = createContext<SupervisorTotpContextValue | null>(
@@ -53,13 +58,19 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
     afterDialogClosed();
   }, []);
 
-  const promptSupervisorTotp = useCallback(() => {
-    return new Promise<SupervisorTotpPromptResult>((resolve) => {
-      setCode("");
-      setError(null);
-      setPending({ resolve });
-    });
-  }, []);
+  const promptSupervisorTotp = useCallback(
+    (options?: { audience?: SupervisorTotpAudience }) => {
+      return new Promise<SupervisorTotpPromptResult>((resolve) => {
+        setCode("");
+        setError(null);
+        setPending({
+          resolve,
+          audience: options?.audience ?? "supervisor",
+        });
+      });
+    },
+    [],
+  );
 
   async function onSubmit() {
     if (!window.blackbox?.totp) {
@@ -71,6 +82,7 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
     try {
       const result = await window.blackbox.totp.verifySupervisorCode(
         code.trim(),
+        pending?.audience === "manager" ? { managerOnly: true } : undefined,
       );
       if (result.ok) {
         finish({
@@ -102,7 +114,9 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
             <DialogHeader>
               <DialogTitle>Supervisor authentication code</DialogTitle>
               <DialogDescription>
-                Enter a valid Manager or Owner authentication code to continue.
+                {pending.audience === "manager"
+                  ? "Enter a manager authentication code to continue."
+                  : "Enter a valid Manager or Owner authentication code to continue."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">

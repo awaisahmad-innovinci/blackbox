@@ -211,6 +211,11 @@ declare global {
           tenantName: string;
           deviceCode: string;
         }) => Promise<string>;
+        peekDocumentNumber: (input: {
+          documentType: import("@blackbox/shared").DocumentCounterType;
+          tenantName: string;
+          deviceCode: string;
+        }) => Promise<string>;
         listInventoryOuts: (
           query?: InventoryOutListQuery,
         ) => Promise<PaginatedInventoryOuts>;
@@ -541,12 +546,14 @@ declare global {
       totp?: {
         verifySupervisorCode: (
           code: string,
+          options?: { managerOnly?: boolean },
         ) => Promise<import("@blackbox/shared").TotpVerifySupervisorCodeResult>;
         replaceSupervisorCache: (
           entries: Array<{
             userId: string;
             secretBase32: string;
             displayName: string;
+            roleKey: string;
           }>,
         ) => Promise<{ ok: true }>;
         listSupervisorUsers: () => Promise<string[]>;

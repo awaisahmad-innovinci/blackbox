@@ -109,10 +109,11 @@ function mergeFbrFields(
 
   return {
     fbrInvoiceNumber: detail.fbrInvoiceNumber ?? null,
+    // fbr_status is NOT NULL (default 'pending'), so drafts store pending too.
     fbrStatus:
       detail.fbrStatus ??
       asFbrInvoiceStatus(existing?.fbrStatus) ??
-      (detail.status === "POSTED" ? "pending" : null),
+      "pending",
     fbrError: detail.fbrError ?? null,
     fbrSubmittedAt: detail.fbrSubmittedAt ?? null,
     fbrSellerNtn: detail.fbrSellerNtn ?? existing?.fbrSellerNtn ?? null,

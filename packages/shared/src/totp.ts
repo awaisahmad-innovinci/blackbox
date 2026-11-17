@@ -8,10 +8,13 @@ export type TotpEnrollStartResponse = {
   qrDataUrl: string;
 };
 
+export type SupervisorRoleKey = "MANAGER" | "OWNER";
+
 export type TotpSupervisorCacheEntry = {
   userId: string;
   secret: string;
   fullName: string;
+  roleKey: SupervisorRoleKey;
 };
 
 export type TotpSupervisorCacheResponse = {
