@@ -82,16 +82,16 @@ export function SaleReturnThermalReceipt({
         <div className="space-y-1 pt-1 text-[11px]">
           {sale.items.map((item) => (
             <div key={item.id}>
-              <p className="break-words font-bold">
+              <p className="font-bold break-normal">
                 {lineProductLabel(item.productName, item.variantName)}
               </p>
-              <div className="flex justify-between gap-2">
-                <span className="min-w-0 break-words">
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 break-normal">
                   {item.quantity} x {formatMoney(item.unitPrice)} Disc{" "}
                   {formatDiscountPercent(item.discountPercent ?? 0)}% FOC{" "}
                   {formatFocQuantity(item.focQuantity ?? 0)}
                 </span>
-                <span className="shrink-0 tabular-nums">
+                <span className="shrink-0 tabular-nums whitespace-nowrap">
                   {formatMoney(item.lineTotal)}
                 </span>
               </div>
@@ -113,12 +113,14 @@ export function SaleReturnThermalReceipt({
         </p>
         {detail.items.map((item) => (
           <div key={item.id} className="text-[11px]">
-            <p className="break-words font-bold">
+            <p className="font-bold break-normal">
               {lineProductLabel(item.productName, item.variantName)}
             </p>
-            <div className="flex justify-between gap-2">
+            <div className="flex items-start justify-between gap-2">
               <span>Qty {item.quantity}</span>
-              <span className="tabular-nums">{formatMoney(item.lineTotal)}</span>
+              <span className="shrink-0 tabular-nums whitespace-nowrap">
+                {formatMoney(item.lineTotal)}
+              </span>
             </div>
           </div>
         ))}

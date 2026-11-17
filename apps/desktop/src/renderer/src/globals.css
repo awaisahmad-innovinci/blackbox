@@ -4,8 +4,13 @@
 
 @media print {
   @page {
-    margin: 4mm 5mm 6mm;
+    size: A4;
+    margin: 14mm;
+  }
+
+  @page receipt {
     size: 80mm auto;
+    margin: 4mm 3mm 6mm;
   }
 
   body {
@@ -31,6 +36,46 @@
     width: 100%;
     margin: 0 !important;
     padding: 0 !important;
+  }
+
+  [data-print-document]:has([data-thermal-receipt]),
+  [data-thermal-receipt] {
+    page: receipt;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) {
+    color: #000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) * {
+    color: #000 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse;
+    table-layout: auto;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) th,
+  [data-print-document]:not(:has([data-thermal-receipt])) td {
+    overflow: visible !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    vertical-align: top;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .tabular-nums {
+    white-space: nowrap !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .overflow-hidden {
+    overflow: visible !important;
   }
 
   header,
@@ -73,13 +118,25 @@
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 2mm 4mm 18mm !important;
+    padding: 1mm 1.5mm 14mm !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   [data-thermal-receipt] * {
     color: #000 !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+  }
+
+  [data-thermal-receipt] .break-all {
+    word-break: break-all !important;
+  }
+
+  [data-thermal-receipt] .tabular-nums {
+    white-space: nowrap !important;
   }
 
   [data-thermal-receipt] .thermal-rule {

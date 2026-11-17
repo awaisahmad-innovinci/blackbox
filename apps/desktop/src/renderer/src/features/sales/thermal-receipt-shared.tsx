@@ -87,15 +87,15 @@ export function ThermalSaleLineItems({ items }: { items: SaleLineRow[] }) {
 
           return (
             <div key={item.id}>
-              <p className="break-words font-bold">
+              <p className="font-bold break-normal">
                 {saleReceiptProductLabel(item.productName, item.variantName)}
               </p>
-              <div className="flex justify-between gap-2">
-                <span className="min-w-0 break-words">
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 break-normal">
                   {item.quantity} x {formatMoney(exGstUnit)}
                   {extras ? ` ${extras}` : ""}
                 </span>
-                <span className="flex shrink-0 gap-2 tabular-nums">
+                <span className="flex shrink-0 gap-2 tabular-nums whitespace-nowrap">
                   <span className="w-12 text-right">{formatMoney(gstAmount)}</span>
                   <span className="w-14 text-right">
                     {formatMoney(item.lineTotal)}
@@ -111,7 +111,7 @@ export function ThermalSaleLineItems({ items }: { items: SaleLineRow[] }) {
 }
 
 export const THERMAL_RECEIPT_CLASS =
-  "thermal-receipt mx-auto w-full max-w-[72mm] px-3 pt-2 pb-8 font-sans text-[11px] font-semibold leading-snug text-center text-black";
+  "thermal-receipt mx-auto w-full max-w-[72mm] px-1 pt-2 pb-8 font-sans text-[11px] font-semibold leading-snug text-center text-black";
 
 export function ThermalReceiptHeader({
   businessName,
@@ -167,8 +167,10 @@ export function ThermalMetaRow({
 }) {
   return (
     <div className="flex justify-between gap-2 text-left text-[11px] font-semibold">
-      <span>{label}</span>
-      <span className="text-right tabular-nums">{value}</span>
+      <span className="min-w-0 break-normal">{label}</span>
+      <span className="shrink-0 text-right tabular-nums whitespace-nowrap">
+        {value}
+      </span>
     </div>
   );
 }
@@ -189,7 +191,7 @@ export function ThermalReceiptBarcode({ value }: { value: string }) {
         height: 50,
         displayValue: true,
         fontSize: 10,
-        margin: 10,
+        margin: 0,
         textMargin: 2,
       });
     } catch {
@@ -200,7 +202,7 @@ export function ThermalReceiptBarcode({ value }: { value: string }) {
   if (!trimmed || trimmed === "DRAFT") return null;
 
   return (
-    <div className="thermal-receipt-barcode mx-auto w-full max-w-[48mm] break-inside-avoid py-2">
+    <div className="thermal-receipt-barcode mx-auto w-full max-w-full break-inside-avoid py-1">
       <svg ref={svgRef} className="mx-auto block h-auto max-w-full" />
     </div>
   );
@@ -219,8 +221,8 @@ export function ThermalTotalsRow({
     <div
       className={`flex justify-between gap-2 text-left text-[11px] font-semibold ${bold ? "text-sm font-bold" : ""}`}
     >
-      <span>{label}</span>
-      <span className="tabular-nums">{value}</span>
+      <span className="min-w-0 break-normal">{label}</span>
+      <span className="shrink-0 tabular-nums whitespace-nowrap">{value}</span>
     </div>
   );
 }
