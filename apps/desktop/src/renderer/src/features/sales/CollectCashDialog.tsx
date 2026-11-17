@@ -56,7 +56,7 @@ export function CollectCashDialog({
 
   async function onManagerAuthorize(): Promise<void> {
     setError(null);
-    const totp = await promptSupervisorTotp();
+    const totp = await promptSupervisorTotp({ audience: "manager" });
     if (!totp.approved) return;
     setSupervisorUserId(totp.supervisorUserId);
     setSupervisorDisplayName(totp.supervisorDisplayName);
@@ -100,7 +100,7 @@ export function CollectCashDialog({
           <DialogTitle>Withdraw cash</DialogTitle>
           <DialogDescription>
             {step === "authorize"
-              ? "Ask a manager or owner to enter their authentication code to authorize a cash withdrawal."
+              ? "Ask a manager to enter their authentication code to authorize a cash withdrawal."
               : "Manager: enter the cash amount you received from this till."}
             {session.status === "CLOSED_LIMIT" ? (
               <>

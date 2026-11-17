@@ -203,7 +203,8 @@ export function lookupSaleReturnLocal(
          ) as lineCount
        from sale_returns r
        left join sales s on s.id = r.sale_id
-       where r.tenant_id = @tenantId and lower(r.return_number) = lower(@returnNumber)`,
+       where r.tenant_id = @tenantId
+         and lower(r.return_number) = lower(@returnNumber)`,
     )
     .get({ tenantId: DEMO_STORE_TENANT_ID, returnNumber: trimmed }) as
     | Record<string, unknown>

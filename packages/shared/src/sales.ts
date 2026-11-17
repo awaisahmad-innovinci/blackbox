@@ -387,10 +387,17 @@ export interface CashSubmissionToday {
   amount: number;
 }
 
-/** Manager dashboard — today's till collections (no refund cash metrics). */
+/** Manager and owner dashboard — today's till collections and posted sales. */
 export interface ManagerDashboardSummary {
   /** Local calendar date (YYYY-MM-DD). */
   date: string;
+  /** Posted bills today, every cashier. Business day +05:00. */
+  salesCount: number;
+  salesTotal: number;
+  /** Cash taken on those posted bills. */
+  cashPayments: number;
+  /** Card taken on those posted bills. */
+  cardPayments: number;
   tillCashCollectedAmount: number;
   customerReturnCount: number;
   /** Signed-in manager's drawer after floats, collections, till floats, expenses, and handovers. */

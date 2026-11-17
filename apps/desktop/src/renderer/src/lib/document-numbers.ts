@@ -2,13 +2,28 @@ import type { DocumentCounterType } from "@blackbox/shared";
 import { nextSkuCodeForProduct } from "@blackbox/shared";
 import { resolveDeviceCode } from "@renderer/lib/device-code";
 
-async function allocate(documentType: DocumentCounterType, tenantName: string): Promise<string> {
+async function withDocumentNumber(
+  documentType: DocumentCounterType,
+  tenantName: string,
+  mode: "allocate" | "peek",
+): Promise<string> {
   const deviceCode = await resolveDeviceCode();
-  const allocateFn = window.blackbox?.localDb?.allocateDocumentNumber;
-  if (!allocateFn) {
+  const fn =
+    mode === "peek"
+      ? window.blackbox?.localDb?.peekDocumentNumber
+      : window.blackbox?.localDb?.allocateDocumentNumber;
+  if (!fn) {
     throw new Error("Local document numbering is unavailable");
   }
-  return allocateFn({ documentType, tenantName, deviceCode });
+  return fn({ documentType, tenantName, deviceCode });
+}
+
+async function allocate(documentType: DocumentCounterType, tenantName: string): Promise<string> {
+  return withDocumentNumber(documentType, tenantName, "allocate");
+}
+
+async function peek(documentType: DocumentCounterType, tenantName: string): Promise<string> {
+  return withDocumentNumber(documentType, tenantName, "peek");
 }
 
 async function existingSkuCodes(): Promise<string[]> {
@@ -27,6 +42,10 @@ export async function allocateSkuCode(productName: string): Promise<string> {
 
 export async function allocateVendorCode(tenantName: string): Promise<string> {
   return allocate("V", tenantName);
+}
+
+export async function peekVendorCode(tenantName: string): Promise<string> {
+  return peek("V", tenantName);
 }
 
 export async function allocatePoNumber(tenantName: string): Promise<string> {

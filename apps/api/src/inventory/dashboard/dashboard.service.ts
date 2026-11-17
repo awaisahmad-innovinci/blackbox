@@ -140,6 +140,31 @@ export class DashboardService {
       .andWhere("r.return_date = :today", { today })
       .getCount();
 
+    const [salesRow, paymentRows] = await Promise.all([
+      this.sales
+        .createQueryBuilder("s")
+        .select("COUNT(*)", "count")
+        .addSelect("COALESCE(SUM(s.total), 0)", "total")
+        .where("s.tenant_id = :tenantId", { tenantId })
+        .andWhere("s.status = :status", { status: "POSTED" })
+        .andWhere("s.posted_at >= :start", { start: bounds.startIso })
+        .andWhere("s.posted_at < :end", { end: bounds.endIso })
+        .getRawOne<{ count: string; total: string }>(),
+      this.salePayments
+        .createQueryBuilder("p")
+        .innerJoin("p.sale", "s")
+        .select("p.method", "method")
+        .addSelect("COALESCE(SUM(p.amount), 0)", "amount")
+        .where("p.tenant_id = :tenantId", { tenantId })
+        .andWhere("s.status = :status", { status: "POSTED" })
+        .andWhere("s.posted_at >= :start", { start: bounds.startIso })
+        .andWhere("s.posted_at < :end", { end: bounds.endIso })
+        .groupBy("p.method")
+        .getRawMany<{ method: string; amount: string }>(),
+    ]);
+    const payments = new Map(
+      paymentRows.map((row) => [row.method, roundMoney(toNum(row.amount))]),
+    );
     const tillCashCollectedAmount = roundMoney(toNum(tillRow?.amount));
     const drawers = await this.cashFlow.drawerBalances(
       tenantId,
@@ -162,6 +187,10 @@ export class DashboardService {
 
     return {
       date: today,
+      salesCount: toNum(salesRow?.count),
+      salesTotal: roundMoney(toNum(salesRow?.total)),
+      cashPayments: payments.get("CASH") ?? 0,
+      cardPayments: payments.get("CARD") ?? 0,
       tillCashCollectedAmount,
       customerReturnCount: returnCount,
       drawerBalance: own?.balance ?? 0,

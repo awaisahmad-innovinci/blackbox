@@ -73,7 +73,6 @@ const emptyForm = {
   reorderLevel: "0",
   minimumStockLevel: "0",
   maximumStockLevel: "",
-  trackInventory: true,
   status: "active" as EntityStatus,
 };
 
@@ -368,7 +367,7 @@ export function AddProductSkuDialog({
       reorderLevel: nums.reorderLevel,
       minimumStockLevel: nums.minimumStockLevel,
       maximumStockLevel: nums.maximumStockLevel,
-      trackInventory: form.trackInventory,
+      trackInventory: true,
       status: form.status,
     };
 
@@ -438,7 +437,7 @@ export function AddProductSkuDialog({
           reorderLevel: body.reorderLevel ?? 0,
           minimumStockLevel: body.minimumStockLevel ?? 0,
           maximumStockLevel: body.maximumStockLevel ?? null,
-          trackInventory: body.trackInventory ?? true,
+          trackInventory: true,
           status: body.status ?? "active",
         };
         await commitLocalChange({

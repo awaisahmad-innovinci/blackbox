@@ -10,7 +10,12 @@ import { InjectRepository } from "@nestjs/typeorm";
 import * as QRCode from "qrcode";
 import { TOTP, Secret } from "otpauth";
 import { In, IsNull, Not, Repository } from "typeorm";
-import type { TotpEnrollStartResponse, TotpStatusResponse } from "@blackbox/shared";
+import type {
+  SupervisorRoleKey,
+  TotpEnrollStartResponse,
+  TotpStatusResponse,
+  TotpSupervisorCacheEntry,
+} from "@blackbox/shared";
 import { Role } from "../../db/entities/role.entity";
 import { UserTotp } from "../../db/entities/user-totp.entity";
 import { User } from "../../db/entities/user.entity";
@@ -186,14 +191,7 @@ export class TotpService {
 
   async listSupervisorSecretsForDevice(
     tenantId: string,
-  ): Promise<
-    Array<{
-      userId: string;
-      secret: string;
-      fullName: string;
-      isManager: boolean;
-    }>
-  > {
+  ): Promise<TotpSupervisorCacheEntry[]> {
     const supervisorRoles = await this.roles.find({
       where: { key: In([...SUPERVISOR_ROLE_KEYS]) },
     });
@@ -206,7 +204,17 @@ export class TotpService {
     const userRoleRows = await this.userRoles.find({
       where: { tenantId, roleId: In(roleIds) },
     });
-    const supervisorUserIds = [...new Set(userRoleRows.map((r) => r.userId))];
+    const roleKeyByUserId = new Map<string, SupervisorRoleKey>();
+    for (const row of userRoleRows) {
+      const next: SupervisorRoleKey = managerRoleIds.has(row.roleId)
+        ? "MANAGER"
+        : "OWNER";
+      const current = roleKeyByUserId.get(row.userId);
+      if (!current || next === "MANAGER") {
+        roleKeyByUserId.set(row.userId, next);
+      }
+    }
+    const supervisorUserIds = [...roleKeyByUserId.keys()];
     if (supervisorUserIds.length === 0) return [];
 
     // Users who hold the MANAGER role (only these may approve till open/close).
@@ -239,7 +247,7 @@ export class TotpService {
       userId: row.userId,
       secret: decryptTotpSecret(row.secretCiphertext, key),
       fullName: nameById.get(row.userId) ?? "Manager",
-      isManager: managerUserIds.has(row.userId),
+      roleKey: roleKeyByUserId.get(row.userId) ?? "OWNER",
     }));
   }
 }

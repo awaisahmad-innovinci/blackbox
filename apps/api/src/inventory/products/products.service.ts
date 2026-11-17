@@ -432,7 +432,7 @@ export class ProductsService {
             dto.maximumStockLevel == null
               ? null
               : String(dto.maximumStockLevel),
-          trackInventory: dto.trackInventory ?? true,
+          trackInventory: true,
           status: dto.status ?? "active",
         }),
       );

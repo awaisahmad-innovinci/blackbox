@@ -42,7 +42,7 @@ export async function refreshSupervisorTotpCache(): Promise<void> {
         userId: entry.userId,
         secretBase32: entry.secret,
         displayName: entry.fullName,
-        isManager: entry.isManager,
+        roleKey: entry.roleKey,
       })),
     );
   } catch {

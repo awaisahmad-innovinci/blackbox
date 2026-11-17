@@ -56,7 +56,7 @@ export function OpenTillDialog({
 
   async function onManagerAuthorize(): Promise<void> {
     setError(null);
-    const totp = await promptSupervisorTotp({ managerOnly: true });
+    const totp = await promptSupervisorTotp({ audience: "manager" });
     if (!totp.approved) return;
     setSupervisorUserId(totp.supervisorUserId);
     setSupervisorDisplayName(totp.supervisorDisplayName);

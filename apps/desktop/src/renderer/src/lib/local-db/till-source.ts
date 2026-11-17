@@ -321,33 +321,26 @@ export async function reopenTill(input: {
 export async function closeTill(input: {
   userId: string;
   userName: string;
-  supervisorUserId?: string;
-  supervisorName?: string;
 }): Promise<TillSessionDetail> {
   const closedAtLabel = new Date().toLocaleString();
   try {
     if (window.blackbox?.localDb?.closeTill) {
       const detail = await window.blackbox.localDb.closeTill(input);
-      const managerLabel =
-        input.supervisorName?.trim() || input.supervisorUserId || "manager";
       await logActivityEvent(
         {
           eventType: "till.closed",
           actorUserId: input.userId,
-          supervisorUserId: input.supervisorUserId,
           subjectUserId: input.userId,
-          summary: `${input.userName} closed till on ${closedAtLabel} — remaining cash moved to ${managerLabel}; till Rs 0`,
+          summary: `${input.userName} closed till on ${closedAtLabel} — till Rs 0`,
           metadata: {
             tillSessionId: detail.id,
             currentCashBalance: detail.currentCashBalance,
             closeReason: detail.closeReason,
-            supervisorUserId: input.supervisorUserId,
           },
         },
         {
           actorName: input.userName,
           subjectName: input.userName,
-          supervisorName: input.supervisorName,
         },
       );
       return detail;
@@ -355,9 +348,7 @@ export async function closeTill(input: {
   } catch {
     /* fall through */
   }
-  return tillsApi.closeCurrent({
-    supervisorUserId: input.supervisorUserId,
-  });
+  return tillsApi.closeCurrent();
 }
 
 export async function assertTillCanPostSale(input: {

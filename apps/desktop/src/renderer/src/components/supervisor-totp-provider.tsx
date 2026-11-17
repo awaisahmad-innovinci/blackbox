@@ -24,20 +24,17 @@ export type SupervisorTotpPromptResult =
   | { approved: false }
   | { approved: true; supervisorUserId: string; supervisorDisplayName: string };
 
-export type SupervisorTotpPromptOptions = {
-  /** Only accept a Manager's code (used for till open/close). */
-  managerOnly?: boolean;
-};
+type SupervisorTotpAudience = "manager" | "supervisor";
 
 type PendingPrompt = {
   resolve: (result: SupervisorTotpPromptResult) => void;
-  managerOnly: boolean;
+  audience: SupervisorTotpAudience;
 };
 
 type SupervisorTotpContextValue = {
-  promptSupervisorTotp: (
-    options?: SupervisorTotpPromptOptions,
-  ) => Promise<SupervisorTotpPromptResult>;
+  promptSupervisorTotp: (options?: {
+    audience?: SupervisorTotpAudience;
+  }) => Promise<SupervisorTotpPromptResult>;
 };
 
 const SupervisorTotpContext = createContext<SupervisorTotpContextValue | null>(
@@ -62,11 +59,14 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const promptSupervisorTotp = useCallback(
-    (options?: SupervisorTotpPromptOptions) => {
+    (options?: { audience?: SupervisorTotpAudience }) => {
       return new Promise<SupervisorTotpPromptResult>((resolve) => {
         setCode("");
         setError(null);
-        setPending({ resolve, managerOnly: options?.managerOnly ?? false });
+        setPending({
+          resolve,
+          audience: options?.audience ?? "supervisor",
+        });
       });
     },
     [],
@@ -82,7 +82,7 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
     try {
       const result = await window.blackbox.totp.verifySupervisorCode(
         code.trim(),
-        { managerOnly: pending?.managerOnly ?? false },
+        pending?.audience === "manager" ? { managerOnly: true } : undefined,
       );
       if (result.ok) {
         finish({
@@ -113,13 +113,13 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>
-                {pending?.managerOnly
+                {pending.audience === "manager"
                   ? "Manager authentication code"
                   : "Supervisor authentication code"}
               </DialogTitle>
               <DialogDescription>
-                {pending?.managerOnly
-                  ? "Enter a valid Manager authentication code to continue."
+                {pending.audience === "manager"
+                  ? "Enter a manager authentication code to continue."
                   : "Enter a valid Manager or Owner authentication code to continue."}
               </DialogDescription>
             </DialogHeader>

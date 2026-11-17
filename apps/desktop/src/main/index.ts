@@ -225,7 +225,10 @@ import {
   vendorReturnableQuantityLocal,
   inventoryOutReturnableQuantityLocal,
 } from "./db/queries-local";
-import { allocateDocumentNumberLocal } from "./db/document-counters-local";
+import {
+  allocateDocumentNumberLocal,
+  peekDocumentNumberLocal,
+} from "./db/document-counters-local";
 import {
   getComputerName,
   getOrCreateFingerprint,
@@ -580,6 +583,17 @@ function registerIpc(): void {
     ) => allocateDocumentNumberLocal(input),
   );
   ipcMain.handle(
+    "localDb:peekDocumentNumber",
+    (
+      _event,
+      input: {
+        documentType: DocumentCounterType;
+        tenantName: string;
+        deviceCode: string;
+      },
+    ) => peekDocumentNumberLocal(input),
+  );
+  ipcMain.handle(
     "localDb:listInventoryOuts",
     (_event, query: InventoryOutListQuery = {}) =>
       listInventoryOutsLocal(query),
@@ -676,8 +690,6 @@ function registerIpc(): void {
       input: {
         userId: string;
         userName: string;
-        supervisorUserId?: string;
-        supervisorName?: string;
       },
     ) => closeTillLocal(input),
   );
@@ -1222,7 +1234,7 @@ function registerIpc(): void {
         userId: string;
         secretBase32: string;
         displayName: string;
-        isManager: boolean;
+        roleKey: string;
       }>,
     ) => {
       replaceSupervisorTotpLocal(entries);

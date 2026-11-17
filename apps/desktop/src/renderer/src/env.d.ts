@@ -211,6 +211,11 @@ declare global {
           tenantName: string;
           deviceCode: string;
         }) => Promise<string>;
+        peekDocumentNumber: (input: {
+          documentType: import("@blackbox/shared").DocumentCounterType;
+          tenantName: string;
+          deviceCode: string;
+        }) => Promise<string>;
         listInventoryOuts: (
           query?: InventoryOutListQuery,
         ) => Promise<PaginatedInventoryOuts>;
@@ -292,8 +297,6 @@ declare global {
         closeTill: (input: {
           userId: string;
           userName: string;
-          supervisorUserId?: string;
-          supervisorName?: string;
         }) => Promise<TillSessionDetail>;
         reopenTill: (input: {
           id: string;
@@ -550,7 +553,7 @@ declare global {
             userId: string;
             secretBase32: string;
             displayName: string;
-            isManager: boolean;
+            roleKey: string;
           }>,
         ) => Promise<{ ok: true }>;
         listSupervisorUsers: () => Promise<string[]>;

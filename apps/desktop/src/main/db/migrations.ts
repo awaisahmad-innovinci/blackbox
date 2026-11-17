@@ -1571,10 +1571,20 @@ where units_per_purchase_unit > 0;
     },
   },
   {
-    id: "049_supervisor_totp_is_manager",
-    sql: `
-      alter table supervisor_totp add column is_manager integer not null default 0;
-    `,
+    id: "049_supervisor_totp_role",
+    sql: `-- column added in after()`,
+    after: (db) => {
+      const cols = (
+        db.prepare("pragma table_info(supervisor_totp)").all() as {
+          name: string;
+        }[]
+      ).map((column) => column.name);
+      if (cols.length > 0 && !cols.includes("role_key")) {
+        db.exec(
+          `alter table supervisor_totp add column role_key text not null default ''`,
+        );
+      }
+    },
   },
 ];
 

@@ -254,6 +254,12 @@ contextBridge.exposeInMainWorld("blackbox", {
       deviceCode: string;
     }) =>
       ipcRenderer.invoke("localDb:allocateDocumentNumber", input) as Promise<string>,
+    peekDocumentNumber: (input: {
+      documentType: import("@blackbox/shared").DocumentCounterType;
+      tenantName: string;
+      deviceCode: string;
+    }) =>
+      ipcRenderer.invoke("localDb:peekDocumentNumber", input) as Promise<string>,
     listInventoryOuts: (query?: InventoryOutListQuery) =>
       ipcRenderer.invoke(
         "localDb:listInventoryOuts",
@@ -317,8 +323,6 @@ contextBridge.exposeInMainWorld("blackbox", {
     closeTill: (input: {
       userId: string;
       userName: string;
-      supervisorUserId?: string;
-      supervisorName?: string;
     }) =>
       ipcRenderer.invoke("localDb:closeTill", input) as Promise<TillSessionDetail>,
     reopenTill: (input: {
@@ -805,17 +809,15 @@ contextBridge.exposeInMainWorld("blackbox", {
       code: string,
       options?: { managerOnly?: boolean },
     ) =>
-      ipcRenderer.invoke(
-        "totp:verifySupervisorCode",
-        code,
-        options,
-      ) as Promise<import("@blackbox/shared").TotpVerifySupervisorCodeResult>,
+      ipcRenderer.invoke("totp:verifySupervisorCode", code, options) as Promise<
+        import("@blackbox/shared").TotpVerifySupervisorCodeResult
+      >,
     replaceSupervisorCache: (
       entries: Array<{
         userId: string;
         secretBase32: string;
         displayName: string;
-        isManager: boolean;
+        roleKey: string;
       }>,
     ) =>
       ipcRenderer.invoke("localDb:replaceSupervisorTotp", entries) as Promise<{

@@ -255,7 +255,7 @@ export default function DeviceDetailPage() {
               </SectionCard>
             ) : null}
 
-            {canManage && !device.deletedAt ? (
+            {canManage && !device.deletedAt && device.fingerprint !== "cloud-hub" ? (
               <SectionCard
                 title="Delete device"
                 description="Deleting revokes the device, erases its local data, and hides it from the devices list."

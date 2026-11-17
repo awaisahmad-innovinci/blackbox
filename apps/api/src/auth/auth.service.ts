@@ -428,7 +428,7 @@ export class AuthService {
   /**
    * Email and username are unique only inside one business. When several
    * active accounts share the typed name, the password picks the account.
-   * Email and username are both case-insensitive.
+   * Email and username are case-insensitive. The password is case-sensitive.
    */
   private async resolveLoginUser(
     identifier: string,
@@ -445,9 +445,10 @@ export class AuthService {
       .where("u.is_active = true")
       .andWhere("u.deleted_at IS NULL")
       .andWhere(
-        "(LOWER(u.email) = :identifierLower OR LOWER(u.username) = :identifierLower)",
+        "(LOWER(u.email) = :email OR LOWER(u.username) = LOWER(:username))",
         {
-          identifierLower,
+          email: identifierLower,
+          username,
         },
       )
       .getMany();

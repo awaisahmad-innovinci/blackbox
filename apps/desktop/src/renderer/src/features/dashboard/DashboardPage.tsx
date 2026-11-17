@@ -239,6 +239,10 @@ export function DashboardPage() {
                 cashSubmittedToday: 0,
                 cashSubmissionsToday: [],
                 ownerCashBalance: 0,
+                salesCount: 0,
+                salesTotal: 0,
+                cashPayments: 0,
+                cardPayments: 0,
               });
               setOwnerOverview(null);
             }
@@ -481,7 +485,7 @@ export function DashboardPage() {
                 <Card className="gap-3 py-5">
                   <CardHeader className="px-5 pb-0">
                     <CardTitle className="text-muted-foreground text-sm font-medium">
-                      Sales today
+                      Sales
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-5">
@@ -489,13 +493,13 @@ export function DashboardPage() {
                       <Skeleton className="h-9 w-24" />
                     ) : (
                       <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                        Rs {formatMoney(ownerOverview?.salesTotal ?? 0)}
+                        Rs {formatMoney(managerSummary?.salesTotal ?? 0)}
                       </p>
                     )}
                     <p className="text-muted-foreground mt-1 text-xs">
-                      {ownerOverview
-                        ? `${ownerOverview.salesCount} posted ${ownerOverview.salesCount === 1 ? "bill" : "bills"} (all cashiers)`
-                        : "Cloud sales totals when online"}
+                      {(managerSummary?.salesCount ?? 0) === 1
+                        ? "1 posted bill today, all cashiers"
+                        : `${managerSummary?.salesCount ?? 0} posted bills today, all cashiers`}
                     </p>
                   </CardContent>
                 </Card>
@@ -510,11 +514,11 @@ export function DashboardPage() {
                       <Skeleton className="h-9 w-24" />
                     ) : (
                       <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                        Rs {formatMoney(ownerOverview?.cashPayments ?? 0)}
+                        Rs {formatMoney(managerSummary?.cashPayments ?? 0)}
                       </p>
                     )}
                     <p className="text-muted-foreground mt-1 text-xs">
-                      Cash paid on posted bills today
+                      Cash taken on posted sales
                     </p>
                   </CardContent>
                 </Card>
@@ -529,11 +533,11 @@ export function DashboardPage() {
                       <Skeleton className="h-9 w-24" />
                     ) : (
                       <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                        Rs {formatMoney(ownerOverview?.cardPayments ?? 0)}
+                        Rs {formatMoney(managerSummary?.cardPayments ?? 0)}
                       </p>
                     )}
                     <p className="text-muted-foreground mt-1 text-xs">
-                      Card paid on posted bills today
+                      Card taken on posted sales
                     </p>
                   </CardContent>
                 </Card>

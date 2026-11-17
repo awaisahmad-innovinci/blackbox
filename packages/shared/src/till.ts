@@ -6,8 +6,8 @@ export const TILL_MAX_EXTRA_CASH = 100_000;
 
 export const TILL_WARNING_EXTRA_CASH = 90_000;
 
-/** Max cash left in till when cashier closes voluntarily (must withdraw above this). */
-export const TILL_MAX_CASH_BALANCE_TO_CLOSE = 1;
+/** Max cash left in till when cashier closes voluntarily. */
+export const TILL_MAX_CASH_BALANCE_TO_CLOSE = 0;
 
 export const TILL_STATUSES = [
   "PENDING_APPROVAL",
@@ -179,9 +179,9 @@ export function validateTillCanCloseBalance(
 ): string | null {
   if (
     Number.isFinite(currentCashBalance) &&
-    currentCashBalance > TILL_MAX_CASH_BALANCE_TO_CLOSE
+    currentCashBalance > TILL_MAX_CASH_BALANCE_TO_CLOSE + 0.0001
   ) {
-    return "Withdraw your cash first. Till balance must be Rs 1 or less before closing.";
+    return "Withdraw your cash first. Till balance must be Rs 0 before closing.";
   }
   return null;
 }

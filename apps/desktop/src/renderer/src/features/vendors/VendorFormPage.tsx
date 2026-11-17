@@ -33,7 +33,10 @@ import { loadVendor } from "@renderer/lib/local-db/entity-source";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
 import { resolveCanonicalEntityId } from "@renderer/lib/local-db/resolve-canonical-entity-id";
-import { allocateVendorCode } from "@renderer/lib/document-numbers";
+import {
+  allocateVendorCode,
+  peekVendorCode,
+} from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
 import {
   KEYBOARD_HINT_ENTER,
@@ -244,6 +247,21 @@ export function VendorFormPage() {
   }, []);
 
   useEffect(() => {
+    if (isEdit) return;
+    const tenantName = user?.tenantName?.trim() ?? "";
+    if (!tenantName) return;
+    let cancelled = false;
+    void peekVendorCode(tenantName).then((code) => {
+      if (!cancelled) {
+        setForm((prev) => ({ ...prev, vendorCode: code }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, user?.tenantName]);
+
+  useEffect(() => {
     if (loading || isEdit) return;
     requestAnimationFrame(() => {
       nameRef.current?.focus();
@@ -363,7 +381,7 @@ export function VendorFormPage() {
     setSaving(true);
     setError(null);
     let vendorCode = form.vendorCode.trim();
-    if (!vendorCode && !isEdit) {
+    if (!isEdit) {
       vendorCode = await allocateVendorCode(user?.tenantName ?? "");
     }
     const body: CreateVendorRequest = {

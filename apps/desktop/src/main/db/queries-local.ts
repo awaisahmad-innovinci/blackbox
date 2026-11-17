@@ -45,7 +45,11 @@ import type {
   WarehouseListItem,
 } from "@blackbox/shared";
 import type { EntityStatusFilter } from "@blackbox/shared";
-import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
+import {
+  asFbrInvoiceStatus,
+  businessPeriodBounds,
+  DEMO_STORE_TENANT_ID,
+} from "@blackbox/shared";
 import { getLocalDb } from "./index";
 import {
   getOwnerCashBalanceLocal,
@@ -594,6 +598,50 @@ function roundMoney(value: number): number {
   return Math.round(value * 10000) / 10000;
 }
 
+/** Store calendar day in +05:00, matching the web owner overview. */
+function businessToday(): string {
+  const shifted = new Date(Date.now() + 5 * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function todaySalesTotalsLocal(db: ReturnType<typeof getLocalDb>, tenantId: string) {
+  const today = businessToday();
+  const bounds = businessPeriodBounds(today, today);
+  const params = { tenantId, start: bounds.startIso, end: bounds.endIso };
+  const salesRow = db
+    .prepare(
+      `select count(*) as cnt, coalesce(sum(total), 0) as amount
+       from sales
+       where tenant_id = @tenantId
+         and status = 'POSTED'
+         and posted_at >= @start
+         and posted_at < @end`,
+    )
+    .get(params) as { cnt: number; amount: number };
+  const paymentRow = (
+    method: "CASH" | "CARD",
+  ) =>
+    db
+      .prepare(
+        `select coalesce(sum(sp.amount), 0) as amount
+         from sale_payments sp
+         inner join sales s on s.id = sp.sale_id and s.tenant_id = sp.tenant_id
+         where s.tenant_id = @tenantId
+           and s.status = 'POSTED'
+           and s.posted_at >= @start
+           and s.posted_at < @end
+           and sp.method = @method`,
+      )
+      .get({ ...params, method }) as { amount: number };
+
+  return {
+    salesCount: Number(salesRow.cnt),
+    salesTotal: roundMoney(Number(salesRow.amount)),
+    cashPayments: roundMoney(Number(paymentRow("CASH").amount)),
+    cardPayments: roundMoney(Number(paymentRow("CARD").amount)),
+  };
+}
+
 export function getCashierDashboardSummaryLocal(
   userId: string,
 ): CashierDashboardSummary {
@@ -804,8 +852,11 @@ export function getManagerDashboardSummaryLocal(
     currentCashBalance: number;
   }[];
 
+  const salesTotals = todaySalesTotalsLocal(db, tenantId);
+
   return {
     date: today,
+    ...salesTotals,
     tillCashCollectedAmount,
     customerReturnCount: Number(returnCountRow.cnt),
     drawerBalance: own?.balance ?? 0,

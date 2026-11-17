@@ -21,6 +21,7 @@ import {
   tillMaxLimit,
   tillOpeningExceedsDrawer,
   tillOpeningExceedsDrawerMessage,
+  validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -414,35 +415,13 @@ export class TillsService {
       throw new ForbiddenException("You can only close your own till");
     }
 
-    const now = new Date();
     const currentBalance = round4(toNum(row.currentCashBalance));
-    // Remaining cash goes to the approving manager's drawer, then the till is zeroed.
-    const withdrawnByUserId =
-      dto.supervisorUserId ??
-      row.approvedByUserId ??
-      row.fundedByUserId ??
-      ctx.userId;
-    if (currentBalance > 0) {
-      await this.assertCanFundDrawer(ctx.tenantId, withdrawnByUserId);
-      await this.withdrawals.save(
-        this.withdrawals.create({
-          id: randomUUID(),
-          tenantId: ctx.tenantId,
-          tillSessionId: row.id,
-          withdrawnByUserId,
-          note10: row.note10,
-          note20: row.note20,
-          note50: row.note50,
-          note100: row.note100,
-          note500: row.note500,
-          note1000: row.note1000,
-          note5000: row.note5000,
-          withdrawalTotal: String(currentBalance),
-          kind: "full",
-        }),
-      );
+    const balanceError = validateTillCanCloseBalance(currentBalance);
+    if (balanceError) {
+      throw new BadRequestException(balanceError);
     }
 
+    const now = new Date();
     row.currentCashBalance = "0";
     row.status = "CLOSED";
     row.closedAt = now;
@@ -457,14 +436,12 @@ export class TillsService {
       tenantId: ctx.tenantId,
       eventType: "till.closed",
       actorUserId: ctx.userId,
-      supervisorUserId: dto.supervisorUserId ?? null,
+      supervisorUserId: null,
       subjectUserId: ctx.userId,
-      summary: `${userName} closed till on ${closedAtLabel} — Rs ${currentBalance.toLocaleString()} moved to manager drawer`,
+      summary: `${userName} closed till on ${closedAtLabel} — till Rs 0`,
       metadata: {
         tillSessionId: row.id,
         currentCashBalance: 0,
-        movedToManager: currentBalance,
-        withdrawnByUserId,
         closeReason: TILL_CLOSE_REASON_CASHIER_CLOSED,
       },
     });

@@ -65,7 +65,11 @@ function ensureCounterFloor(
     return;
   }
 
-  if (row.nextValue < floor) {
+  // Vendor previews used to increment on open. Pull the counter back to the
+  // next code after the last saved vendor so cancelled forms do not leave gaps.
+  const snapToSaved =
+    documentType === "V" && row.nextValue > floor;
+  if (row.nextValue < floor || snapToSaved) {
     db.prepare(
       `update document_counters
        set next_value = @nextValue
@@ -74,11 +78,51 @@ function ensureCounterFloor(
   }
 }
 
-export function allocateDocumentNumberLocal(input: {
+type DocumentNumberInput = {
   documentType: DocumentCounterType;
   tenantName: string;
   deviceCode: string;
-}): string {
+};
+
+function readNextSequence(
+  db: Database.Database,
+  input: DocumentNumberInput,
+  deviceId: string,
+  prefix: string,
+): number {
+  ensureCounterFloor(db, input.documentType, deviceId, prefix);
+
+  db.prepare(
+    `insert into document_counters (document_type, device_id, next_value)
+     values (@documentType, @deviceId, 1)
+     on conflict(document_type, device_id) do nothing`,
+  ).run({
+    documentType: input.documentType,
+    deviceId,
+  });
+
+  const row = db
+    .prepare(
+      `select next_value as nextValue
+       from document_counters
+       where document_type = @documentType and device_id = @deviceId`,
+    )
+    .get({
+      documentType: input.documentType,
+      deviceId,
+    }) as { nextValue: number };
+
+  return row.nextValue;
+}
+
+function withDocumentNumber<T>(
+  input: DocumentNumberInput,
+  run: (
+    db: Database.Database,
+    deviceId: string,
+    prefix: string,
+  ) => T,
+): T {
   const identity = readIdentity();
   if (!identity?.deviceId) {
     throw new Error("Device identity is not bound");
@@ -92,39 +136,34 @@ export function allocateDocumentNumberLocal(input: {
     input.deviceCode,
   );
 
-  return db.transaction(() => {
-    ensureCounterFloor(db, input.documentType, identity.deviceId, prefix);
+  return db.transaction(() =>
+    run(db, identity.deviceId, prefix),
+  )();
+}
 
-    db.prepare(
-      `insert into document_counters (document_type, device_id, next_value)
-       values (@documentType, @deviceId, 1)
-       on conflict(document_type, device_id) do nothing`,
-    ).run({
-      documentType: input.documentType,
-      deviceId: identity.deviceId,
-    });
+function formatSequence(prefix: string, seq: number): string {
+  return `${prefix}${String(seq).padStart(2, "0")}`;
+}
 
-    const row = db
-      .prepare(
-        `select next_value as nextValue
-         from document_counters
-         where document_type = @documentType and device_id = @deviceId`,
-      )
-      .get({
-        documentType: input.documentType,
-        deviceId: identity.deviceId,
-      }) as { nextValue: number };
+/** Next code for display. Does not advance the counter. */
+export function peekDocumentNumberLocal(input: DocumentNumberInput): string {
+  return withDocumentNumber(input, (db, deviceId, prefix) => {
+    const seq = readNextSequence(db, input, deviceId, prefix);
+    return formatSequence(prefix, seq);
+  });
+}
 
-    const seq = row.nextValue;
+export function allocateDocumentNumberLocal(input: DocumentNumberInput): string {
+  return withDocumentNumber(input, (db, deviceId, prefix) => {
+    const seq = readNextSequence(db, input, deviceId, prefix);
     db.prepare(
       `update document_counters
        set next_value = next_value + 1
        where document_type = @documentType and device_id = @deviceId`,
     ).run({
       documentType: input.documentType,
-      deviceId: identity.deviceId,
+      deviceId,
     });
-
-    return `${prefix}${String(seq).padStart(2, "0")}`;
-  })();
+    return formatSequence(prefix, seq);
+  });
 }
