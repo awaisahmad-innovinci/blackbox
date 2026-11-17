@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import { BrandLogo } from "@/components/brand-logo";
 import { getCurrentTenant } from "@/lib/admin-api";
 
 const STEPS = [
@@ -72,9 +73,7 @@ export default function OnboardingLayout({
     <div className="bb-auth-canvas relative flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-6 py-5 md:px-10">
         <div className="flex items-center gap-2.5">
-          <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg text-xs font-bold">
-            Bx
-          </div>
+          <BrandLogo />
           <p className="font-display text-lg font-semibold tracking-tight">
             Blackbox
           </p>

@@ -37,7 +37,7 @@ function FbrInvoiceQr({ value }: { value: string }) {
     <img
       src={src}
       alt="FBR invoice QR"
-      className="mx-auto h-[1in] w-[1in]"
+      className="h-[16mm] w-[16mm]"
     />
   );
 }
@@ -97,10 +97,6 @@ export function SaleThermalReceipt({
   const cashChange = hasCashOverpay
     ? round4(detail.cashTendered! - amountDue)
     : 0;
-  const nonCashPayments = detail.payments.filter(
-    (payment) => payment.method !== "CASH",
-  );
-  const showAllPayments = detail.payments.length > 1;
   const showFbrNumber = Boolean(detail.fbrInvoiceNumber);
   const showFbrError =
     fbrEnabled &&
@@ -114,19 +110,19 @@ export function SaleThermalReceipt({
         businessName={businessName}
         businessAddress={businessAddress}
         businessPhone={businessPhone}
+        ntn={detail.fbrSellerNtn}
       />
 
       <ThermalRule />
 
+      <p className="text-center text-sm font-bold tracking-wide">SALES INVOICE</p>
+
       <section className="space-y-0.5 text-left">
         <ThermalMetaRow label="Bill #" value={detail.saleNumber} />
         <ThermalMetaRow label="Date" value={date} />
-        <ThermalMetaRow label="At" value={time} />
+        <ThermalMetaRow label="Time" value={time} />
         <ThermalMetaRow label="Cashier" value={cashierName} />
         <ThermalMetaRow label="Customer" value={detail.customerName} />
-        {detail.fbrSellerNtn ? (
-          <ThermalMetaRow label="NTN" value={detail.fbrSellerNtn} />
-        ) : null}
         {detail.status === "VOID" ? (
           <p className="pt-0.5 text-center text-sm font-bold">*** VOID ***</p>
         ) : null}
@@ -134,11 +130,15 @@ export function SaleThermalReceipt({
 
       <ThermalReceiptBarcode value={detail.saleNumber} />
 
+      <ThermalRule />
+
       <ThermalSaleLineItems items={detail.items} />
 
+      <ThermalRule />
+
       <section className="space-y-0.5">
-        <ThermalTotalsRow label="Total Items" value={totalItems} />
-        <ThermalTotalsRow label="Total Qty" value={totalQty} />
+        <ThermalTotalsRow label="Total items" value={totalItems} />
+        <ThermalTotalsRow label="Total qty" value={totalQty} />
         {hasFoc ? (
           <>
             <ThermalTotalsRow label="Total FOC" value={totalFoc} />
@@ -158,9 +158,11 @@ export function SaleThermalReceipt({
             value={formatMoney(detail.salesTaxAmount)}
           />
         ) : null}
+        <ThermalRule />
         <ThermalTotalsRow
-          label="Bill total"
+          label="BILL TOTAL"
           value={formatMoney(detail.total)}
+          bold
         />
         {returnCredit ? (
           <ThermalTotalsRow
@@ -183,40 +185,35 @@ export function SaleThermalReceipt({
             <ThermalTotalsRow label="Change" value={formatMoney(cashChange)} />
           </>
         ) : null}
-        <ThermalTotalsRow
-          label="Net Amount"
-          value={formatMoney(netAmount)}
-          bold
-        />
-        {showAllPayments
-          ? detail.payments.map((payment) => (
-              <ThermalTotalsRow
-                key={payment.id}
-                label={paymentMethodLabel(payment.method)}
-                value={formatMoney(payment.amount)}
-              />
-            ))
-          : nonCashPayments.map((payment) => (
-              <ThermalTotalsRow
-                key={payment.id}
-                label={paymentMethodLabel(payment.method)}
-                value={formatMoney(payment.amount)}
-              />
-            ))}
+        <ThermalTotalsRow label="Net amount" value={formatMoney(netAmount)} />
+        {detail.payments.map((payment) => (
+          <ThermalTotalsRow
+            key={payment.id}
+            label={paymentMethodLabel(payment.method)}
+            value={formatMoney(payment.amount)}
+          />
+        ))}
       </section>
 
       {showFbrNumber || showFbrError ? (
         <>
           <ThermalRule />
-          <section className="space-y-1 text-center">
+          <section>
             {showFbrNumber && detail.fbrInvoiceNumber ? (
-              <>
-                <p className="text-sm font-bold">FBR Invoice No</p>
-                <p className="font-mono text-xs break-all">{detail.fbrInvoiceNumber}</p>
-                <FbrInvoiceQr value={detail.fbrInvoiceNumber} />
-              </>
+              <div className="flex items-center gap-2 text-left">
+                <div className="flex h-[18mm] w-[18mm] shrink-0 items-center justify-center border border-dashed border-black">
+                  <FbrInvoiceQr value={detail.fbrInvoiceNumber} />
+                </div>
+                <div className="min-w-0 text-[10px] leading-tight">
+                  <p className="font-bold">FBR Invoice #</p>
+                  <p className="font-semibold break-all">
+                    {detail.fbrInvoiceNumber}
+                  </p>
+                  <p>Scan to verify with FBR</p>
+                </div>
+              </div>
             ) : (
-              <p className="text-xs font-bold">{detail.fbrError}</p>
+              <p className="text-center text-xs font-bold">{detail.fbrError}</p>
             )}
           </section>
         </>
@@ -233,17 +230,16 @@ export function SaleThermalReceipt({
         </ol>
       </section>
 
-      <section className="pt-1 text-center text-[10px] leading-tight">
+      <ThermalRule />
+
+      <section className="pt-0.5 text-center text-[10px] leading-tight">
         <p className="font-bold">Thanks for visiting us</p>
         <p className="mt-0.5 font-bold">No Bill No Return</p>
       </section>
 
-      <ThermalRule />
-
-      <footer className="text-center text-[9px] leading-tight font-semibold">
+      <footer className="pt-1 text-center text-[9px] leading-tight font-semibold">
         <p>This software design &amp; developed by</p>
-        <p>Innovinci Technologies</p>
-        <p>www.innovinci.com</p>
+        <p>Innovinci Technologies · www.innovinci.com</p>
       </footer>
 
       <div className="thermal-receipt-feed" aria-hidden="true" />
