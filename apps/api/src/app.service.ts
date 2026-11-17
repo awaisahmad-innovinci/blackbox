@@ -31,12 +31,12 @@ export class AppService {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Debug-Session-Id": "e34b00",
+            "X-Debug-Session-Id": "2f96b3",
           },
           body: JSON.stringify({
-            sessionId: "e34b00",
-            runId: "pre-fix",
-            hypothesisId: "B",
+            sessionId: "2f96b3",
+            runId: "post-fix",
+            hypothesisId: "C",
             location: "apps/api/src/app.service.ts:getHealth",
             message: "DB health probe succeeded",
             data: {
@@ -64,18 +64,21 @@ export class AppService {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Debug-Session-Id": "e34b00",
+            "X-Debug-Session-Id": "2f96b3",
           },
           body: JSON.stringify({
-            sessionId: "e34b00",
-            runId: "pre-fix",
-            hypothesisId: "C",
+            sessionId: "2f96b3",
+            runId: "post-fix",
+            hypothesisId: "A",
             location: "apps/api/src/app.service.ts:getHealth",
             message: "DB health probe failed",
             data: {
               ok: false,
               dbMs,
               code: e.code ?? null,
+              emaxConn:
+                (e.message ?? "").includes("EMAXCONNSESSION") ||
+                (e.message ?? "").includes("max clients reached"),
               error: e.message ?? "unknown",
               nested: (e.errors ?? []).map((row) => ({
                 code: row.code ?? null,

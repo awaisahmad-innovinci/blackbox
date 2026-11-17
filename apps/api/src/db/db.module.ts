@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { entities } from "./entities";
+import { resolvePgPoolMax } from "./postgres-connection";
 
 function typeOrmPostgresUrl(rawUrl: string): {
   url: string;
@@ -30,8 +31,11 @@ function typeOrmPostgresUrl(rawUrl: string): {
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const { url, ssl } = typeOrmPostgresUrl(
-          config.getOrThrow<string>("DATABASE_URL"),
+        const databaseUrl = config.getOrThrow<string>("DATABASE_URL");
+        const { url, ssl } = typeOrmPostgresUrl(databaseUrl);
+        const poolMax = resolvePgPoolMax(
+          databaseUrl,
+          config.get<string>("DATABASE_POOL_MAX"),
         );
         // #region agent log
         try {
@@ -44,81 +48,25 @@ function typeOrmPostgresUrl(rawUrl: string): {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "X-Debug-Session-Id": "e34b00",
+                "X-Debug-Session-Id": "2f96b3",
               },
               body: JSON.stringify({
-                sessionId: "e34b00",
-                runId: "pre-fix",
-                hypothesisId: "D",
+                sessionId: "2f96b3",
+                runId: "post-fix",
+                hypothesisId: "B",
                 location: "apps/api/src/db/db.module.ts:useFactory",
-                message: "TypeORM DATABASE_URL host/port",
+                message: "TypeORM pg pool configured",
                 data: {
                   host,
                   port,
                   hasPooler: host.includes("pooler"),
+                  poolMax,
                   sslEnabled: Boolean(ssl),
                 },
                 timestamp: Date.now(),
               }),
             },
           ).catch(() => {});
-          void import("dns")
-            .then((dns) => dns.promises.lookup(host, { all: true }))
-            .then((addrs) => {
-              fetch(
-                "http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Debug-Session-Id": "e34b00",
-                  },
-                  body: JSON.stringify({
-                    sessionId: "e34b00",
-                    runId: "pre-fix",
-                    hypothesisId: "A",
-                    location: "apps/api/src/db/db.module.ts:dnsLookup",
-                    message: "DNS lookup for DATABASE host",
-                    data: {
-                      host,
-                      ok: true,
-                      addresses: addrs.map((a) => ({
-                        address: a.address,
-                        family: a.family,
-                      })),
-                    },
-                    timestamp: Date.now(),
-                  }),
-                },
-              ).catch(() => {});
-            })
-            .catch((err: unknown) => {
-              const e = err as { code?: string; message?: string };
-              fetch(
-                "http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Debug-Session-Id": "e34b00",
-                  },
-                  body: JSON.stringify({
-                    sessionId: "e34b00",
-                    runId: "pre-fix",
-                    hypothesisId: "A",
-                    location: "apps/api/src/db/db.module.ts:dnsLookup",
-                    message: "DNS lookup failed for DATABASE host",
-                    data: {
-                      host,
-                      ok: false,
-                      code: e.code ?? null,
-                      error: e.message ?? "unknown",
-                    },
-                    timestamp: Date.now(),
-                  }),
-                },
-              ).catch(() => {});
-            });
         } catch {
           /* ignore debug parse errors */
         }
@@ -130,7 +78,9 @@ function typeOrmPostgresUrl(rawUrl: string): {
           entities: [...entities],
           synchronize: false,
           logging: false,
+          poolSize: poolMax,
           extra: {
+            max: poolMax,
             keepAlive: true,
             keepAliveInitialDelayMillis: 10_000,
           },

@@ -28,6 +28,10 @@ import { startAutoSync, stopAutoSync } from "@renderer/lib/sync/auto-sync";
 import { refreshPendingCount } from "@renderer/lib/sync/sync-status";
 import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
 import {
+  clearCashierOpenSaleState,
+} from "@renderer/lib/open-sale";
+import { clearStashedNewSale } from "@renderer/lib/open-sale-stash";
+import {
   registerSessionUserRefresh,
   refreshSessionUserFromApi,
 } from "./session-user-refresh";
@@ -299,6 +303,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }).catch(() => null);
       if (block) throw new Error(block);
     }
+    if (user?.id) {
+      await clearCashierOpenSaleState(user.id);
+    }
+    clearStashedNewSale();
     await desktopLogout();
     writeCachedDeviceCode(null);
     writeCachedUser(null);

@@ -32,7 +32,7 @@ export function HeldSalesPage() {
     try {
       const [res, openSaleId] = await Promise.all([
         loadSales({ status: "DRAFT", pageSize: 100 }),
-        readOpenSaleId(),
+        readOpenSaleId(user?.id),
       ]);
       setItems(
         openSaleId ? res.items.filter((row) => row.id !== openSaleId) : res.items,
