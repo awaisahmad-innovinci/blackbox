@@ -66,7 +66,16 @@ import { AddSaleItemDialog } from "./AddSaleItemDialog";
 import { AdjustSaleQtyDialog } from "./AdjustSaleQtyDialog";
 import { CollectCashDialog } from "./CollectCashDialog";
 import { allocateHoldNumber, allocateSaleNumber } from "@renderer/lib/document-numbers";
-import { readOpenSaleId, writeOpenSaleId } from "@renderer/lib/open-sale";
+import {
+  clearCashierOpenSaleState,
+  readOpenSaleId,
+  writeOpenSaleId,
+} from "@renderer/lib/open-sale";
+import {
+  clearStashedNewSale,
+  stashOpenSale,
+  takeOpenSaleStash,
+} from "@renderer/lib/open-sale-stash";
 import { useSession } from "@renderer/lib/session/context";
 import { useSalesAccess } from "@renderer/lib/use-sales-access";
 import {
@@ -111,20 +120,6 @@ type PaymentMode = "cash" | "card" | "split";
  * SalePage unmount within a session) because the app uses a non-data HashRouter
  * where `useBlocker` is unavailable. Restored when returning to a fresh sale.
  */
-type StashedNewSale = {
-  customerName: string;
-  warehouseId: string;
-  lines: DraftSaleLine[];
-  payments: DraftPayment[];
-  paymentMode: PaymentMode;
-};
-
-let stashedNewSale: StashedNewSale | null = null;
-
-function clearStashedNewSale(): void {
-  stashedNewSale = null;
-}
-
 const NO_WAREHOUSE_ERROR = "No active warehouse configured";
 const NOT_ON_BILL_ERROR = "This item is not on the current bill.";
 
@@ -261,6 +256,8 @@ export function SalePage() {
   const openSaleIdRef = useRef<string | null>(null);
   const openSaleReadyRef = useRef(false);
   const skipOpenSalePersistRef = useRef(false);
+  const salePostCompletedRef = useRef(false);
+  const prevTillStatusRef = useRef<string | "loading">("loading");
   const openSaleEpochRef = useRef(0);
   const persistOpenSaleRef = useRef<(force?: boolean) => Promise<void>>(
     async () => undefined,
@@ -275,6 +272,7 @@ export function SalePage() {
   // Snapshot of the current bill so it can be stashed on unmount (issue: items
   // lost when switching module mid-sale). Kept current on every render.
   const saleStashRef = useRef<{
+    userId: string | null;
     customerName: string;
     warehouseId: string;
     lines: DraftSaleLine[];
@@ -284,6 +282,7 @@ export function SalePage() {
     saving: boolean;
     holding: boolean;
   }>({
+    userId: null,
     customerName,
     warehouseId,
     lines,
@@ -316,6 +315,7 @@ export function SalePage() {
   }
 
   saleStashRef.current = {
+    userId: user?.id ?? null,
     customerName,
     warehouseId,
     lines,
@@ -326,40 +326,50 @@ export function SalePage() {
     holding,
   };
 
+  useEffect(() => {
+    salePostCompletedRef.current = false;
+  }, []);
+
   // Stash an in-progress fresh sale when leaving the page (switching module),
   // then restore it when a new sale is opened again, so items are not lost.
   useEffect(() => {
     return () => {
+      if (skipOpenSalePersistRef.current || salePostCompletedRef.current) {
+        return;
+      }
       const snapshot = saleStashRef.current;
       if (
+        snapshot.userId &&
         !snapshot.editingDraftId &&
         !snapshot.saving &&
         !snapshot.holding &&
         snapshot.lines.length > 0
       ) {
-        stashedNewSale = {
+        stashOpenSale({
+          userId: snapshot.userId,
           customerName: snapshot.customerName,
           warehouseId: snapshot.warehouseId,
           lines: snapshot.lines,
           payments: snapshot.payments,
           paymentMode: snapshot.paymentMode,
-        };
+        });
       }
     };
   }, []);
 
   useEffect(() => {
     if (routeDraftId) return;
-    const stashed = stashedNewSale;
-    if (!stashed || stashed.lines.length === 0) return;
-    stashedNewSale = null;
-    setLines(stashed.lines);
-    setPayments(stashed.payments);
-    setPaymentMode(stashed.paymentMode);
+    const stashed = takeOpenSaleStash(user?.id);
+    if (!stashed || (stashed.lines as DraftSaleLine[]).length === 0) {
+      return;
+    }
+    setLines(stashed.lines as DraftSaleLine[]);
+    setPayments(stashed.payments as DraftPayment[]);
+    setPaymentMode(stashed.paymentMode as PaymentMode);
     setCustomerName(stashed.customerName);
     if (stashed.customerName.trim()) setShowCustomerField(true);
     if (stashed.warehouseId) setWarehouseId(stashed.warehouseId);
-  }, [routeDraftId]);
+  }, [routeDraftId, user?.id]);
 
   useEffect(() => {
     if (!canWrite) navigate("/", { replace: true });
@@ -368,12 +378,71 @@ export function SalePage() {
   useEffect(() => {
     if (!user?.id || canManageTill) {
       setTillSession(null);
+      prevTillStatusRef.current = "loading";
       return;
     }
     void loadCurrentTill(user.id)
       .then(setTillSession)
       .catch(() => undefined);
   }, [user?.id, canManageTill, location.pathname]);
+
+  function clearOpenBillBecauseTillClosed(): void {
+    if (!user?.id) return;
+    openSaleEpochRef.current += 1;
+    skipOpenSalePersistRef.current = true;
+    resetForNewSale();
+    clearStashedNewSale();
+    openSaleIdRef.current = null;
+    setOpenSaleId(null);
+    holdNumberRef.current = null;
+    void clearCashierOpenSaleState(user.id)
+      .catch(() => undefined)
+      .finally(() => {
+        skipOpenSalePersistRef.current = false;
+      });
+  }
+
+  useEffect(() => {
+    if (canManageTill || !user?.id || saving || holding || loadingDraft) {
+      return;
+    }
+
+    const status = tillSession?.status ?? null;
+    const prev = prevTillStatusRef.current;
+    const hasOpenBill = lines.length > 0 || openSaleIdRef.current !== null;
+
+    if (prev === "loading") {
+      prevTillStatusRef.current = status === "OPEN" ? "OPEN" : (status ?? "none");
+      if (status !== "OPEN" && hasOpenBill) {
+        clearOpenBillBecauseTillClosed();
+      }
+      return;
+    }
+
+    if (status === "OPEN") {
+      prevTillStatusRef.current = "OPEN";
+      return;
+    }
+
+    if (prev === "OPEN") {
+      prevTillStatusRef.current = status ?? "none";
+      clearOpenBillBecauseTillClosed();
+      return;
+    }
+
+    if (status !== null) {
+      prevTillStatusRef.current = status;
+    }
+  }, [
+    tillSession,
+    tillSession?.status,
+    canManageTill,
+    user?.id,
+    saving,
+    holding,
+    loadingDraft,
+    lines.length,
+  ]);
 
   const tillBlocked =
     !canManageTill && !loadingDraft && tillSession?.status !== "OPEN";
@@ -468,28 +537,36 @@ export function SalePage() {
         if (shouldFlush) await persistOpenSaleRef.current(true);
         if (cancelled) return;
 
-        const draftId = routeDraftId ?? (await readOpenSaleId());
+        const draftId = routeDraftId ?? (await readOpenSaleId(user?.id));
         if (cancelled) return;
         if (!draftId) return;
 
         const detail = await loadSale(draftId);
         if (cancelled) return;
         if (detail.status !== "DRAFT") {
-          if (!routeDraftId) await writeOpenSaleId(null);
+          if (!routeDraftId) await writeOpenSaleId(user?.id, null);
           if (routeDraftId) navigate(`/sales/${detail.id}`, { replace: true });
+          return;
+        }
+        if (
+          user?.id &&
+          detail.postedBy &&
+          detail.postedBy !== user.id
+        ) {
+          if (!routeDraftId) await writeOpenSaleId(user.id, null);
           return;
         }
 
         openSaleIdRef.current = detail.id;
         setOpenSaleId(detail.id);
-        await writeOpenSaleId(detail.id);
+        await writeOpenSaleId(user?.id, detail.id);
         await hydrateDraft(detail);
       } catch (err: unknown) {
         if (cancelled) return;
         if (routeDraftId) {
           setError(getApiErrorMessage(err, "Held bill not found"));
         } else {
-          await writeOpenSaleId(null);
+          await writeOpenSaleId(user?.id, null);
         }
       } finally {
         if (!cancelled) {
@@ -504,7 +581,7 @@ export function SalePage() {
     return () => {
       cancelled = true;
     };
-  }, [routeDraftId, navigate]);
+  }, [routeDraftId, navigate, user?.id]);
 
   const billTotals = useMemo(
     () =>
@@ -787,7 +864,7 @@ export function SalePage() {
       openSaleIdRef.current = null;
       setOpenSaleId(null);
       holdNumberRef.current = null;
-      await writeOpenSaleId(null);
+      await writeOpenSaleId(user?.id, null);
       if (openSaleEpochRef.current !== clearEpoch) return;
       try {
         await window.blackbox?.localDb?.deleteSaleDraft?.(id);
@@ -811,7 +888,7 @@ export function SalePage() {
     });
     await window.blackbox?.localDb?.upsertSaleDraft?.(detail);
     if (!stillCurrent() || openSaleIdRef.current !== id) return;
-    await writeOpenSaleId(id);
+    await writeOpenSaleId(user?.id, id);
   };
 
   useEffect(() => {
@@ -1424,7 +1501,7 @@ export function SalePage() {
         openSaleIdRef.current = null;
         setOpenSaleId(null);
         holdNumberRef.current = null;
-        await writeOpenSaleId(null);
+        await writeOpenSaleId(user?.id, null);
       }
       bumpDataVersion();
       resetForNewSale();
@@ -1712,7 +1789,7 @@ export function SalePage() {
         }
         openSaleIdRef.current = null;
         setOpenSaleId(null);
-        await writeOpenSaleId(null);
+        await writeOpenSaleId(user?.id, null);
         if (openIdAtPost && openIdAtPost !== localId) {
           try {
             await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
@@ -1744,6 +1821,8 @@ export function SalePage() {
           );
         }
         clearStashedNewSale();
+        salePostCompletedRef.current = true;
+        resetForNewSale();
         navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
         void syncNow();
         return;
@@ -1803,7 +1882,7 @@ export function SalePage() {
       }
       openSaleIdRef.current = null;
       setOpenSaleId(null);
-      await writeOpenSaleId(null);
+      await writeOpenSaleId(user?.id, null);
       if (openIdAtPost && openIdAtPost !== editingDraftId) {
         try {
           await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
@@ -1818,10 +1897,13 @@ export function SalePage() {
           : detail;
       bumpDataVersion();
       clearStashedNewSale();
+      salePostCompletedRef.current = true;
+      resetForNewSale();
       navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
       void syncNow();
     } catch (err: unknown) {
       skipOpenSalePersistRef.current = false;
+      salePostCompletedRef.current = false;
       setError(getApiErrorMessage(err, "Failed to post sale"));
     } finally {
       setSaving(false);
@@ -2127,6 +2209,14 @@ export function SalePage() {
               onClick={() => void onHoldBill()}
             >
               {holding ? "Holding…" : "Hold (F6)"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/sales/held")}
+            >
+              Held bills (F7)
             </Button>
             <Button
               type="button"

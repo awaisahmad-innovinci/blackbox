@@ -13,6 +13,7 @@ import {
   type PlatformTenantSummary,
 } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
+import { BrandLogo } from "@/components/brand-logo";
 import {
   Card,
   CardContent,
@@ -332,6 +333,7 @@ export function TenantManagement() {
       <div className="bb-auth-canvas flex min-h-screen items-center justify-center px-6">
         <Card className="w-full max-w-md">
           <CardHeader>
+            <BrandLogo />
             <CardTitle className="font-display text-xl">
               Tenant management
             </CardTitle>

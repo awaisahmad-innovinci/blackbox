@@ -17,7 +17,7 @@ import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
   goodsReceiptGrandTotal,
-  goodsReceiptLineTotal,
+  goodsReceiptLineTotalForDisplay,
   landedUnitByQuantity,
   poOrderUnitLabel,
   roundMoney4,
@@ -50,6 +50,7 @@ import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-w
 import { loadPendingVendorReturns, loadPurchaseOrder, loadReceivingDraft, loadVendorReturn } from "@renderer/lib/local-db/entity-source";
 import { allocateReceiptNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
+import { canRecordVendorPayment } from "@renderer/lib/sales-access";
 import { UpdateVendorSkuPriceDialog } from "./UpdateVendorSkuPriceDialog";
 
 type DraftLine = ReceivingLineDraft & {
@@ -65,14 +66,16 @@ type DraftLine = ReceivingLineDraft & {
 };
 
 function lineTaxTotal(line: DraftLine): number {
-  return goodsReceiptLineTotal(
-    receivePurchaseQty(line),
-    line.receivingUnitCost,
-    line.discountPercent,
-    line.saleTax,
-    line.advTax,
-    line.gst,
-  );
+  return goodsReceiptLineTotalForDisplay({
+    displayQuantity: line.receiveQuantity,
+    receivingUnitCost: line.receivingUnitCost,
+    unitsPerPurchaseUnit: line.unitsPerPurchaseUnit,
+    orderUnit: line.orderUnit,
+    discountPercent: line.discountPercent,
+    saleTax: line.saleTax,
+    advTax: line.advTax,
+    gst: line.gst,
+  });
 }
 
 function costChanged(line: DraftLine): boolean {
@@ -305,6 +308,7 @@ export function ReceivePurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useSession();
+  const canRecordPayment = canRecordVendorPayment(user?.permissions ?? []);
 
   const [header, setHeader] = useState<Omit<ReceivingDraft, "items"> | null>(
     null,
@@ -496,15 +500,21 @@ export function ReceivePurchaseOrderPage() {
       returnCredit,
     ],
   );
-  const paidDisplay = paidTouched ? paidInput : String(grandTotal);
+  const paidDisplay = canRecordPayment
+    ? paidTouched
+      ? paidInput
+      : String(grandTotal)
+    : "0";
   const amountPaid = useMemo(() => {
+    if (!canRecordPayment) return 0;
     const n = Number(paidDisplay);
     return Number.isFinite(n) ? roundMoney4(n) : Number.NaN;
-  }, [paidDisplay]);
+  }, [canRecordPayment, paidDisplay]);
   const receiptCredit = useMemo(() => {
+    if (!canRecordPayment) return roundMoney4(grandTotal);
     if (!Number.isFinite(amountPaid)) return 0;
     return roundMoney4(Math.max(0, grandTotal - amountPaid));
-  }, [amountPaid, grandTotal]);
+  }, [amountPaid, canRecordPayment, grandTotal]);
   const returnAdjustments = useMemo(
     () => buildReturnAdjustments(pendingReturns, returnSettlements),
     [pendingReturns, returnSettlements],
@@ -577,9 +587,15 @@ export function ReceivePurchaseOrderPage() {
       setError("You cannot receive with 0 quantity.");
       return false;
     }
-    if (!Number.isFinite(amountPaid) || amountPaid < 0 || amountPaid > grandTotal) {
-      setError("Paid amount must be between 0 and the grand total");
-      return false;
+    if (canRecordPayment) {
+      if (
+        !Number.isFinite(amountPaid) ||
+        amountPaid < 0 ||
+        amountPaid > grandTotal
+      ) {
+        setError("Paid amount must be between 0 and the grand total");
+        return false;
+      }
     }
     return true;
   }
@@ -823,6 +839,7 @@ export function ReceivePurchaseOrderPage() {
         items: lines.map((l) => ({
           purchaseOrderItemId: l.purchaseOrderItemId,
           receivedQuantity: receivePurchaseQty(l),
+          displayReceiveQuantity: l.receiveQuantity,
           bonusQuantity: l.bonusQuantity,
           receivingUnitCost: l.receivingUnitCost,
           discountPercent: l.discountPercent,
@@ -1309,20 +1326,27 @@ export function ReceivePurchaseOrderPage() {
           <span>Grand total</span>
           <span className="tabular-nums">{formatMoney(grandTotal)}</span>
         </div>
-        <div className="flex items-center justify-between gap-6">
-          <Label htmlFor="amount-paid">Paid</Label>
-          <Input
-            id="amount-paid"
-            className="h-8 w-28"
-            inputMode="decimal"
-            value={paidDisplay}
-            onFocus={(e) => e.currentTarget.select()}
-            onChange={(e) => {
-              setPaidTouched(true);
-              setPaidInput(e.target.value);
-            }}
-          />
-        </div>
+        {canRecordPayment ? (
+          <div className="flex items-center justify-between gap-6">
+            <Label htmlFor="amount-paid">Paid</Label>
+            <Input
+              id="amount-paid"
+              className="h-8 w-28"
+              inputMode="decimal"
+              value={paidDisplay}
+              onFocus={(e) => e.currentTarget.select()}
+              onChange={(e) => {
+                setPaidTouched(true);
+                setPaidInput(e.target.value);
+              }}
+            />
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            No payment on receive — the full amount is added to vendor credit. An
+            owner or manager can record payment later from Vendor payments.
+          </p>
+        )}
         {header?.vendorId ? (
           <div className="flex justify-between gap-6">
             <span className="text-muted-foreground">Credit for this vendor</span>
@@ -1397,8 +1421,19 @@ export function ReceivePurchaseOrderPage() {
               </p>
               <p>Return credit: {formatMoney(returnCredit)}</p>
               <p>Total: {formatMoney(grandTotal)}</p>
-              <p>Paid: {Number.isFinite(amountPaid) ? formatMoney(amountPaid) : "—"}</p>
-              <p>Vendor credit: {formatMoney(receiptCredit)}</p>
+              {canRecordPayment ? (
+                <p>
+                  Paid:{" "}
+                  {Number.isFinite(amountPaid) ? formatMoney(amountPaid) : "—"}
+                </p>
+              ) : (
+                <p>
+                  Vendor credit (full amount): {formatMoney(receiptCredit)}
+                </p>
+              )}
+              {canRecordPayment ? (
+                <p>Vendor credit: {formatMoney(receiptCredit)}</p>
+              ) : null}
             </>
           ) : null
         }

@@ -32,6 +32,8 @@ import { OpenTillDialog } from "@renderer/features/sales/OpenTillDialog";
 import { PosCardTerminalSettingsDialog } from "@renderer/features/sales/PosCardTerminalSettingsDialog";
 import { PosPrinterSettingsDialog } from "@renderer/features/sales/PosPrinterSettingsDialog";
 import { ReopenTillDialog } from "@renderer/features/sales/ReopenTillDialog";
+import { clearCashierOpenSaleState } from "@renderer/lib/open-sale";
+import { clearStashedNewSale } from "@renderer/lib/open-sale-stash";
 import {
   approveTill,
   closeTill,
@@ -302,6 +304,8 @@ export function TillPage() {
         userId: user.id,
         userName: user.fullName?.trim() || user.username,
       });
+      await clearCashierOpenSaleState(user.id);
+      clearStashedNewSale();
       setCloseDialogOpen(false);
       await refresh();
     } catch (err: unknown) {

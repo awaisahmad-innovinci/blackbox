@@ -510,6 +510,7 @@ export {
   clampDiscountPercent,
   lineTotalAfterDiscount,
   goodsReceiptLineTotal,
+  goodsReceiptLineTotalForDisplay,
   netUnitAfterDiscounts,
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,

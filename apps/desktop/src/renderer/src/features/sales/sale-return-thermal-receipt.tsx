@@ -36,6 +36,7 @@ export function SaleReturnThermalReceipt({
   const returnDate = formatReceiptDateTime(`${detail.returnDate}T12:00:00`);
   const salePosted = formatReceiptDateTime(sale.postedAt);
   const isPending = detail.status === "PENDING";
+  const isDraft = detail.returnNumber === "DRAFT";
 
   return (
     <article data-thermal-receipt className={THERMAL_RECEIPT_CLASS}>
@@ -43,107 +44,86 @@ export function SaleReturnThermalReceipt({
         businessName={businessName}
         businessAddress={businessAddress}
         businessPhone={businessPhone}
+        ntn={sale.fbrSellerNtn}
       />
 
       <ThermalRule />
 
+      <p className="text-center text-sm font-bold tracking-wide">
+        CUSTOMER RETURN
+      </p>
+
       <section className="space-y-0.5 text-left">
-        <p className="text-center text-sm font-bold">CUSTOMER RETURN</p>
-        {detail.returnNumber === "DRAFT" ? (
-          <p className="text-center text-[11px] font-bold">*** DRAFT — NOT ISSUED ***</p>
+        {isDraft ? (
+          <p className="text-center text-[11px] font-bold">
+            *** DRAFT — NOT ISSUED ***
+          </p>
         ) : isPending ? (
           <p className="text-center text-[11px] font-bold">
             PENDING — present to cashier for refund
           </p>
         ) : null}
         <ThermalMetaRow label="Return #" value={detail.returnNumber} />
-        {detail.returnNumber !== "DRAFT" ? (
-          <ThermalReceiptBarcode value={detail.returnNumber} />
-        ) : null}
         <ThermalMetaRow label="Date" value={returnDate.date} />
         <ThermalMetaRow label="Manager" value={managerName} />
       </section>
 
+      {isDraft ? null : <ThermalReceiptBarcode value={detail.returnNumber} />}
+
       <ThermalRule />
 
       <section className="space-y-0.5 text-left">
-        <p className="text-center text-[11px] font-bold">Original invoice</p>
+        <p className="text-center text-[11px] font-bold tracking-wide">
+          ORIGINAL INVOICE
+        </p>
         <ThermalMetaRow label="Bill #" value={sale.saleNumber} />
         <ThermalMetaRow label="Date" value={salePosted.date} />
-        <ThermalMetaRow label="At" value={salePosted.time} />
-      </section>
-
-      <table className="mt-1 w-full border-collapse text-left text-[11px]">
-        <thead>
-          <tr className="border-b border-solid border-black">
-            <th className="py-0.5 pr-1 text-left font-bold">Item</th>
-            <th className="w-6 py-0.5 text-right font-bold">Qty</th>
-            <th className="w-6 py-0.5 text-right font-bold">Disc</th>
-            <th className="w-5 py-0.5 text-right font-bold">FOC</th>
-            <th className="w-9 py-0.5 text-right font-bold">Price</th>
-            <th className="w-9 py-0.5 text-right font-bold">Total</th>
-          </tr>
-        </thead>
-        <tbody>
+        <ThermalMetaRow label="Time" value={salePosted.time} />
+        <div className="space-y-1 pt-1 text-[11px]">
           {sale.items.map((item) => (
-            <tr key={item.id}>
-              <td className="py-0.5 pr-1 align-top break-words font-bold">
+            <div key={item.id}>
+              <p className="font-bold break-normal">
                 {lineProductLabel(item.productName, item.variantName)}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {item.quantity}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatDiscountPercent(item.discountPercent ?? 0)}%
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatFocQuantity(item.focQuantity ?? 0)}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatMoney(item.unitPrice)}
-              </td>
-              <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                {formatMoney(item.lineTotal)}
-              </td>
-            </tr>
+              </p>
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 break-normal">
+                  {item.quantity} x {formatMoney(item.unitPrice)} Disc{" "}
+                  {formatDiscountPercent(item.discountPercent ?? 0)}% FOC{" "}
+                  {formatFocQuantity(item.focQuantity ?? 0)}
+                </span>
+                <span className="shrink-0 tabular-nums whitespace-nowrap">
+                  {formatMoney(item.lineTotal)}
+                </span>
+              </div>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      </section>
 
       <ThermalTotalsRow
         label="Original gross"
         value={formatMoney(sale.total)}
-        bold
       />
 
       <ThermalRule />
 
-      <section className="space-y-0.5 text-left">
-        <p className="text-center text-[11px] font-bold">Return</p>
-        <table className="w-full border-collapse text-[11px]">
-          <thead>
-            <tr className="border-b border-solid border-black">
-              <th className="py-0.5 pr-1 text-left font-bold">Item</th>
-              <th className="w-8 py-0.5 text-right font-bold">Qty</th>
-              <th className="w-10 py-0.5 text-right font-bold">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {detail.items.map((item) => (
-              <tr key={item.id}>
-                <td className="py-0.5 pr-1 align-top break-words font-bold">
-                  {lineProductLabel(item.productName, item.variantName)}
-                </td>
-                <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                  {item.quantity}
-                </td>
-                <td className="py-0.5 text-right tabular-nums align-top font-semibold">
-                  {formatMoney(item.lineTotal)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <section className="space-y-1 text-left">
+        <p className="text-center text-[11px] font-bold tracking-wide">
+          RETURNED ITEMS
+        </p>
+        {detail.items.map((item) => (
+          <div key={item.id} className="text-[11px]">
+            <p className="font-bold break-normal">
+              {lineProductLabel(item.productName, item.variantName)}
+            </p>
+            <div className="flex items-start justify-between gap-2">
+              <span>Qty {item.quantity}</span>
+              <span className="shrink-0 tabular-nums whitespace-nowrap">
+                {formatMoney(item.lineTotal)}
+              </span>
+            </div>
+          </div>
+        ))}
       </section>
 
       <ThermalRule />
@@ -166,7 +146,7 @@ export function SaleReturnThermalReceipt({
           />
         ) : null}
         <ThermalTotalsRow
-          label="Refund total"
+          label="REFUND TOTAL"
           value={formatMoney(detail.refundTotal)}
           bold
         />
@@ -174,12 +154,31 @@ export function SaleReturnThermalReceipt({
           label="Method"
           value={paymentMethodLabel(detail.refundMethod)}
         />
-        <p className="pt-0.5 text-center text-[10px]">
-          {isPending
-            ? "Cashier will refund at till — present this voucher"
-            : "Refund completed"}
-        </p>
       </section>
+
+      <ThermalRule />
+
+      {isPending ? (
+        <p className="text-center text-[10px] font-bold">
+          Cashier will refund at till — present this voucher
+        </p>
+      ) : isDraft ? null : (
+        <p className="text-center text-[11px] font-bold">
+          ** REFUND COMPLETED **
+        </p>
+      )}
+
+      <ThermalRule />
+
+      <section className="text-left text-[11px]">
+        <p>Customer signature</p>
+        <div className="mt-8 border-t border-dashed border-black" />
+      </section>
+
+      <footer className="pt-2 text-center text-[9px] leading-tight font-semibold">
+        <p>Software by Innovinci Technologies ·</p>
+        <p>www.innovinci.com</p>
+      </footer>
     </article>
   );
 }

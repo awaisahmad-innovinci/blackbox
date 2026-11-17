@@ -400,6 +400,9 @@ export interface ManagerDashboardSummary {
   cardPayments: number;
   tillCashCollectedAmount: number;
   customerReturnCount: number;
+  /** Completed refunds today, all cashiers (business calendar day). */
+  refundCount: number;
+  refundTotal: number;
   /** Signed-in manager's drawer after floats, collections, till floats, expenses, and handovers. */
   drawerBalance: number;
   /** Owner sees every manager. A manager sees only their own row. */

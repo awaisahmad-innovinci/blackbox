@@ -16,6 +16,7 @@ import {
 } from "@renderer/lib/sync/catalog-sync";
 import { LAST_FULL_PULL_AT_KEY } from "@renderer/lib/local-db/pull";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
+import { BrandLogo } from "@renderer/components/brand-logo";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { NavDropdownMenuItem } from "@renderer/components/nav-dropdown-menu-item";
 import { ImportMasterDataDialog } from "@renderer/features/dashboard/ImportMasterDataDialog";
@@ -194,7 +195,10 @@ export function AppShell() {
     return (
       <div className="bg-background text-foreground flex min-h-screen flex-col">
         <header className="border-border flex items-center justify-between border-b px-8 py-4">
-          <span className="text-sm font-semibold">Blackbox</span>
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <BrandLogo />
+            Blackbox
+          </span>
           <button
             type="button"
             className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-3 py-1.5 text-sm font-medium"
@@ -229,7 +233,11 @@ export function AppShell() {
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <header className="border-border/80 bg-card/40 sticky top-0 z-10 border-b backdrop-blur-md">
         <div className="mx-auto flex min-h-14 w-full max-w-none items-center gap-6 px-8 py-2 lg:px-10">
-          <Link to="/" className="text-lg font-semibold tracking-tight">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-lg font-semibold tracking-tight"
+          >
+            <BrandLogo />
             Blackbox
           </Link>
           <nav

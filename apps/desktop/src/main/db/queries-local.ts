@@ -789,10 +789,7 @@ export function getManagerDashboardSummaryLocal(
 ): ManagerDashboardSummary {
   const db = getLocalDb();
   const tenantId = DEMO_STORE_TENANT_ID;
-  const todayRow = db
-    .prepare(`select date('now', 'localtime') as d`)
-    .get() as { d: string };
-  const today = todayRow.d;
+  const today = businessToday();
 
   const tillRow = db
     .prepare(
@@ -854,11 +851,23 @@ export function getManagerDashboardSummaryLocal(
 
   const salesTotals = todaySalesTotalsLocal(db, tenantId);
 
+  const refundRow = db
+    .prepare(
+      `select count(*) as cnt, coalesce(sum(refund_total), 0) as amount
+       from sale_returns
+       where tenant_id = @tenantId
+         and status = 'COMPLETED'
+         and return_date = @today`,
+    )
+    .get({ tenantId, today }) as { cnt: number; amount: number };
+
   return {
     date: today,
     ...salesTotals,
     tillCashCollectedAmount,
     customerReturnCount: Number(returnCountRow.cnt),
+    refundCount: Number(refundRow.cnt),
+    refundTotal: roundMoney(Number(refundRow.amount)),
     drawerBalance: own?.balance ?? 0,
     drawers,
     cashSubmittedToday,

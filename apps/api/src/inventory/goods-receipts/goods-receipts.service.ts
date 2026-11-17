@@ -19,6 +19,7 @@ import {
   goodsReceiptCostCredits,
   goodsReceiptGrandTotal,
   goodsReceiptLineTotal,
+  goodsReceiptLineTotalForDisplay,
   landedUnitByQuantity,
   roundMoney4,
   weightedAvgUnitCost,
@@ -360,14 +361,27 @@ export class GoodsReceiptsService {
         }
 
         const unitsPer = toNum(poLine.unitsPerPurchaseUnit) || 1;
-        const lineTotal = goodsReceiptLineTotal(
-          item.receivedQuantity,
-          item.receivingUnitCost,
-          discountPercent,
-          lineSaleTax,
-          lineAdvTax,
-          lineGst,
-        );
+        const orderUnit = poLine.orderUnit === "pc" ? "pc" : "box";
+        const lineTotal =
+          item.displayReceiveQuantity != null
+            ? goodsReceiptLineTotalForDisplay({
+                displayQuantity: item.displayReceiveQuantity,
+                receivingUnitCost: item.receivingUnitCost,
+                unitsPerPurchaseUnit: unitsPer,
+                orderUnit,
+                discountPercent,
+                saleTax: lineSaleTax,
+                advTax: lineAdvTax,
+                gst: lineGst,
+              })
+            : goodsReceiptLineTotal(
+                item.receivedQuantity,
+                item.receivingUnitCost,
+                discountPercent,
+                lineSaleTax,
+                lineAdvTax,
+                lineGst,
+              );
         subtotal = round4(subtotal + lineTotal);
         const billedDelta = round4(item.receivedQuantity * unitsPer);
         const stockDelta = round4(

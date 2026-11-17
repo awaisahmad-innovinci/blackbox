@@ -29,6 +29,7 @@ import {
 } from "@blackbox/ui/sheet";
 import { cn } from "@blackbox/ui/lib/utils";
 import { useAuth } from "@/components/auth-provider";
+import { BrandLogo } from "@/components/brand-logo";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getCurrentTenant } from "@/lib/admin-api";
 
@@ -126,12 +127,7 @@ function NavItems({
 function BrandMark() {
   return (
     <div className="flex items-center gap-2.5 px-2">
-      <div
-        className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg text-xs font-bold tracking-tight"
-        aria-hidden
-      >
-        Bx
-      </div>
+      <BrandLogo />
       <div className="min-w-0">
         <p className="font-display truncate text-base font-semibold tracking-tight">
           Blackbox

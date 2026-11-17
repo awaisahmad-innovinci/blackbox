@@ -347,7 +347,7 @@ function OwnerOverview({
     {
       label: "Refunds",
       value: money(overview.refundTotal),
-      hint: `${overview.refundCount} completed ${overview.refundCount === 1 ? "return" : "returns"}`,
+      hint: `${overview.refundCount} completed ${overview.refundCount === 1 ? "refund" : "refunds"} today, all cashiers`,
     },
   ];
   const inventoryCards = [

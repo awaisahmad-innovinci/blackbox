@@ -27,7 +27,10 @@ import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-w
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { syncNow } from "@renderer/lib/sync/sync-status";
 import { useConfirm } from "@renderer/components/confirm-provider";
-import { canAccessVendorsModule } from "@renderer/lib/sales-access";
+import {
+  canAccessVendorsModule,
+  canRecordVendorPayment,
+} from "@renderer/lib/sales-access";
 import { useSession } from "@renderer/lib/session/context";
 import { AddProductDialog } from "@renderer/features/products/AddProductDialog";
 import { AddProductSkuDialog } from "@renderer/features/products/AddProductSkuDialog";
@@ -67,7 +70,7 @@ export function VendorProfilePage() {
   const permissions = user?.permissions ?? [];
   const canRecordPayment =
     canAccessVendorsModule(permissions) &&
-    (permissions.includes("web.access") || permissions.includes("till.manage"));
+    canRecordVendorPayment(permissions);
   const [vendor, setVendor] = useState<VendorDetail | null>(seeded ?? null);
   const [ledger, setLedger] = useState<VendorLedger | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
