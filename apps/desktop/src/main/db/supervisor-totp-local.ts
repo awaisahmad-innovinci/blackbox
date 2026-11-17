@@ -57,13 +57,13 @@ export function getSupervisorTotpSecretsLocal(): SupervisorTotpRow[] {
     userId: string;
     secretBase32: string;
     displayName: string;
-    isManager: number;
+    roleKey: string;
   }>;
   return rows.map((row) => ({
     userId: row.userId,
     secretBase32: row.secretBase32,
     displayName: row.displayName,
-    isManager: row.isManager === 1,
+    roleKey: row.roleKey,
   }));
 }
 

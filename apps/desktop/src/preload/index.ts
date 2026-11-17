@@ -323,8 +323,6 @@ contextBridge.exposeInMainWorld("blackbox", {
     closeTill: (input: {
       userId: string;
       userName: string;
-      supervisorUserId?: string;
-      supervisorName?: string;
     }) =>
       ipcRenderer.invoke("localDb:closeTill", input) as Promise<TillSessionDetail>,
     reopenTill: (input: {

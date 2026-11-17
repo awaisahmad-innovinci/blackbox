@@ -297,8 +297,6 @@ declare global {
         closeTill: (input: {
           userId: string;
           userName: string;
-          supervisorUserId?: string;
-          supervisorName?: string;
         }) => Promise<TillSessionDetail>;
         reopenTill: (input: {
           id: string;

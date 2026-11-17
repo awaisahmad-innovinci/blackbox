@@ -173,7 +173,7 @@ export function TillPage() {
     }
     setFundError(null);
     // Only a Manager authentication code may open a till.
-    const totp = await promptSupervisorTotp({ managerOnly: true });
+    const totp = await promptSupervisorTotp({ audience: "manager" });
     if (!totp.approved) return;
     setBusy(true);
     try {
@@ -292,17 +292,15 @@ export function TillPage() {
   }
 
   async function onCloseTill(): Promise<void> {
-    if (!user) return;
+    if (!user || !session) return;
+    const balanceError = validateTillCanCloseBalance(session.currentCashBalance);
+    if (balanceError) return;
     setError(null);
-    const totp = await promptSupervisorTotp({ managerOnly: true });
-    if (!totp.approved) return;
     setBusy(true);
     try {
       await closeTill({
         userId: user.id,
         userName: user.fullName?.trim() || user.username,
-        supervisorUserId: totp.supervisorUserId,
-        supervisorName: totp.supervisorDisplayName,
       });
       setCloseDialogOpen(false);
       await refresh();
@@ -317,6 +315,10 @@ export function TillPage() {
     session && session.maxCashLimit > 0
       ? Math.min(100, (session.currentCashBalance / session.maxCashLimit) * 100)
       : 0;
+
+  const closeBalanceError = session
+    ? validateTillCanCloseBalance(session.currentCashBalance)
+    : null;
 
   async function onOpenDrawer(): Promise<void> {
     setOpeningDrawer(true);
@@ -648,8 +650,7 @@ export function TillPage() {
           </DialogHeader>
           <p className="text-muted-foreground text-sm">
             Close your till for this shift? You will not be able to post sales
-            until a manager reopens your till. A manager must enter their
-            authentication code to close.
+            until a manager reopens your till.
           </p>
           {session ? (
             <>
@@ -677,7 +678,7 @@ export function TillPage() {
               Cancel
             </Button>
             <Button
-              disabled={busy}
+              disabled={busy || !!closeBalanceError}
               onClick={() => void onCloseTill()}
             >
               {busy ? "Closing…" : "Close till"}

@@ -447,7 +447,7 @@ export class AuthService {
       .andWhere(
         "(LOWER(u.email) = :email OR LOWER(u.username) = LOWER(:username))",
         {
-          email,
+          email: identifierLower,
           username,
         },
       )

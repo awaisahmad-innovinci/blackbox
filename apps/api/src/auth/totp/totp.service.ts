@@ -197,9 +197,6 @@ export class TotpService {
     });
     if (supervisorRoles.length === 0) return [];
 
-    const managerRoleIds = new Set(
-      supervisorRoles.filter((role) => role.key === "MANAGER").map((role) => role.id),
-    );
     const roleIds = supervisorRoles.map((r) => r.id);
     const managerRoleIds = new Set(
       supervisorRoles.filter((r) => r.key === "MANAGER").map((r) => r.id),

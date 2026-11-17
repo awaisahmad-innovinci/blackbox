@@ -36,7 +36,7 @@ export function verifySupervisorTotpCode(
   const allSecrets = getSupervisorTotpSecretsLocal();
   // Till open/close may only be authorised by a Manager — never an Owner.
   const secrets = options?.managerOnly
-    ? allSecrets.filter((row) => row.isManager)
+    ? allSecrets.filter((row) => row.roleKey === "MANAGER")
     : allSecrets;
   if (secrets.length === 0) {
     return {

@@ -113,7 +113,7 @@ export function SupervisorTotpProvider({ children }: { children: ReactNode }) {
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>
-                {pending?.managerOnly
+                {pending.audience === "manager"
                   ? "Manager authentication code"
                   : "Supervisor authentication code"}
               </DialogTitle>
