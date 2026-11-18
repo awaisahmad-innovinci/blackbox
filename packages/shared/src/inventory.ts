@@ -522,6 +522,48 @@ export function purchaseUnitAllowsPackSize(input: {
   return isBoxUnit(input);
 }
 
+/** Minimum pieces per box when purchase unit is Box. */
+export const MIN_UNITS_PER_BOX_PURCHASE_UNIT = 2;
+
+export function unitsPerPurchaseUnitMinimum(purchaseUnit: {
+  name?: string | null;
+  abbreviation?: string | null;
+}): number {
+  return purchaseUnitAllowsPackSize(purchaseUnit)
+    ? MIN_UNITS_PER_BOX_PURCHASE_UNIT
+    : 1;
+}
+
+export function defaultUnitsPerPurchaseUnit(purchaseUnit: {
+  name?: string | null;
+  abbreviation?: string | null;
+}): number {
+  return unitsPerPurchaseUnitMinimum(purchaseUnit);
+}
+
+export function validateUnitsPerPurchaseUnit(
+  raw: number,
+  purchaseUnit: { name?: string | null; abbreviation?: string | null },
+  options?: { valueLabel?: string },
+): string | null {
+  const label = options?.valueLabel ?? "Units / purchase unit";
+  const min = unitsPerPurchaseUnitMinimum(purchaseUnit);
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    if (min > 1) {
+      return `${label} must be at least ${min} when purchase unit is Box`;
+    }
+    return `${label} must be greater than zero`;
+  }
+  if (n < min) {
+    if (min > 1) {
+      return `${label} must be at least ${min} when purchase unit is Box`;
+    }
+    return `${label} must be at least ${min}`;
+  }
+  return null;
+}
+
 export function poAllowsOrderUnitChoice(input: {
   purchaseUnitName?: string | null;
   purchaseUnitAbbreviation?: string | null;
@@ -538,7 +580,7 @@ export function normalizeUnitsPerPurchaseUnit(
 ): number {
   if (!purchaseUnitAllowsPackSize(purchaseUnit)) return 1;
   const n = Number(unitsPer);
-  if (!Number.isFinite(n) || n <= 0) return 1;
+  if (!Number.isFinite(n) || n <= 0) return MIN_UNITS_PER_BOX_PURCHASE_UNIT;
   return n;
 }
 

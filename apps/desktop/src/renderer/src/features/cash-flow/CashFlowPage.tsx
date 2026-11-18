@@ -451,7 +451,7 @@ export function CashFlowPage() {
             <p className="text-muted-foreground text-sm">No drawer activity yet.</p>
           ) : null}
         </div>
-        {canManageTill && ownBalance > 0 ? (
+        {canManageTill && !seeAll && ownBalance > 0 ? (
           <form
             className="flex flex-wrap items-end gap-2"
             onSubmit={(event) => void onSubmitCash(event)}
@@ -555,12 +555,12 @@ export function CashFlowPage() {
         <MoneyTable
           loading={loading}
           empty="No collections in this period."
-          columns={["When", "Manager", "Cashier", "Kind", "Amount"]}
+          columns={["When", "Manager", "Cashier", "Status", "Amount"]}
           rows={(report?.collections ?? []).map((row) => [
             when(row.at),
             row.managerName,
             row.cashierName,
-            row.kind === "partial" ? "Partial" : "Full",
+            row.status === "partial" ? "Partial" : "Full",
             money(row.amount),
           ])}
         />
@@ -633,7 +633,7 @@ export function CashFlowPage() {
         <MoneyTable
           loading={loading}
           empty="No expenses in this period."
-          columns={["When", "Manager", "Category", "Note", "Amount"]}
+          columns={["When", "Recorded by", "Category", "Note", "Amount"]}
           rows={(report?.expenses ?? []).map((row) => [
             when(row.at),
             row.managerName,

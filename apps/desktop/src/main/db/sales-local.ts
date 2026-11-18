@@ -298,6 +298,37 @@ export function countDraftSalesLocal(): number {
   return Number(row.cnt);
 }
 
+export function countHeldBillsForCashierLocal(
+  userId: string,
+  excludeSaleId?: string | null,
+): number {
+  const db = getLocalDb();
+  const exclude = excludeSaleId?.trim() ?? "";
+  const row = db
+    .prepare(
+      exclude
+        ? `select count(*) as cnt
+           from sales
+           where tenant_id = @tenantId
+             and status = 'DRAFT'
+             and sync_status = 'local'
+             and posted_by = @userId
+             and id != @excludeSaleId`
+        : `select count(*) as cnt
+           from sales
+           where tenant_id = @tenantId
+             and status = 'DRAFT'
+             and sync_status = 'local'
+             and posted_by = @userId`,
+    )
+    .get({
+      tenantId: DEMO_STORE_TENANT_ID,
+      userId,
+      ...(exclude ? { excludeSaleId: exclude } : {}),
+    }) as { cnt: number };
+  return Number(row.cnt);
+}
+
 export function getDraftSaleReservedQtyLocal(
   warehouseId: string,
   productSkuId: string,

@@ -74,7 +74,7 @@ export function AddProductSupplierDialog({
   const [purchaseUnitId, setPurchaseUnitId] = useState("");
   const [unitsPerPurchaseUnit, setUnitsPerPurchaseUnit] = useState("1");
   const [purchasePrice, setPurchasePrice] = useState("");
-  const [moq, setMoq] = useState("1");
+  const [moq, setMoq] = useState("0");
   const [leadTimeDays, setLeadTimeDays] = useState("0");
   const [isPreferred, setIsPreferred] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +124,7 @@ export function AddProductSupplierDialog({
     setPurchaseUnitId(packaging.purchaseUnitId);
     setUnitsPerPurchaseUnit(packaging.unitsPerPurchaseUnit);
     setPurchasePrice(String(purchasePriceFromSku(sku)));
-    setMoq("1");
+    setMoq("0");
     setLeadTimeDays("0");
     setIsPreferred(false);
     setError(null);

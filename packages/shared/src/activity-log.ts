@@ -1,4 +1,5 @@
 export const ACTIVITY_LOG_EVENT_TYPES = [
+  "sale.held_discarded",
   "sale.line_removed",
   "sale.line_qty_adjusted",
   "sale.foc_posted",
@@ -67,6 +68,7 @@ export type CreateActivityLogRequest = {
 };
 
 export const ACTIVITY_LOG_EVENT_LABELS: Record<ActivityLogEventType, string> = {
+  "sale.held_discarded": "Held bill discarded",
   "sale.line_removed": "Sale line removed",
   "sale.line_qty_adjusted": "Sale line quantity adjusted",
   "sale.foc_posted": "FOC sale posted",

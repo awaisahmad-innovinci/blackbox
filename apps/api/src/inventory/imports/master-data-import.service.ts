@@ -9,6 +9,8 @@ import {
   PAYMENT_TERMS,
   PRODUCT_TYPES,
   UNIT_TYPES,
+  isBoxUnit,
+  MIN_UNITS_PER_BOX_PURCHASE_UNIT,
   normalizeOptionalStoredText,
   normalizeStoredText,
 } from "@blackbox/shared";
@@ -535,6 +537,18 @@ export class MasterDataImportService {
       this.number(row, "sales_target", errors, { optional: true, min: 0 });
       this.number(row, "credit_limit", errors, { optional: true, min: 0 });
     }
+    const importUnitByAbbr = new Map<
+      string,
+      { name: string; abbreviation: string }
+    >();
+    for (const row of files["01_units.csv"]) {
+      const abbreviation = row.values.abbreviation.trim();
+      if (!abbreviation) continue;
+      importUnitByAbbr.set(abbreviation.toLowerCase(), {
+        name: row.values.name.trim(),
+        abbreviation,
+      });
+    }
     for (const row of files["07_product_skus.csv"]) {
       for (const column of [
     "cost_price",
@@ -557,6 +571,29 @@ export class MasterDataImportService {
       this.number(row, "units_per_purchase_unit", errors, {
         min: Number.EPSILON,
       });
+      const purchaseAbbr = row.values.purchase_unit_abbreviation?.trim() ?? "";
+      if (purchaseAbbr) {
+        const purchaseUnit =
+          importUnitByAbbr.get(purchaseAbbr.toLowerCase()) ?? {
+            name: purchaseAbbr,
+            abbreviation: purchaseAbbr,
+          };
+        if (isBoxUnit(purchaseUnit)) {
+          const unitsPer = Number(row.values.units_per_purchase_unit);
+          if (
+            Number.isFinite(unitsPer) &&
+            unitsPer < MIN_UNITS_PER_BOX_PURCHASE_UNIT
+          ) {
+            errors.push(
+              this.rowError(
+                row,
+                "units_per_purchase_unit",
+                `Must be at least ${MIN_UNITS_PER_BOX_PURCHASE_UNIT} when purchase unit is Box`,
+              ),
+            );
+          }
+        }
+      }
       this.boolean(row, "track_inventory", errors);
       if (row.values.barcode_quantity_multiplier.trim()) {
         this.number(row, "barcode_quantity_multiplier", errors, {

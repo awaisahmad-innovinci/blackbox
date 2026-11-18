@@ -138,7 +138,7 @@ export function listLocalActivityLogs(
 
   return {
     items: rows.map(rowToItem),
-    total: totalRow.count,
+    total: Number(totalRow.count),
     page,
     pageSize,
   };

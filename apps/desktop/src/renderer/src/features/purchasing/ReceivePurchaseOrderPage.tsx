@@ -23,6 +23,8 @@ import {
   roundMoney4,
   toPurchaseQuantity,
   VENDOR_RETURN_REASON_LABELS,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
 } from "@blackbox/shared";
 import { FORM_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
@@ -50,7 +52,7 @@ import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-w
 import { loadPendingVendorReturns, loadPurchaseOrder, loadReceivingDraft, loadVendorReturn } from "@renderer/lib/local-db/entity-source";
 import { allocateReceiptNumber } from "@renderer/lib/document-numbers";
 import { useSession } from "@renderer/lib/session/context";
-import { canRecordVendorPayment } from "@renderer/lib/sales-access";
+import { canPayVendorOnGoodsReceipt } from "@renderer/lib/sales-access";
 import { UpdateVendorSkuPriceDialog } from "./UpdateVendorSkuPriceDialog";
 
 type DraftLine = ReceivingLineDraft & {
@@ -308,7 +310,8 @@ export function ReceivePurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useSession();
-  const canRecordPayment = canRecordVendorPayment(user?.permissions ?? []);
+  const canPayOnReceive = canPayVendorOnGoodsReceipt(user?.permissions ?? []);
+  const [ownerCashBalance, setOwnerCashBalance] = useState(0);
 
   const [header, setHeader] = useState<Omit<ReceivingDraft, "items"> | null>(
     null,
@@ -500,25 +503,35 @@ export function ReceivePurchaseOrderPage() {
       returnCredit,
     ],
   );
-  const paidDisplay = canRecordPayment
+  const paidDisplay = canPayOnReceive
     ? paidTouched
       ? paidInput
       : String(grandTotal)
     : "0";
   const amountPaid = useMemo(() => {
-    if (!canRecordPayment) return 0;
+    if (!canPayOnReceive) return 0;
     const n = Number(paidDisplay);
     return Number.isFinite(n) ? roundMoney4(n) : Number.NaN;
-  }, [canRecordPayment, paidDisplay]);
+  }, [canPayOnReceive, paidDisplay]);
   const receiptCredit = useMemo(() => {
-    if (!canRecordPayment) return roundMoney4(grandTotal);
+    if (!canPayOnReceive) return roundMoney4(grandTotal);
     if (!Number.isFinite(amountPaid)) return 0;
     return roundMoney4(Math.max(0, grandTotal - amountPaid));
-  }, [amountPaid, canRecordPayment, grandTotal]);
+  }, [amountPaid, canPayOnReceive, grandTotal]);
   const returnAdjustments = useMemo(
     () => buildReturnAdjustments(pendingReturns, returnSettlements),
     [pendingReturns, returnSettlements],
   );
+
+  useEffect(() => {
+    if (!canPayOnReceive || !user?.id) {
+      setOwnerCashBalance(0);
+      return;
+    }
+    void window.blackbox?.localDb?.getOwnerCashBalance?.(user.id).then((value) => {
+      setOwnerCashBalance(Number.isFinite(value) ? value : 0);
+    });
+  }, [canPayOnReceive, user?.id, confirmOpen, grandTotal]);
 
   function updateLine(
     purchaseOrderItemId: string,
@@ -587,13 +600,17 @@ export function ReceivePurchaseOrderPage() {
       setError("You cannot receive with 0 quantity.");
       return false;
     }
-    if (canRecordPayment) {
+    if (canPayOnReceive) {
       if (
         !Number.isFinite(amountPaid) ||
         amountPaid < 0 ||
         amountPaid > grandTotal
       ) {
         setError("Paid amount must be between 0 and the grand total");
+        return false;
+      }
+      if (amountPaid > 0 && expenseExceedsDrawer(amountPaid, ownerCashBalance)) {
+        setError(expenseOverDrawerMessage(ownerCashBalance));
         return false;
       }
     }
@@ -606,6 +623,15 @@ export function ReceivePurchaseOrderPage() {
     setSaving(true);
     setError(null);
     try {
+      if (canPayOnReceive && amountPaid > 0 && user?.id) {
+        const available =
+          (await window.blackbox?.localDb?.getOwnerCashBalance?.(user.id)) ?? 0;
+        if (expenseExceedsDrawer(amountPaid, available)) {
+          setError(expenseOverDrawerMessage(available));
+          setSaving(false);
+          return;
+        }
+      }
       if (await isDeviceBound()) {
         const localId = crypto.randomUUID();
         const now = new Date().toISOString();
@@ -709,6 +735,28 @@ export function ReceivePurchaseOrderPage() {
               updatedAt: now,
             },
           });
+          if (canPayOnReceive && user) {
+            const expenseId = crypto.randomUUID();
+            const payerName = user.fullName?.trim() || user.username;
+            await commitLocalChange({
+              entityType: "cash_expense",
+              entityId: expenseId,
+              operation: "UPSERT",
+              payload: {
+                recordedByUserId: user.id,
+                recordedByName: payerName,
+                category: "Vendor payment",
+                amount: amountPaid,
+                note:
+                  `Payment on receipt ${receiptNumber}` +
+                  (header.vendorName ? ` — ${header.vendorName}` : ""),
+                occurredAt: now,
+                ownerCash: true,
+                createdAt: now,
+                updatedAt: now,
+              },
+            });
+          }
         }
         const poPayload = await buildReceivedPurchaseOrderPayload(
           id,
@@ -1326,7 +1374,7 @@ export function ReceivePurchaseOrderPage() {
           <span>Grand total</span>
           <span className="tabular-nums">{formatMoney(grandTotal)}</span>
         </div>
-        {canRecordPayment ? (
+        {canPayOnReceive ? (
           <div className="flex items-center justify-between gap-6">
             <Label htmlFor="amount-paid">Paid</Label>
             <Input
@@ -1341,10 +1389,16 @@ export function ReceivePurchaseOrderPage() {
               }}
             />
           </div>
+        ) : null}
+        {canPayOnReceive ? (
+          <p className="text-muted-foreground text-sm">
+            Cash on hand: Rs {formatMoney(ownerCashBalance)}. Paid cannot exceed
+            your cash on hand or the grand total.
+          </p>
         ) : (
           <p className="text-muted-foreground text-sm">
             No payment on receive — the full amount is added to vendor credit. An
-            owner or manager can record payment later from Vendor payments.
+            owner can record payment on receive or later from Vendor payments.
           </p>
         )}
         {header?.vendorId ? (
@@ -1421,7 +1475,7 @@ export function ReceivePurchaseOrderPage() {
               </p>
               <p>Return credit: {formatMoney(returnCredit)}</p>
               <p>Total: {formatMoney(grandTotal)}</p>
-              {canRecordPayment ? (
+              {canPayOnReceive ? (
                 <p>
                   Paid:{" "}
                   {Number.isFinite(amountPaid) ? formatMoney(amountPaid) : "—"}
@@ -1431,7 +1485,7 @@ export function ReceivePurchaseOrderPage() {
                   Vendor credit (full amount): {formatMoney(receiptCredit)}
                 </p>
               )}
-              {canRecordPayment ? (
+              {canPayOnReceive ? (
                 <p>Vendor credit: {formatMoney(receiptCredit)}</p>
               ) : null}
             </>

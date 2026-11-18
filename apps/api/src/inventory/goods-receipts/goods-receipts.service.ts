@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
   GoodsReceiptDetail,
@@ -17,6 +18,8 @@ import type {
 import {
   goodsReceiptCostCharges,
   goodsReceiptCostCredits,
+  expenseExceedsDrawer,
+  expenseOverDrawerMessage,
   goodsReceiptGrandTotal,
   goodsReceiptLineTotal,
   goodsReceiptLineTotalForDisplay,
@@ -26,9 +29,12 @@ import {
 } from "@blackbox/shared";
 import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
 import { allocateReceiptNumber } from "../common/allocate-document-number";
+import type { TenantContext } from "../../common/tenant-context";
 import { getRequestTenant } from "../../common/request-tenant";
 import { ActivityLogService } from "../../activity-log/activity-log.service";
+import { CashFlowService } from "../../cash-flow/cash-flow.service";
 import {
+  CashExpense,
   GoodsReceipt,
   GoodsReceiptItem,
   InventoryMovement,
@@ -36,6 +42,7 @@ import {
   ProductSku,
   PurchaseOrder,
   PurchaseOrderItem,
+  User,
   Vendor,
   VendorLedgerEntry,
   VendorReturn,
@@ -74,6 +81,7 @@ export class GoodsReceiptsService {
     @InjectRepository(Warehouse)
     private readonly warehouses: Repository<Warehouse>,
     private readonly activityLog: ActivityLogService,
+    private readonly cashFlow: CashFlowService,
   ) {}
 
   async list(query: ListGoodsReceiptsQueryDto): Promise<PaginatedGoodsReceipts> {
@@ -256,10 +264,12 @@ export class GoodsReceiptsService {
   }
 
   async createReceipt(
+    user: TenantContext,
     purchaseOrderId: string,
     dto: CreateGoodsReceiptDto,
   ): Promise<GoodsReceiptDetail> {
     const tenantId = this.fixedTenant.tenantId;
+    const isOwner = user.permissions.includes("web.access");
 
     const posted = await this.dataSource.transaction(async (manager) => {
       const po = await manager.getRepository(PurchaseOrder).findOne({
@@ -467,12 +477,33 @@ export class GoodsReceiptsService {
         shelfRent,
         returnCredit,
       });
-      const amountPaid =
-        dto.amountPaid == null ? total : round4(Number(dto.amountPaid));
+      let amountPaid: number;
+      if (isOwner) {
+        amountPaid =
+          dto.amountPaid == null ? total : round4(Number(dto.amountPaid));
+      } else {
+        const requested =
+          dto.amountPaid == null ? 0 : round4(Number(dto.amountPaid));
+        if (requested > 0) {
+          throw new BadRequestException(
+            "Only an owner can record payment on receive",
+          );
+        }
+        amountPaid = 0;
+      }
       if (amountPaid < 0 || amountPaid > total) {
         throw new BadRequestException(
           "Paid amount must be between 0 and the grand total",
         );
+      }
+      if (amountPaid > 0) {
+        const available = await this.cashFlow.ownerCashBalance(
+          tenantId,
+          user.userId,
+        );
+        if (expenseExceedsDrawer(amountPaid, available)) {
+          throw new BadRequestException(expenseOverDrawerMessage(available));
+        }
       }
 
       const receiptNumber = await allocateReceiptNumber(manager, tenantId);
@@ -527,6 +558,31 @@ export class GoodsReceiptsService {
             goodsReceiptId: receipt.id,
             receiptNumber,
             note: `Payment on receipt ${receiptNumber}`,
+            occurredAt: receivedAt,
+          }),
+        );
+        const payer = await manager.getRepository(User).findOne({
+          where: { id: user.userId, tenantId },
+        });
+        const payerName =
+          payer?.fullName?.trim() || payer?.username || "Owner";
+        const vendor = po.vendorId
+          ? await manager.getRepository(Vendor).findOne({
+              where: { id: po.vendorId, tenantId },
+            })
+          : null;
+        const expenseId = randomUUID();
+        await manager.getRepository(CashExpense).save(
+          manager.getRepository(CashExpense).create({
+            id: expenseId,
+            tenantId,
+            recordedByUserId: user.userId,
+            recordedByName: payerName,
+            category: "Vendor payment",
+            amount: String(amountPaid),
+            note: vendor
+              ? `Payment on receipt ${receiptNumber} — ${vendor.name}`
+              : `Payment on receipt ${receiptNumber}`,
             occurredAt: receivedAt,
           }),
         );

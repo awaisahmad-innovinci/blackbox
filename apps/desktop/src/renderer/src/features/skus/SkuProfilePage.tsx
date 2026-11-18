@@ -43,6 +43,8 @@ import {
   normalizeStoredText,
   purchaseUnitAllowsPackSize,
   normalizeUnitsPerPurchaseUnit,
+  validateUnitsPerPurchaseUnit,
+  MIN_UNITS_PER_BOX_PURCHASE_UNIT,
 } from "@blackbox/shared";
 import {
   marginFromSellingGst,
@@ -205,7 +207,18 @@ export function SkuProfilePage() {
     const unit = units.find((u) => u.id === nextId);
     const allowsPack = unit ? purchaseUnitAllowsPackSize(unit) : false;
     setPurchaseUnitId(nextId);
-    if (!allowsPack) setUnitsPerPurchaseUnit("1");
+    if (!allowsPack) {
+      setUnitsPerPurchaseUnit("1");
+      return;
+    }
+    const n = Number(unitsPerPurchaseUnit);
+    if (
+      !unitsPerPurchaseUnit.trim() ||
+      !Number.isFinite(n) ||
+      n < MIN_UNITS_PER_BOX_PURCHASE_UNIT
+    ) {
+      setUnitsPerPurchaseUnit(String(MIN_UNITS_PER_BOX_PURCHASE_UNIT));
+    }
   }
 
   const unitsPerPurchaseUnitN = normalizeUnitsPerPurchaseUnit(
@@ -219,12 +232,14 @@ export function SkuProfilePage() {
   const saleDiscountPercentN = Number(saleDiscountPercent);
   const baseUnitError = baseUnitId ? null : "Base unit is required";
   const purchaseUnitError = purchaseUnitId ? null : "Purchase unit is required";
-  const unitsPerError =
-    !unitsPerPurchaseUnit.trim() ||
-    Number.isNaN(unitsPerPurchaseUnitN) ||
-    unitsPerPurchaseUnitN <= 0
-      ? "Units / purchase unit must be greater than zero"
-      : null;
+  const unitsPerError = packSizeEditable
+    ? !unitsPerPurchaseUnit.trim()
+      ? "Units / purchase unit is required"
+      : validateUnitsPerPurchaseUnit(
+          Number(unitsPerPurchaseUnit),
+          selectedPurchaseUnit ?? {},
+        )
+    : null;
   const costError =
     !costPrice.trim() || Number.isNaN(costPriceN) || costPriceN < 0
       ? "Cost price is required"
@@ -963,12 +978,19 @@ export function SkuProfilePage() {
             <div className="space-y-1.5">
               <Label>Units / purchase unit *</Label>
               <Input
+                inputMode="decimal"
+                min={packSizeEditable ? MIN_UNITS_PER_BOX_PURCHASE_UNIT : undefined}
                 value={packSizeEditable ? unitsPerPurchaseUnit : "1"}
                 readOnly={!packSizeEditable}
                 disabled={!packSizeEditable}
                 aria-invalid={Boolean(unitsPerError)}
                 onChange={(e) => setUnitsPerPurchaseUnit(e.target.value)}
               />
+              {packSizeEditable ? (
+                <p className="text-muted-foreground text-xs">
+                  At least {MIN_UNITS_PER_BOX_PURCHASE_UNIT} pieces per box.
+                </p>
+              ) : null}
               {!packSizeEditable && purchaseUnitId ? (
                 <p className="text-muted-foreground text-xs">
                   Fixed at 1 when purchase unit is not Box.

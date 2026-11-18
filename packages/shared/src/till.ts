@@ -186,6 +186,26 @@ export function validateTillCanCloseBalance(
   return null;
 }
 
+export function validateTillCanCloseHeldBills(
+  heldBillsCount: number,
+): string | null {
+  if (heldBillsCount > 0) {
+    const noun = heldBillsCount === 1 ? "held bill" : "held bills";
+    return `You have ${heldBillsCount} ${noun}. Resume and post each one, or discard it on Held bills (a manager must approve discard) before closing your till.`;
+  }
+  return null;
+}
+
+export function validateTillCanClose(input: {
+  currentCashBalance: number;
+  heldBillsCount: number;
+}): string | null {
+  return (
+    validateTillCanCloseBalance(input.currentCashBalance) ??
+    validateTillCanCloseHeldBills(input.heldBillsCount)
+  );
+}
+
 export function tillSessionBlocksLogout(
   session: TillSessionDetail | null,
 ): boolean {

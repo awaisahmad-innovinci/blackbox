@@ -51,7 +51,7 @@ export function AddVendorSkuDialog({
   const [selectedSku, setSelectedSku] = useState<ProductSkuDetail | null>(null);
   const [productQuery, setProductQuery] = useState("");
   const [productResults, setProductResults] = useState<ProductListItem[]>([]);
-  const [moq, setMoq] = useState("1");
+  const [moq, setMoq] = useState("0");
   const [leadTimeDays, setLeadTimeDays] = useState("0");
   const [isPreferred, setIsPreferred] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function AddVendorSkuDialog({
     setSelectedSku(null);
     setProductQuery("");
     setProductResults([]);
-    setMoq("1");
+    setMoq("0");
     setLeadTimeDays("0");
     setIsPreferred(false);
     setError(null);

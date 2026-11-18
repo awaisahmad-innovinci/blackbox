@@ -17,10 +17,12 @@ import {
   tillMaxLimit,
   tillOpeningExceedsDrawer,
   tillOpeningExceedsDrawerMessage,
-  validateTillCanCloseBalance,
+  tillWithdrawalKind,
+  validateTillCanClose,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
+import { countHeldBillsForCashierLocal } from "./sales-local";
 import { randomUUID } from "node:crypto";
 import { getLocalDb } from "./index";
 import { getManagerDrawerBalanceLocal } from "./cash-flow-local";
@@ -567,6 +569,7 @@ export function collectCashLocal(input: {
   const db = getLocalDb();
   const now = new Date().toISOString();
   const withdrawalId = randomUUID();
+  const kind = tillWithdrawalKind(withdrawalTotal, row.current_cash_balance);
   db.prepare(
     `
     insert into till_withdrawals (
@@ -593,7 +596,7 @@ export function collectCashLocal(input: {
     note_1000: input.body.note1000,
     note_5000: input.body.note5000,
     withdrawalTotal,
-    kind: "partial",
+    kind,
     createdAt: now,
   });
 
@@ -636,7 +639,7 @@ export function collectCashLocal(input: {
     note1000: input.body.note1000,
     note5000: input.body.note5000,
     withdrawalTotal,
-    kind: "partial",
+    kind,
     createdAt: now,
   });
   return detail;
@@ -669,6 +672,7 @@ export function collectCashByAmountLocal(input: {
   const withdrawnByUserId = input.supervisorUserId ?? input.userId;
   const withdrawnByName = input.collectedByName?.trim() || "Manager";
   const withdrawalId = randomUUID();
+  const kind = tillWithdrawalKind(withdrawalTotal, row.current_cash_balance);
   db.prepare(
     `
     insert into till_withdrawals (
@@ -688,7 +692,7 @@ export function collectCashByAmountLocal(input: {
     withdrawnByUserId,
     withdrawnByName,
     withdrawalTotal,
-    kind: "partial",
+    kind,
     createdAt: now,
   });
 
@@ -731,7 +735,7 @@ export function collectCashByAmountLocal(input: {
     note1000: 0,
     note5000: 0,
     withdrawalTotal,
-    kind: "partial",
+    kind,
     createdAt: now,
   });
   return detail;
@@ -747,9 +751,13 @@ export function closeTillLocal(input: {
     throw new Error("Till must be open to close");
   }
 
-  const balanceError = validateTillCanCloseBalance(row.current_cash_balance);
-  if (balanceError) {
-    throw new Error(balanceError);
+  const heldBillsCount = countHeldBillsForCashierLocal(input.userId);
+  const closeError = validateTillCanClose({
+    currentCashBalance: row.current_cash_balance,
+    heldBillsCount,
+  });
+  if (closeError) {
+    throw new Error(closeError);
   }
 
   const db = getLocalDb();

@@ -14,6 +14,8 @@ import {
   costWithGst,
   purchaseUnitAllowsPackSize,
   normalizeUnitsPerPurchaseUnit,
+  validateUnitsPerPurchaseUnit,
+  MIN_UNITS_PER_BOX_PURCHASE_UNIT,
 } from "@blackbox/shared";
 import { FORM_DIALOG_FIELD_FULL, FORM_DIALOG_GRID } from "@renderer/lib/form-layout";
 import { Button } from "@blackbox/ui/button";
@@ -205,11 +207,17 @@ export function AddProductSkuDialog({
   function onPurchaseUnitChange(purchaseUnitId: string) {
     const unit = units.find((u) => u.id === purchaseUnitId);
     const allowsPack = unit ? purchaseUnitAllowsPackSize(unit) : false;
-    setForm((prev) => ({
-      ...prev,
-      purchaseUnitId,
-      unitsPerPurchaseUnit: allowsPack ? prev.unitsPerPurchaseUnit || "1" : "1",
-    }));
+    setForm((prev) => {
+      let unitsPerPurchaseUnit = "1";
+      if (allowsPack) {
+        const n = Number(prev.unitsPerPurchaseUnit);
+        unitsPerPurchaseUnit =
+          Number.isFinite(n) && n >= MIN_UNITS_PER_BOX_PURCHASE_UNIT
+            ? prev.unitsPerPurchaseUnit
+            : String(MIN_UNITS_PER_BOX_PURCHASE_UNIT);
+      }
+      return { ...prev, purchaseUnitId, unitsPerPurchaseUnit };
+    });
   }
 
   const selectedPurchaseUnit = units.find((u) => u.id === form.purchaseUnitId);
@@ -270,10 +278,16 @@ export function AddProductSkuDialog({
       purchaseUnitId: attempted
         ? requiredSelect(form.purchaseUnitId, "Purchase unit")
         : null,
-      unitsPerPurchaseUnit:
-        form.unitsPerPurchaseUnit.trim() || attempted
-          ? requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit")
-          : null,
+      unitsPerPurchaseUnit: !packSizeEditable
+        ? null
+        : !form.unitsPerPurchaseUnit.trim()
+          ? attempted
+            ? "Units / purchase unit is required"
+            : null
+          : validateUnitsPerPurchaseUnit(
+              Number(form.unitsPerPurchaseUnit),
+              selectedPurchaseUnit ?? {},
+            ),
       costPrice:
         form.costPrice.trim() || attempted
           ? requiredNonNegative(form.costPrice, "Cost price/pc")
@@ -291,7 +305,7 @@ export function AddProductSkuDialog({
             )
           : null,
     }),
-    [form, attempted],
+    [form, attempted, packSizeEditable, selectedPurchaseUnit],
   );
 
   const canSave =
@@ -299,7 +313,11 @@ export function AddProductSkuDialog({
     Boolean(form.sku.trim()) &&
     !requiredSelect(form.baseUnitId, "Base unit") &&
     !requiredSelect(form.purchaseUnitId, "Purchase unit") &&
-    !requiredPositive(form.unitsPerPurchaseUnit, "Units / purchase unit") &&
+    (!packSizeEditable ||
+      !validateUnitsPerPurchaseUnit(
+        Number(form.unitsPerPurchaseUnit),
+        selectedPurchaseUnit ?? {},
+      )) &&
     !requiredNonNegative(form.costPrice, "Cost price/pc") &&
     !optionalGstPercent(form.gstPercent) &&
     !hsCodeError(form.hsCode, true) &&
@@ -314,6 +332,16 @@ export function AddProductSkuDialog({
     if (!canSave) return;
 
     const purchaseUnit = units.find((u) => u.id === form.purchaseUnitId);
+    const unitsPerValidation = packSizeEditable
+      ? validateUnitsPerPurchaseUnit(
+          Number(form.unitsPerPurchaseUnit),
+          purchaseUnit ?? {},
+        )
+      : null;
+    if (unitsPerValidation) {
+      setError(unitsPerValidation);
+      return;
+    }
     const unitsPerNormalized = normalizeUnitsPerPurchaseUnit(
       Number(form.unitsPerPurchaseUnit),
       purchaseUnit ?? {},
@@ -675,12 +703,19 @@ export function AddProductSkuDialog({
           <div className="space-y-1.5">
             <Label>Units / purchase unit *</Label>
             <Input
+              inputMode="decimal"
+              min={packSizeEditable ? MIN_UNITS_PER_BOX_PURCHASE_UNIT : undefined}
               value={packSizeEditable ? form.unitsPerPurchaseUnit : "1"}
               readOnly={!packSizeEditable}
               disabled={!packSizeEditable}
               aria-invalid={Boolean(fieldErrors.unitsPerPurchaseUnit)}
               onChange={(e) => setField("unitsPerPurchaseUnit", e.target.value)}
             />
+            {packSizeEditable ? (
+              <p className="text-muted-foreground text-xs">
+                At least {MIN_UNITS_PER_BOX_PURCHASE_UNIT} pieces per box.
+              </p>
+            ) : null}
             {!packSizeEditable && form.purchaseUnitId ? (
               <p className="text-muted-foreground text-xs">
                 Fixed at 1 when purchase unit is not Box.

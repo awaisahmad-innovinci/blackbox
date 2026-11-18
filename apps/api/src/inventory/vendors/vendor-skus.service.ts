@@ -161,7 +161,7 @@ export class VendorSkusService {
       existing.purchasePrice = String(dto.purchasePrice);
       existing.purchaseUnitId = dto.purchaseUnitId ?? null;
       existing.unitsPerPurchaseUnit = String(dto.unitsPerPurchaseUnit ?? 1);
-      existing.minimumOrderQuantity = String(dto.minimumOrderQuantity ?? 1);
+      existing.minimumOrderQuantity = String(dto.minimumOrderQuantity ?? 0);
       existing.leadTimeDays = dto.leadTimeDays ?? 0;
       existing.isPreferred = dto.isPreferred ?? false;
       existing.notes = dto.notes?.trim() ?? "";
@@ -176,7 +176,7 @@ export class VendorSkusService {
           purchasePrice: String(dto.purchasePrice),
           purchaseUnitId: dto.purchaseUnitId ?? null,
           unitsPerPurchaseUnit: String(dto.unitsPerPurchaseUnit ?? 1),
-          minimumOrderQuantity: String(dto.minimumOrderQuantity ?? 1),
+          minimumOrderQuantity: String(dto.minimumOrderQuantity ?? 0),
           leadTimeDays: dto.leadTimeDays ?? 0,
           isPreferred: dto.isPreferred ?? false,
           notes: dto.notes?.trim() ?? "",
