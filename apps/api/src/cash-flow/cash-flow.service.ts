@@ -767,7 +767,9 @@ export class CashFlowService {
       managerName: row.manager_name,
       cashierUserId: row.cashier_user_id,
       cashierName: row.cashier_name,
-      kind: row.kind || "full",
+      status: (row.kind === "partial" ? "partial" : "full") as
+        | "full"
+        | "partial",
       amount: roundMoney(num(row.withdrawal_total)),
     }));
   }
@@ -793,7 +795,7 @@ export class CashFlowService {
       `select e.id,
               e.occurred_at,
               e.recorded_by_user_id as manager_user_id,
-              coalesce(nullif(e.recorded_by_name, ''), nullif(u.full_name, ''), 'Manager') as manager_name,
+              coalesce(nullif(trim(e.recorded_by_name), ''), nullif(trim(u.full_name), ''), '—') as manager_name,
               e.category,
               e.amount,
               e.note
@@ -814,7 +816,7 @@ export class CashFlowService {
         id: row.id,
         at: new Date(row.occurred_at).toISOString(),
         managerUserId: row.manager_user_id,
-        managerName: row.manager_name,
+        managerName: row.manager_name?.trim() || "—",
         category,
         amount: roundMoney(num(row.amount)),
         note: row.note ?? "",

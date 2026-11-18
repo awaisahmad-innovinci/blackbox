@@ -21,7 +21,7 @@ export async function createVendorSkuLink(
     vendorId,
     productName,
     sku,
-    minimumOrderQuantity = 1,
+    minimumOrderQuantity = 0,
     leadTimeDays = 0,
     isPreferred = false,
   } = input;

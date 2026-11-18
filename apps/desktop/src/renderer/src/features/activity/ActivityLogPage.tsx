@@ -32,8 +32,8 @@ export function ActivityLogPage() {
   const [eventType, setEventType] = useState<ActivityLogEventType | "">("");
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
+    setLoading(true);
     try {
       const result = await loadActivityLogs({
         page,
@@ -122,7 +122,7 @@ export function ActivityLogPage() {
         </p>
       ) : null}
 
-      {loading ? (
+      {loading && items.length === 0 ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : items.length === 0 ? (
         <p className="text-muted-foreground text-sm">No activity recorded.</p>

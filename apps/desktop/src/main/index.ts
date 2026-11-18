@@ -83,6 +83,7 @@ import {
 } from "./db/inventory-out-returns-local";
 import {
   countDraftSalesLocal,
+  countHeldBillsForCashierLocal,
   deleteSaleDraftLocal,
   getDraftSaleReservedQtyLocal,
   getPosAvailableForSaleLocal,
@@ -489,6 +490,11 @@ function registerIpc(): void {
     ok: deleteSaleDraftLocal(id),
   }));
   ipcMain.handle("localDb:countDraftSales", () => countDraftSalesLocal());
+  ipcMain.handle(
+    "localDb:countHeldBillsForCashier",
+    (_event, userId: string, excludeSaleId?: string | null) =>
+      countHeldBillsForCashierLocal(userId, excludeSaleId),
+  );
   ipcMain.handle(
     "localDb:getDraftSaleReservedQty",
     (

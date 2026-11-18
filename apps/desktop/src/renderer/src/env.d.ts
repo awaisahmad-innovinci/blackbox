@@ -161,6 +161,10 @@ declare global {
         upsertSaleDraft: (detail: SaleDetail) => Promise<{ ok: true }>;
         deleteSaleDraft: (id: string) => Promise<{ ok: boolean }>;
         countDraftSales: () => Promise<number>;
+        countHeldBillsForCashier: (
+          userId: string,
+          excludeSaleId?: string | null,
+        ) => Promise<number>;
         getDraftSaleReservedQty: (
           warehouseId: string,
           productSkuId: string,

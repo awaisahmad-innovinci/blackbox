@@ -6,7 +6,9 @@ import {
   emptyTillNotes,
   formatMoney,
   isTillNearLimit,
+  validateTillCanClose,
   validateTillCanCloseBalance,
+  validateTillCanCloseHeldBills,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -89,8 +91,26 @@ export function TillPage() {
   const [cardTerminalSettingsOpen, setCardTerminalSettingsOpen] = useState(false);
   const [openingDrawer, setOpeningDrawer] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [heldBillsCount, setHeldBillsCount] = useState(0);
+  const [heldBillsCountKnown, setHeldBillsCountKnown] = useState(true);
+
+  const HELD_BILLS_COUNT_UNAVAILABLE =
+    "Could not verify held bills on this device. Wait for the app to finish loading, then try again.";
   const [openDialogOpen, setOpenDialogOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+
+  async function loadHeldBillsCount(): Promise<number | null> {
+    if (!user?.id) return null;
+    const counter = window.blackbox?.localDb?.countHeldBillsForCashier;
+    if (!counter) {
+      setHeldBillsCountKnown(false);
+      return null;
+    }
+    setHeldBillsCountKnown(true);
+    const count = await counter(user.id);
+    setHeldBillsCount(count);
+    return count;
+  }
 
   useEffect(() => {
     if (!canReadTill) navigate(defaultRouteForUser(permissions), { replace: true });
@@ -121,6 +141,7 @@ export function TillPage() {
           ),
         );
       }
+      await loadHeldBillsCount();
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, "Failed to load till"));
     } finally {
@@ -131,6 +152,12 @@ export function TillPage() {
   useEffect(() => {
     void refresh();
   }, [user?.id, canManageTill]);
+
+  useEffect(() => {
+    if (closeDialogOpen) {
+      void loadHeldBillsCount();
+    }
+  }, [closeDialogOpen, user?.id]);
 
   useEffect(() => {
     function onFocus() {
@@ -295,8 +322,20 @@ export function TillPage() {
 
   async function onCloseTill(): Promise<void> {
     if (!user || !session) return;
-    const balanceError = validateTillCanCloseBalance(session.currentCashBalance);
-    if (balanceError) return;
+    const heldCount = await loadHeldBillsCount();
+    if (heldCount == null) {
+      setError(HELD_BILLS_COUNT_UNAVAILABLE);
+      return;
+    }
+    const closeError = validateTillCanClose({
+      currentCashBalance: session.currentCashBalance,
+      heldBillsCount: heldCount,
+    });
+    if (closeError) {
+      setError(closeError);
+      setHeldBillsCount(heldCount);
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
@@ -320,9 +359,20 @@ export function TillPage() {
       ? Math.min(100, (session.currentCashBalance / session.maxCashLimit) * 100)
       : 0;
 
+  const closeTillError = session
+    ? heldBillsCountKnown
+      ? validateTillCanClose({
+          currentCashBalance: session.currentCashBalance,
+          heldBillsCount,
+        })
+      : HELD_BILLS_COUNT_UNAVAILABLE
+    : null;
   const closeBalanceError = session
     ? validateTillCanCloseBalance(session.currentCashBalance)
     : null;
+  const closeHeldBillsError = heldBillsCountKnown
+    ? validateTillCanCloseHeldBills(heldBillsCount)
+    : HELD_BILLS_COUNT_UNAVAILABLE;
 
   async function onOpenDrawer(): Promise<void> {
     setOpeningDrawer(true);
@@ -668,25 +718,48 @@ export function TillPage() {
                 </p>
               ) : (
                 <p className="text-muted-foreground text-sm">
-                  Till balance is Rs 0. You can close now.
+                  Till balance is Rs 0.
                 </p>
               )}
+              {closeHeldBillsError ? (
+                <p className="text-destructive text-sm" role="alert">
+                  {closeHeldBillsError}
+                </p>
+              ) : heldBillsCountKnown &&
+                heldBillsCount === 0 &&
+                !closeBalanceError ? (
+                <p className="text-muted-foreground text-sm">You can close now.</p>
+              ) : null}
             </>
           ) : null}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => setCloseDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={busy || !!closeBalanceError}
-              onClick={() => void onCloseTill()}
-            >
-              {busy ? "Closing…" : "Close till"}
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            {heldBillsCountKnown && heldBillsCount > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCloseDialogOpen(false);
+                  navigate("/sales/held");
+                }}
+              >
+                Go to held bills
+              </Button>
+            ) : null}
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => setCloseDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={busy || !!closeTillError}
+                onClick={() => void onCloseTill()}
+              >
+                {busy ? "Closing…" : "Close till"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

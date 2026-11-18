@@ -30,6 +30,15 @@ export function expenseOverDrawerMessage(available: number): string {
   return `Expense cannot be more than the drawer balance of Rs ${formatMoney(shown)}`;
 }
 
+/** Cash collection from a cashier till: full when no cash remains in the till. */
+export function tillWithdrawalKind(
+  withdrawalTotal: number,
+  balanceBefore: number,
+): "full" | "partial" {
+  const next = roundMoney4(balanceBefore - withdrawalTotal);
+  return next <= 0 ? "full" : "partial";
+}
+
 export interface CashierCashSaleRow {
   cashierUserId: string;
   cashierName: string;
@@ -38,6 +47,8 @@ export interface CashierCashSaleRow {
   netCash: number;
 }
 
+export type TillCollectionStatus = "full" | "partial";
+
 export interface CashCollectionRow {
   id: string;
   at: string;
@@ -45,7 +56,7 @@ export interface CashCollectionRow {
   managerName: string;
   cashierUserId: string;
   cashierName: string;
-  kind: string;
+  status: TillCollectionStatus;
   amount: number;
 }
 

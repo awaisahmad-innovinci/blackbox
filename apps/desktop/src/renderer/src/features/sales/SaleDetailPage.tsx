@@ -5,6 +5,8 @@ import { Button } from "@blackbox/ui/button";
 import { PrintButton } from "@renderer/components/print-button";
 import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
+import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
+import { discardHeldBillWithApproval } from "@renderer/lib/discard-held-bill";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { submitPostedSaleToFbr } from "@renderer/lib/sales/submit-fbr";
 import { loadSale, loadSaleReturnCreditForSale } from "@renderer/lib/local-db/entity-source";
@@ -22,6 +24,7 @@ export function SaleDetailPage() {
   );
   const printedBillFor = useRef<string | null>(null);
   const confirm = useConfirm();
+  const { promptSupervisorTotp } = useSupervisorTotp();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
   const { canReadList, canWrite } = useSalesAccess();
@@ -81,20 +84,21 @@ export function SaleDetailPage() {
   }, [loading, detail, printBill]);
 
   async function onDiscardDraft() {
-    if (!detail || detail.status !== "DRAFT") return;
-    const ok = await confirm({
-      title: "Discard held bill?",
-      description: `${detail.saleNumber} will be removed from this device.`,
-      confirmLabel: "Discard",
-    });
-    if (!ok) return;
+    if (!detail || detail.status !== "DRAFT" || !user) return;
 
     setDiscarding(true);
     setError(null);
     try {
-      const result = await window.blackbox?.localDb?.deleteSaleDraft?.(detail.id);
-      if (!result?.ok) {
-        setError("Held bill not found or already removed");
+      const result = await discardHeldBillWithApproval({
+        saleId: detail.id,
+        saleNumber: detail.saleNumber,
+        user,
+        confirm,
+        promptSupervisorTotp,
+      });
+      if (!result.ok) {
+        if (result.reason === "cancelled") return;
+        setError(result.message ?? "Failed to discard held bill");
         return;
       }
       navigate("/sales/held");

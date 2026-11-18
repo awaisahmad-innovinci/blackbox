@@ -26,3 +26,10 @@ export function requireManagerRemoveSaleLineApproval(
 ): boolean {
   return user?.requireManagerApprovalRemoveSaleLine === true;
 }
+
+/** Manager authentication code before discarding a held bill. */
+export function requireManagerDiscardHeldBillApproval(
+  _user: AuthUser | null | undefined,
+): boolean {
+  return true;
+}

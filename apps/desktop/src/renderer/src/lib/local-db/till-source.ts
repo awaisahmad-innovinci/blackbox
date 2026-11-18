@@ -60,12 +60,22 @@ export async function loadTills(query: {
   return tillsApi.list(query);
 }
 
+function normalizeIpcErrorMessage(message: string): string {
+  return message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+}
+
 function rethrowDrawerError(err: unknown): void {
   if (err instanceof Error && /drawer|manager must|reopen|active till/i.test(err.message)) {
-    throw new Error(
-      err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ""),
-    );
+    throw new Error(normalizeIpcErrorMessage(err.message));
   }
+}
+
+/** Local closeTill validation must not fall through to cloud API (held bills are device-only). */
+function rethrowTillCloseError(err: unknown): never {
+  if (err instanceof Error) {
+    throw new Error(normalizeIpcErrorMessage(err.message));
+  }
+  throw err;
 }
 
 export async function openTill(input: {
@@ -323,9 +333,10 @@ export async function closeTill(input: {
   userName: string;
 }): Promise<TillSessionDetail> {
   const closedAtLabel = new Date().toLocaleString();
-  try {
-    if (window.blackbox?.localDb?.closeTill) {
-      const detail = await window.blackbox.localDb.closeTill(input);
+  const closeLocal = window.blackbox?.localDb?.closeTill;
+  if (closeLocal) {
+    try {
+      const detail = await closeLocal(input);
       await logActivityEvent(
         {
           eventType: "till.closed",
@@ -344,9 +355,9 @@ export async function closeTill(input: {
         },
       );
       return detail;
+    } catch (err: unknown) {
+      rethrowTillCloseError(err);
     }
-  } catch {
-    /* fall through */
   }
   return tillsApi.closeCurrent();
 }

@@ -8,6 +8,8 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import type { TenantContext } from "../../common/tenant-context";
+import { CurrentUser } from "../../common/current-user.decorator";
 import type {
   GoodsReceiptDetail,
   PaginatedPurchaseOrders,
@@ -52,10 +54,11 @@ export class PurchaseOrdersController {
 
   @Post(":id/receipts")
   createReceipt(
+    @CurrentUser() user: TenantContext,
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: CreateGoodsReceiptDto,
   ): Promise<GoodsReceiptDetail> {
-    return this.goodsReceipts.createReceipt(id, dto);
+    return this.goodsReceipts.createReceipt(user, id, dto);
   }
 
   @Patch(":id/items/:itemId/price")

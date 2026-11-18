@@ -17,10 +17,12 @@ import {
 import { GoodsReceiptsController } from "./goods-receipts.controller";
 import { GoodsReceiptsService } from "./goods-receipts.service";
 import { ActivityLogModule } from "../../activity-log/activity-log.module";
+import { CashFlowModule } from "../../cash-flow/cash-flow.module";
 
 @Module({
   imports: [
     ActivityLogModule,
+    CashFlowModule,
     TypeOrmModule.forFeature([
       GoodsReceipt,
       GoodsReceiptItem,

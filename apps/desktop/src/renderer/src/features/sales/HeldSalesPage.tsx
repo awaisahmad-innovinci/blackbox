@@ -6,6 +6,8 @@ import { Button } from "@blackbox/ui/button";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { ListTableLink, ListTableRow } from "@renderer/components/list-table-row";
 import { useConfirm } from "@renderer/components/confirm-provider";
+import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
+import { discardHeldBillWithApproval } from "@renderer/lib/discard-held-bill";
 import { loadSales } from "@renderer/lib/local-db/entity-source";
 import { readOpenSaleId } from "@renderer/lib/open-sale";
 import { defaultRouteForUser } from "@renderer/lib/sales-access";
@@ -15,6 +17,7 @@ import { useSalesAccess } from "@renderer/lib/use-sales-access";
 export function HeldSalesPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { promptSupervisorTotp } = useSupervisorTotp();
   const { user } = useSession();
   const permissions = user?.permissions ?? [];
   const { canWrite, canReadList, canReadTill } = useSalesAccess();
@@ -50,19 +53,21 @@ export function HeldSalesPage() {
   }, []);
 
   async function onDiscard(id: string, saleNumber: string) {
-    const ok = await confirm({
-      title: "Discard held bill?",
-      description: `${saleNumber} will be removed from this device. Reserved stock is released.`,
-      confirmLabel: "Discard",
-    });
-    if (!ok) return;
+    if (!user) return;
 
     setDiscardingId(id);
     setError(null);
     try {
-      const result = await window.blackbox?.localDb?.deleteSaleDraft?.(id);
-      if (!result?.ok) {
-        setError("Held bill not found or already removed");
+      const result = await discardHeldBillWithApproval({
+        saleId: id,
+        saleNumber,
+        user,
+        confirm,
+        promptSupervisorTotp,
+      });
+      if (!result.ok) {
+        if (result.reason === "cancelled") return;
+        setError(result.message ?? "Failed to discard held bill");
         return;
       }
       setItems((prev) => prev.filter((row) => row.id !== id));

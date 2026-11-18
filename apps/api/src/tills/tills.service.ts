@@ -21,6 +21,7 @@ import {
   tillMaxLimit,
   tillOpeningExceedsDrawer,
   tillOpeningExceedsDrawerMessage,
+  tillWithdrawalKind,
   validateTillCanCloseBalance,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
@@ -741,6 +742,8 @@ export class TillsService {
       );
     }
 
+    const kind = tillWithdrawalKind(input.withdrawalTotal, currentBalance);
+
     await this.withdrawals.save(
       this.withdrawals.create({
         id: randomUUID(),
@@ -749,7 +752,7 @@ export class TillsService {
         withdrawnByUserId: input.withdrawnByUserId,
         ...input.notes,
         withdrawalTotal: String(input.withdrawalTotal),
-        kind: "partial",
+        kind,
       }),
     );
 

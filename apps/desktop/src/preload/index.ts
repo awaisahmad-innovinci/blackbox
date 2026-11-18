@@ -172,6 +172,15 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:deleteSaleDraft", id) as Promise<{ ok: boolean }>,
     countDraftSales: () =>
       ipcRenderer.invoke("localDb:countDraftSales") as Promise<number>,
+    countHeldBillsForCashier: (
+      userId: string,
+      excludeSaleId?: string | null,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:countHeldBillsForCashier",
+        userId,
+        excludeSaleId,
+      ) as Promise<number>,
     getDraftSaleReservedQty: (
       warehouseId: string,
       productSkuId: string,

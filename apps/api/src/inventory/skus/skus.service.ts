@@ -18,6 +18,7 @@ import {
   normalizeHsCode,
   normalizeStoredText,
   normalizeUnitsPerPurchaseUnit,
+  validateUnitsPerPurchaseUnit,
   vendorPurchasePriceFromSku,
 } from "@blackbox/shared";
 import { DataSource, Repository } from "typeorm";
@@ -508,10 +509,12 @@ export class SkusService {
     const unit = await this.units.findOne({
       where: { id: purchaseUnitId, tenantId },
     });
-    if (!unit) return normalizeUnitsPerPurchaseUnit(raw, {});
-    return normalizeUnitsPerPurchaseUnit(raw, {
-      name: unit.name,
-      abbreviation: unit.abbreviation,
-    });
+    const purchaseUnit = unit
+      ? { name: unit.name, abbreviation: unit.abbreviation }
+      : {};
+    const resolved = normalizeUnitsPerPurchaseUnit(raw, purchaseUnit);
+    const message = validateUnitsPerPurchaseUnit(resolved, purchaseUnit);
+    if (message) throw new BadRequestException(message);
+    return resolved;
   }
 }
