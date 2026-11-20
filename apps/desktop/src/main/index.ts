@@ -1134,7 +1134,7 @@ function registerIpc(): void {
       const printOptions = {
         silent: false,
         printBackground: true,
-        preferCSSPageSize: true,
+        preferCSSPageSize: false,
         scaleFactor: 100,
         margins: { marginType: "none" as const },
         pageSize: { width, height },
