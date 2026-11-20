@@ -40,6 +40,8 @@ export function ProductProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [skuOpen, setSkuOpen] = useState(false);
+  const [editingSku, setEditingSku] = useState<ProductSkuDetail | null>(null);
+  const [supplierPromptRequired, setSupplierPromptRequired] = useState(false);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [lockedSupplierSkuId, setLockedSupplierSkuId] = useState<string | null>(
     null,
@@ -331,7 +333,14 @@ export function ProductProfilePage() {
           >
             Edit
           </Button>
-          <Button onClick={() => setSkuOpen(true)}>+ Add SKU</Button>
+          <Button
+            onClick={() => {
+              setEditingSku(null);
+              setSkuOpen(true);
+            }}
+          >
+            + Add SKU
+          </Button>
           {product.status === "active" ? (
             <Button
               variant="outline"
@@ -418,13 +427,14 @@ export function ProductProfilePage() {
                 <th className="px-4 py-3 font-medium">Cost</th>
                 <th className="px-4 py-3 font-medium">Selling</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium"> </th>
               </tr>
             </thead>
             <tbody>
               {skus.length === 0 ? (
                 <tr className="border-border border-t">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="text-muted-foreground px-4 py-6 text-center"
                   >
                     No SKUs yet. Add one to continue.
@@ -455,6 +465,19 @@ export function ProductProfilePage() {
                     <td className="px-4 py-3 tabular-nums">{formatMoney(s.sellingPrice)}</td>
                     <td className="px-4 py-3 capitalize">
                       {s.deletedAt ? "Deleted" : s.status}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingSku(s);
+                          setSkuOpen(true);
+                        }}
+                      >
+                        Edit
+                      </Button>
                     </td>
                   </ListTableRow>
                 ))
@@ -638,21 +661,34 @@ export function ProductProfilePage() {
         open={skuOpen}
         productId={product.id}
         productName={product.name}
-        onClose={() => setSkuOpen(false)}
-        onCreated={(row, cacheWarning) => {
+        editingSku={editingSku}
+        onClose={() => {
           setSkuOpen(false);
+          setEditingSku(null);
+        }}
+        onCreated={(row, cacheWarning) => {
+          const wasEdit = editingSku?.id === row.id;
+          setSkuOpen(false);
+          setEditingSku(null);
           setSkus((prev) =>
-            prev.some((s) => s.id === row.id) ? prev : [...prev, row],
+            prev.some((s) => s.id === row.id)
+              ? prev.map((s) => (s.id === row.id ? row : s))
+              : [...prev, row],
           );
           setLockedSupplierSkuId(row.id);
-          setNeedsSupplierSkuIds((prev) =>
-            prev.includes(row.id) ? prev : [...prev, row.id],
-          );
+          setSupplierPromptRequired(!wasEdit);
+          if (!wasEdit) {
+            setNeedsSupplierSkuIds((prev) =>
+              prev.includes(row.id) ? prev : [...prev, row.id],
+            );
+          }
           setSupplierOpen(true);
           setNotice(
             cacheWarning
-              ? "SKU saved on server; local cache update failed. Add a supplier to finish setup."
-              : "SKU created. Add a supplier to finish setup.",
+              ? "SKU saved on server; local cache update failed. Check the supplier next."
+              : wasEdit
+                ? "SKU updated. Update the supplier if needed."
+                : "SKU created. Add a supplier to finish setup.",
           );
         }}
       />
@@ -666,7 +702,7 @@ export function ProductProfilePage() {
         lockedSkuId={lockedSupplierSkuId}
         existingSuppliers={suppliers}
         onClose={() => {
-          if (lockedSupplierSkuId) {
+          if (lockedSupplierSkuId && supplierPromptRequired) {
             setNeedsSupplierSkuIds((prev) =>
               prev.includes(lockedSupplierSkuId)
                 ? prev
@@ -676,6 +712,7 @@ export function ProductProfilePage() {
               "SKU still needs a supplier. Use Add Supplier to link a vendor.",
             );
           }
+          setSupplierPromptRequired(false);
           setLockedSupplierSkuId(null);
           setSupplierOpen(false);
         }}

@@ -1,12 +1,14 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import type {
-  ActivityLogItem,
-  CreateActivityLogRequest,
-  PaginatedActivityLogs,
+import {
+  businessDayEndUtc,
+  businessDayStartUtc,
+  type ActivityLogItem,
+  type CreateActivityLogRequest,
+  type PaginatedActivityLogs,
 } from "@blackbox/shared";
 import { randomUUID } from "node:crypto";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import { getRequestTenant } from "../common/request-tenant";
 import type { TenantContext } from "../common/tenant-context";
 import { ActivityLog, User } from "../db/entities";
@@ -35,32 +37,53 @@ export class ActivityLogService {
     if (!tenantId) return { items: [], total: 0, page: 1, pageSize: 25 };
 
     const { page, pageSize, offset } = pageParams(query.page, query.pageSize);
-    const qb = this.logs
+    const idQb = this.logs
       .createQueryBuilder("log")
-      .leftJoinAndSelect("log.actorUser", "actor")
-      .leftJoinAndSelect("log.supervisorUser", "supervisor")
-      .leftJoinAndSelect("log.subjectUser", "subject")
-      .where("log.tenant_id = :tenantId", { tenantId })
-      .orderBy("log.created_at", "DESC");
+      .where("log.tenant_id = :tenantId", { tenantId });
 
     if (query.eventType) {
-      qb.andWhere("log.event_type = :eventType", { eventType: query.eventType });
+      idQb.andWhere("log.event_type = :eventType", { eventType: query.eventType });
     }
     if (query.dateFrom) {
-      qb.andWhere("log.created_at >= :dateFrom", {
-        dateFrom: `${query.dateFrom}T00:00:00.000Z`,
+      idQb.andWhere("log.created_at >= :dateFrom", {
+        dateFrom: businessDayStartUtc(query.dateFrom),
       });
     }
     if (query.dateTo) {
-      qb.andWhere("log.created_at <= :dateTo", {
-        dateTo: `${query.dateTo}T23:59:59.999Z`,
+      idQb.andWhere("log.created_at <= :dateTo", {
+        dateTo: businessDayEndUtc(query.dateTo),
       });
     }
 
-    const total = await qb.getCount();
-    const rows = await qb.skip(offset).take(pageSize).getMany();
+    const total = await idQb.getCount();
+    const idRows = await idQb
+      .clone()
+      .select("log.id", "id")
+      .orderBy("log.created_at", "DESC")
+      .addOrderBy("log.id", "ASC")
+      .offset(offset)
+      .limit(pageSize)
+      .getRawMany<Record<string, unknown>>();
+    const ids = idRows
+      .map((row) => {
+        const value = row.id ?? row.log_id;
+        return typeof value === "string" ? value : "";
+      })
+      .filter((id) => id.length > 0);
+    if (ids.length === 0) {
+      return { items: [], total, page, pageSize };
+    }
+
+    const rows = await this.logs.find({
+      where: { id: In(ids), tenantId },
+      relations: { actorUser: true, supervisorUser: true, subjectUser: true },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
     return {
-      items: rows.map((row) => this.toItem(row)),
+      items: ids
+        .map((id) => byId.get(id))
+        .filter((row): row is ActivityLog => row != null)
+        .map((row) => this.toItem(row)),
       total,
       page,
       pageSize,

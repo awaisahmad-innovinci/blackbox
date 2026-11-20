@@ -461,6 +461,7 @@ export {
   formatTillName,
   validateTillCanCloseBalance,
   validateTillCanCloseHeldBills,
+  validateTillCanCloseOpenCart,
   validateTillCanClose,
   tillSessionBlocksLogout,
   tillLogoutBlockMessage,
@@ -610,7 +611,12 @@ export const livePasswordError = checkLivePasswordError;
 export const normalizeStoredText = normalizeStoredTextFn;
 export const normalizeOptionalStoredText = normalizeOptionalStoredTextFn;
 
-export { buildReceivedAtIso, formatStoredDateTime } from "./datetime";
+export {
+  buildReceivedAtIso,
+  businessDayEndUtc,
+  businessDayStartUtc,
+  formatStoredDateTime,
+} from "./datetime";
 
 export type {
   PosPrinterSettings,

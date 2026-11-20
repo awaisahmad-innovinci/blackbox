@@ -181,6 +181,13 @@ contextBridge.exposeInMainWorld("blackbox", {
         userId,
         excludeSaleId,
       ) as Promise<number>,
+    openCartHasProducts: (userId: string) =>
+      ipcRenderer.invoke("localDb:openCartHasProducts", userId) as Promise<boolean>,
+    clearCashierDrafts: (userId: string) =>
+      ipcRenderer.invoke("localDb:clearCashierDrafts", userId) as Promise<{
+        ok: true;
+        cleared: number;
+      }>,
     getDraftSaleReservedQty: (
       warehouseId: string,
       productSkuId: string,

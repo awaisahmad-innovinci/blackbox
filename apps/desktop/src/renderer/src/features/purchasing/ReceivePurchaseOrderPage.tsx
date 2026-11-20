@@ -325,7 +325,6 @@ export function ReceivePurchaseOrderPage() {
   const [shelfRent, setShelfRent] = useState("0");
   const [discount, setDiscount] = useState("0");
   const [paidInput, setPaidInput] = useState("");
-  const [paidTouched, setPaidTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -503,13 +502,10 @@ export function ReceivePurchaseOrderPage() {
       returnCredit,
     ],
   );
-  const paidDisplay = canPayOnReceive
-    ? paidTouched
-      ? paidInput
-      : String(grandTotal)
-    : "0";
+  const paidDisplay = canPayOnReceive ? paidInput : "0";
   const amountPaid = useMemo(() => {
     if (!canPayOnReceive) return 0;
+    if (!paidDisplay.trim()) return 0;
     const n = Number(paidDisplay);
     return Number.isFinite(n) ? roundMoney4(n) : Number.NaN;
   }, [canPayOnReceive, paidDisplay]);
@@ -1384,7 +1380,6 @@ export function ReceivePurchaseOrderPage() {
               value={paidDisplay}
               onFocus={(e) => e.currentTarget.select()}
               onChange={(e) => {
-                setPaidTouched(true);
                 setPaidInput(e.target.value);
               }}
             />

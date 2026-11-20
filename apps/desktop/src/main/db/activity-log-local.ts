@@ -1,9 +1,11 @@
-import type {
-  ActivityLogEventType,
-  ActivityLogItem,
-  ActivityLogListQuery,
-  CreateActivityLogRequest,
-  PaginatedActivityLogs,
+import {
+  businessDayEndUtc,
+  businessDayStartUtc,
+  type ActivityLogEventType,
+  type ActivityLogItem,
+  type ActivityLogListQuery,
+  type CreateActivityLogRequest,
+  type PaginatedActivityLogs,
 } from "@blackbox/shared";
 import { getLocalDb } from "./index";
 
@@ -108,11 +110,11 @@ export function listLocalActivityLogs(
   }
   if (query.dateFrom) {
     conditions.push("created_at >= @dateFrom");
-    params.dateFrom = `${query.dateFrom}T00:00:00.000Z`;
+    params.dateFrom = businessDayStartUtc(query.dateFrom);
   }
   if (query.dateTo) {
     conditions.push("created_at <= @dateTo");
-    params.dateTo = `${query.dateTo}T23:59:59.999Z`;
+    params.dateTo = businessDayEndUtc(query.dateTo);
   }
 
   const where = conditions.length > 0 ? `where ${conditions.join(" and ")}` : "";

@@ -254,14 +254,15 @@ export function SalePage() {
   const holdNumberRef = useRef<string | null>(null);
   const holdInFlightRef = useRef(false);
   const openSaleIdRef = useRef<string | null>(null);
+  const routeDraftIdRef = useRef<string | undefined>(routeDraftId);
   const openSaleReadyRef = useRef(false);
   const skipOpenSalePersistRef = useRef(false);
   const salePostCompletedRef = useRef(false);
   const prevTillStatusRef = useRef<string | "loading">("loading");
   const openSaleEpochRef = useRef(0);
-  const persistOpenSaleRef = useRef<(force?: boolean) => Promise<void>>(
-    async () => undefined,
-  );
+  const persistOpenSaleRef = useRef<
+    (force?: boolean, target?: "auto" | "open") => Promise<void>
+  >(async () => undefined);
   const activeDraftId = editingDraftId ?? openSaleId;
   const scanQueueRef = useRef<string[]>([]);
   const scanProcessingRef = useRef(false);
@@ -465,8 +466,15 @@ export function SalePage() {
 
   useEffect(() => {
     let cancelled = false;
+    const previousRoute = routeDraftIdRef.current;
+    const leavingOpenSale =
+      previousRoute !== routeDraftId &&
+      (!previousRoute || previousRoute === openSaleIdRef.current);
+    routeDraftIdRef.current = routeDraftId;
     const shouldFlush =
-      openSaleReadyRef.current && openSaleIdRef.current != null;
+      leavingOpenSale &&
+      openSaleReadyRef.current &&
+      openSaleIdRef.current != null;
     openSaleReadyRef.current = false;
     setLoadingDraft(true);
     setError(null);
@@ -534,7 +542,7 @@ export function SalePage() {
 
     void (async () => {
       try {
-        if (shouldFlush) await persistOpenSaleRef.current(true);
+        if (shouldFlush) await persistOpenSaleRef.current(true, "open");
         if (cancelled) return;
 
         const draftId = routeDraftId ?? (await readOpenSaleId(user?.id));
@@ -557,9 +565,13 @@ export function SalePage() {
           return;
         }
 
-        openSaleIdRef.current = detail.id;
-        setOpenSaleId(detail.id);
-        await writeOpenSaleId(user?.id, detail.id);
+        const editingHeldBill =
+          Boolean(routeDraftId) && routeDraftId !== openSaleIdRef.current;
+        if (!editingHeldBill) {
+          openSaleIdRef.current = detail.id;
+          setOpenSaleId(detail.id);
+          await writeOpenSaleId(user?.id, detail.id);
+        }
         await hydrateDraft(detail);
       } catch (err: unknown) {
         if (cancelled) return;
@@ -570,9 +582,7 @@ export function SalePage() {
         }
       } finally {
         if (!cancelled) {
-          if (!routeDraftId || openSaleIdRef.current) {
-            openSaleReadyRef.current = true;
-          }
+          openSaleReadyRef.current = true;
           setLoadingDraft(false);
         }
       }
@@ -843,18 +853,45 @@ export function SalePage() {
     };
   }
 
-  persistOpenSaleRef.current = async (force = false) => {
+  persistOpenSaleRef.current = async (
+    force = false,
+    target: "auto" | "open" = "auto",
+  ) => {
     const epoch = openSaleEpochRef.current;
-    const onOpenSaleScreen =
-      !routeDraftId || routeDraftId === openSaleIdRef.current;
+    const saveOpenCart =
+      target === "open" ||
+      !routeDraftId ||
+      routeDraftId === openSaleIdRef.current;
     const stillCurrent = () =>
       force ||
       (epoch === openSaleEpochRef.current &&
         !skipOpenSalePersistRef.current &&
         !holdInFlightRef.current &&
-        openSaleReadyRef.current &&
-        onOpenSaleScreen);
+        openSaleReadyRef.current);
     if (!stillCurrent() || !warehouseId) return;
+
+    if (!saveOpenCart && routeDraftId) {
+      if (lines.length === 0) {
+        try {
+          await window.blackbox?.localDb?.deleteSaleDraft?.(routeDraftId);
+        } catch {
+          /* draft cleanup is best-effort */
+        }
+        return;
+      }
+      const holdNumber =
+        holdNumberRef.current ??
+        (await allocateHoldNumber(user?.tenantName ?? ""));
+      holdNumberRef.current = holdNumber;
+      if (!stillCurrent()) return;
+      const heldDetail = buildDetailFromForm({
+        id: routeDraftId,
+        saleNumber: holdNumber,
+        status: "DRAFT",
+      });
+      await window.blackbox?.localDb?.upsertSaleDraft?.(heldDetail);
+      return;
+    }
 
     if (lines.length === 0) {
       const id = openSaleIdRef.current;
@@ -898,9 +935,7 @@ export function SalePage() {
   }, [lines]);
 
   useEffect(() => {
-    const onOpenSaleScreen =
-      !routeDraftId || routeDraftId === openSaleIdRef.current;
-    if (!onOpenSaleScreen || loadingDraft || !openSaleReadyRef.current) return;
+    if (loadingDraft || !openSaleReadyRef.current) return;
     const timer = window.setTimeout(() => {
       void persistOpenSaleRef.current();
     }, 400);
@@ -1787,14 +1822,18 @@ export function SalePage() {
             /* draft cleanup is best-effort */
           }
         }
-        openSaleIdRef.current = null;
-        setOpenSaleId(null);
-        await writeOpenSaleId(user?.id, null);
-        if (openIdAtPost && openIdAtPost !== localId) {
-          try {
-            await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
-          } catch {
-            /* draft cleanup is best-effort */
+        const keepOtherCart =
+          Boolean(editingDraftId) && editingDraftId !== openIdAtPost;
+        if (!keepOtherCart) {
+          openSaleIdRef.current = null;
+          setOpenSaleId(null);
+          await writeOpenSaleId(user?.id, null);
+          if (openIdAtPost && openIdAtPost !== localId) {
+            try {
+              await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
+            } catch {
+              /* draft cleanup is best-effort */
+            }
           }
         }
         const registerOffline =
@@ -1880,14 +1919,18 @@ export function SalePage() {
           /* draft cleanup is best-effort */
         }
       }
-      openSaleIdRef.current = null;
-      setOpenSaleId(null);
-      await writeOpenSaleId(user?.id, null);
-      if (openIdAtPost && openIdAtPost !== editingDraftId) {
-        try {
-          await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
-        } catch {
-          /* draft cleanup is best-effort */
+      const keepOtherCart =
+        Boolean(editingDraftId) && editingDraftId !== openIdAtPost;
+      if (!keepOtherCart) {
+        openSaleIdRef.current = null;
+        setOpenSaleId(null);
+        await writeOpenSaleId(user?.id, null);
+        if (openIdAtPost && openIdAtPost !== editingDraftId) {
+          try {
+            await window.blackbox?.localDb?.deleteSaleDraft?.(openIdAtPost);
+          } catch {
+            /* draft cleanup is best-effort */
+          }
         }
       }
 

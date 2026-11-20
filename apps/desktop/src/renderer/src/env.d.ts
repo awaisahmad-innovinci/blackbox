@@ -165,6 +165,10 @@ declare global {
           userId: string,
           excludeSaleId?: string | null,
         ) => Promise<number>;
+        openCartHasProducts: (userId: string) => Promise<boolean>;
+        clearCashierDrafts: (
+          userId: string,
+        ) => Promise<{ ok: true; cleared: number }>;
         getDraftSaleReservedQty: (
           warehouseId: string,
           productSkuId: string,

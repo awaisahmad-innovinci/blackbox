@@ -82,9 +82,11 @@ import {
   upsertInventoryOutReturnsLocal,
 } from "./db/inventory-out-returns-local";
 import {
+  clearCashierDraftsLocal,
   countDraftSalesLocal,
   countHeldBillsForCashierLocal,
   deleteSaleDraftLocal,
+  openCartHasProductsLocal,
   getDraftSaleReservedQtyLocal,
   getPosAvailableForSaleLocal,
   upsertSaleDraftLocal,
@@ -495,6 +497,13 @@ function registerIpc(): void {
     (_event, userId: string, excludeSaleId?: string | null) =>
       countHeldBillsForCashierLocal(userId, excludeSaleId),
   );
+  ipcMain.handle("localDb:openCartHasProducts", (_event, userId: string) =>
+    openCartHasProductsLocal(userId),
+  );
+  ipcMain.handle("localDb:clearCashierDrafts", (_event, userId: string) => ({
+    ok: true as const,
+    cleared: clearCashierDraftsLocal(userId),
+  }));
   ipcMain.handle(
     "localDb:getDraftSaleReservedQty",
     (
