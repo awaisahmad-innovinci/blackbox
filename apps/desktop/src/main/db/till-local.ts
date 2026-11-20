@@ -22,7 +22,10 @@ import {
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
-import { countHeldBillsForCashierLocal } from "./sales-local";
+import {
+  countHeldBillsForCashierLocal,
+  openCartHasProductsLocal,
+} from "./sales-local";
 import { randomUUID } from "node:crypto";
 import { getLocalDb } from "./index";
 import { getManagerDrawerBalanceLocal } from "./cash-flow-local";
@@ -752,9 +755,11 @@ export function closeTillLocal(input: {
   }
 
   const heldBillsCount = countHeldBillsForCashierLocal(input.userId);
+  const openCartHasProducts = openCartHasProductsLocal(input.userId);
   const closeError = validateTillCanClose({
     currentCashBalance: row.current_cash_balance,
     heldBillsCount,
+    openCartHasProducts,
   });
   if (closeError) {
     throw new Error(closeError);

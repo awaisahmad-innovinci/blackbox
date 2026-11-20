@@ -43,6 +43,7 @@ import {
 } from "@renderer/components/keyboard-hints";
 import { usePageKeyboard } from "@renderer/lib/use-page-keyboard";
 import { productsApi } from "@renderer/lib/api/products";
+import { skusApi } from "@renderer/lib/api/skus";
 import { allocateSkuCode } from "@renderer/lib/document-numbers";
 import { loadUnits, lookupSkuByBarcode, lookupSkuByCode } from "@renderer/lib/local-db/entity-source";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -116,6 +117,7 @@ export function AddProductSkuDialog({
   open,
   productId,
   productName,
+  editingSku = null,
   linkToVendor,
   onClose,
   onCreated,
@@ -124,6 +126,8 @@ export function AddProductSkuDialog({
   open: boolean;
   productId: string;
   productName: string;
+  /** When set, the dialog updates this SKU instead of creating one. */
+  editingSku?: ProductSkuDetail | null;
   /** When set, auto-links the new SKU to this vendor after creation. */
   linkToVendor?: VendorDetail;
   onClose: () => void;
@@ -145,16 +149,47 @@ export function AddProductSkuDialog({
 
   useEffect(() => {
     if (!open) return;
-    setForm(emptyForm);
     setError(null);
     setDuplicateLookup(null);
     setDuplicateMessage(null);
     setAttempted(false);
-    void allocateSkuCode(productName).then((code) => {
-      setForm((prev) => ({ ...prev, sku: code }));
-    });
+    if (editingSku) {
+      setForm({
+        variantName: editingSku.variantName,
+        sku: editingSku.sku,
+        barcode: editingSku.barcode ?? "",
+        sizeValue: editingSku.sizeValue ?? "",
+        sizeUnit: editingSku.sizeUnit ?? "",
+        baseUnitId: editingSku.baseUnitId ?? "",
+        purchaseUnitId: editingSku.purchaseUnitId ?? "",
+        unitsPerPurchaseUnit: String(editingSku.unitsPerPurchaseUnit),
+        costPrice: String(editingSku.costPrice),
+        gstPercent: String(editingSku.gstPercent ?? 0),
+        hsCode: editingSku.hsCode ?? "",
+        marginPercent:
+          marginFromSellingGst(
+            String(editingSku.costPrice),
+            String(editingSku.gstPercent ?? 0),
+            String(editingSku.sellingPrice),
+          ) ?? "",
+        sellingPrice: String(editingSku.sellingPrice),
+        saleDiscountPercent: String(editingSku.saleDiscountPercent ?? 0),
+        reorderLevel: String(editingSku.reorderLevel),
+        minimumStockLevel: String(editingSku.minimumStockLevel),
+        maximumStockLevel:
+          editingSku.maximumStockLevel == null
+            ? ""
+            : String(editingSku.maximumStockLevel),
+        status: editingSku.status,
+      });
+    } else {
+      setForm(emptyForm);
+      void allocateSkuCode(productName).then((code) => {
+        setForm((prev) => ({ ...prev, sku: code }));
+      });
+    }
     void loadUnits().then(setUnits).catch(() => undefined);
-  }, [open, productName]);
+  }, [open, productName, editingSku]);
 
   async function applyBarcode(code: string) {
     const trimmed = code.trim();
@@ -170,7 +205,7 @@ export function AddProductSkuDialog({
     try {
       const match = await lookupSkuByBarcode(trimmed);
       setForm((prev) => ({ ...prev, barcode: trimmed }));
-      if (match) {
+      if (match && match.id !== editingSku?.id) {
         setDuplicateLookup(match);
         setDuplicateMessage(duplicateBarcodeMessage(match));
       } else {
@@ -399,6 +434,107 @@ export function AddProductSkuDialog({
       status: form.status,
     };
 
+    if (editingSku) {
+      setSaving(true);
+      setError(null);
+      if (body.barcode && body.barcode !== (editingSku.barcode ?? "")) {
+        try {
+          const dup = await lookupSkuByBarcode(body.barcode);
+          if (dup && dup.id !== editingSku.id) {
+            setDuplicateLookup(dup);
+            setDuplicateMessage(duplicateBarcodeMessage(dup));
+            setSaving(false);
+            return;
+          }
+        } catch (err: unknown) {
+          setSaving(false);
+          setError(getApiErrorMessage(err, "Barcode lookup failed"));
+          return;
+        }
+      }
+      const skuCode = body.sku?.trim() || editingSku.sku;
+      if (skuCode !== editingSku.sku) {
+        const skuDup = await lookupSkuByCode(skuCode);
+        if (skuDup && skuDup.id !== editingSku.id) {
+          setSaving(false);
+          setError(
+            `SKU code ${skuCode} already exists on ${skuDup.productName}.`,
+          );
+          return;
+        }
+      }
+      const baseUnit = units.find((u) => u.id === body.baseUnitId);
+      const nextPurchaseUnit = units.find((u) => u.id === body.purchaseUnitId);
+      const row: ProductSkuDetail = {
+        ...editingSku,
+        productId,
+        variantName: body.variantName,
+        sku: skuCode,
+        barcode: body.barcode ?? null,
+        sizeValue: body.sizeValue ?? null,
+        sizeUnit: body.sizeUnit ?? null,
+        baseUnitId: body.baseUnitId,
+        baseUnitName: baseUnit?.name ?? editingSku.baseUnitName,
+        purchaseUnitId: body.purchaseUnitId,
+        purchaseUnitName: nextPurchaseUnit?.name ?? editingSku.purchaseUnitName,
+        unitsPerPurchaseUnit: body.unitsPerPurchaseUnit,
+        costPrice: body.costPrice,
+        gstPercent: body.gstPercent ?? 0,
+        hsCode: body.hsCode?.trim() || null,
+        sellingPrice: body.sellingPrice,
+        saleDiscountPercent: body.saleDiscountPercent ?? 0,
+        reorderLevel: body.reorderLevel ?? 0,
+        minimumStockLevel: body.minimumStockLevel ?? 0,
+        maximumStockLevel: body.maximumStockLevel ?? null,
+        trackInventory: true,
+        status: body.status ?? editingSku.status,
+      };
+      try {
+        if (await isDeviceBound()) {
+          await commitLocalChange({
+            entityType: "product_sku",
+            entityId: editingSku.id,
+            operation: "UPSERT",
+            payload: row as unknown as Record<string, unknown>,
+          });
+          if (body.barcode && body.barcode !== (editingSku.barcode ?? "")) {
+            const barcodeId = crypto.randomUUID();
+            await commitLocalChange({
+              entityType: "product_sku_barcode",
+              entityId: barcodeId,
+              operation: "UPSERT",
+              payload: {
+                id: barcodeId,
+                productSkuId: editingSku.id,
+                barcode: body.barcode,
+                status: "active",
+                quantityMultiplier: 1,
+              },
+            });
+          }
+          void syncNow();
+        } else {
+          const updated = await skusApi.update(editingSku.id, {
+            ...body,
+            sku: skuCode,
+          });
+          row.barcode = updated.barcode ?? row.barcode;
+          row.status = updated.status;
+          try {
+            await window.blackbox?.localDb?.upsertProductSku?.(row);
+          } catch {
+            /* optional cache */
+          }
+        }
+        setSaving(false);
+        onCreated(row, false);
+      } catch (err: unknown) {
+        setSaving(false);
+        setError(getApiErrorMessage(err, "Failed to update SKU"));
+      }
+      return;
+    }
+
     setSaving(true);
     setError(null);
     if (body.barcode) {
@@ -589,7 +725,7 @@ export function AddProductSkuDialog({
     >
       <DialogContent className="fixed top-1/2 left-1/2 max-h-[85vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto lg:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Add SKU</DialogTitle>
+          <DialogTitle>{editingSku ? "Edit SKU" : "Add SKU"}</DialogTitle>
         </DialogHeader>
 
         {duplicateMessage ? (
@@ -857,7 +993,7 @@ export function AddProductSkuDialog({
             disabled={saving || !canSave}
             onClick={() => void onSave()}
           >
-            {saving ? "Saving…" : "Add SKU"}
+            {saving ? "Saving…" : editingSku ? "Save SKU" : "Add SKU"}
           </Button>
         </DialogFooter>
       </DialogContent>

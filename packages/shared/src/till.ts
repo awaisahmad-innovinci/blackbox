@@ -191,17 +191,26 @@ export function validateTillCanCloseHeldBills(
 ): string | null {
   if (heldBillsCount > 0) {
     const noun = heldBillsCount === 1 ? "held bill" : "held bills";
-    return `You have ${heldBillsCount} ${noun}. Resume and post each one, or discard it on Held bills (a manager must approve discard) before closing your till.`;
+    return `You have ${heldBillsCount} ${noun}. Finish them before closing, or ask a manager to close the till and clear them.`;
   }
   return null;
+}
+
+export function validateTillCanCloseOpenCart(
+  openCartHasProducts: boolean,
+): string | null {
+  if (!openCartHasProducts) return null;
+  return "This sale still has products that are not billed. Finish or hold the bill, or ask a manager to close the till and clear it.";
 }
 
 export function validateTillCanClose(input: {
   currentCashBalance: number;
   heldBillsCount: number;
+  openCartHasProducts?: boolean;
 }): string | null {
   return (
     validateTillCanCloseBalance(input.currentCashBalance) ??
+    validateTillCanCloseOpenCart(input.openCartHasProducts ?? false) ??
     validateTillCanCloseHeldBills(input.heldBillsCount)
   );
 }

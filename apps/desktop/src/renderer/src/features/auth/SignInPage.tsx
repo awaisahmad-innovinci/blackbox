@@ -6,6 +6,7 @@ import { Input } from "@blackbox/ui/input";
 import { Label } from "@blackbox/ui/label";
 import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
 import { BrandLogo } from "@renderer/components/brand-logo";
+import { useAppVersion } from "@renderer/lib/app-version";
 import { useSession } from "@renderer/lib/session/context";
 
 const REINSTALL_HINT =
@@ -13,6 +14,7 @@ const REINSTALL_HINT =
 
 export function SignInPage() {
   const { signIn } = useSession();
+  const appVersion = useAppVersion();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,8 @@ export function SignInPage() {
 
   return (
     <div className="bg-background text-foreground flex min-h-screen items-center justify-center px-6">
-      <Card className="w-full max-w-sm">
+      <div className="w-full max-w-sm">
+      <Card className="w-full">
         <CardHeader>
           <BrandLogo />
           <CardTitle className="text-xl">Sign in</CardTitle>
@@ -86,6 +89,12 @@ export function SignInPage() {
           </form>
         </CardContent>
       </Card>
+      {appVersion ? (
+        <p className="text-muted-foreground mt-4 text-center text-xs tabular-nums">
+          v{appVersion}
+        </p>
+      ) : null}
+      </div>
     </div>
   );
 }

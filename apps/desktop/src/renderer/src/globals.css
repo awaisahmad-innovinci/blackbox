@@ -46,12 +46,93 @@
   [data-print-document]:not(:has([data-thermal-receipt])) {
     color: #000 !important;
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 12px !important;
-    line-height: 1.4 !important;
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    line-height: 1.35 !important;
   }
 
   [data-print-document]:not(:has([data-thermal-receipt])) * {
     color: #000 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) p,
+  [data-print-document]:not(:has([data-thermal-receipt])) span,
+  [data-print-document]:not(:has([data-thermal-receipt])) div,
+  [data-print-document]:not(:has([data-thermal-receipt])) section {
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    line-height: 1.35 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .print-doc-head {
+    border-bottom: 1px solid #000 !important;
+    margin: 0 0 8px !important;
+    padding: 0 0 6px !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .print-doc-store {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .print-doc-kind {
+    font-size: 9px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    line-height: 1.3 !important;
+    margin: 2px 0 0 !important;
+    text-transform: uppercase !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) h1 {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    margin: 8px 0 0 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) h1 + p {
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    line-height: 1.3 !important;
+    margin-top: 2px !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) h2 {
+    border-bottom: 1px solid #ccc !important;
+    font-size: 9px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.06em !important;
+    line-height: 1.2 !important;
+    margin: 8px 0 6px !important;
+    padding-bottom: 2px !important;
+    text-transform: uppercase !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) dt {
+    font-size: 8px !important;
+    font-weight: 400 !important;
+    line-height: 1.3 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) dd,
+  [data-print-document]:not(:has([data-thermal-receipt])) dd * {
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .grid {
+    gap: 8px 16px !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .text-xs {
+    display: block !important;
+    font-size: 8px !important;
+    font-weight: 400 !important;
+    line-height: 1.3 !important;
   }
 
   [data-print-document]:not(:has([data-thermal-receipt])) table {
@@ -61,17 +142,50 @@
     table-layout: auto;
   }
 
-  [data-print-document]:not(:has([data-thermal-receipt])) th,
+  [data-print-document]:not(:has([data-thermal-receipt])) thead,
+  [data-print-document]:not(:has([data-thermal-receipt])) thead tr,
+  [data-print-document]:not(:has([data-thermal-receipt])) th {
+    background: transparent !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) th {
+    border-bottom: 1px solid #000 !important;
+    font-size: 8px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.04em !important;
+    line-height: 1.2 !important;
+    padding: 3px 6px !important;
+    text-transform: uppercase !important;
+    vertical-align: bottom;
+  }
+
   [data-print-document]:not(:has([data-thermal-receipt])) td {
+    border-bottom: 1px solid #ddd !important;
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    line-height: 1.35 !important;
     overflow: visible !important;
-    word-break: normal !important;
     overflow-wrap: break-word !important;
-    white-space: normal !important;
+    padding: 3px 6px !important;
     vertical-align: top;
+    white-space: normal !important;
+    word-break: normal !important;
   }
 
   [data-print-document]:not(:has([data-thermal-receipt])) .tabular-nums {
+    text-align: right !important;
     white-space: nowrap !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .border-t {
+    border-top: 1px solid #000 !important;
+    margin-top: 6px !important;
+    padding-top: 4px !important;
+  }
+
+  [data-print-document]:not(:has([data-thermal-receipt])) .max-w-sm {
+    margin-left: auto !important;
+    width: 220px !important;
   }
 
   [data-print-document]:not(:has([data-thermal-receipt])) .overflow-hidden {
@@ -112,13 +226,13 @@
     box-sizing: border-box !important;
     color: #000 !important;
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
     line-height: 1.35 !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 1mm 1.5mm 14mm !important;
+    padding: 1mm 1.5mm 8mm !important;
     word-break: normal !important;
     overflow-wrap: break-word !important;
     -webkit-print-color-adjust: exact;
@@ -129,6 +243,12 @@
     color: #000 !important;
     word-break: normal !important;
     overflow-wrap: break-word !important;
+  }
+
+  [data-thermal-receipt] p,
+  [data-thermal-receipt] span,
+  [data-thermal-receipt] div {
+    font-size: 14px !important;
   }
 
   [data-thermal-receipt] .break-all {
@@ -157,6 +277,8 @@
     color: #000 !important;
     fill: #000 !important;
     stroke: #000 !important;
+    width: 100% !important;
+    height: 16mm !important;
   }
 
   [data-thermal-receipt] .thermal-receipt-feed {

@@ -9,6 +9,7 @@ import {
   validateTillCanClose,
   validateTillCanCloseBalance,
   validateTillCanCloseHeldBills,
+  validateTillCanCloseOpenCart,
   validateTillOpeningBalance,
   validateTillOpeningBalanceAmount,
 } from "@blackbox/shared";
@@ -92,6 +93,7 @@ export function TillPage() {
   const [openingDrawer, setOpeningDrawer] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [heldBillsCount, setHeldBillsCount] = useState(0);
+  const [openCartHasProducts, setOpenCartHasProducts] = useState(false);
   const [heldBillsCountKnown, setHeldBillsCountKnown] = useState(true);
 
   const HELD_BILLS_COUNT_UNAVAILABLE =
@@ -99,7 +101,10 @@ export function TillPage() {
   const [openDialogOpen, setOpenDialogOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
 
-  async function loadHeldBillsCount(): Promise<number | null> {
+  async function loadHeldBillsCount(): Promise<{
+    heldBillsCount: number;
+    openCartHasProducts: boolean;
+  } | null> {
     if (!user?.id) return null;
     const counter = window.blackbox?.localDb?.countHeldBillsForCashier;
     if (!counter) {
@@ -107,9 +112,13 @@ export function TillPage() {
       return null;
     }
     setHeldBillsCountKnown(true);
-    const count = await counter(user.id);
+    const [count, openCart] = await Promise.all([
+      counter(user.id),
+      window.blackbox?.localDb?.openCartHasProducts?.(user.id) ?? false,
+    ]);
     setHeldBillsCount(count);
-    return count;
+    setOpenCartHasProducts(openCart);
+    return { heldBillsCount: count, openCartHasProducts: openCart };
   }
 
   useEffect(() => {
@@ -322,18 +331,18 @@ export function TillPage() {
 
   async function onCloseTill(): Promise<void> {
     if (!user || !session) return;
-    const heldCount = await loadHeldBillsCount();
-    if (heldCount == null) {
+    const heldFacts = await loadHeldBillsCount();
+    if (heldFacts == null) {
       setError(HELD_BILLS_COUNT_UNAVAILABLE);
       return;
     }
     const closeError = validateTillCanClose({
       currentCashBalance: session.currentCashBalance,
-      heldBillsCount: heldCount,
+      heldBillsCount: heldFacts.heldBillsCount,
+      openCartHasProducts: heldFacts.openCartHasProducts,
     });
     if (closeError) {
       setError(closeError);
-      setHeldBillsCount(heldCount);
       return;
     }
     setError(null);
@@ -364,6 +373,7 @@ export function TillPage() {
       ? validateTillCanClose({
           currentCashBalance: session.currentCashBalance,
           heldBillsCount,
+          openCartHasProducts,
         })
       : HELD_BILLS_COUNT_UNAVAILABLE
     : null;
@@ -373,6 +383,45 @@ export function TillPage() {
   const closeHeldBillsError = heldBillsCountKnown
     ? validateTillCanCloseHeldBills(heldBillsCount)
     : HELD_BILLS_COUNT_UNAVAILABLE;
+  const closeOpenCartError = heldBillsCountKnown
+    ? validateTillCanCloseOpenCart(openCartHasProducts)
+    : null;
+  const managerCanClearAndClose =
+    heldBillsCountKnown &&
+    !closeBalanceError &&
+    (heldBillsCount > 0 || openCartHasProducts);
+
+  async function onManagerForceClose(): Promise<void> {
+    if (!user || !session) return;
+    if (closeBalanceError) {
+      setError(closeBalanceError);
+      return;
+    }
+    const totp = await promptSupervisorTotp({ audience: "manager" });
+    if (!totp.approved) return;
+    const clearDrafts = window.blackbox?.localDb?.clearCashierDrafts;
+    if (!clearDrafts) {
+      setError("Could not clear open sales on this device.");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await clearDrafts(user.id);
+      await clearCashierOpenSaleState(user.id);
+      clearStashedNewSale();
+      await closeTill({
+        userId: user.id,
+        userName: user.fullName?.trim() || user.username,
+      });
+      setCloseDialogOpen(false);
+      await refresh();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to close till"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onOpenDrawer(): Promise<void> {
     setOpeningDrawer(true);
@@ -721,30 +770,50 @@ export function TillPage() {
                   Till balance is Rs 0.
                 </p>
               )}
+              {closeOpenCartError ? (
+                <p className="text-destructive text-sm" role="alert">
+                  {closeOpenCartError}
+                </p>
+              ) : null}
               {closeHeldBillsError ? (
                 <p className="text-destructive text-sm" role="alert">
                   {closeHeldBillsError}
                 </p>
               ) : heldBillsCountKnown &&
                 heldBillsCount === 0 &&
+                !openCartHasProducts &&
                 !closeBalanceError ? (
                 <p className="text-muted-foreground text-sm">You can close now.</p>
               ) : null}
             </>
           ) : null}
           <DialogFooter className="gap-2 sm:justify-between">
-            {heldBillsCountKnown && heldBillsCount > 0 ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setCloseDialogOpen(false);
-                  navigate("/sales/held");
-                }}
-              >
-                Go to held bills
-              </Button>
-            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {heldBillsCountKnown && heldBillsCount > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCloseDialogOpen(false);
+                    navigate("/sales/held");
+                  }}
+                >
+                  Go to held bills
+                </Button>
+              ) : null}
+              {openCartHasProducts ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCloseDialogOpen(false);
+                    navigate("/sales/new");
+                  }}
+                >
+                  Go to sale
+                </Button>
+              ) : null}
+            </div>
             <div className="flex flex-wrap gap-2 sm:justify-end">
               <Button
                 variant="outline"
@@ -753,6 +822,15 @@ export function TillPage() {
               >
                 Cancel
               </Button>
+              {managerCanClearAndClose ? (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void onManagerForceClose()}
+                >
+                  {busy ? "Closing…" : "Close with manager code"}
+                </Button>
+              ) : null}
               <Button
                 disabled={busy || !!closeTillError}
                 onClick={() => void onCloseTill()}

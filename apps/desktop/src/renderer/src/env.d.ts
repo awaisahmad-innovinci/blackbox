@@ -98,6 +98,7 @@ declare global {
   interface Window {
     blackbox?: {
       platform: NodeJS.Platform;
+      getAppVersion?: () => Promise<string>;
       localDb?: {
         getStatus: () => Promise<LocalDbStatus>;
         wipe: () => Promise<{ ok: true }>;
@@ -165,6 +166,10 @@ declare global {
           userId: string,
           excludeSaleId?: string | null,
         ) => Promise<number>;
+        openCartHasProducts: (userId: string) => Promise<boolean>;
+        clearCashierDrafts: (
+          userId: string,
+        ) => Promise<{ ok: true; cleared: number }>;
         getDraftSaleReservedQty: (
           warehouseId: string,
           productSkuId: string,

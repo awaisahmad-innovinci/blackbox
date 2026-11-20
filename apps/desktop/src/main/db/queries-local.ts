@@ -51,6 +51,7 @@ import {
   DEMO_STORE_TENANT_ID,
 } from "@blackbox/shared";
 import { getLocalDb } from "./index";
+import { countHeldBillsForCashierLocal } from "./sales-local";
 import {
   getOwnerCashBalanceLocal,
   listDrawerBalancesLocal,
@@ -651,16 +652,7 @@ export function getCashierDashboardSummaryLocal(
     .prepare(`select date('now', 'localtime') as d`)
     .get() as { d: string };
 
-  const heldRow = db
-    .prepare(
-      `select count(*) as cnt
-       from sales
-       where tenant_id = @tenantId
-         and status = 'DRAFT'
-         and sync_status = 'local'
-         and posted_by = @userId`,
-    )
-    .get({ tenantId, userId }) as { cnt: number };
+  const heldBillsCount = countHeldBillsForCashierLocal(userId);
 
   const withdrawnRow = db
     .prepare(
@@ -693,7 +685,6 @@ export function getCashierDashboardSummaryLocal(
       }
     | undefined;
 
-  const heldBillsCount = Number(heldRow.cnt);
   const cashWithdrawnAmount = roundMoney(Number(withdrawnRow.amount));
   if (!session) {
     return {

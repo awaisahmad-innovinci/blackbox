@@ -3,6 +3,20 @@ import { asFbrInvoiceStatus, DEMO_STORE_TENANT_ID } from "@blackbox/shared";
 import type Database from "better-sqlite3";
 import { applyInventoryOutBalanceDeltaLocal, getInventoryOutBalanceQtyLocal } from "./inventory-out-balance-local";
 import { getLocalDb } from "./index";
+import { getSyncMeta, setSyncMeta } from "./sync-meta";
+
+const OPEN_SALE_KEY_LEGACY = "cashier_open_sale_id";
+
+function openSaleMetaKey(userId: string): string {
+  return `cashier_open_sale_id:${userId}`;
+}
+
+export function readOpenSaleIdLocal(userId: string): string | null {
+  const scoped = getSyncMeta(openSaleMetaKey(userId))?.trim() ?? "";
+  if (scoped) return scoped;
+  const legacy = getSyncMeta(OPEN_SALE_KEY_LEGACY)?.trim() ?? "";
+  return legacy || null;
+}
 
 function removeStaleSaleByNumber(
   db: Database.Database,
@@ -303,7 +317,7 @@ export function countHeldBillsForCashierLocal(
   excludeSaleId?: string | null,
 ): number {
   const db = getLocalDb();
-  const exclude = excludeSaleId?.trim() ?? "";
+  const exclude = excludeSaleId?.trim() || readOpenSaleIdLocal(userId) || "";
   const row = db
     .prepare(
       exclude
@@ -327,6 +341,39 @@ export function countHeldBillsForCashierLocal(
       ...(exclude ? { excludeSaleId: exclude } : {}),
     }) as { cnt: number };
   return Number(row.cnt);
+}
+
+export function openCartHasProductsLocal(userId: string): boolean {
+  const saleId = readOpenSaleIdLocal(userId);
+  if (!saleId) return false;
+  const db = getLocalDb();
+  const row = db
+    .prepare(
+      `select count(*) as cnt
+       from sale_lines l
+       inner join sales s on s.id = l.sale_id
+       where s.id = ?
+         and s.tenant_id = ?
+         and s.status = 'DRAFT'
+         and s.sync_status = 'local'`,
+    )
+    .get(saleId, DEMO_STORE_TENANT_ID) as { cnt: number };
+  return Number(row.cnt) > 0;
+}
+
+/** Drops this cashier's open cart and held bills. Used when a manager closes the till. */
+export function clearCashierDraftsLocal(userId: string): number {
+  const db = getLocalDb();
+  const rows = db
+    .prepare(
+      `select id from sales
+       where tenant_id = ? and status = 'DRAFT' and sync_status = 'local' and posted_by = ?`,
+    )
+    .all(DEMO_STORE_TENANT_ID, userId) as { id: string }[];
+  for (const row of rows) deleteSaleDraftLocal(row.id);
+  setSyncMeta(openSaleMetaKey(userId), "");
+  setSyncMeta(OPEN_SALE_KEY_LEGACY, "");
+  return rows.length;
 }
 
 export function getDraftSaleReservedQtyLocal(
