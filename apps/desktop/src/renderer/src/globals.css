@@ -43,6 +43,25 @@
     page: receipt;
   }
 
+  html:has([data-thermal-receipt]),
+  body:has([data-thermal-receipt]),
+  body:has([data-thermal-receipt]) .min-h-screen,
+  body:has([data-thermal-receipt]) main,
+  [data-print-document]:has([data-thermal-receipt]) {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  [data-print-document]:has([data-thermal-receipt]) {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+  }
+
   [data-print-document]:not(:has([data-thermal-receipt])) {
     color: #000 !important;
     font-family: Arial, Helvetica, sans-serif !important;
@@ -249,6 +268,12 @@
   [data-thermal-receipt] span,
   [data-thermal-receipt] div {
     font-size: 14px !important;
+  }
+
+  [data-thermal-receipt] header p:first-of-type {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
   }
 
   [data-thermal-receipt] .break-all {

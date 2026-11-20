@@ -99,6 +99,10 @@ declare global {
     blackbox?: {
       platform: NodeJS.Platform;
       getAppVersion?: () => Promise<string>;
+      printPage?: (options: {
+        widthMicrons: number;
+        heightMicrons: number;
+      }) => Promise<boolean>;
       localDb?: {
         getStatus: () => Promise<LocalDbStatus>;
         wipe: () => Promise<{ ok: true }>;
