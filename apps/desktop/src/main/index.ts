@@ -1121,6 +1121,31 @@ function registerIpc(): void {
   );
 
   ipcMain.handle("app:getVersion", () => app.getVersion());
+  ipcMain.handle(
+    "print:page",
+    (
+      event,
+      options: { widthMicrons: number; heightMicrons: number },
+    ) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) return false;
+      const width = Math.round(options.widthMicrons);
+      const height = Math.round(options.heightMicrons);
+      const printOptions = {
+        silent: false,
+        printBackground: true,
+        preferCSSPageSize: true,
+        scaleFactor: 100,
+        margins: { marginType: "none" as const },
+        pageSize: { width, height },
+      };
+      return new Promise<boolean>((resolve) => {
+        win.webContents.print(printOptions, (success) => {
+          resolve(success);
+        });
+      });
+    },
+  );
   ipcMain.handle("identity:getComputerName", () => getComputerName());
   ipcMain.handle("identity:getFingerprint", () => getOrCreateFingerprint());
   ipcMain.handle("identity:getStableFingerprint", () =>

@@ -92,6 +92,8 @@ contextBridge.exposeInMainWorld("blackbox", {
   platform: process.platform,
   getAppVersion: () =>
     ipcRenderer.invoke("app:getVersion") as Promise<string>,
+  printPage: (options: { widthMicrons: number; heightMicrons: number }) =>
+    ipcRenderer.invoke("print:page", options) as Promise<boolean>,
   localDb: {
     getStatus: () =>
       ipcRenderer.invoke("localDb:getStatus") as Promise<LocalDbStatus>,
