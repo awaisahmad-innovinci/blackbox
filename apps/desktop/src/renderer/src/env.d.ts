@@ -98,6 +98,7 @@ declare global {
   interface Window {
     blackbox?: {
       platform: NodeJS.Platform;
+      getAppVersion?: () => Promise<string>;
       localDb?: {
         getStatus: () => Promise<LocalDbStatus>;
         wipe: () => Promise<{ ok: true }>;

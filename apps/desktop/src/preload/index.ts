@@ -90,6 +90,8 @@ type Ok = { ok: true };
 
 contextBridge.exposeInMainWorld("blackbox", {
   platform: process.platform,
+  getAppVersion: () =>
+    ipcRenderer.invoke("app:getVersion") as Promise<string>,
   localDb: {
     getStatus: () =>
       ipcRenderer.invoke("localDb:getStatus") as Promise<LocalDbStatus>,

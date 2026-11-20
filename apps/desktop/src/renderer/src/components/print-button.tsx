@@ -1,4 +1,5 @@
 import { Button } from "@blackbox/ui/button";
+import { printDocument } from "@renderer/lib/print-document";
 
 type PrintButtonProps = {
   /** When true, send ESC/POS drawer kick after the print dialog (if enabled in settings). */
@@ -31,7 +32,7 @@ export function PrintButton({ openDrawerOnPrint = false }: PrintButtonProps) {
       );
     }
 
-    window.print();
+    printDocument();
   }
 
   return (

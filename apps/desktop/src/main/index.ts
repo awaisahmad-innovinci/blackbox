@@ -1120,6 +1120,7 @@ function registerIpc(): void {
       listInventoryInOutReportLocal(dateFrom, dateTo),
   );
 
+  ipcMain.handle("app:getVersion", () => app.getVersion());
   ipcMain.handle("identity:getComputerName", () => getComputerName());
   ipcMain.handle("identity:getFingerprint", () => getOrCreateFingerprint());
   ipcMain.handle("identity:getStableFingerprint", () =>

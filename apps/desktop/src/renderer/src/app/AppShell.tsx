@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
 import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard";
@@ -17,6 +17,7 @@ import {
 import { LAST_FULL_PULL_AT_KEY } from "@renderer/lib/local-db/pull";
 import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
 import { BrandLogo } from "@renderer/components/brand-logo";
+import { useAppVersion } from "@renderer/lib/app-version";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
 import { NavDropdownMenuItem } from "@renderer/components/nav-dropdown-menu-item";
 import { ImportMasterDataDialog } from "@renderer/features/dashboard/ImportMasterDataDialog";
@@ -81,7 +82,11 @@ export function AppShell() {
     signOut,
   } = useSession();
   const sync = useSyncStatus();
+  const appVersion = useAppVersion();
   const catalog = useCatalogSync();
+  const seenDataVersion = useRef(sync.dataVersion);
+  const [screenKey, setScreenKey] = useState(0);
+  const [refreshReady, setRefreshReady] = useState(false);
   const [lastFullSync, setLastFullSync] = useState<string | null>(null);
   const { requestLogout, logoutDialogs } = useTillGuardedLogout();
   const permissions = user?.permissions ?? [];
@@ -111,7 +116,14 @@ export function AppShell() {
 
   useEffect(() => {
     releaseStuckModalState({ retry: true });
+    setRefreshReady(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (sync.dataVersion === seenDataVersion.current) return;
+    seenDataVersion.current = sync.dataVersion;
+    setRefreshReady(true);
+  }, [sync.dataVersion]);
 
   useEffect(() => {
     if (deviceLocked && location.pathname !== "/") {
@@ -332,6 +344,32 @@ export function AppShell() {
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
+            {appVersion ? (
+              <span className="text-muted-foreground text-xs tabular-nums">
+                v{appVersion}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              disabled={!refreshReady}
+              onClick={() => {
+                setScreenKey((key) => key + 1);
+                setRefreshReady(false);
+              }}
+              className={cn(
+                "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                refreshReady
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "text-muted-foreground cursor-default opacity-40",
+              )}
+              title={
+                refreshReady
+                  ? "Reload this screen with the latest synced data"
+                  : "Refresh becomes available after a sync"
+              }
+            >
+              Refresh
+            </button>
             <button
               type="button"
               onClick={() => void syncNow()}
@@ -419,7 +457,7 @@ export function AppShell() {
           if (!hasOpenModal()) afterDialogClosed();
         }}
       >
-        <Outlet />
+        <Outlet key={screenKey} />
       </main>
 
       {logoutDialogs}

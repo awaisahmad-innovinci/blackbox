@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { SaleDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { PrintButton } from "@renderer/components/print-button";
+import { printDocument } from "@renderer/lib/print-document";
 import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
@@ -80,7 +81,7 @@ export function SaleDetailPage() {
     if (detail.status !== "POSTED") return;
     if (printedBillFor.current === detail.id) return;
     printedBillFor.current = detail.id;
-    window.print();
+    printDocument();
   }, [loading, detail, printBill]);
 
   async function onDiscardDraft() {

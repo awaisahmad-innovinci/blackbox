@@ -187,10 +187,10 @@ export function ThermalReceiptBarcode({ value }: { value: string }) {
     try {
       JsBarcode(svg, trimmed, {
         format: "CODE128",
-        width: 1,
-        height: 50,
+        width: 2,
+        height: 60,
         displayValue: true,
-        fontSize: 10,
+        fontSize: 12,
         margin: 0,
         textMargin: 2,
       });
@@ -203,7 +203,7 @@ export function ThermalReceiptBarcode({ value }: { value: string }) {
 
   return (
     <div className="thermal-receipt-barcode mx-auto w-full max-w-full break-inside-avoid py-1">
-      <svg ref={svgRef} className="mx-auto block h-auto max-w-full" />
+      <svg ref={svgRef} className="mx-auto block h-[16mm] w-full" />
     </div>
   );
 }
