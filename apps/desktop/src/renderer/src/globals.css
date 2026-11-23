@@ -305,7 +305,8 @@
   [data-thermal-receipt] .thermal-receipt-barcode svg {
     color: #000 !important;
     fill: #000 !important;
-    stroke: #000 !important;
+    /* stroke is inherited: on the bars it closes the gaps and frames the quiet zone → unscannable */
+    stroke: none !important;
     width: 100% !important;
     height: 16mm !important;
   }
