@@ -129,6 +129,9 @@ function BrandMark() {
     <div className="flex items-center gap-2.5 px-2">
       <BrandLogo />
       <div className="min-w-0">
+        <p className="font-display truncate text-base font-semibold tracking-tight">
+          Blackbox
+        </p>
         <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
           Workspace admin
         </p>
