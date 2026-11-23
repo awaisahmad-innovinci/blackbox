@@ -85,7 +85,6 @@ export class SalesController {
     ) {
       throw new ForbiddenException("Insufficient permissions");
     }
-    
     return this.fbr.submitSale(id, body.sale);
   }
 
