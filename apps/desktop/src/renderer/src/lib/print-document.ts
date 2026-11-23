@@ -1,11 +1,12 @@
-const RECEIPT_PAGE_STYLE = `
-@media print {
-  @page {
-    size: 80mm auto;
-    margin: 3mm 2mm;
-  }
+/**
+ * Receipt page box. Must be a valid `size` (two lengths): an invalid one is dropped and the
+ * global `@page { size: A4 }` wins, so Chromium lays the slip out on A4 and shrinks it onto the roll.
+ * Margin 0 because the slip is already laid out at the full 80mm width.
+ */
+function receiptPageStyle(heightMicrons: number): string {
+  const page = `size: 80mm ${heightMicrons / MICRONS_PER_MM}mm; margin: 0;`;
+  return `@media print { @page { ${page} } @page receipt { ${page} } }`;
 }
-`;
 
 const MICRONS_PER_MM = 1000;
 const MICRONS_PER_PX = 25400 / 96;
@@ -20,10 +21,11 @@ function receiptHeightMicrons(slip: Element): number {
 /** Print the current page. Sale and return slips use an 80mm page so they are not shrunk onto A4. */
 export function printDocument(): void {
   const thermal = document.querySelector("[data-thermal-receipt]");
+  const heightMicrons = thermal ? receiptHeightMicrons(thermal) : 0;
   const style = thermal ? document.createElement("style") : null;
   if (style) {
     style.setAttribute("data-print-page", "receipt");
-    style.textContent = RECEIPT_PAGE_STYLE;
+    style.textContent = receiptPageStyle(heightMicrons);
     document.head.appendChild(style);
   }
   const cleanup = () => {
@@ -35,7 +37,7 @@ export function printDocument(): void {
     void window.blackbox
       .printPage({
         widthMicrons: 80 * MICRONS_PER_MM,
-        heightMicrons: receiptHeightMicrons(thermal),
+        heightMicrons,
       })
       .finally(cleanup);
     return;

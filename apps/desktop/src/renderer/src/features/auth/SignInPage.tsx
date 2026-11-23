@@ -48,7 +48,7 @@ export function SignInPage() {
       <Card className="w-full">
         <CardHeader>
           <BrandLogo />
-          <CardTitle className="text-xl">Sign in to Blackbox</CardTitle>
+          <CardTitle className="text-xl">Sign in</CardTitle>
           <p className="text-muted-foreground text-sm">
             Use the credentials your owner created for you. This machine is
             registered as a device on first sign in.

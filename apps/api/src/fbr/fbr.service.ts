@@ -89,18 +89,14 @@ export class FbrService {
     let sale = await this.sales.findOne({
       where: { id: saleId, tenantId },
     });
-    console.log("sale", sale, saleId, tenantId);
-    
     // #region agent log
-    // fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"A",location:"fbr.service.ts:submitSale",message:"fbr lookup before upsert",data:{saleId,tenantId,found:Boolean(sale),hasIncoming:Boolean(incoming&&Object.keys(incoming).length>0),incomingSaleNumber:incoming?.saleNumber??null},timestamp:Date.now()})}).catch(()=>{});
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"c77da1"},body:JSON.stringify({sessionId:"c77da1",hypothesisId:"A",location:"fbr.service.ts:submitSale",message:"fbr lookup before upsert",data:{saleId,tenantId,found:Boolean(sale),hasIncoming:Boolean(incoming&&Object.keys(incoming).length>0),incomingSaleNumber:incoming?.saleNumber??null},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
     if (!sale && incoming && Object.keys(incoming).length > 0) {
       await this.sync.upsertPostedSale(tenantId, saleId, incoming);
       sale = await this.sales.findOne({
         where: { id: saleId, tenantId },
       });
-      console.log("sale after upsert", sale);
-      
     }
     if (!sale) throw new NotFoundException("Sale not found");
     if (sale.status !== "POSTED") {
@@ -121,8 +117,6 @@ export class FbrService {
 
     const configError = this.configError(tenant);
     if (configError) {
-      console.log("configError", configError);
-      
       await this.markFailed(sale, configError, tenant.fbrSellerNtn);
       return this.publishAndLoad(saleId);
     }
@@ -147,8 +141,6 @@ export class FbrService {
         tenant.fbrToken!.trim(),
         payload,
       );
-      console.log("invoiceNumber", invoiceNumber);
-      
       await this.saveSale(sale, {
         fbrInvoiceNumber: invoiceNumber,
         fbrStatus: "submitted",
