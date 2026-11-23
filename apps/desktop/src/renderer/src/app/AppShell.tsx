@@ -209,7 +209,7 @@ export function AppShell() {
         <header className="border-border flex items-center justify-between border-b px-8 py-4">
           <span className="flex items-center gap-2 text-sm font-semibold">
             <BrandLogo />
-            
+            Blackbox
           </span>
           <button
             type="button"
@@ -250,6 +250,7 @@ export function AppShell() {
             className="flex items-center gap-2 text-lg font-semibold tracking-tight"
           >
             <BrandLogo />
+            Blackbox
           </Link>
           <nav
             role="menubar"

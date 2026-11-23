@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { runIncrementalSync } from "@renderer/lib/api/sync";
 import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
+import { flushPendingFbrSales } from "@renderer/lib/sales/flush-pending-fbr";
 import { refreshSessionUserFromApi } from "@renderer/lib/session/session-user-refresh";
 
 export type SyncStatusState = {
@@ -84,6 +85,7 @@ export async function syncNow(): Promise<boolean> {
     // #region agent log
     fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"A-D",location:"sync-status.ts:syncNow",message:"incremental sync ok",data:{pushed,pulled},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
+    await flushPendingFbrSales();
     return true;
   } catch (error: unknown) {
     const offline = error instanceof TypeError;

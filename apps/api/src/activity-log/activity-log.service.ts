@@ -144,7 +144,74 @@ export class ActivityLogService {
       summary: dto.summary.trim(),
       metadata: dto.metadata ?? {},
     });
-    await this.logs.save(row);
+  // #region agent log
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "52d579",
+      },
+      body: JSON.stringify({
+        sessionId: "52d579",
+        runId: "pre-fix",
+        hypothesisId: "B",
+        location: "activity-log.service.ts:insertLog",
+        message: "activity log insert attempt",
+        data: { eventType: dto.eventType, tenantId },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    try {
+      await this.logs.save(row);
+      // #region agent log
+      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "52d579",
+        },
+        body: JSON.stringify({
+          sessionId: "52d579",
+          runId: "pre-fix",
+          hypothesisId: "B",
+          location: "activity-log.service.ts:insertLog",
+          message: "activity log insert ok",
+          data: { eventType: dto.eventType, logId: row.id },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    } catch (error: unknown) {
+      const pgCode =
+        error &&
+        typeof error === "object" &&
+        "driverError" in error &&
+        error.driverError &&
+        typeof error.driverError === "object" &&
+        "code" in error.driverError
+          ? String((error.driverError as { code?: string }).code)
+          : null;
+      // #region agent log
+      fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "52d579",
+        },
+        body: JSON.stringify({
+          sessionId: "52d579",
+          runId: "pre-fix",
+          hypothesisId: "B",
+          location: "activity-log.service.ts:insertLog",
+          message: "activity log insert failed",
+          data: { eventType: dto.eventType, pgCode },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      throw error;
+    }
     const saved = await this.logs.findOne({
       where: { id: row.id, tenantId },
       relations: { actorUser: true, supervisorUser: true, subjectUser: true },

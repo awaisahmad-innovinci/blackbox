@@ -50,7 +50,10 @@ import {
 import { logActivityEvent } from "@renderer/lib/api/activity-logs";
 import { salesApi } from "@renderer/lib/api/sales";
 import { bumpDataVersion, syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
-import { submitPostedSaleToFbr } from "@renderer/lib/sales/submit-fbr";
+import {
+  isFbrApiUnreachable,
+  submitPostedSaleToFbr,
+} from "@renderer/lib/sales/submit-fbr";
 import { resolveCardTerminalAmount } from "@renderer/features/sales/resolve-card-terminal-amount";
 import { useCardTerminalAmountSync } from "@renderer/features/sales/use-card-terminal-amount-sync";
 import { commitLocalChange, isDeviceBound } from "@renderer/lib/local-db/local-write";
@@ -1836,12 +1839,10 @@ export function SalePage() {
             }
           }
         }
-        const registerOffline =
-          offline ||
-          sync.offline ||
-          (typeof navigator !== "undefined" && navigator.onLine === false);
         const withFbr =
-          user?.fbrEnabled && !nonFbrSale && !registerOffline
+          user?.fbrEnabled &&
+          !nonFbrSale &&
+          !isFbrApiUnreachable(offline)
             ? await submitPostedSaleToFbr(detail)
             : detail;
         if (user?.id) {
