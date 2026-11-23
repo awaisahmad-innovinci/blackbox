@@ -2,6 +2,14 @@ import type { SaleDetail } from "@blackbox/shared";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { salesApi } from "@renderer/lib/api/sales";
 
+/** FBR uses HTTP directly; sync push failures must not block invoicing. */
+export function isFbrApiUnreachable(sessionOffline: boolean): boolean {
+  return (
+    sessionOffline ||
+    (typeof navigator !== "undefined" && navigator.onLine === false)
+  );
+}
+
 function isOfflineError(error: unknown, message: string): boolean {
   return (
     error instanceof TypeError ||
