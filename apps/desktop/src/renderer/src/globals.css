@@ -48,7 +48,7 @@
     display: none !important;
   }
 
-  /* Thermal: every wrapper around the receipt collapses to a plain 80mm block. */
+  /* Thermal: every wrapper around the receipt collapses to a plain 72mm block (printable width of 80mm paper). */
   html:has([data-thermal-receipt]),
   body:has([data-thermal-receipt]),
   body:has([data-thermal-receipt]) :has([data-thermal-receipt]) {
@@ -56,8 +56,8 @@
     position: static !important;
     left: auto !important;
     top: auto !important;
-    width: 80mm !important;
-    max-width: 80mm !important;
+    width: 72mm !important;
+    max-width: 72mm !important;
     min-height: 0 !important;
     height: auto !important;
     margin: 0 !important;

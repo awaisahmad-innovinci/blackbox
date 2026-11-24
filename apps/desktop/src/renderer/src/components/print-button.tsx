@@ -6,33 +6,32 @@ type PrintButtonProps = {
   openDrawerOnPrint?: boolean;
 };
 
+/** ESC/POS drawer kick after a receipt print, if enabled in printer settings. */
+export async function openDrawerAfterReceiptPrint(): Promise<void> {
+  try {
+    const settings = await window.blackbox?.pos?.getPrinterSettings?.();
+    if (!settings?.enabled || !settings.openDrawerOnReceiptPrint) {
+      return;
+    }
+    await window.blackbox?.pos?.openCashDrawer?.();
+  } catch {
+    /* drawer is optional hardware */
+  }
+}
+
 export function PrintButton({ openDrawerOnPrint = false }: PrintButtonProps) {
   function onPrint() {
     if (openDrawerOnPrint) {
       window.addEventListener(
         "afterprint",
         () => {
-          void (async () => {
-            try {
-              const settings =
-                await window.blackbox?.pos?.getPrinterSettings?.();
-              if (
-                !settings?.enabled ||
-                !settings.openDrawerOnReceiptPrint
-              ) {
-                return;
-              }
-              await window.blackbox?.pos?.openCashDrawer?.();
-            } catch {
-              /* drawer is optional hardware */
-            }
-          })();
+          void openDrawerAfterReceiptPrint();
         },
         { once: true },
       );
     }
 
-    printDocument();
+    void printDocument();
   }
 
   return (

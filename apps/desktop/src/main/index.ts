@@ -271,6 +271,7 @@ import {
 } from "./db/canonical-id-local";
 import { seedLocalEntityVersions } from "./db/entity-versions-local";
 import { registerPosHandlers } from "./pos/register-pos-handlers";
+import { loadPosPrinterSettings } from "./pos/pos-service";
 
 let appMainWindow: BrowserWindow | null = null;
 
@@ -1154,14 +1155,19 @@ function registerIpc(): void {
     "print:page",
     (
       event,
-      options: { widthMicrons: number; heightMicrons: number },
+      options: { widthMicrons: number; heightMicrons: number; silent?: boolean },
     ) => {
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win) return false;
       const width = Math.round(options.widthMicrons);
       const height = Math.round(options.heightMicrons);
+      // Silent only when a receipt printer is configured (Till → Printer settings); else show the dialog.
+      const receiptPrinter = options.silent
+        ? loadPosPrinterSettings().printerName.trim()
+        : "";
       const printOptions = {
-        silent: false,
+        silent: Boolean(receiptPrinter),
+        ...(receiptPrinter ? { deviceName: receiptPrinter } : {}),
         printBackground: true,
         preferCSSPageSize: false,
         scaleFactor: 100,

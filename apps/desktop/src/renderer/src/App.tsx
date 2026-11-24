@@ -42,7 +42,7 @@ import { VendorsListPage } from "./features/vendors/VendorsListPage";
 import { WarehouseFormPage } from "./features/warehouses/WarehouseFormPage";
 import { WarehousesListPage } from "./features/warehouses/WarehousesListPage";
 import { HeldSalesPage } from "./features/sales/HeldSalesPage";
-import { SalePage } from "./features/sales/SalePage";
+import { NewSaleRoute, SalePage } from "./features/sales/SalePage";
 import { SaleDetailPage } from "./features/sales/SaleDetailPage";
 import { SalesListPage } from "./features/sales/SalesListPage";
 import { ManagerStockOverviewPage } from "./features/sales/ManagerStockOverviewPage";
@@ -184,7 +184,7 @@ function AuthenticatedApp() {
           <Route path="activity" element={<ActivityLogPage />} />
           <Route path="reports/taxes" element={<TaxReportPage />} />
           <Route path="sales/new/:draftId" element={<SalePage />} />
-          <Route path="sales/new" element={<SalePage />} />
+          <Route path="sales/new" element={<NewSaleRoute />} />
           <Route path="sales/:id" element={<SaleDetailPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

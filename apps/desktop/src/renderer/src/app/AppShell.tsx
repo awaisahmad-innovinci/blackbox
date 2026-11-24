@@ -15,7 +15,11 @@ import {
   useCatalogSync,
 } from "@renderer/lib/sync/catalog-sync";
 import { LAST_FULL_PULL_AT_KEY } from "@renderer/lib/local-db/pull";
-import { syncNow, useSyncStatus } from "@renderer/lib/sync/sync-status";
+import {
+  getSyncStatus,
+  syncNow,
+  useSyncStatus,
+} from "@renderer/lib/sync/sync-status";
 import { BrandLogo } from "@renderer/components/brand-logo";
 import { useAppVersion } from "@renderer/lib/app-version";
 import { ConfirmDialog } from "@renderer/components/confirm-dialog";
@@ -75,6 +79,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const {
+    status,
     user,
     offline,
     deviceState,
@@ -88,6 +93,11 @@ export function AppShell() {
   const appVersion = useAppVersion();
   const catalog = useCatalogSync();
   const seenDataVersion = useRef(sync.dataVersion);
+  const loginRefresh = useRef<{
+    armed: boolean;
+    sawSyncing: boolean;
+    baseline: string | null;
+  } | null>(null);
   const [screenKey, setScreenKey] = useState(0);
   const [refreshReady, setRefreshReady] = useState(false);
   const [lastFullSync, setLastFullSync] = useState<string | null>(null);
@@ -127,6 +137,35 @@ export function AppShell() {
     seenDataVersion.current = sync.dataVersion;
     setRefreshReady(true);
   }, [sync.dataVersion]);
+
+  useEffect(() => {
+    if (status !== "signed-in") {
+      loginRefresh.current = null;
+      return;
+    }
+    if (loginRefresh.current) return;
+    loginRefresh.current = {
+      armed: true,
+      sawSyncing: false,
+      baseline: getSyncStatus().lastSyncedAt,
+    };
+  }, [status]);
+
+  useEffect(() => {
+    const pending = loginRefresh.current;
+    if (!pending?.armed) return;
+    if (sync.syncing) {
+      pending.sawSyncing = true;
+      return;
+    }
+    if (!pending.sawSyncing) return;
+    pending.armed = false;
+    if (sync.lastSyncedAt && sync.lastSyncedAt !== pending.baseline) {
+      seenDataVersion.current = sync.dataVersion;
+      setScreenKey((key) => key + 1);
+      setRefreshReady(false);
+    }
+  }, [sync.syncing, sync.lastSyncedAt, sync.dataVersion]);
 
   useEffect(() => {
     if (deviceLocked && location.pathname !== "/") {

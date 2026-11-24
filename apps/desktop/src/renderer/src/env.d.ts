@@ -102,6 +102,7 @@ declare global {
       printPage?: (options: {
         widthMicrons: number;
         heightMicrons: number;
+        silent?: boolean;
       }) => Promise<boolean>;
       localDb?: {
         getStatus: () => Promise<LocalDbStatus>;
