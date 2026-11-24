@@ -108,3 +108,52 @@ export async function syncNow(): Promise<boolean> {
 export function clearSyncError(): void {
   setState({ lastError: null });
 }
+
+const MAX_UPLOAD_ROUNDS = 20;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitUntilSyncIdle(): Promise<void> {
+  while (state.syncing) await wait(100);
+}
+
+async function readPendingCount(): Promise<number> {
+  const count = await window.blackbox?.sync?.pendingCount();
+  return count ?? 0;
+}
+
+/**
+ * Uploads the local outbox before sign-out. Each sync sends at most 100 rows,
+ * so this repeats until nothing is left queued.
+ */
+export async function uploadPendingChanges(): Promise<void> {
+  await waitUntilSyncIdle();
+  for (let round = 0; round < MAX_UPLOAD_ROUNDS; round += 1) {
+    const before = await readPendingCount();
+    if (before === 0) return;
+    const ok = await syncNow();
+    if (!ok) {
+      if (state.syncing) {
+        await waitUntilSyncIdle();
+        continue;
+      }
+      throw new Error(
+        state.lastError ??
+          "Some changes could not be uploaded. Stay signed in and try again.",
+      );
+    }
+    const after = await readPendingCount();
+    if (after === 0) return;
+    if (after >= before) {
+      throw new Error(
+        state.lastError ??
+          "Some changes could not be uploaded. Stay signed in and try again.",
+      );
+    }
+  }
+  throw new Error(
+    "Some changes could not be uploaded. Stay signed in and try again.",
+  );
+}
