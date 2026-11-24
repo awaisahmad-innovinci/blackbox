@@ -19,8 +19,12 @@ function receiptHeightMicrons(slip: Element): number {
   return Math.max(40 * MICRONS_PER_MM, scaled + 14 * MICRONS_PER_MM); // 8mm slack + 3mm top/bottom margins
 }
 
-/** Print the current page. Sale and return slips use an 80mm page so they are not shrunk onto A4. */
-export function printDocument(): void {
+/**
+ * Print the current page. Sale and return slips use an 80mm page so they are not shrunk onto A4.
+ * `silent`: slips go straight to the configured receipt printer (dialog if none is set).
+ * Resolves to whether printing succeeded.
+ */
+export function printDocument(options?: { silent?: boolean }): Promise<boolean> {
   const thermal = document.querySelector("[data-thermal-receipt]");
   const heightMicrons = thermal ? receiptHeightMicrons(thermal) : 0;
   const style = thermal ? document.createElement("style") : null;
@@ -35,14 +39,17 @@ export function printDocument(): void {
   window.addEventListener("afterprint", cleanup, { once: true });
 
   if (thermal && window.blackbox?.printPage) {
-    void window.blackbox
+    return window.blackbox
       .printPage({
-        widthMicrons: 80 * MICRONS_PER_MM,
+        // Paper = printable width. Drivers reject wider custom paper (CUPS falls back to Letter →
+        // blank roll); the 80mm CSS page is fitted onto it.
+        widthMicrons: 72 * MICRONS_PER_MM,
         heightMicrons,
+        silent: options?.silent,
       })
       .finally(cleanup);
-    return;
   }
 
   window.print();
+  return Promise.resolve(true);
 }

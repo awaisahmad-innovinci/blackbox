@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import type { SaleDetail } from "@blackbox/shared";
 import { Button } from "@blackbox/ui/button";
 import { PrintButton } from "@renderer/components/print-button";
-import { printDocument } from "@renderer/lib/print-document";
 import { PrintDocument } from "@renderer/components/print-document";
 import { useConfirm } from "@renderer/components/confirm-provider";
 import { useSupervisorTotp } from "@renderer/components/supervisor-totp-provider";
@@ -19,11 +18,6 @@ import { useSession } from "@renderer/lib/session/context";
 export function SaleDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const printBill = Boolean(
-    (location.state as { printBill?: boolean } | null)?.printBill,
-  );
-  const printedBillFor = useRef<string | null>(null);
   const confirm = useConfirm();
   const { promptSupervisorTotp } = useSupervisorTotp();
   const { user } = useSession();
@@ -75,14 +69,6 @@ export function SaleDetailPage() {
       cancelled = true;
     };
   }, [id]);
-
-  useEffect(() => {
-    if (loading || !detail || !printBill) return;
-    if (detail.status !== "POSTED") return;
-    if (printedBillFor.current === detail.id) return;
-    printedBillFor.current = detail.id;
-    printDocument();
-  }, [loading, detail, printBill]);
 
   async function onDiscardDraft() {
     if (!detail || detail.status !== "DRAFT" || !user) return;

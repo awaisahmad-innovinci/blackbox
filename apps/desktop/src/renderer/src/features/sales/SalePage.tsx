@@ -66,6 +66,7 @@ import {
   loadCurrentTill,
 } from "@renderer/lib/local-db/till-source";
 import { AddSaleItemDialog } from "./AddSaleItemDialog";
+import { PostedSaleAutoPrint } from "./posted-sale-print";
 import { AdjustSaleQtyDialog } from "./AdjustSaleQtyDialog";
 import { CollectCashDialog } from "./CollectCashDialog";
 import { allocateHoldNumber, allocateSaleNumber } from "@renderer/lib/document-numbers";
@@ -213,9 +214,27 @@ function buildSplitPayments(
   ];
 }
 
+/**
+ * Route element for /sales/new. A just-posted sale (state.printSaleId) gets a fresh SalePage, as
+ * navigating away after posting used to; clearing that state afterwards does not remount.
+ */
+export function NewSaleRoute() {
+  const printSaleId = (useLocation().state as { printSaleId?: string } | null)
+    ?.printSaleId;
+  const key = useRef("new");
+  if (printSaleId) key.current = printSaleId;
+  return <SalePage key={key.current} />;
+}
+
 export function SalePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const printSaleId = (location.state as { printSaleId?: string } | null)
+    ?.printSaleId;
+  const onPostedSalePrinted = useCallback(
+    () => navigate("/sales/new", { replace: true, state: null }),
+    [navigate],
+  );
   const { draftId: routeDraftId } = useParams();
   const { user, offline } = useSession();
   const sync = useSyncStatus();
@@ -1863,7 +1882,7 @@ export function SalePage() {
         clearStashedNewSale();
         salePostCompletedRef.current = true;
         resetForNewSale();
-        navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
+        navigate("/sales/new", { replace: true, state: { printSaleId: withFbr.id } });
         void syncNow();
         return;
       }
@@ -1943,7 +1962,7 @@ export function SalePage() {
       clearStashedNewSale();
       salePostCompletedRef.current = true;
       resetForNewSale();
-      navigate(`/sales/${withFbr.id}`, { state: { printBill: true } });
+      navigate("/sales/new", { replace: true, state: { printSaleId: withFbr.id } });
       void syncNow();
     } catch (err: unknown) {
       skipOpenSalePersistRef.current = false;
@@ -2062,6 +2081,9 @@ export function SalePage() {
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
+      {printSaleId ? (
+        <PostedSaleAutoPrint saleId={printSaleId} onDone={onPostedSalePrinted} />
+      ) : null}
       <div className="border-border bg-muted/30 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2 text-sm">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-semibold">
