@@ -16,6 +16,8 @@ import {
   type CurrentDevice,
 } from "@renderer/lib/api/auth";
 import { startForcedFullSync } from "@renderer/lib/sync/catalog-sync";
+import { runIncrementalSync } from "@renderer/lib/api/sync";
+import { bumpDataVersion } from "@renderer/lib/sync/sync-status";
 import {
   isDeviceRevokedMessage,
   setOnDeviceRevoked,
@@ -23,9 +25,9 @@ import {
 import { writeCachedDeviceCode } from "@renderer/lib/device-code";
 import { getTillLogoutBlockMessage } from "@renderer/lib/local-db/till-source";
 import { setOnSessionCleared } from "@renderer/lib/api/session";
-import { setDeviceRevoked } from "@renderer/lib/local-db/local-write";
+import { setLocalWritesBlocked } from "@renderer/lib/local-db/local-write";
 import { startAutoSync, stopAutoSync } from "@renderer/lib/sync/auto-sync";
-import { refreshPendingCount } from "@renderer/lib/sync/sync-status";
+import { refreshPendingCount, syncNow } from "@renderer/lib/sync/sync-status";
 import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
 import {
   clearCashierOpenSaleState,
@@ -70,6 +72,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [deviceState, setDeviceState] = useState<DeviceState>("unknown");
   const [deviceLocked, setDeviceLocked] = useState(false);
   const [deviceRestoring, setDeviceRestoring] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const mounted = useRef(true);
   const offlineRef = useRef(false);
   const holdingRef = useRef(false);
@@ -77,10 +80,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const restoreRef = useRef<Promise<void> | null>(null);
   const deviceEpoch = useRef(0);
   const refreshInFlight = useRef(false);
+  const pendingLockRef = useRef(false);
   offlineRef.current = offline;
 
   const applyDeviceState = useCallback((next: DeviceState) => {
-    setDeviceRevoked(next === "revoked" || holdingRef.current);
+    if (holdingRef.current || next === "revoked") {
+      setLocalWritesBlocked("revoked");
+    } else if (next === "pending") {
+      setLocalWritesBlocked("pending");
+    } else {
+      setLocalWritesBlocked("none");
+    }
     if (mounted.current) setDeviceState(next);
   }, []);
 
@@ -89,7 +99,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     wipedRef.current = true;
     holdingRef.current = true;
     setDeviceLocked(true);
-    setDeviceRevoked(true);
+    setLocalWritesBlocked("revoked");
     stopAutoSync();
     await window.blackbox?.localDb?.wipe?.();
   }, []);
@@ -103,15 +113,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await window.blackbox?.localDb?.reopen?.();
         await startForcedFullSync();
         await acknowledgeLocalWipe();
+        await runIncrementalSync();
+        bumpDataVersion();
         wipedRef.current = false;
         holdingRef.current = false;
-        setDeviceRevoked(false);
+        setLocalWritesBlocked("none");
         setDeviceLocked(false);
         setDeviceRestoring(false);
         if (mounted.current) applyDeviceState("trusted");
       } catch (error: unknown) {
         setDeviceRestoring(false);
-        if (mounted.current) applyDeviceState("trusted");
         throw error;
       }
     })();
@@ -129,17 +140,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!device) {
         holdingRef.current = false;
         wipedRef.current = false;
+        pendingLockRef.current = false;
         setDeviceLocked(false);
         setDeviceRestoring(false);
         applyDeviceState("unbound");
         return;
       }
-      if (!mustWipe) {
+      if (device.status === "pending") {
         holdingRef.current = false;
         wipedRef.current = false;
+        pendingLockRef.current = true;
+        setDeviceLocked(true);
+        setDeviceRestoring(false);
+        applyDeviceState("pending");
+        return;
+      }
+      if (!mustWipe) {
+        const unlockFromPending = pendingLockRef.current;
+        holdingRef.current = false;
+        wipedRef.current = false;
+        pendingLockRef.current = false;
         setDeviceLocked(false);
         setDeviceRestoring(false);
-        applyDeviceState(device.status === "trusted" ? "trusted" : "pending");
+        applyDeviceState("trusted");
+        if (unlockFromPending) {
+          void syncNow().catch(() => undefined);
+        }
         return;
       }
       await wipeLocalData();
@@ -206,6 +232,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       writeCachedUser(null);
       holdingRef.current = false;
       wipedRef.current = false;
+      pendingLockRef.current = false;
+      setLocalWritesBlocked("none");
       setDeviceLocked(false);
       setDeviceRestoring(false);
       setUser(null);
@@ -295,30 +323,45 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await refreshSessionUserFromApi();
   }, []);
 
+  const retryDeviceRestore = useCallback(async () => {
+    await restoreAfterTrust();
+  }, [restoreAfterTrust]);
+
   const signOut = useCallback(async () => {
-    if (user && !holdingRef.current) {
-      const block = await getTillLogoutBlockMessage({
-        userId: user.id,
-        permissions: user.permissions ?? [],
-      }).catch(() => null);
-      if (block) throw new Error(block);
+    setSigningOut(true);
+    const skipLocalDb =
+      holdingRef.current ||
+      deviceState === "revoked" ||
+      deviceLocked;
+    try {
+      if (user && !skipLocalDb) {
+        const block = await getTillLogoutBlockMessage({
+          userId: user.id,
+          permissions: user.permissions ?? [],
+        }).catch(() => null);
+        if (block) throw new Error(block);
+      }
+      if (user?.id && !skipLocalDb) {
+        await clearCashierOpenSaleState(user.id).catch(() => undefined);
+      }
+      clearStashedNewSale();
+      await desktopLogout();
+      writeCachedDeviceCode(null);
+      writeCachedUser(null);
+      holdingRef.current = false;
+      wipedRef.current = false;
+      pendingLockRef.current = false;
+      setLocalWritesBlocked("none");
+      setDeviceLocked(false);
+      setDeviceRestoring(false);
+      setUser(null);
+      setOffline(false);
+      setDeviceState("unknown");
+      setStatus("signed-out");
+    } finally {
+      setSigningOut(false);
     }
-    if (user?.id) {
-      await clearCashierOpenSaleState(user.id);
-    }
-    clearStashedNewSale();
-    await desktopLogout();
-    writeCachedDeviceCode(null);
-    writeCachedUser(null);
-    holdingRef.current = false;
-    wipedRef.current = false;
-    setDeviceLocked(false);
-    setDeviceRestoring(false);
-    setUser(null);
-    setOffline(false);
-    setDeviceState("unknown");
-    setStatus("signed-out");
-  }, [user]);
+  }, [user, deviceState, deviceLocked]);
 
   const value = useMemo<SessionValue>(
     () => ({
@@ -328,10 +371,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       deviceState,
       deviceLocked,
       deviceRestoring,
+      signingOut,
       signIn,
       signOut,
       refreshDeviceState,
       refreshSessionUser,
+      retryDeviceRestore,
     }),
     [
       status,
@@ -340,10 +385,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       deviceState,
       deviceLocked,
       deviceRestoring,
+      signingOut,
       signIn,
       signOut,
       refreshDeviceState,
       refreshSessionUser,
+      retryDeviceRestore,
     ],
   );
 

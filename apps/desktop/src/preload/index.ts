@@ -239,6 +239,13 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listGoodsReceipts",
         query,
       ) as Promise<PaginatedGoodsReceipts>,
+    upsertVendorLedgerEntriesFromPull: (
+      entries: import("@blackbox/shared").VendorLedgerEntry[],
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:upsertVendorLedgerEntriesFromPull",
+        entries,
+      ) as Promise<{ ok: true }>,
     getVendorLedger: (vendorId: string) =>
       ipcRenderer.invoke(
         "localDb:getVendorLedger",
@@ -396,6 +403,12 @@ contextBridge.exposeInMainWorld("blackbox", {
       }>,
     appendLocalActivityLog: (item: import("@blackbox/shared").ActivityLogItem) =>
       ipcRenderer.invoke("localDb:appendLocalActivityLog", item) as Promise<{
+        ok: true;
+      }>,
+    upsertActivityLogsFromPull: (
+      items: import("@blackbox/shared").ActivityLogItem[],
+    ) =>
+      ipcRenderer.invoke("localDb:upsertActivityLogsFromPull", items) as Promise<{
         ok: true;
       }>,
     listLocalActivityLogs: (
@@ -806,7 +819,14 @@ contextBridge.exposeInMainWorld("blackbox", {
       changes: import("@blackbox/shared").SyncChangeDto[];
       nextCursor: string;
       stream: string;
+      bootstrapOnly?: boolean;
     }) => ipcRenderer.invoke("sync:applyPull", payload) as Promise<{ ok: true }>,
+    applyCashLedgerBootstrap: (
+      items: import("@blackbox/shared").SyncCashLedgerBootstrapItem[],
+    ) =>
+      ipcRenderer.invoke("sync:applyCashLedgerBootstrap", items) as Promise<{
+        ok: true;
+      }>,
     pendingCount: () =>
       ipcRenderer.invoke("sync:pendingCount") as Promise<number>,
     enqueue: (input: unknown) =>

@@ -54,6 +54,32 @@ export const SYNC_CATALOG_DOCUMENT_KINDS = [
 export type SyncCatalogDocumentKind =
   (typeof SYNC_CATALOG_DOCUMENT_KINDS)[number];
 
+export const SYNC_CASH_LEDGER_SECTIONS = [
+  "owner_cash",
+  "manager_drawer_openings",
+  "manager_drawer_submissions",
+  "cash_expenses",
+  "till_sessions",
+  "till_withdrawals",
+] as const;
+
+export type SyncCashLedgerSection =
+  (typeof SYNC_CASH_LEDGER_SECTIONS)[number];
+
+export type SyncCashLedgerBootstrapItem = {
+  entityType: SyncEntityType;
+  entityId: string;
+  payload: Record<string, unknown>;
+};
+
+export type SyncCashLedgerBootstrapPage = {
+  items: SyncCashLedgerBootstrapItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
 export type MasterDataEntityType =
   | "unit"
   | "brand"

@@ -122,6 +122,7 @@ export {
   SYNC_PULL_BATCH_SIZE,
   SYNC_CATALOG_PAGE_SIZE,
   SYNC_CATALOG_SECTIONS,
+  SYNC_CASH_LEDGER_SECTIONS,
   SYNC_CATALOG_DOCUMENT_KINDS,
   SYNC_MAX_BODY_BYTES,
   SYNC_MAX_PAYLOAD_BYTES,
@@ -152,6 +153,9 @@ export type {
   SyncCatalogReference,
   SyncCatalogProductRow,
   SyncCatalogVendorRow,
+  SyncCashLedgerSection,
+  SyncCashLedgerBootstrapItem,
+  SyncCashLedgerBootstrapPage,
 } from "./sync";
 export type {
   BusinessType,

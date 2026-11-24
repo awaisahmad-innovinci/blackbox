@@ -21,6 +21,9 @@ import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
 import { bumpDataVersion } from "@renderer/lib/sync/sync-status";
 import { seedEntityVersionHeadsFromCloud } from "@renderer/lib/sync/entity-version-seed";
+import { pullInventoryMovementsIntoLocal } from "@renderer/lib/local-db/inventory-movements-pull";
+import { pullInventoryPurchasingIntoLocal } from "@renderer/lib/local-db/inventory-purchasing-pull";
+import { pullSalesAndReturnsIntoLocal } from "@renderer/lib/local-db/sales-pull";
 
 export const LAST_FULL_PULL_AT_KEY = "last_full_pull_at";
 
@@ -467,6 +470,10 @@ export async function runFullPull(
       getApiErrorMessage(err, "Failed to finish catalog sync"),
     );
   }
+
+  await pullSalesAndReturnsIntoLocal().catch(() => undefined);
+  await pullInventoryPurchasingIntoLocal().catch(() => undefined);
+  await pullInventoryMovementsIntoLocal().catch(() => undefined);
 
   const lastSyncedAt = new Date().toISOString();
   await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);

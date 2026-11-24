@@ -52,8 +52,11 @@ function rowToItem(row: LocalActivityLogRow): ActivityLogItem {
   };
 }
 
-export function appendLocalActivityLog(item: ActivityLogItem): void {
-  const db = getLocalDb();
+function upsertActivityLogRow(
+  db: ReturnType<typeof getLocalDb>,
+  item: ActivityLogItem,
+  syncedAt: string | null,
+): void {
   db.prepare(
     `
     insert into activity_logs (
@@ -75,7 +78,8 @@ export function appendLocalActivityLog(item: ActivityLogItem): void {
       subject_name = excluded.subject_name,
       summary = excluded.summary,
       metadata = excluded.metadata,
-      created_at = excluded.created_at
+      created_at = excluded.created_at,
+      synced_at = coalesce(synced_at, excluded.synced_at)
   `,
   ).run({
     id: item.id,
@@ -89,8 +93,26 @@ export function appendLocalActivityLog(item: ActivityLogItem): void {
     summary: item.summary,
     metadata: JSON.stringify(item.metadata ?? {}),
     createdAt: item.createdAt,
-    syncedAt: null,
+    syncedAt,
   });
+}
+
+export function appendLocalActivityLog(item: ActivityLogItem): void {
+  const db = getLocalDb();
+  upsertActivityLogRow(db, item, null);
+}
+
+/** Merge tenant activity logs downloaded from the API during incremental sync. */
+export function upsertActivityLogsFromPull(items: ActivityLogItem[]): void {
+  if (items.length === 0) return;
+  const db = getLocalDb();
+  const syncedAt = new Date().toISOString();
+  const tx = db.transaction((rows: ActivityLogItem[]) => {
+    for (const item of rows) {
+      upsertActivityLogRow(db, item, syncedAt);
+    }
+  });
+  tx(items);
 }
 
 export function listLocalActivityLogs(

@@ -204,6 +204,9 @@ declare global {
         listGoodsReceipts: (
           query?: GoodsReceiptListQuery,
         ) => Promise<PaginatedGoodsReceipts>;
+        upsertVendorLedgerEntriesFromPull: (
+          entries: import("@blackbox/shared").VendorLedgerEntry[],
+        ) => Promise<{ ok: true }>;
         getVendorLedger: (vendorId: string) => Promise<VendorLedger>;
         listVendorPayments: (
           query?: VendorPaymentListQuery,
@@ -350,6 +353,9 @@ declare global {
         }) => Promise<{ ok: true }>;
         appendLocalActivityLog: (
           item: import("@blackbox/shared").ActivityLogItem,
+        ) => Promise<{ ok: true }>;
+        upsertActivityLogsFromPull: (
+          items: import("@blackbox/shared").ActivityLogItem[],
         ) => Promise<{ ok: true }>;
         listLocalActivityLogs: (
           query?: import("@blackbox/shared").ActivityLogListQuery,
@@ -544,7 +550,11 @@ declare global {
           changes: import("@blackbox/shared").SyncChangeDto[];
           nextCursor: string;
           stream: string;
+          bootstrapOnly?: boolean;
         }) => Promise<{ ok: true }>;
+        applyCashLedgerBootstrap: (
+          items: import("@blackbox/shared").SyncCashLedgerBootstrapItem[],
+        ) => Promise<{ ok: true }>;
         pendingCount: () => Promise<number>;
         enqueue: (input: unknown) => Promise<{ changeId: string }>;
         commit: (input: unknown) => Promise<{ changeId: string }>;

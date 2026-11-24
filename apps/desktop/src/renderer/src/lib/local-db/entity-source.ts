@@ -296,18 +296,7 @@ export async function loadSales(
 
 export async function loadSaleRegister(
   query: SaleRegisterQuery = {},
-  options: { preferApi?: boolean } = {},
 ): Promise<PaginatedSaleRegister> {
-  // Owner/manager views want tenant-wide sales (every cashier's bills), which
-  // only the cloud has in full. Prefer the API when online and fall back to
-  // local SQLite when the call fails (offline).
-  if (options.preferApi) {
-    try {
-      return await salesApi.register(query);
-    } catch {
-      /* offline — fall back to local */
-    }
-  }
   try {
     const local = await window.blackbox?.localDb?.listSaleRegister?.(query);
     if (local) return local;

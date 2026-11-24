@@ -4,6 +4,8 @@ import type {
   SyncCatalogProductRow,
   SyncCatalogReference,
   SyncCatalogVendorRow,
+  SyncCashLedgerBootstrapPage,
+  SyncCashLedgerSection,
   SyncChangeInput,
   SyncEntityVersionHeadsResponse,
   SyncPushResponse,
@@ -17,6 +19,10 @@ import { SYNC_CATALOG_PAGE_SIZE, SYNC_STREAMS } from "@blackbox/shared";
 import { fetchCurrentDevice } from "./auth";
 import { apiFetch } from "./client";
 import { flushPendingActivityLogs } from "./activity-logs";
+import { pullActivityLogsIntoLocal } from "@renderer/lib/local-db/activity-log-pull";
+import { pullInventoryMovementsIntoLocal } from "@renderer/lib/local-db/inventory-movements-pull";
+import { pullInventoryPurchasingIntoLocal } from "@renderer/lib/local-db/inventory-purchasing-pull";
+import { pullSalesAndReturnsIntoLocal } from "@renderer/lib/local-db/sales-pull";
 import {
   isDeviceRevokedMessage,
   notifyDeviceRevoked,
@@ -106,6 +112,20 @@ export const syncApi = {
     if (options?.entityId) q.set("entityId", options.entityId);
     return apiFetch<SyncEntityVersionHeadsResponse>(
       `/sync/entity-version-heads?${q.toString()}`,
+    );
+  },
+  cashLedger(
+    section: SyncCashLedgerSection,
+    page: number,
+    pageSize = SYNC_CATALOG_PAGE_SIZE,
+  ) {
+    const q = new URLSearchParams({
+      section,
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return apiFetch<SyncCashLedgerBootstrapPage>(
+      `/sync/cash-ledger?${q.toString()}`,
     );
   },
 };
@@ -202,15 +222,24 @@ async function pushOutboxBatch(
 
 export async function runIncrementalSync(): Promise<IncrementalSyncResult> {
   const device = await fetchCurrentDevice();
-  if (device?.status === "revoked" || device?.wipeLocalData) {
+  if (device?.status === "revoked") {
     notifyDeviceRevoked();
     throw new Error("This device cannot sync until it is trusted");
+  }
+  if (device?.wipeLocalData) {
+    throw new Error(
+      "This device is still restoring. Wait for the download to finish.",
+    );
   }
   if (!device || device.status !== "trusted") {
     throw new Error("This device cannot sync until it is trusted");
   }
 
   await flushPendingActivityLogs().catch(() => undefined);
+  await pullActivityLogsIntoLocal().catch(() => undefined);
+  await pullSalesAndReturnsIntoLocal().catch(() => undefined);
+  await pullInventoryPurchasingIntoLocal().catch(() => undefined);
+  await pullInventoryMovementsIntoLocal().catch(() => undefined);
 
   const bridge = window.blackbox?.sync;
   if (!bridge) return { pushed: 0, pulled: 0 };
@@ -218,7 +247,18 @@ export async function runIncrementalSync(): Promise<IncrementalSyncResult> {
   let pushed = 0;
   let pulled = 0;
 
-  const pending = (await bridge.listOutbox(100)) as OutboxRow[];
+  let pending: OutboxRow[];
+  try {
+    pending = (await bridge.listOutbox(100)) as OutboxRow[];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/erased|not initialized|not trusted/i.test(msg)) {
+      throw new Error(
+        "Local database is restoring — try again in a moment.",
+      );
+    }
+    throw error;
+  }
   const byStream = new Map<SyncStream, OutboxRow[]>();
   for (const row of pending) {
     const batch = byStream.get(row.stream) ?? [];

@@ -44,6 +44,7 @@ import {
 } from "@renderer/lib/api/totp";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
 import { useTillGuardedLogout } from "@renderer/lib/use-till-guarded-logout";
+import { Loader2 } from "lucide-react";
 
 const DEVICE_LABEL: Record<string, string> = {
   unknown: "Device status unknown",
@@ -79,7 +80,9 @@ export function AppShell() {
     deviceState,
     deviceLocked,
     deviceRestoring,
+    signingOut,
     signOut,
+    retryDeviceRestore,
   } = useSession();
   const sync = useSyncStatus();
   const appVersion = useAppVersion();
@@ -132,16 +135,18 @@ export function AppShell() {
   }, [deviceLocked, location.pathname, navigate]);
 
   useEffect(() => {
+    if (deviceLocked) return;
     let cancelled = false;
     void window.blackbox?.localDb
       ?.getSyncMeta?.(LAST_FULL_PULL_AT_KEY)
       .then((value) => {
         if (!cancelled) setLastFullSync(value ?? null);
-      });
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [catalog.finishedAt]);
+  }, [catalog.finishedAt, deviceLocked]);
 
   useEffect(() => {
     if (!user || offline || !supervisorCapable) return;
@@ -213,28 +218,53 @@ export function AppShell() {
           </span>
           <button
             type="button"
-            className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-3 py-1.5 text-sm font-medium"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+            disabled={signingOut}
             onClick={() => void signOut()}
           >
-            Sign out
+            {signingOut ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                Signing out…
+              </>
+            ) : (
+              "Sign out"
+            )}
           </button>
         </header>
         <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-16">
           <h1 className="text-2xl font-semibold tracking-tight">
-            {deviceRestoring ? "Restoring this device" : "Device not trusted"}
+            {deviceRestoring
+              ? "Restoring this device"
+              : deviceState === "pending"
+                ? "Device awaiting approval"
+                : catalog.error
+                  ? "Restore did not finish"
+                  : "Device not trusted"}
           </h1>
           <p className="text-muted-foreground mt-3 text-sm leading-6">
             {deviceRestoring
               ? "This device is trusted again. Its previous local data was erased, and a fresh copy is downloading from the cloud."
-              : deviceState === "trusted"
-                ? "This device is trusted again. The download did not finish, and it will try again shortly."
-                : "This device was marked untrusted. Its local data has been erased, and sales or other work stay unavailable until an owner trusts it again."}
+              : deviceState === "pending"
+                ? "An owner must trust this device in admin before you can work here. This app checks every few seconds and unlocks automatically when the device is trusted."
+                : deviceState === "trusted"
+                  ? "This device is trusted again. The download did not finish, and it will try again shortly."
+                  : "This device was marked untrusted. Its local data has been erased, and sales or other work stay unavailable until an owner trusts it again."}
           </p>
           {deviceRestoring && catalog.message ? (
             <p className="mt-4 text-sm">{catalog.message}</p>
           ) : null}
           {catalog.error ? (
-            <p className="text-destructive mt-4 text-sm">{catalog.error}</p>
+            <div className="mt-4 space-y-3">
+              <p className="text-destructive text-sm">{catalog.error}</p>
+              <button
+                type="button"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium"
+                onClick={() => void retryDeviceRestore()}
+              >
+                Retry restore
+              </button>
+            </div>
           ) : null}
         </main>
       </div>
@@ -440,15 +470,6 @@ export function AppShell() {
           </div>
         </div>
       </header>
-      {deviceState === "pending" ? (
-        <div
-          role="status"
-          className="border-b border-amber-500/40 bg-amber-500/5 px-6 py-2 text-center text-xs text-amber-900 dark:text-amber-200"
-        >
-          This device is awaiting owner approval. Changes are saved locally and
-          sync once it is trusted.
-        </div>
-      ) : null}
       <main
         className="mx-auto w-full max-w-none flex-1 px-8 py-8 lg:px-10"
         data-enter-nav=""

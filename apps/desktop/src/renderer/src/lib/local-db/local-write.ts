@@ -7,11 +7,13 @@ export async function isDeviceBound(): Promise<boolean> {
   return Boolean(identity);
 }
 
-let knownDeviceRevoked = false;
+export type LocalWriteBlock = "none" | "pending" | "revoked";
 
-/** Kept in sync by the session provider so writes can be blocked after revoke. */
-export function setDeviceRevoked(revoked: boolean): void {
-  knownDeviceRevoked = revoked;
+let localWriteBlock: LocalWriteBlock = "none";
+
+/** Kept in sync by the session provider so writes can be blocked while pending or revoked. */
+export function setLocalWritesBlocked(block: LocalWriteBlock): void {
+  localWriteBlock = block;
 }
 
 export async function commitLocalChange(input: {
@@ -21,7 +23,12 @@ export async function commitLocalChange(input: {
   payload: Record<string, unknown>;
   baseEntityVersion?: number;
 }): Promise<string> {
-  if (knownDeviceRevoked) {
+  if (localWriteBlock === "pending") {
+    throw new Error(
+      "This device is awaiting owner approval. Ask an owner to trust it before making changes.",
+    );
+  }
+  if (localWriteBlock === "revoked") {
     throw new Error(
       "This device was revoked. Ask an owner to trust it again before making changes.",
     );

@@ -208,19 +208,41 @@ export function DashboardPage() {
         setCashierSummary(null);
 
         if (showManagerDashboard && user?.id) {
-          if (
-            mode === "local" &&
-            window.blackbox?.localDb?.getManagerDashboardSummary
-          ) {
-            setManagerSummary(
-              await window.blackbox.localDb.getManagerDashboardSummary(
-                user.id,
-                user.permissions.includes("web.access"),
-                user.fullName || user.username,
-              ),
-            );
-            setOwnerOverview(null);
-          } else {
+          const emptyManagerSummary = (): ManagerDashboardSummary => ({
+            date: new Date().toISOString().slice(0, 10),
+            tillCashCollectedAmount: 0,
+            customerReturnCount: 0,
+            drawerBalance: 0,
+            drawers: [],
+            cashierTills: [],
+            cashSubmittedToday: 0,
+            cashSubmissionsToday: [],
+            ownerCashBalance: 0,
+            salesCount: 0,
+            salesTotal: 0,
+            cashPayments: 0,
+            cardPayments: 0,
+            refundCount: 0,
+            refundTotal: 0,
+          });
+
+          let managerLoaded = false;
+          if (localDbConnected && localDb?.getManagerDashboardSummary) {
+            try {
+              setManagerSummary(
+                await localDb.getManagerDashboardSummary(
+                  user.id,
+                  user.permissions.includes("web.access"),
+                  user.fullName || user.username,
+                ),
+              );
+              setOwnerOverview(null);
+              managerLoaded = true;
+            } catch {
+              managerLoaded = false;
+            }
+          }
+          if (!managerLoaded) {
             try {
               const [manager, overview] = await Promise.all([
                 dashboardApi.getManagerSummary(),
@@ -229,23 +251,7 @@ export function DashboardPage() {
               setManagerSummary(manager);
               setOwnerOverview(overview);
             } catch {
-              setManagerSummary({
-                date: new Date().toISOString().slice(0, 10),
-                tillCashCollectedAmount: 0,
-                customerReturnCount: 0,
-                drawerBalance: 0,
-                drawers: [],
-                cashierTills: [],
-                cashSubmittedToday: 0,
-                cashSubmissionsToday: [],
-                ownerCashBalance: 0,
-                salesCount: 0,
-                salesTotal: 0,
-                cashPayments: 0,
-                cardPayments: 0,
-                refundCount: 0,
-                refundTotal: 0,
-              });
+              setManagerSummary(emptyManagerSummary());
               setOwnerOverview(null);
             }
           }
