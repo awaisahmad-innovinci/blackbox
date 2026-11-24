@@ -177,7 +177,7 @@ export function SaleReturnThermalReceipt({
 
       <footer className="pt-2 text-center text-[9px] leading-tight font-semibold">
         <p>Software by Innovinci Technologies ·</p>
-        <p>www.innovinci.com</p>
+        <p>www.innovincitech.com</p>
       </footer>
     </article>
   );
