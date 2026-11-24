@@ -239,7 +239,7 @@ export function SaleThermalReceipt({
 
       <footer className="pt-1 text-center text-[9px] leading-tight font-semibold">
         <p>This software design &amp; developed by</p>
-        <p>Innovinci Technologies · www.innovinci.com</p>
+        <p>Innovinci Technologies · www.innovincitech.com</p>
       </footer>
 
       <div className="thermal-receipt-feed" aria-hidden="true" />

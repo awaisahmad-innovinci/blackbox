@@ -1,10 +1,11 @@
 /**
  * Receipt page box. Must be a valid `size` (two lengths): an invalid one is dropped and the
  * global `@page { size: A4 }` wins, so Chromium lays the slip out on A4 and shrinks it onto the roll.
- * Margin 0 because the slip is already laid out at the full 80mm width.
+ * Margins keep the slip inside the head's printable area: 80mm paper prints only the middle 72mm.
+ * Windows drivers clip (not scale) anything outside it.
  */
 function receiptPageStyle(heightMicrons: number): string {
-  const page = `size: 80mm ${heightMicrons / MICRONS_PER_MM}mm; margin: 0;`;
+  const page = `size: 80mm ${heightMicrons / MICRONS_PER_MM}mm; margin: 3mm 4mm;`;
   return `@media print { @page { ${page} } @page receipt { ${page} } }`;
 }
 
@@ -15,7 +16,7 @@ const MICRONS_PER_PX = 25400 / 96;
 function receiptHeightMicrons(slip: Element): number {
   const heightPx = slip.scrollHeight;
   const scaled = Math.ceil(heightPx * (14 / 11) * MICRONS_PER_PX);
-  return Math.max(40 * MICRONS_PER_MM, scaled + 8 * MICRONS_PER_MM);
+  return Math.max(40 * MICRONS_PER_MM, scaled + 14 * MICRONS_PER_MM); // 8mm slack + 3mm top/bottom margins
 }
 
 /** Print the current page. Sale and return slips use an 80mm page so they are not shrunk onto A4. */
