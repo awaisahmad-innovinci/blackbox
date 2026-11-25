@@ -1305,7 +1305,20 @@ function shutdownLocalDbOnSignal(): void {
 process.once("SIGTERM", shutdownLocalDbOnSignal);
 process.once("SIGINT", shutdownLocalDbOnSignal);
 
-app.whenReady().then(() => {
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const win = appMainWindow;
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+    win.focus();
+  });
+}
+
+if (gotSingleInstanceLock) app.whenReady().then(() => {
   try {
     initLocalDb();
   } catch (err: unknown) {
