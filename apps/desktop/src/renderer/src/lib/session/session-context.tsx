@@ -25,7 +25,10 @@ import { getTillLogoutBlockMessage } from "@renderer/lib/local-db/till-source";
 import { setOnSessionCleared } from "@renderer/lib/api/session";
 import { setDeviceRevoked } from "@renderer/lib/local-db/local-write";
 import { startAutoSync, stopAutoSync } from "@renderer/lib/sync/auto-sync";
-import { refreshPendingCount } from "@renderer/lib/sync/sync-status";
+import {
+  refreshPendingCount,
+  uploadPendingChanges,
+} from "@renderer/lib/sync/sync-status";
 import { refreshSupervisorTotpCache } from "@renderer/lib/api/totp";
 import {
   clearCashierOpenSaleState,
@@ -307,6 +310,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await clearCashierOpenSaleState(user.id);
     }
     clearStashedNewSale();
+    const skipUpload = deviceLocked || deviceState === "revoked";
+    if (!skipUpload) {
+      const pending = (await window.blackbox?.sync?.pendingCount()) ?? 0;
+      const browserOffline =
+        typeof navigator !== "undefined" && navigator.onLine === false;
+      if (pending > 0 && browserOffline) {
+        throw new Error(
+          "You're offline. Connect to the internet so this device can upload its changes, then sign out.",
+        );
+      }
+      if (
+        pending > 0 &&
+        (deviceState === "pending" || deviceState === "unbound")
+      ) {
+        throw new Error(
+          "This device is not approved yet, so changes cannot upload. Stay signed in until an admin trusts it.",
+        );
+      }
+      if (pending > 0) {
+        const resumeAutoSync = deviceState === "trusted" && !deviceLocked;
+        if (resumeAutoSync) stopAutoSync();
+        try {
+          await uploadPendingChanges();
+        } catch (error: unknown) {
+          if (resumeAutoSync) startAutoSync();
+          throw error instanceof Error
+            ? error
+            : new Error(
+                "Some changes could not be uploaded. Stay signed in and try again.",
+              );
+        }
+      }
+    }
     await desktopLogout();
     writeCachedDeviceCode(null);
     writeCachedUser(null);
@@ -318,7 +354,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setOffline(false);
     setDeviceState("unknown");
     setStatus("signed-out");
-  }, [user]);
+  }, [user, deviceLocked, deviceState]);
 
   const value = useMemo<SessionValue>(
     () => ({
