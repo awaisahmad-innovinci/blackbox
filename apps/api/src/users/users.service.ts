@@ -240,7 +240,20 @@ export class UsersService {
         throw new NotFoundException("User not found");
       }
 
-      await this.assertRolesExist(manager.getRepository(Role), roleIds);
+      const alreadyOwner = await manager
+        .getRepository(UserRole)
+        .createQueryBuilder("ur")
+        .innerJoin("ur.role", "role")
+        .where("ur.tenant_id = :tenantId", { tenantId })
+        .andWhere("ur.user_id = :userId", { userId: found.id })
+        .andWhere("role.key = :key", { key: "OWNER" })
+        .getExists();
+
+      await this.assertRolesExist(
+        manager.getRepository(Role),
+        roleIds,
+        alreadyOwner,
+      );
 
       await manager.delete(UserRole, { userId: found.id, tenantId });
 
@@ -304,16 +317,22 @@ export class UsersService {
   private async assertRolesExist(
     rolesRepo: Repository<Role>,
     roleIds: string[],
+    allowOwner = false,
   ): Promise<void> {
     if (roleIds.length === 0) {
       return;
     }
     const found = await rolesRepo.find({
       where: { id: In(roleIds) },
-      select: { id: true },
+      select: { id: true, key: true },
     });
     if (found.length !== roleIds.length) {
       throw new BadRequestException("One or more roles are invalid");
+    }
+    if (!allowOwner && found.some((role) => role.key === "OWNER")) {
+      throw new BadRequestException(
+        "The owner account is created from the platform admin.",
+      );
     }
   }
 }
