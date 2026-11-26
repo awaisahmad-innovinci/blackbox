@@ -4,12 +4,23 @@ export const ACTIVITY_LOGS_LAST_PULLED_AT_KEY = "activity_logs_last_pulled_at";
 
 const PAGE_SIZE = 100;
 
-/** Download tenant activity logs from the API into SQLite (incremental sync). */
-export async function pullActivityLogsIntoLocal(): Promise<number> {
+export type PullActivityLogsOptions = {
+  /** When true, clear the watermark and download the full tenant log (full / catalog pull). */
+  full?: boolean;
+};
+
+/** Download tenant activity logs from the API into SQLite. */
+export async function pullActivityLogsIntoLocal(
+  options?: PullActivityLogsOptions,
+): Promise<number> {
   const localDb = window.blackbox?.localDb;
   const upsert = localDb?.upsertActivityLogsFromPull;
   if (!upsert || !localDb?.getSyncMeta || !localDb?.setSyncMeta) {
     return 0;
+  }
+
+  if (options?.full) {
+    await localDb.setSyncMeta(ACTIVITY_LOGS_LAST_PULLED_AT_KEY, "");
   }
 
   const lastPulled = await localDb.getSyncMeta(ACTIVITY_LOGS_LAST_PULLED_AT_KEY);

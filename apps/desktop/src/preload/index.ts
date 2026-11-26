@@ -71,6 +71,8 @@ import type {
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  TaxReportKind,
+  TaxReportSummary,
 } from "@blackbox/shared";
 
 type LocalDbStatus =
@@ -115,6 +117,10 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:getSyncMeta", key) as Promise<string | null>,
     setSyncMeta: (key: string, value: string) =>
       ipcRenderer.invoke("localDb:setSyncMeta", key, value) as Promise<Ok>,
+    markTillSyncBackfillComplete: () =>
+      ipcRenderer.invoke(
+        "localDb:markTillSyncBackfillComplete",
+      ) as Promise<{ ok: true }>,
     resolveCanonicalEntityId: (input: unknown) =>
       ipcRenderer.invoke(
         "localDb:resolveCanonicalEntityId",
@@ -739,6 +745,19 @@ contextBridge.exposeInMainWorld("blackbox", {
         dateFrom,
         dateTo,
       ) as Promise<InventoryInOutReport>,
+    taxReportSummary: (
+      dateFrom: string,
+      dateTo: string,
+      vendorId?: string | null,
+      taxKind?: TaxReportKind,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:taxReportSummary",
+        dateFrom,
+        dateTo,
+        vendorId,
+        taxKind,
+      ) as Promise<TaxReportSummary>,
   },
   identity: {
     getComputerName: () =>

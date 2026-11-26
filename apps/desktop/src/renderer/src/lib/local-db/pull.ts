@@ -23,6 +23,7 @@ import { bumpDataVersion } from "@renderer/lib/sync/sync-status";
 import { seedEntityVersionHeadsFromCloud } from "@renderer/lib/sync/entity-version-seed";
 import { pullInventoryMovementsIntoLocal } from "@renderer/lib/local-db/inventory-movements-pull";
 import { pullInventoryPurchasingIntoLocal } from "@renderer/lib/local-db/inventory-purchasing-pull";
+import { pullActivityLogsIntoLocal } from "@renderer/lib/local-db/activity-log-pull";
 import { pullSalesAndReturnsIntoLocal } from "@renderer/lib/local-db/sales-pull";
 
 export const LAST_FULL_PULL_AT_KEY = "last_full_pull_at";
@@ -450,19 +451,6 @@ export async function runFullPull(
   }
 
   try {
-    report("movements", 1, 1, "Rebuilding POS balance from synced documents…");
-    await localDb.rebuildPosBalanceFromDocuments?.();
-    // #region agent log
-    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"C",location:"pull.ts:rebuild",message:"pos rebuild invoked",data:{},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  } catch (err: unknown) {
-    throw new SyncPullError(
-      "movements",
-      getApiErrorMessage(err, "Failed to rebuild POS balance"),
-    );
-  }
-
-  try {
     await finalizeCatalogCursors();
   } catch (err: unknown) {
     throw new SyncPullError(
@@ -471,12 +459,27 @@ export async function runFullPull(
     );
   }
 
+  report("done", 0, 1, "Syncing activity log…");
+  await pullActivityLogsIntoLocal({
+    full: options?.resume !== true,
+  }).catch(() => undefined);
   await pullSalesAndReturnsIntoLocal().catch(() => undefined);
   await pullInventoryPurchasingIntoLocal().catch(() => undefined);
   await pullInventoryMovementsIntoLocal().catch(() => undefined);
 
+  try {
+    report("done", 0, 1, "Rebuilding POS balance from synced documents…");
+    await localDb.rebuildPosBalanceFromDocuments?.();
+  } catch (err: unknown) {
+    throw new SyncPullError(
+      "done",
+      getApiErrorMessage(err, "Failed to rebuild POS balance"),
+    );
+  }
+
   const lastSyncedAt = new Date().toISOString();
   await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);
+  await localDb.markTillSyncBackfillComplete?.();
   report("done", 1, 1, "Sync complete");
   return { lastSyncedAt };
 }

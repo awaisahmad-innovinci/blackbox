@@ -17,9 +17,11 @@ import {
   filterSelectProps,
 } from "@renderer/components/list-filter-nav";
 import { getApiErrorMessage } from "@renderer/lib/api/client";
-import { taxReportsApi } from "@renderer/lib/api/tax-reports";
 import { downloadTextFile } from "@renderer/lib/download-file";
-import { loadVendors } from "@renderer/lib/local-db/entity-source";
+import {
+  loadTaxReportSummary,
+  loadVendors,
+} from "@renderer/lib/local-db/entity-source";
 
 const TAX_KIND_LABELS: Record<TaxReportKind, string> = {
   all: "All taxes",
@@ -64,8 +66,7 @@ export function TaxReportPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void taxReportsApi
-      .summary({
+    void loadTaxReportSummary({
         dateFrom: resolvedRange.dateFrom,
         dateTo: resolvedRange.dateTo,
         vendorId: vendorId || undefined,

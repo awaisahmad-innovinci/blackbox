@@ -586,6 +586,10 @@ export type {
   TaxReportPeriodMode,
 } from "./tax-report";
 export { buildTaxReportCsv, taxReportCsvFilename } from "./tax-report-csv";
+export {
+  applyTaxReportPaidTaxKind,
+  applyTaxReportCollectedTaxKind,
+} from "./tax-report-filter";
 export const VENDOR_CONTACT_TYPES = vendorContactTypesList;
 export const VENDOR_LEDGER_ENTRY_TYPES = vendorLedgerEntryTypesList;
 export const PAYMENT_TERMS = paymentTermsList;

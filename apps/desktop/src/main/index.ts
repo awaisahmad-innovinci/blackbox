@@ -118,6 +118,7 @@ import {
   getLatestTillSessionLocal,
   listTillsLocal,
   enqueueExistingTillsOnce,
+  markTillSyncBackfillComplete,
   openTillLocal,
   reopenTillLocal,
   upsertTillSessionLocal,
@@ -196,6 +197,7 @@ import {
   upsertSkuBarcodeLocal,
 } from "./db/sku-barcodes-local";
 import { getCashFlowLocal, getOwnerCashBalanceLocal } from "./db/cash-flow-local";
+import { getTaxReportSummaryLocal } from "./db/tax-report-local";
 import {
   getCashierDashboardSummaryLocal,
   getDashboardSummaryLocal,
@@ -320,6 +322,10 @@ function registerIpc(): void {
   ipcMain.handle("localDb:getStatus", () => getLocalDbStatus());
   ipcMain.handle("localDb:wipe", () => {
     wipeLocalDb();
+    return { ok: true as const };
+  });
+  ipcMain.handle("localDb:markTillSyncBackfillComplete", () => {
+    markTillSyncBackfillComplete();
     return { ok: true as const };
   });
   ipcMain.handle("localDb:reopen", () => {
@@ -1148,6 +1154,16 @@ function registerIpc(): void {
     "localDb:inventoryInOutReport",
     (_event, dateFrom: string, dateTo: string) =>
       listInventoryInOutReportLocal(dateFrom, dateTo),
+  );
+  ipcMain.handle(
+    "localDb:taxReportSummary",
+    (
+      _event,
+      dateFrom: string,
+      dateTo: string,
+      vendorId?: string | null,
+      taxKind?: import("@blackbox/shared").TaxReportKind,
+    ) => getTaxReportSummaryLocal(dateFrom, dateTo, vendorId, taxKind),
   );
 
   ipcMain.handle("app:getVersion", () => app.getVersion());

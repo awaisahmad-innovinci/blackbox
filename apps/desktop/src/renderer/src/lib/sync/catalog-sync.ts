@@ -87,6 +87,7 @@ export function startForcedFullSync(): Promise<void> {
         await pullSalesAndReturnsIntoLocal().catch(() => undefined);
         await pullInventoryPurchasingIntoLocal().catch(() => undefined);
         await pullInventoryMovementsIntoLocal().catch(() => undefined);
+        await localDb?.markTillSyncBackfillComplete?.();
         await localDb?.setSyncMeta?.(CATALOG_PULL_ACTIVE_KEY, "0");
         bumpDataVersion();
         setState({

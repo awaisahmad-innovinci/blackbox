@@ -108,5 +108,9 @@ async function pullSaleReturnsIntoLocal(): Promise<number> {
 export async function pullSalesAndReturnsIntoLocal(): Promise<number> {
   const sales = await pullSalesIntoLocal();
   const returns = await pullSaleReturnsIntoLocal();
-  return sales + returns;
+  const merged = sales + returns;
+  if (merged > 0) {
+    await window.blackbox?.localDb?.rebuildPosBalanceFromDocuments?.();
+  }
+  return merged;
 }

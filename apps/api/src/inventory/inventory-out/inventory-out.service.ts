@@ -27,6 +27,7 @@ import { getRequestTenant } from "../../common/request-tenant";
 import { ActivityLogService } from "../../activity-log/activity-log.service";
 import { SyncService } from "../../sync/sync.service";
 import { applyInventoryOutBalanceDelta } from "./inventory-out-balance";
+import { rebuildInventoryOutBalanceFromDocuments } from "./inventory-out-balance-rebuild";
 import { CreateInventoryOutDto } from "./dto/inventory-out.dto";
 import { ListInventoryOutQueryDto } from "./dto/list-inventory-out-query.dto";
 
@@ -296,6 +297,7 @@ export class InventoryOutService {
         await stockRepo.save(line.stock);
       }
 
+      await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
       return this.getByIdInManager(manager, header.id);
     });
 

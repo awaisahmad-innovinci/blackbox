@@ -73,6 +73,8 @@ import type {
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  TaxReportKind,
+  TaxReportSummary,
 } from "@blackbox/shared";
 
 export type LocalDbStatus =
@@ -114,6 +116,7 @@ declare global {
         >;
         getSyncMeta: (key: string) => Promise<string | null>;
         setSyncMeta: (key: string, value: string) => Promise<{ ok: true }>;
+        markTillSyncBackfillComplete: () => Promise<{ ok: true }>;
         resolveCanonicalEntityId: (input: {
           entityType: import("@blackbox/shared").SyncEntityType;
           vendorCode?: string;
@@ -492,6 +495,12 @@ declare global {
           dateFrom: string,
           dateTo: string,
         ) => Promise<InventoryInOutReport>;
+        taxReportSummary: (
+          dateFrom: string,
+          dateTo: string,
+          vendorId?: string | null,
+          taxKind?: TaxReportKind,
+        ) => Promise<TaxReportSummary>;
       };
       identity?: {
         getComputerName: () => Promise<string>;

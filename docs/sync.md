@@ -25,7 +25,7 @@ Push body: `{ stream, changes: [{ changeId, entityType, entityId, operation, bas
 
 Pull returns `{ changes, nextCursor, hasMore, serverSeq }`. The server returns only changes whose `origin_device_id` is **not** the requesting device (other POS devices and the per-tenant `cloud-hub` device for admin REST writes). When only this device's changes exist ahead of the cursor, the server skip-aheads `nextCursor` to the stream tail without transferring payloads. The client still defensively skips apply when `originDeviceId` is itself, then advances `pull_cursor` to `nextCursor` in the same SQLite transaction as apply.
 
-Incremental sync on desktop lists the outbox once, pushes pending rows grouped by stream, calls `GET /sync/status`, then pulls only streams where `lag > 0`.
+Incremental sync on desktop: **`GET /devices/me`** (device status), read **`local_sync_outbox`** via IPC, **`GET /sync/status`**, then **exits immediately** when the outbox is empty, local pull cursors have caught the per-stream change-log head, and there are no pending local activity logs. Otherwise it may **`POST /sync/push`** (outbox rows only), **`GET /sync/pull`** (streams where the local cursor is behind the stream’s head), and flush pending activity logs. When push or pull touches **`sale`**, **`sale_return`**, **`inventory_out`**, or **`inventory_out_return`**, the desktop reconciles **`inventory_out_items`** from all posted documents (`rebuildPosBalanceFromDocuments`) and bumps `dataVersion`. REST list/detail “sidecar” pulls (**activity logs**, sales, movements, vendor ledger, etc.) run only during **catalog / full pull**, not on every incremental tick. Activity history uses paginated **`GET /activity-logs`** into local `activity_logs` (permission `activity.read`); a non-resume full pull clears the activity watermark and loads the full tenant log.
 
 Cloud `sync_cursors` stores the **committed** cursor the device sent, not the delivered head.
 
@@ -35,6 +35,8 @@ Cloud `sync_cursors` stores the **committed** cursor the device sent, not the de
 - `inventory` — `EVENT` movements; warehouse `inventory_stock` is a projection from movement `delta` (or INVENTORY_OUT / RETURN sign). **`SALE` and `SALE_RETURN` movements are audit-only** — they do not change warehouse stock; floor qty is updated by `sale` / `sale_return` entity UPSERTs (`inventory_out_items` balance).
 - `purchasing` — document UPSERT snapshots
 - `auth_snapshot` — reserved (pull-only later)
+
+**POS floor balance (`inventory_out_items`)** is not a sync entity. Cloud and each device derive it from posted **`inventory_out`**, **`inventory_out_return`**, **`sale`**, and open **`sale_return`** lines. After sync push or REST post of any of those documents, the API runs the same document-based reconcile (`rebuildInventoryOutBalanceFromDocuments`) so concurrent offline cashier sales converge on one quantity. Catalog **full pull** imports sales via REST, then rebuilds POS balance once at the end (after all document sidecars).
 
 REST writes also append `sync_changes` (origin = JWT device or per-tenant `cloud-hub` device).
 
@@ -46,16 +48,18 @@ Every inventory route is tenant-scoped through `FixedTenantContext`: the JWT ten
 
 The desktop runs [auto-sync.ts](../apps/desktop/src/renderer/src/lib/sync/auto-sync.ts) whenever the session is signed in and the device is trusted:
 
-- once immediately, then every 30s, rescheduled from the end of each attempt so runs cannot stack
+- once immediately, then every 60s, rescheduled from the end of each attempt so runs cannot stack
 - on the `online` event, window focus, and tab visibility, each of which resets the interval
 - after every local write, through the `syncNow()` call in the form pages
-- on failure the delay doubles up to 5 minutes, and resets to 30s after the next success
+- on failure the delay doubles up to 5 minutes, and resets to 60s after the next success
 
 While the device is `pending` or its state is unknown, the session polls `GET /devices/me` every 15s (plus on window focus and when the browser goes online) so trusting the device in the web admin unlocks the shell and starts sync without an app restart. A sync that moved rows bumps `dataVersion` in the sync store, which list pages and the dashboard include in their load effects so open screens refresh themselves.
 
 ## Local outbox
 
 `local_sync_outbox` + `local_applied_changes` + `local_sync_state`. Business mutation and outbox insert share one SQLite transaction via `sync.commit`.
+
+After a **forced restore** (wipe + `runFullPull` + cash ledger) or a dashboard **full pull**, the outbox should stay **empty**: cloud data lands in business tables only. The desktop sets `sync_meta` `till_sync_backfill_v1` so the legacy one-shot till outbox backfill (`enqueueExistingTillsOnce` on `listOutbox`) does not treat restored till sessions as new local pushes. Only new `sync.commit` calls add outbox rows.
 
 The desktop signs in on its own sign-in screen, which binds `{tenantId, deviceId}` locally and to the JWT. An admin must `POST /devices/:id/trust` before `/sync/*` succeeds. Until then the shell shows a full-screen lock (sign out only), local writes via `sync.commit` are rejected, and SQLite is not wiped. Push/pull failures land in the renderer sync store and are shown in the header instead of being swallowed.
 

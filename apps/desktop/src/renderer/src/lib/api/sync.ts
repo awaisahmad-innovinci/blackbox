@@ -19,14 +19,11 @@ import { SYNC_CATALOG_PAGE_SIZE, SYNC_STREAMS } from "@blackbox/shared";
 import { fetchCurrentDevice } from "./auth";
 import { apiFetch } from "./client";
 import { flushPendingActivityLogs } from "./activity-logs";
-import { pullActivityLogsIntoLocal } from "@renderer/lib/local-db/activity-log-pull";
-import { pullInventoryMovementsIntoLocal } from "@renderer/lib/local-db/inventory-movements-pull";
-import { pullInventoryPurchasingIntoLocal } from "@renderer/lib/local-db/inventory-purchasing-pull";
-import { pullSalesAndReturnsIntoLocal } from "@renderer/lib/local-db/sales-pull";
 import {
   isDeviceRevokedMessage,
   notifyDeviceRevoked,
 } from "@renderer/lib/session/device-lock";
+import { bumpDataVersion } from "@renderer/lib/sync/sync-status";
 
 export const syncApi = {
   push(stream: SyncStream, changes: SyncChangeInput[]) {
@@ -151,6 +148,54 @@ type OutboxRow = {
 
 const VERSION_HEAD_STREAMS: SyncStream[] = ["master_data", "purchasing"];
 
+const POS_BALANCE_ENTITY_TYPES = new Set<string>([
+  "sale",
+  "sale_return",
+  "inventory_out",
+  "inventory_out_return",
+]);
+
+function touchesPosBalanceEntityType(entityType: string): boolean {
+  return POS_BALANCE_ENTITY_TYPES.has(entityType);
+}
+
+async function countPendingLocalActivityLogs(): Promise<number> {
+  const rows =
+    (await window.blackbox?.localDb?.listPendingActivityLogs?.()) ?? [];
+  return rows.length;
+}
+
+async function flushPendingActivityLogsIfAny(): Promise<void> {
+  if ((await countPendingLocalActivityLogs()) === 0) return;
+  await flushPendingActivityLogs().catch(() => undefined);
+}
+
+async function streamNeedsPull(
+  bridge: SyncBridge,
+  status: SyncStatusResponse,
+  stream: SyncStream,
+): Promise<boolean> {
+  if (stream === "auth_snapshot") return false;
+  const streamStatus = status.streams.find((row) => row.stream === stream);
+  if (!streamStatus) return false;
+  const localCursor = Number(await bridge.pullCursor(stream));
+  const streamHead = Number(streamStatus.serverSeq);
+  if (!Number.isFinite(localCursor) || !Number.isFinite(streamHead)) {
+    return streamStatus.lag > 0;
+  }
+  return localCursor < streamHead;
+}
+
+async function anyStreamNeedsPull(
+  bridge: SyncBridge,
+  status: SyncStatusResponse,
+): Promise<boolean> {
+  for (const stream of SYNC_STREAMS) {
+    if (await streamNeedsPull(bridge, status, stream)) return true;
+  }
+  return false;
+}
+
 async function refreshEntityVersionHeadAfterReject(
   bridge: SyncBridge,
   entityType: SyncEntityType,
@@ -235,17 +280,8 @@ export async function runIncrementalSync(): Promise<IncrementalSyncResult> {
     throw new Error("This device cannot sync until it is trusted");
   }
 
-  await flushPendingActivityLogs().catch(() => undefined);
-  await pullActivityLogsIntoLocal().catch(() => undefined);
-  await pullSalesAndReturnsIntoLocal().catch(() => undefined);
-  await pullInventoryPurchasingIntoLocal().catch(() => undefined);
-  await pullInventoryMovementsIntoLocal().catch(() => undefined);
-
   const bridge = window.blackbox?.sync;
   if (!bridge) return { pushed: 0, pulled: 0 };
-
-  let pushed = 0;
-  let pulled = 0;
 
   let pending: OutboxRow[];
   try {
@@ -259,38 +295,70 @@ export async function runIncrementalSync(): Promise<IncrementalSyncResult> {
     }
     throw error;
   }
-  const byStream = new Map<SyncStream, OutboxRow[]>();
-  for (const row of pending) {
-    const batch = byStream.get(row.stream) ?? [];
-    batch.push(row);
-    byStream.set(row.stream, batch);
-  }
-
-  for (const [stream, batch] of byStream) {
-    if (stream === "auth_snapshot") continue;
-    pushed += await pushOutboxBatch(bridge, stream, batch);
-  }
 
   const status = await syncApi.status();
+  const needsPull = await anyStreamNeedsPull(bridge, status);
+  const pendingActivityLogs = await countPendingLocalActivityLogs();
 
-  for (const stream of SYNC_STREAMS) {
-    if (stream === "auth_snapshot") continue;
+  if (pending.length === 0 && !needsPull && pendingActivityLogs === 0) {
+    return { pushed: 0, pulled: 0 };
+  }
 
-    const streamStatus = status.streams.find((row) => row.stream === stream);
-    if (streamStatus && streamStatus.lag === 0) continue;
+  await flushPendingActivityLogsIfAny();
 
-    let hasMore = true;
-    while (hasMore) {
-      const cursor = await bridge.pullCursor(stream);
-      const page = await syncApi.pull(stream, cursor);
-      await bridge.applyPull({
-        changes: page.changes,
-        nextCursor: page.nextCursor,
-        stream,
-      });
-      pulled += page.changes.length;
-      hasMore = page.hasMore;
+  let pushed = 0;
+  let pulled = 0;
+  let needsPosBalanceRebuild =
+    pending.some((row) => touchesPosBalanceEntityType(row.entityType));
+
+  if (pending.length > 0) {
+    const byStream = new Map<SyncStream, OutboxRow[]>();
+    for (const row of pending) {
+      const batch = byStream.get(row.stream) ?? [];
+      batch.push(row);
+      byStream.set(row.stream, batch);
     }
+    for (const [stream, batch] of byStream) {
+      if (stream === "auth_snapshot") continue;
+      pushed += await pushOutboxBatch(bridge, stream, batch);
+    }
+  }
+
+  let pullStatus = status;
+  let shouldPull = needsPull;
+  if (pushed > 0) {
+    pullStatus = await syncApi.status();
+    shouldPull = await anyStreamNeedsPull(bridge, pullStatus);
+  }
+
+  if (shouldPull) {
+    for (const stream of SYNC_STREAMS) {
+      if (stream === "auth_snapshot") continue;
+      if (!(await streamNeedsPull(bridge, pullStatus, stream))) continue;
+
+      let hasMore = true;
+      while (hasMore) {
+        const cursor = await bridge.pullCursor(stream);
+        const page = await syncApi.pull(stream, cursor);
+        await bridge.applyPull({
+          changes: page.changes,
+          nextCursor: page.nextCursor,
+          stream,
+        });
+        for (const change of page.changes) {
+          if (touchesPosBalanceEntityType(change.entityType)) {
+            needsPosBalanceRebuild = true;
+          }
+        }
+        pulled += page.changes.length;
+        hasMore = page.hasMore;
+      }
+    }
+  }
+
+  if (needsPosBalanceRebuild) {
+    await window.blackbox?.localDb?.rebuildPosBalanceFromDocuments?.();
+    bumpDataVersion();
   }
 
   return { pushed, pulled };

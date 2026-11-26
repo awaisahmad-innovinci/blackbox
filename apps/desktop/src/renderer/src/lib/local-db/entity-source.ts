@@ -51,11 +51,14 @@ import type {
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  TaxReportKind,
+  TaxReportSummary,
 } from "@blackbox/shared";
 import { ApiError } from "@renderer/lib/api/client";
 import { dashboardApi } from "@renderer/lib/api/dashboard";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
+import { taxReportsApi } from "@renderer/lib/api/tax-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
 import { salesApi } from "@renderer/lib/api/sales";
@@ -897,4 +900,24 @@ export async function loadInventoryInOutReport(
     /* fall through to API */
   }
   return inventoryReportsApi.inOut(dateFrom, dateTo);
+}
+
+export async function loadTaxReportSummary(options: {
+  dateFrom: string;
+  dateTo: string;
+  vendorId?: string;
+  taxKind?: TaxReportKind;
+}): Promise<TaxReportSummary> {
+  try {
+    const local = await window.blackbox?.localDb?.taxReportSummary?.(
+      options.dateFrom,
+      options.dateTo,
+      options.vendorId ?? null,
+      options.taxKind,
+    );
+    if (local) return local;
+  } catch {
+    /* fall through to API */
+  }
+  return taxReportsApi.summary(options);
 }
