@@ -143,7 +143,7 @@ export default function UsersPage() {
     : livePasswordError(createDraft.password);
 
   const systemRoles = useMemo(
-    () => roles.filter((role) => role.isSystem),
+    () => roles.filter((role) => role.isSystem && role.key !== "OWNER"),
     [roles],
   );
   const canCreateUser =
@@ -206,7 +206,7 @@ export default function UsersPage() {
     }
     if (
       selectedRoles.length !== 1 ||
-      !roles.some((role) => role.isSystem && role.id === selectedRoles[0])
+      !systemRoles.some((role) => role.id === selectedRoles[0])
     ) {
       setFormError("Choose one role");
       return;

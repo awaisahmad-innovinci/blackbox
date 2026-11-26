@@ -164,7 +164,12 @@ export default function UserDetailPage() {
     if (!user) return;
     if (
       selectedRoles.length !== 1 ||
-      !roles.some((role) => role.isSystem && role.id === selectedRoles[0])
+      !roles.some(
+        (role) =>
+          role.isSystem &&
+          (role.key !== "OWNER" || isOwner) &&
+          role.id === selectedRoles[0],
+      )
     ) {
       setFormError("Choose one role.");
       return;
@@ -405,7 +410,10 @@ export default function UserDetailPage() {
                     disabled={
                       busy ||
                       !roles.some(
-                        (role) => role.isSystem && role.id === selectedRoles[0],
+                        (role) =>
+                          role.isSystem &&
+                          (role.key !== "OWNER" || isOwner) &&
+                          role.id === selectedRoles[0],
                       )
                     }
                     onClick={() => void onSaveRoles()}
@@ -422,7 +430,10 @@ export default function UserDetailPage() {
                 }
               >
                 <RoleChecklist
-                  roles={roles.filter((role) => role.isSystem)}
+                  roles={roles.filter(
+                    (role) =>
+                      role.isSystem && (role.key !== "OWNER" || isOwner),
+                  )}
                   selectedIds={selectedRoles}
                   onChange={setSelectedRoles}
                   selection="single"

@@ -1,4 +1,5 @@
 import { useCallback, useState, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
@@ -91,6 +92,12 @@ export function useTillGuardedLogout(): {
         confirmLabel="Yes"
         cancelLabel="Cancel"
         loading={loggingOut}
+        loadingLabel={
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="size-4 animate-spin" />
+            Syncing your changes…
+          </span>
+        }
         onConfirm={confirmLogout}
       />
     </>

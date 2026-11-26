@@ -23,6 +23,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = "Cancel",
   loading = false,
+  loadingLabel = "Working…",
   onConfirm,
 }: {
   open: boolean;
@@ -32,6 +33,7 @@ export function ConfirmDialog({
   confirmLabel: string;
   cancelLabel?: string;
   loading?: boolean;
+  loadingLabel?: ReactNode;
   onConfirm: () => void | Promise<void>;
 }) {
   function handleOpenChange(next: boolean): void {
@@ -63,7 +65,7 @@ export function ConfirmDialog({
               void onConfirm();
             }}
           >
-            {loading ? "Working…" : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

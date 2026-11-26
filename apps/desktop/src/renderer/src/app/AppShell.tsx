@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@blackbox/ui/lib/utils";
 import { handleEnterNavKeyDown } from "@blackbox/ui/lib/form-keyboard";
@@ -99,6 +100,7 @@ export function AppShell() {
     baseline: string | null;
   } | null>(null);
   const [screenKey, setScreenKey] = useState(0);
+  const [loginGate, setLoginGate] = useState(true);
   const [refreshReady, setRefreshReady] = useState(false);
   const [lastFullSync, setLastFullSync] = useState<string | null>(null);
   const { requestLogout, logoutDialogs } = useTillGuardedLogout();
@@ -165,7 +167,24 @@ export function AppShell() {
       setScreenKey((key) => key + 1);
       setRefreshReady(false);
     }
+    setLoginGate(false);
   }, [sync.syncing, sync.lastSyncedAt, sync.dataVersion]);
+
+  useEffect(() => {
+    if (!loginGate) return;
+    const browserOffline =
+      typeof navigator !== "undefined" && navigator.onLine === false;
+    if (
+      offline ||
+      browserOffline ||
+      deviceLocked ||
+      deviceState === "pending" ||
+      deviceState === "unbound" ||
+      deviceState === "revoked"
+    ) {
+      setLoginGate(false);
+    }
+  }, [loginGate, offline, deviceLocked, deviceState]);
 
   useEffect(() => {
     if (deviceLocked && location.pathname !== "/") {
@@ -246,6 +265,14 @@ export function AppShell() {
     location.pathname.startsWith("/purchasing") ||
     location.pathname.startsWith("/goods-receipts");
   const salesActive = location.pathname.startsWith("/sales");
+  const browserOffline =
+    typeof navigator !== "undefined" && navigator.onLine === false;
+  const showLoginLoader =
+    loginGate &&
+    !offline &&
+    !browserOffline &&
+    !deviceLocked &&
+    deviceState === "trusted";
 
   if (deviceLocked) {
     return (
@@ -519,6 +546,19 @@ export function AppShell() {
       >
         <Outlet key={screenKey} />
       </main>
+
+      {showLoginLoader ? (
+        <div
+          className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-3 text-sm">
+            <Loader2 className="size-5 animate-spin" />
+            Syncing your data…
+          </div>
+        </div>
+      ) : null}
 
       {logoutDialogs}
 
