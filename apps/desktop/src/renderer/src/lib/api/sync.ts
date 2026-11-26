@@ -1,5 +1,9 @@
 import type {
+  ActivityLogItem,
+  InventoryMovementListItem,
+  SyncCatalogActivityLogsPage,
   SyncCatalogDocumentKind,
+  SyncCatalogInventoryMovementsPage,
   SyncCatalogPage,
   SyncCatalogProductRow,
   SyncCatalogReference,
@@ -75,6 +79,32 @@ export const syncApi = {
       pageSize: String(pageSize),
     });
     return apiFetch<SyncCatalogPage<WarehouseStockRow>>(
+      `/sync/catalog?${q.toString()}`,
+    );
+  },
+  catalogActivityLogs(
+    page: number,
+    pageSize = SYNC_CATALOG_PAGE_SIZE,
+  ): Promise<SyncCatalogActivityLogsPage> {
+    const q = new URLSearchParams({
+      section: "activityLogs",
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return apiFetch<SyncCatalogPage<ActivityLogItem>>(
+      `/sync/catalog?${q.toString()}`,
+    );
+  },
+  catalogInventoryMovements(
+    page: number,
+    pageSize = SYNC_CATALOG_PAGE_SIZE,
+  ): Promise<SyncCatalogInventoryMovementsPage> {
+    const q = new URLSearchParams({
+      section: "inventoryMovements",
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return apiFetch<SyncCatalogPage<InventoryMovementListItem>>(
       `/sync/catalog?${q.toString()}`,
     );
   },

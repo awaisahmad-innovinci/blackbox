@@ -49,7 +49,7 @@ import {
 } from "@renderer/lib/api/totp";
 import { useAppNavKeyboard } from "@renderer/lib/use-app-nav-keyboard";
 import { useTillGuardedLogout } from "@renderer/lib/use-till-guarded-logout";
-import { Loader2 } from "lucide-react";
+// import { Loader2 } from "lucide-react";
 
 const DEVICE_LABEL: Record<string, string> = {
   unknown: "Device status unknown",

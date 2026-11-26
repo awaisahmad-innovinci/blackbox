@@ -8,9 +8,6 @@ import {
   SyncPullError,
 } from "@renderer/lib/local-db/pull";
 import { runCashLedgerBootstrap } from "@renderer/lib/local-db/cash-ledger-pull";
-import { pullInventoryMovementsIntoLocal } from "@renderer/lib/local-db/inventory-movements-pull";
-import { pullInventoryPurchasingIntoLocal } from "@renderer/lib/local-db/inventory-purchasing-pull";
-import { pullSalesAndReturnsIntoLocal } from "@renderer/lib/local-db/sales-pull";
 import { bumpDataVersion } from "./sync-status";
 
 export type CatalogSyncState = {
@@ -78,15 +75,15 @@ export function startForcedFullSync(): Promise<void> {
       try {
         const localDb = window.blackbox?.localDb;
         await localDb?.setSyncMeta?.(CATALOG_PULL_ACTIVE_KEY, "1");
-        await runFullPull((progress) => {
-          setState({ active: true, error: null, message: progress.message });
-        });
+        await runFullPull(
+          (progress) => {
+            setState({ active: true, error: null, message: progress.message });
+          },
+          { fullBootstrap: true },
+        );
         await runCashLedgerBootstrap((progress) => {
           setState({ active: true, error: null, message: progress.message });
         });
-        await pullSalesAndReturnsIntoLocal().catch(() => undefined);
-        await pullInventoryPurchasingIntoLocal().catch(() => undefined);
-        await pullInventoryMovementsIntoLocal().catch(() => undefined);
         await localDb?.markTillSyncBackfillComplete?.();
         await localDb?.setSyncMeta?.(CATALOG_PULL_ACTIVE_KEY, "0");
         bumpDataVersion();
@@ -189,7 +186,10 @@ async function runCatalogSync(): Promise<void> {
       (progress) => {
         setState({ active: true, error: null, message: progress.message });
       },
-      { resume: interrupted },
+      {
+        resume: interrupted,
+        fullBootstrap: interrupted || needsFullResync || !lastPull,
+      },
     );
     await localDb.setSyncMeta(CATALOG_PULL_ACTIVE_KEY, "0");
     bumpDataVersion();

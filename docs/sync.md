@@ -25,7 +25,18 @@ Push body: `{ stream, changes: [{ changeId, entityType, entityId, operation, bas
 
 Pull returns `{ changes, nextCursor, hasMore, serverSeq }`. The server returns only changes whose `origin_device_id` is **not** the requesting device (other POS devices and the per-tenant `cloud-hub` device for admin REST writes). When only this device's changes exist ahead of the cursor, the server skip-aheads `nextCursor` to the stream tail without transferring payloads. The client still defensively skips apply when `originDeviceId` is itself, then advances `pull_cursor` to `nextCursor` in the same SQLite transaction as apply.
 
-Incremental sync on desktop: **`GET /devices/me`** (device status), read **`local_sync_outbox`** via IPC, **`GET /sync/status`**, then **exits immediately** when the outbox is empty, local pull cursors have caught the per-stream change-log head, and there are no pending local activity logs. Otherwise it may **`POST /sync/push`** (outbox rows only), **`GET /sync/pull`** (streams where the local cursor is behind the stream’s head), and flush pending activity logs. When push or pull touches **`sale`**, **`sale_return`**, **`inventory_out`**, or **`inventory_out_return`**, the desktop reconciles **`inventory_out_items`** from all posted documents (`rebuildPosBalanceFromDocuments`) and bumps `dataVersion`. REST list/detail “sidecar” pulls (**activity logs**, sales, movements, vendor ledger, etc.) run only during **catalog / full pull**, not on every incremental tick. Activity history uses paginated **`GET /activity-logs`** into local `activity_logs` (permission `activity.read`); a non-resume full pull clears the activity watermark and loads the full tenant log.
+Incremental sync on desktop: **`GET /devices/me`** (device status), read **`local_sync_outbox`** via IPC, **`GET /sync/status`**, then **exits immediately** when the outbox is empty, local pull cursors have caught the per-stream change-log head, and there are no pending local activity logs. Otherwise it may **`POST /sync/push`** (outbox rows only), **`GET /sync/pull`** (streams where the local cursor is behind the stream’s head), and flush pending activity logs. When push or pull touches **`sale`**, **`sale_return`**, **`inventory_out`**, or **`inventory_out_return`**, the desktop reconciles **`inventory_out_items`** from all posted documents (`rebuildPosBalanceFromDocuments`) and bumps `dataVersion`. Header **Sync** is incremental only (outbox + change log).
+
+**Catalog / full pull** (`runFullPull`, forced restore, `needsFullResync`) also downloads operational history through **`GET /sync/catalog`** (`sync.use` only — no separate `sales.read` / `activity.read`):
+
+| Catalog | SQLite tables |
+|---------|----------------|
+| `documents` kind **`sales`** | `sales`, `sale_lines`, `sale_payments` |
+| `documents` kind **`saleReturns`** | `sale_returns`, `sale_return_lines` |
+| section **`activityLogs`** | `activity_logs` |
+| section **`inventoryMovements`** | `inventory_movements` |
+
+`fullBootstrap: true` clears operational watermarks and page cursors before download. Inventory out **returns** and vendor ledger still hydrate via REST during full pull until catalog covers them.
 
 Cloud `sync_cursors` stores the **committed** cursor the device sent, not the delivered head.
 
@@ -36,7 +47,7 @@ Cloud `sync_cursors` stores the **committed** cursor the device sent, not the de
 - `purchasing` — document UPSERT snapshots
 - `auth_snapshot` — reserved (pull-only later)
 
-**POS floor balance (`inventory_out_items`)** is not a sync entity. Cloud and each device derive it from posted **`inventory_out`**, **`inventory_out_return`**, **`sale`**, and open **`sale_return`** lines. After sync push or REST post of any of those documents, the API runs the same document-based reconcile (`rebuildInventoryOutBalanceFromDocuments`) so concurrent offline cashier sales converge on one quantity. Catalog **full pull** imports sales via REST, then rebuilds POS balance once at the end (after all document sidecars).
+**POS floor balance (`inventory_out_items`)** is not a sync entity. Cloud and each device derive it from posted **`inventory_out`**, **`inventory_out_return`**, **`sale`**, and open **`sale_return`** lines. After sync push or REST post of any of those documents, the API runs the same document-based reconcile (`rebuildInventoryOutBalanceFromDocuments`) so concurrent offline cashier sales converge on one quantity. Catalog **full pull** imports **sales** via catalog documents, then rebuilds POS balance once at the end.
 
 REST writes also append `sync_changes` (origin = JWT device or per-tenant `cloud-hub` device).
 

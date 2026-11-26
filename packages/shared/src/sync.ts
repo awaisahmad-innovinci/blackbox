@@ -1,7 +1,9 @@
+import type { ActivityLogItem } from "./activity-log";
 import type {
   Brand,
   Category,
   GoodsReceiptDetail,
+  InventoryMovementListItem,
   InventoryOutDetail,
   ProductDetail,
   ProductSkuDetail,
@@ -15,6 +17,7 @@ import type {
   WarehouseListItem,
   WarehouseStockRow,
 } from "./inventory";
+import type { SaleDetail, SaleReturnDetail } from "./sales";
 
 export const SYNC_STREAMS = [
   "auth_snapshot",
@@ -40,6 +43,8 @@ export const SYNC_CATALOG_SECTIONS = [
   "vendors",
   "stock",
   "documents",
+  "activityLogs",
+  "inventoryMovements",
 ] as const;
 
 export type SyncCatalogSection = (typeof SYNC_CATALOG_SECTIONS)[number];
@@ -49,6 +54,8 @@ export const SYNC_CATALOG_DOCUMENT_KINDS = [
   "goodsReceipts",
   "inventoryOuts",
   "vendorReturns",
+  "sales",
+  "saleReturns",
 ] as const;
 
 export type SyncCatalogDocumentKind =
@@ -231,6 +238,11 @@ export type SyncCatalogPurchaseOrderPage = SyncCatalogPage<PurchaseOrderDetail>;
 export type SyncCatalogGoodsReceiptPage = SyncCatalogPage<GoodsReceiptDetail>;
 export type SyncCatalogInventoryOutPage = SyncCatalogPage<InventoryOutDetail>;
 export type SyncCatalogVendorReturnPage = SyncCatalogPage<VendorReturnDetail>;
+export type SyncCatalogSalesPage = SyncCatalogPage<SaleDetail>;
+export type SyncCatalogSaleReturnsPage = SyncCatalogPage<SaleReturnDetail>;
+export type SyncCatalogActivityLogsPage = SyncCatalogPage<ActivityLogItem>;
+export type SyncCatalogInventoryMovementsPage =
+  SyncCatalogPage<InventoryMovementListItem>;
 
 export function streamForEntity(entityType: SyncEntityType): SyncStream {
   if (entityType === "auth_snapshot") return "auth_snapshot";
