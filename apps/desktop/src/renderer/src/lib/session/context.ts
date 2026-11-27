@@ -17,14 +17,18 @@ export type SessionValue = {
   /** True when the session was restored from cache without reaching the API. */
   offline: boolean;
   deviceState: DeviceState;
-  /** Revoked, or trusted again and still downloading a fresh database. */
+  /** Pending approval, revoked, or trusted again and still downloading a fresh database. */
   deviceLocked: boolean;
   /** True while the fresh database is downloading after the device is trusted again. */
   deviceRestoring: boolean;
+  /** True while sign-out is in progress (e.g. clearing session on a revoked device). */
+  signingOut: boolean;
   signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshDeviceState: () => Promise<void>;
   refreshSessionUser: () => Promise<void>;
+  /** Re-run post-revoke download while the shell is locked after a failed restore. */
+  retryDeviceRestore: () => Promise<void>;
 };
 
 export const SessionContext = createContext<SessionValue | null>(null);

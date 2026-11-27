@@ -71,6 +71,8 @@ import type {
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  TaxReportKind,
+  TaxReportSummary,
 } from "@blackbox/shared";
 
 type LocalDbStatus =
@@ -115,6 +117,10 @@ contextBridge.exposeInMainWorld("blackbox", {
       ipcRenderer.invoke("localDb:getSyncMeta", key) as Promise<string | null>,
     setSyncMeta: (key: string, value: string) =>
       ipcRenderer.invoke("localDb:setSyncMeta", key, value) as Promise<Ok>,
+    markTillSyncBackfillComplete: () =>
+      ipcRenderer.invoke(
+        "localDb:markTillSyncBackfillComplete",
+      ) as Promise<{ ok: true }>,
     resolveCanonicalEntityId: (input: unknown) =>
       ipcRenderer.invoke(
         "localDb:resolveCanonicalEntityId",
@@ -243,6 +249,13 @@ contextBridge.exposeInMainWorld("blackbox", {
         "localDb:listGoodsReceipts",
         query,
       ) as Promise<PaginatedGoodsReceipts>,
+    upsertVendorLedgerEntriesFromPull: (
+      entries: import("@blackbox/shared").VendorLedgerEntry[],
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:upsertVendorLedgerEntriesFromPull",
+        entries,
+      ) as Promise<{ ok: true }>,
     getVendorLedger: (vendorId: string) =>
       ipcRenderer.invoke(
         "localDb:getVendorLedger",
@@ -400,6 +413,12 @@ contextBridge.exposeInMainWorld("blackbox", {
       }>,
     appendLocalActivityLog: (item: import("@blackbox/shared").ActivityLogItem) =>
       ipcRenderer.invoke("localDb:appendLocalActivityLog", item) as Promise<{
+        ok: true;
+      }>,
+    upsertActivityLogsFromPull: (
+      items: import("@blackbox/shared").ActivityLogItem[],
+    ) =>
+      ipcRenderer.invoke("localDb:upsertActivityLogsFromPull", items) as Promise<{
         ok: true;
       }>,
     listLocalActivityLogs: (
@@ -726,6 +745,19 @@ contextBridge.exposeInMainWorld("blackbox", {
         dateFrom,
         dateTo,
       ) as Promise<InventoryInOutReport>,
+    taxReportSummary: (
+      dateFrom: string,
+      dateTo: string,
+      vendorId?: string | null,
+      taxKind?: TaxReportKind,
+    ) =>
+      ipcRenderer.invoke(
+        "localDb:taxReportSummary",
+        dateFrom,
+        dateTo,
+        vendorId,
+        taxKind,
+      ) as Promise<TaxReportSummary>,
   },
   identity: {
     getComputerName: () =>
@@ -810,7 +842,14 @@ contextBridge.exposeInMainWorld("blackbox", {
       changes: import("@blackbox/shared").SyncChangeDto[];
       nextCursor: string;
       stream: string;
+      bootstrapOnly?: boolean;
     }) => ipcRenderer.invoke("sync:applyPull", payload) as Promise<{ ok: true }>,
+    applyCashLedgerBootstrap: (
+      items: import("@blackbox/shared").SyncCashLedgerBootstrapItem[],
+    ) =>
+      ipcRenderer.invoke("sync:applyCashLedgerBootstrap", items) as Promise<{
+        ok: true;
+      }>,
     pendingCount: () =>
       ipcRenderer.invoke("sync:pendingCount") as Promise<number>,
     enqueue: (input: unknown) =>

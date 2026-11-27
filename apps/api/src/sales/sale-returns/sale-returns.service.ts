@@ -43,6 +43,7 @@ import {
 } from "../../db/entities";
 import { FixedTenantContext } from "../../inventory/common/fixed-tenant.context";
 import { applyInventoryOutBalanceDelta } from "../../inventory/inventory-out/inventory-out-balance";
+import { rebuildInventoryOutBalanceFromDocuments } from "../../inventory/inventory-out/inventory-out-balance-rebuild";
 import { ActivityLogService } from "../../activity-log/activity-log.service";
 import { TillsService } from "../../tills/tills.service";
 import { SalesService } from "../sales.service";
@@ -488,6 +489,7 @@ export class SaleReturnsService {
         },
       });
 
+      await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
       return detail;
     });
   }
@@ -691,6 +693,10 @@ export class SaleReturnsService {
   ): Promise<SaleReturnDetail> {
     await this.dataSource.transaction(async (manager) => {
       await this.completeWithSale(manager, id, saleId, user);
+      await rebuildInventoryOutBalanceFromDocuments(
+        manager,
+        this.fixedTenant.tenantId,
+      );
     });
     return this.getById(id);
   }

@@ -16,6 +16,19 @@ function paymentMethodOf(value: string | null): VendorPaymentMethod | null {
   return value === "CASH" || value === "BANK" ? value : null;
 }
 
+export function upsertVendorLedgerEntriesFromPull(
+  entries: VendorLedgerEntry[],
+): void {
+  if (entries.length === 0) return;
+  const db = getLocalDb();
+  const tx = db.transaction((rows: VendorLedgerEntry[]) => {
+    for (const row of rows) {
+      upsertVendorLedgerEntryLocal(row);
+    }
+  });
+  tx(entries);
+}
+
 export function upsertVendorLedgerEntryLocal(entry: VendorLedgerEntry): void {
   const db = getLocalDb();
   db.prepare(

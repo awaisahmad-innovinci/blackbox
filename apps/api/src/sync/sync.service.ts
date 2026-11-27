@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -79,6 +80,7 @@ import {
   Warehouse,
 } from "../db/entities";
 import { applyInventoryOutBalanceDelta } from "../inventory/inventory-out/inventory-out-balance";
+import { rebuildInventoryOutBalanceFromDocuments } from "../inventory/inventory-out/inventory-out-balance-rebuild";
 import type { SyncChangeInputDto, SyncPushDto } from "./dto/sync.dto";
 
 const RETENTION_DAYS = 90;
@@ -93,6 +95,7 @@ function toDeletedAtDate(value: unknown): Date | null {
 
 @Injectable()
 export class SyncService {
+  private readonly logger = new Logger(SyncService.name);
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(Device) private readonly devices: Repository<Device>,
@@ -257,9 +260,9 @@ export class SyncService {
 
   async status(user: TenantContext): Promise<SyncStatusResponse> {
     const device = await this.requireDevice(user);
-    const serverHead = await this.serverSeq(user.tenantId);
     const streams = await Promise.all(
       SYNC_STREAMS.map(async (stream) => {
+        const streamHead = await this.streamSeq(user.tenantId, stream);
         const cursor = await this.cursors.findOne({
           where: { tenantId: user.tenantId, deviceId: device.id, stream },
         });
@@ -274,9 +277,9 @@ export class SyncService {
         });
         return {
           stream,
-          serverSeq: String(serverHead),
+          serverSeq: String(streamHead),
           deviceCursor: String(deviceCursor),
-          lag: Math.max(serverHead - deviceCursor, 0),
+          lag: Math.max(streamHead - deviceCursor, 0),
           pendingConflicts,
         };
       }),
@@ -1006,18 +1009,22 @@ export class SyncService {
       }
       case "inventory_out": {
         await this.upsertInventoryOut(manager, tenantId, change.entityId, p);
+        await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
         break;
       }
       case "inventory_out_return": {
         await this.upsertInventoryOutReturn(manager, tenantId, change.entityId, p);
+        await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
         break;
       }
       case "sale": {
         await this.upsertSale(manager, tenantId, change.entityId, p);
+        await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
         break;
       }
       case "sale_return": {
         await this.upsertSaleReturn(manager, tenantId, change.entityId, p);
+        await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
         break;
       }
       case "vendor_return": {
@@ -1983,6 +1990,7 @@ export class SyncService {
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       await this.upsertSale(manager, tenantId, entityId, payload);
+      await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
     });
   }
 
@@ -2023,6 +2031,9 @@ export class SyncService {
         message.includes("No inventory out balance") ||
         detail.includes("No inventory out balance")
       ) {
+        this.logger.warn(
+          `Sale balance deduct skipped (missing out row); reconcile will correct: wh=${warehouseId} sku=${productSkuId} qty=${inventoryQty}`,
+        );
         return;
       }
       throw error;
@@ -2333,6 +2344,16 @@ export class SyncService {
       .createQueryBuilder("c")
       .select("MAX(c.seq)", "max")
       .where("c.tenant_id = :tenantId", { tenantId })
+      .getRawOne<{ max: string | null }>();
+    return Number(head?.max ?? "0");
+  }
+
+  private async streamSeq(tenantId: string, stream: string): Promise<number> {
+    const head = await this.changes
+      .createQueryBuilder("c")
+      .select("MAX(c.seq)", "max")
+      .where("c.tenant_id = :tenantId", { tenantId })
+      .andWhere("c.stream = :stream", { stream })
       .getRawOne<{ max: string | null }>();
     return Number(head?.max ?? "0");
   }

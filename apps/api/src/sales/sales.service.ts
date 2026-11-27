@@ -42,6 +42,7 @@ import {
   applyInventoryOutBalanceDelta,
   getInventoryOutBalanceQty,
 } from "../inventory/inventory-out/inventory-out-balance";
+import { rebuildInventoryOutBalanceFromDocuments } from "../inventory/inventory-out/inventory-out-balance-rebuild";
 import {
   CreateSaleDto,
   ListSaleRegisterQueryDto,
@@ -729,6 +730,7 @@ export class SalesService {
         updatedAt: header.updatedAt.toISOString(),
       };
 
+      await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
       return detail;
     });
 
@@ -796,6 +798,7 @@ export class SalesService {
       header.updatedAt = new Date();
       await manager.save(header);
 
+      await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
       return this.toDetail(header, manager);
     });
   }

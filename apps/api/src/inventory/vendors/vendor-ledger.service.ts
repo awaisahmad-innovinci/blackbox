@@ -174,6 +174,26 @@ export class VendorLedgerService {
   }
 
   async getLedger(vendorId: string): Promise<VendorLedger> {
+    // #region agent log
+    fetch("http://127.0.0.1:7833/ingest/5c639e3b-d485-4142-8cf3-71119b248855", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "9ce663",
+      },
+      body: JSON.stringify({
+        sessionId: "9ce663",
+        hypothesisId: "B",
+        location: "vendor-ledger.service.ts:getLedger",
+        message: "getLedger entry",
+        data: {
+          vendorId,
+          fixedTenantId: this.fixedTenant.tenantId,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => undefined);
+    // #endregion
     await this.requireVendor(vendorId);
     return this.load(vendorId);
   }

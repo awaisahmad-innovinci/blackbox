@@ -51,11 +51,14 @@ import type {
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  TaxReportKind,
+  TaxReportSummary,
 } from "@blackbox/shared";
 import { ApiError } from "@renderer/lib/api/client";
 import { dashboardApi } from "@renderer/lib/api/dashboard";
 import { goodsReceiptsApi } from "@renderer/lib/api/goods-receipts";
 import { inventoryReportsApi } from "@renderer/lib/api/inventory-reports";
+import { taxReportsApi } from "@renderer/lib/api/tax-reports";
 import { inventoryOutApi } from "@renderer/lib/api/inventory-out";
 import { inventoryOutReturnsApi } from "@renderer/lib/api/inventory-out-returns";
 import { salesApi } from "@renderer/lib/api/sales";
@@ -296,18 +299,7 @@ export async function loadSales(
 
 export async function loadSaleRegister(
   query: SaleRegisterQuery = {},
-  options: { preferApi?: boolean } = {},
 ): Promise<PaginatedSaleRegister> {
-  // Owner/manager views want tenant-wide sales (every cashier's bills), which
-  // only the cloud has in full. Prefer the API when online and fall back to
-  // local SQLite when the call fails (offline).
-  if (options.preferApi) {
-    try {
-      return await salesApi.register(query);
-    } catch {
-      /* offline — fall back to local */
-    }
-  }
   try {
     const local = await window.blackbox?.localDb?.listSaleRegister?.(query);
     if (local) return local;
@@ -908,4 +900,24 @@ export async function loadInventoryInOutReport(
     /* fall through to API */
   }
   return inventoryReportsApi.inOut(dateFrom, dateTo);
+}
+
+export async function loadTaxReportSummary(options: {
+  dateFrom: string;
+  dateTo: string;
+  vendorId?: string;
+  taxKind?: TaxReportKind;
+}): Promise<TaxReportSummary> {
+  try {
+    const local = await window.blackbox?.localDb?.taxReportSummary?.(
+      options.dateFrom,
+      options.dateTo,
+      options.vendorId ?? null,
+      options.taxKind,
+    );
+    if (local) return local;
+  } catch {
+    /* fall through to API */
+  }
+  return taxReportsApi.summary(options);
 }

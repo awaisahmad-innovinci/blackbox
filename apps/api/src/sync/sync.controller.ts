@@ -13,6 +13,7 @@ import type { TenantContext } from "../common/tenant-context";
 import { PermissionsGuard } from "../rbac/permissions.guard";
 import { RequirePermissions } from "../rbac/require-permissions.decorator";
 import { SyncConflictAckDto, SyncPushDto } from "./dto/sync.dto";
+import { CashLedgerBootstrapService } from "./cash-ledger-bootstrap.service";
 import { SyncCatalogService } from "./sync-catalog.service";
 import { SyncService } from "./sync.service";
 
@@ -22,6 +23,7 @@ export class SyncController {
   constructor(
     private readonly sync: SyncService,
     private readonly catalogService: SyncCatalogService,
+    private readonly cashLedgerBootstrap: CashLedgerBootstrapService,
   ) {}
 
   @Post("push")
@@ -48,6 +50,17 @@ export class SyncController {
   @RequirePermissions("sync.use")
   status(@CurrentUser() user: TenantContext): Promise<SyncStatusResponse> {
     return this.sync.status(user);
+  }
+
+  @Get("cash-ledger")
+  @RequirePermissions("sync.use")
+  cashLedger(
+    @CurrentUser() user: TenantContext,
+    @Query("section") section: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.cashLedgerBootstrap.page(user, section, page, pageSize);
   }
 
   @Get("catalog")
