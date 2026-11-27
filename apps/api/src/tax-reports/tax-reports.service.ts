@@ -6,6 +6,10 @@ import type {
   TaxReportPaidToVendors,
   TaxReportSummary,
 } from "@blackbox/shared";
+import {
+  applyTaxReportCollectedTaxKind,
+  applyTaxReportPaidTaxKind,
+} from "@blackbox/shared";
 import { DataSource } from "typeorm";
 import { FixedTenantContext } from "../inventory/common/fixed-tenant.context";
 
@@ -22,155 +26,6 @@ function dateRangeExclusiveEnd(dateTo: string): Date {
   const toExclusive = new Date(`${dateTo}T00:00:00.000Z`);
   toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
   return toExclusive;
-}
-
-function applyPaidTaxKind(
-  paid: TaxReportPaidToVendors,
-  taxKind: TaxReportKind,
-): TaxReportPaidToVendors {
-  if (taxKind === "all") return paid;
-  const zero = {
-    saleTax: 0,
-    advTax: 0,
-    gst: 0,
-    credits: 0,
-    totalTaxPaid: 0,
-  };
-  const pick = (): TaxReportPaidToVendors => {
-    switch (taxKind) {
-      case "gst":
-        return {
-          ...paid,
-          saleTax: 0,
-          advTax: 0,
-          credits: 0,
-          totalTaxPaid: paid.gst,
-          byVendor: paid.byVendor.map((r) => ({
-            ...r,
-            saleTax: 0,
-            advTax: 0,
-            credits: 0,
-            totalTaxPaid: r.gst,
-          })),
-          byMonth: paid.byMonth.map((r) => ({
-            ...r,
-            saleTax: 0,
-            advTax: 0,
-            credits: 0,
-            totalTaxPaid: r.gst,
-          })),
-        };
-      case "sale_tax":
-        return {
-          ...paid,
-          advTax: 0,
-          gst: 0,
-          credits: 0,
-          totalTaxPaid: paid.saleTax,
-          byVendor: paid.byVendor.map((r) => ({
-            ...r,
-            advTax: 0,
-            gst: 0,
-            credits: 0,
-            totalTaxPaid: r.saleTax,
-          })),
-          byMonth: paid.byMonth.map((r) => ({
-            ...r,
-            advTax: 0,
-            gst: 0,
-            credits: 0,
-            totalTaxPaid: r.saleTax,
-          })),
-        };
-      case "adv_tax":
-        return {
-          ...paid,
-          saleTax: 0,
-          gst: 0,
-          credits: 0,
-          totalTaxPaid: paid.advTax,
-          byVendor: paid.byVendor.map((r) => ({
-            ...r,
-            saleTax: 0,
-            gst: 0,
-            credits: 0,
-            totalTaxPaid: r.advTax,
-          })),
-          byMonth: paid.byMonth.map((r) => ({
-            ...r,
-            saleTax: 0,
-            gst: 0,
-            credits: 0,
-            totalTaxPaid: r.advTax,
-          })),
-        };
-      case "credits":
-        return {
-          ...paid,
-          saleTax: 0,
-          advTax: 0,
-          gst: 0,
-          totalTaxPaid: paid.credits,
-          byVendor: paid.byVendor.map((r) => ({
-            ...r,
-            saleTax: 0,
-            advTax: 0,
-            gst: 0,
-            totalTaxPaid: r.credits,
-          })),
-          byMonth: paid.byMonth.map((r) => ({
-            ...r,
-            saleTax: 0,
-            advTax: 0,
-            gst: 0,
-            totalTaxPaid: r.credits,
-          })),
-        };
-      case "sales_tax":
-        return { ...paid, ...zero, receiptCount: paid.receiptCount };
-      default:
-        return paid;
-    }
-  };
-  return pick();
-}
-
-function applyCollectedTaxKind(
-  collected: TaxReportCollectedFromCustomers,
-  taxKind: TaxReportKind,
-): TaxReportCollectedFromCustomers {
-  if (taxKind === "all" || taxKind === "gst") return collected;
-  if (taxKind === "sales_tax") {
-    const zero = { gst: 0, salesTax: 0, total: 0 };
-    return {
-      ...collected,
-      gross: {
-        gst: 0,
-        salesTax: collected.gross.salesTax,
-        total: collected.gross.salesTax,
-      },
-      returns: {
-        gst: 0,
-        salesTax: collected.returns.salesTax,
-        total: collected.returns.salesTax,
-      },
-      net: {
-        gst: 0,
-        salesTax: collected.net.salesTax,
-        total: collected.net.salesTax,
-      },
-    };
-  }
-  // Vendor-side kinds: no customer collected amounts in focus.
-  const empty = { gst: 0, salesTax: 0, total: 0 };
-  return {
-    ...collected,
-    gross: empty,
-    returns: empty,
-    net: empty,
-    saleCount: collected.saleCount,
-    returnCount: collected.returnCount,
-  };
 }
 
 @Injectable()
@@ -207,8 +62,8 @@ export class TaxReportsService {
       toExclusive,
     );
 
-    const filteredPaid = applyPaidTaxKind(paid, taxKind);
-    const filteredCollected = applyCollectedTaxKind(collected, taxKind);
+    const filteredPaid = applyTaxReportPaidTaxKind(paid, taxKind);
+    const filteredCollected = applyTaxReportCollectedTaxKind(collected, taxKind);
 
     return {
       dateFrom,

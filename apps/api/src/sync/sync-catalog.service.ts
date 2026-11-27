@@ -5,8 +5,13 @@ import {
   SYNC_CATALOG_PAGE_SIZE,
   SYNC_CATALOG_SECTIONS,
   VENDOR_CONTACT_TYPES,
+  asFbrInvoiceStatus,
+  DEFAULT_SALE_CUSTOMER_NAME,
   roundMoney4,
+  type ActivityLogItem,
   type EntityStatus,
+  type InventoryMovementListItem,
+  type InventoryMovementType,
   type GoodsReceiptDetail,
   type GoodsReceiptItemRow,
   type GoodsReceiptStatus,
@@ -20,6 +25,12 @@ import {
   type PurchaseOrderDetail,
   type PurchaseOrderItemRow,
   type PurchaseOrderStatus,
+  type SaleDetail,
+  type SalePaymentMethod,
+  type SaleReturnCompletionMode,
+  type SaleReturnDetail,
+  type SaleReturnStatus,
+  type SaleStatus,
   type SkuBarcode,
   type SyncCatalogDocumentKind,
   type SyncCatalogPage,
@@ -40,13 +51,15 @@ import {
   type WarehouseListItem,
   type WarehouseStockRow,
 } from "@blackbox/shared";
-import { In, Repository } from "typeorm";
+import { In, Repository, type FindOptionsWhere } from "typeorm";
 import type { TenantContext } from "../common/tenant-context";
 import {
+  ActivityLog,
   Brand,
   Category,
   GoodsReceipt,
   GoodsReceiptItem,
+  InventoryMovement,
   InventoryOut,
   InventoryOutLine,
   InventoryStock,
@@ -55,6 +68,11 @@ import {
   ProductSkuBarcode,
   PurchaseOrder,
   PurchaseOrderItem,
+  Sale,
+  SaleLine,
+  SalePayment,
+  SaleReturn,
+  SaleReturnLine,
   Unit,
   Vendor,
   VendorContact as VendorContactEntity,
@@ -149,6 +167,20 @@ export class SyncCatalogService {
     private readonly vendorReturns: Repository<VendorReturn>,
     @InjectRepository(VendorReturnItem)
     private readonly vendorReturnItems: Repository<VendorReturnItem>,
+    @InjectRepository(Sale)
+    private readonly sales: Repository<Sale>,
+    @InjectRepository(SaleLine)
+    private readonly saleLines: Repository<SaleLine>,
+    @InjectRepository(SalePayment)
+    private readonly salePayments: Repository<SalePayment>,
+    @InjectRepository(SaleReturn)
+    private readonly saleReturns: Repository<SaleReturn>,
+    @InjectRepository(SaleReturnLine)
+    private readonly saleReturnLines: Repository<SaleReturnLine>,
+    @InjectRepository(ActivityLog)
+    private readonly activityLogs: Repository<ActivityLog>,
+    @InjectRepository(InventoryMovement)
+    private readonly inventoryMovements: Repository<InventoryMovement>,
   ) {}
 
   async snapshot(
@@ -166,6 +198,10 @@ export class SyncCatalogService {
     | SyncCatalogPage<GoodsReceiptDetail>
     | SyncCatalogPage<InventoryOutDetail>
     | SyncCatalogPage<VendorReturnDetail>
+    | SyncCatalogPage<SaleDetail>
+    | SyncCatalogPage<SaleReturnDetail>
+    | SyncCatalogPage<ActivityLogItem>
+    | SyncCatalogPage<InventoryMovementListItem>
   > {
     await this.sync.assertCanSync(user);
     if (!SYNC_CATALOG_SECTIONS.includes(sectionRaw as SyncCatalogSection)) {
@@ -186,6 +222,10 @@ export class SyncCatalogService {
         return this.stockPage(tenantId, page);
       case "documents":
         return this.documentPage(tenantId, page, kindRaw);
+      case "activityLogs":
+        return this.activityLogPage(tenantId, page);
+      case "inventoryMovements":
+        return this.inventoryMovementPage(tenantId, page);
     }
   }
 
@@ -461,6 +501,10 @@ export class SyncCatalogService {
         return this.inventoryOutPage(tenantId, page);
       case "vendorReturns":
         return this.vendorReturnPage(tenantId, page);
+      case "sales":
+        return this.salePage(tenantId, page);
+      case "saleReturns":
+        return this.saleReturnPage(tenantId, page);
     }
   }
 
@@ -750,6 +794,326 @@ export class SyncCatalogService {
         updatedAt: header.updatedAt.toISOString(),
       };
     });
+    return { items, total, page: page.page, pageSize: page.pageSize };
+  }
+
+  private async salePage(
+    tenantId: string,
+    page: ReturnType<typeof pageArgs>,
+  ): Promise<SyncCatalogPage<SaleDetail>> {
+    const qb = this.sales
+      .createQueryBuilder("s")
+      .leftJoinAndSelect("s.warehouse", "warehouse")
+      .where("s.tenant_id = :tenantId", { tenantId })
+      .andWhere("s.status IN (:...statuses)", { statuses: ["POSTED", "VOID"] })
+      .orderBy("s.posted_at", "ASC", "NULLS LAST")
+      .addOrderBy("s.id", "ASC");
+
+    const total = await qb.getCount();
+    const rows = await qb.skip(page.skip).take(page.pageSize).getMany();
+    const ids = rows.map((row) => row.id);
+
+    const lines =
+      ids.length === 0
+        ? []
+        : await this.saleLines.find({
+            where: { tenantId, saleId: In(ids) },
+            relations: { productSku: { product: true } },
+            order: { createdAt: "ASC" },
+          });
+    const payments =
+      ids.length === 0
+        ? []
+        : await this.salePayments.find({
+            where: { tenantId, saleId: In(ids) },
+            order: { createdAt: "ASC" },
+          });
+    const linesBySale = groupBy(lines, (row) => row.saleId);
+    const paymentsBySale = groupBy(payments, (row) => row.saleId);
+
+    const items = rows.map((header) =>
+      this.mapSaleDetail(
+        header,
+        linesBySale.get(header.id) ?? [],
+        paymentsBySale.get(header.id) ?? [],
+      ),
+    );
+    return { items, total, page: page.page, pageSize: page.pageSize };
+  }
+
+  private async saleReturnPage(
+    tenantId: string,
+    page: ReturnType<typeof pageArgs>,
+  ): Promise<SyncCatalogPage<SaleReturnDetail>> {
+    const total = await this.saleReturns.count({ where: { tenantId } });
+    const rows = await this.saleReturns.find({
+      where: { tenantId },
+      relations: {
+        warehouse: true,
+        sale: true,
+        issuedByUser: true,
+        processedByUser: true,
+        refundedByUser: true,
+      },
+      order: { createdAt: "ASC", id: "ASC" },
+      skip: page.skip,
+      take: page.pageSize,
+    });
+    const returnIds = rows.map((row) => row.id);
+    const saleIds = [...new Set(rows.map((row) => row.saleId))];
+
+    const returnLines =
+      returnIds.length === 0
+        ? []
+        : await this.saleReturnLines.find({
+            where: { tenantId, saleReturnId: In(returnIds) },
+            relations: { productSku: { product: true }, saleLine: true },
+            order: { createdAt: "ASC" },
+          });
+    const sales =
+      saleIds.length === 0
+        ? []
+        : await this.sales.find({
+            where: { tenantId, id: In(saleIds) },
+            relations: { warehouse: true },
+          });
+    const saleLines =
+      saleIds.length === 0
+        ? []
+        : await this.saleLines.find({
+            where: { tenantId, saleId: In(saleIds) },
+            relations: { productSku: { product: true } },
+            order: { createdAt: "ASC" },
+          });
+    const salePayments =
+      saleIds.length === 0
+        ? []
+        : await this.salePayments.find({
+            where: { tenantId, saleId: In(saleIds) },
+            order: { createdAt: "ASC" },
+          });
+
+    const returnLinesByReturn = groupBy(returnLines, (row) => row.saleReturnId);
+    const linesBySale = groupBy(saleLines, (row) => row.saleId);
+    const paymentsBySale = groupBy(salePayments, (row) => row.saleId);
+    const saleById = new Map(sales.map((row) => [row.id, row]));
+
+    const items = rows.map((header): SaleReturnDetail => {
+      const saleHeader = saleById.get(header.saleId);
+      const saleDetail = saleHeader
+        ? this.mapSaleDetail(
+            saleHeader,
+            linesBySale.get(header.saleId) ?? [],
+            paymentsBySale.get(header.saleId) ?? [],
+          )
+        : ({
+            id: header.saleId,
+            saleNumber: header.sale?.saleNumber ?? "—",
+            warehouseId: header.warehouseId,
+            warehouseName: header.warehouse?.name ?? "—",
+            status: "POSTED" as SaleStatus,
+            subtotal: 0,
+            gstRate: 0,
+            gstAmount: 0,
+            salesTaxRate: 0,
+            salesTaxAmount: 0,
+            total: 0,
+            customerName: DEFAULT_SALE_CUSTOMER_NAME,
+            cashTendered: null,
+            notes: "",
+            deviceId: null,
+            postedBy: null,
+            postedByName: null,
+            postedAt: null,
+            items: [],
+            payments: [],
+            fbrInvoiceNumber: null,
+            fbrStatus: "pending",
+            fbrError: null,
+            fbrSubmittedAt: null,
+            fbrSellerNtn: null,
+            createdAt: header.createdAt.toISOString(),
+            updatedAt: header.updatedAt.toISOString(),
+          } satisfies SaleDetail);
+
+      return {
+        id: header.id,
+        returnNumber: header.returnNumber,
+        saleId: header.saleId,
+        saleNumber: header.sale?.saleNumber ?? saleDetail.saleNumber,
+        warehouseId: header.warehouseId,
+        warehouseName: header.warehouse?.name ?? saleDetail.warehouseName,
+        returnDate: header.returnDate,
+        status: header.status as SaleReturnStatus,
+        subtotal: num(header.subtotal),
+        gstRate: num(header.gstRate),
+        gstAmount: num(header.gstAmount),
+        salesTaxRate: num(header.salesTaxRate),
+        salesTaxAmount: num(header.salesTaxAmount),
+        refundTotal: num(header.refundTotal),
+        refundMethod: header.refundMethod as SalePaymentMethod,
+        notes: header.notes,
+        processedBy: header.processedBy ?? header.issuedBy,
+        processedByName:
+          header.issuedByName?.trim() ||
+          header.issuedByUser?.fullName?.trim() ||
+          header.processedByUser?.fullName?.trim() ||
+          null,
+        issuedBy: header.issuedBy ?? header.processedBy,
+        issuedByName:
+          header.issuedByName?.trim() ||
+          header.issuedByUser?.fullName?.trim() ||
+          header.processedByUser?.fullName?.trim() ||
+          null,
+        refundedBy: header.refundedBy,
+        refundedByName:
+          header.refundedByName?.trim() ||
+          header.refundedByUser?.fullName?.trim() ||
+          null,
+        refundedAt: header.refundedAt?.toISOString() ?? null,
+        appliedToSaleId: header.appliedToSaleId,
+        completionMode:
+          (header.completionMode as SaleReturnCompletionMode | null) ?? null,
+        sale: saleDetail,
+        items: (returnLinesByReturn.get(header.id) ?? []).map((line) => ({
+          id: line.id,
+          saleLineId: line.saleLineId,
+          productSkuId: line.productSkuId,
+          productName: line.productSku?.product?.name ?? "—",
+          variantName: line.productSku?.variantName ?? "",
+          sku: line.productSku?.sku ?? "—",
+          barcode: line.barcode ?? line.productSku?.barcode ?? null,
+          quantity: num(line.quantity),
+          unitPrice: num(line.unitPrice),
+          discountPercent: num(line.discountPercent),
+          lineTotal: num(line.lineTotal),
+          sellUnit: (line.sellUnit as "pc" | "box") ?? "pc",
+        })),
+        createdAt: header.createdAt.toISOString(),
+        updatedAt: header.updatedAt.toISOString(),
+      };
+    });
+    return { items, total, page: page.page, pageSize: page.pageSize };
+  }
+
+  private mapSaleDetail(
+    header: Sale,
+    lines: SaleLine[],
+    payments: SalePayment[],
+  ): SaleDetail {
+    return {
+      id: header.id,
+      saleNumber: header.saleNumber,
+      warehouseId: header.warehouseId,
+      warehouseName: header.warehouse?.name ?? "—",
+      status: header.status as SaleStatus,
+      subtotal: num(header.subtotal),
+      gstRate: num(header.gstRate),
+      gstAmount: num(header.gstAmount),
+      salesTaxRate: num(header.salesTaxRate),
+      salesTaxAmount: num(header.salesTaxAmount),
+      total: num(header.total),
+      customerName: header.customerName ?? DEFAULT_SALE_CUSTOMER_NAME,
+      cashTendered: header.cashTendered ? num(header.cashTendered) : null,
+      notes: header.notes,
+      deviceId: header.deviceId,
+      postedBy: header.postedBy,
+      postedByName: header.postedByName,
+      postedAt: header.postedAt?.toISOString() ?? null,
+      items: lines.map((line) => ({
+        id: line.id,
+        productSkuId: line.productSkuId,
+        productName: line.productSku?.product?.name ?? "—",
+        variantName: line.productSku?.variantName ?? "",
+        sku: line.productSku?.sku ?? "—",
+        barcode: line.barcode ?? line.productSku?.barcode ?? null,
+        quantity: num(line.quantity),
+        unitPrice: num(line.unitPrice),
+        lineTotal: num(line.lineTotal),
+        gstPercent: num(line.gstPercent),
+        hsCode: line.hsCode,
+        sellUnit: (line.sellUnit as "pc" | "box") ?? "pc",
+        discountPercent: num(line.discountPercent),
+        focQuantity: num(line.focQuantity),
+      })),
+      payments: payments.map((payment) => ({
+        id: payment.id,
+        method: payment.method as SalePaymentMethod,
+        amount: num(payment.amount),
+        reference: payment.reference,
+      })),
+      fbrInvoiceNumber: header.fbrInvoiceNumber,
+      fbrStatus: asFbrInvoiceStatus(header.fbrStatus),
+      fbrError: header.fbrError,
+      fbrSubmittedAt: header.fbrSubmittedAt?.toISOString() ?? null,
+      fbrSellerNtn: header.fbrSellerNtn,
+      createdAt: header.createdAt.toISOString(),
+      updatedAt: header.updatedAt.toISOString(),
+    };
+  }
+
+  private async activityLogPage(
+    tenantId: string,
+    page: ReturnType<typeof pageArgs>,
+  ): Promise<SyncCatalogPage<ActivityLogItem>> {
+    const total = await this.activityLogs.count({
+      where: { tenantId } satisfies FindOptionsWhere<ActivityLog>,
+    });
+    const rows = await this.activityLogs.find({
+      where: { tenantId },
+      relations: { actorUser: true, supervisorUser: true, subjectUser: true },
+      order: { createdAt: "ASC", id: "ASC" },
+      skip: page.skip,
+      take: page.pageSize,
+    });
+    const items: ActivityLogItem[] = rows.map((row) => ({
+      id: row.id,
+      eventType: row.eventType as ActivityLogItem["eventType"],
+      actorUserId: row.actorUserId,
+      actorName: row.actorUser?.fullName?.trim() || "—",
+      supervisorUserId: row.supervisorUserId,
+      supervisorName: row.supervisorUser?.fullName?.trim() || null,
+      subjectUserId: row.subjectUserId,
+      subjectName: row.subjectUser?.fullName?.trim() || null,
+      summary: row.summary,
+      metadata: row.metadata ?? {},
+      createdAt: row.createdAt.toISOString(),
+    }));
+    return { items, total, page: page.page, pageSize: page.pageSize };
+  }
+
+  private async inventoryMovementPage(
+    tenantId: string,
+    page: ReturnType<typeof pageArgs>,
+  ): Promise<SyncCatalogPage<InventoryMovementListItem>> {
+    const qb = this.inventoryMovements
+      .createQueryBuilder("m")
+      .innerJoinAndSelect("m.productSku", "s")
+      .innerJoinAndSelect("m.warehouse", "w")
+      .where("m.tenant_id = :tenantId", { tenantId });
+
+    const total = await qb.getCount();
+    const rows = await qb
+      .orderBy("m.created_at", "ASC")
+      .addOrderBy("m.id", "ASC")
+      .skip(page.skip)
+      .take(page.pageSize)
+      .getMany();
+
+    const items: InventoryMovementListItem[] = rows.map((m) => ({
+      id: m.id,
+      productSkuId: m.productSkuId,
+      sku: m.productSku.sku,
+      variantName: m.productSku.variantName,
+      warehouseId: m.warehouseId,
+      warehouseName: m.warehouse.name,
+      movementType: m.movementType as InventoryMovementType,
+      quantity: num(m.quantity),
+      referenceType: m.referenceType,
+      referenceId: m.referenceId,
+      reason: m.reason,
+      createdAt: m.createdAt.toISOString(),
+    }));
     return { items, total, page: page.page, pageSize: page.pageSize };
   }
 

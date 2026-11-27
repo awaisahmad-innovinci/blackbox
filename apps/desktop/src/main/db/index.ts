@@ -4,8 +4,19 @@ import { sqlitePathFor, readIdentity } from "./identity";
 import { runLocalMigrations } from "./migrations";
 import { resetStalePushing } from "./outbox-local";
 
-const WIPED_DB_MESSAGE =
+export const WIPED_DB_MESSAGE =
   "Local data was erased because this device is not trusted";
+
+const LOCAL_DB_NOT_INITIALIZED = "Local SQLite database is not initialized";
+
+export function isLocalDbUnavailable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg === WIPED_DB_MESSAGE ||
+    msg === LOCAL_DB_NOT_INITIALIZED ||
+    msg.includes("Local data was erased")
+  );
+}
 
 export type LocalDbStatus =
   | {

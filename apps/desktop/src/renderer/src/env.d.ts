@@ -73,6 +73,8 @@ import type {
   VendorSku,
   WarehouseListItem,
   WarehouseStockRow,
+  TaxReportKind,
+  TaxReportSummary,
 } from "@blackbox/shared";
 
 export type LocalDbStatus =
@@ -114,6 +116,7 @@ declare global {
         >;
         getSyncMeta: (key: string) => Promise<string | null>;
         setSyncMeta: (key: string, value: string) => Promise<{ ok: true }>;
+        markTillSyncBackfillComplete: () => Promise<{ ok: true }>;
         resolveCanonicalEntityId: (input: {
           entityType: import("@blackbox/shared").SyncEntityType;
           vendorCode?: string;
@@ -205,6 +208,9 @@ declare global {
         listGoodsReceipts: (
           query?: GoodsReceiptListQuery,
         ) => Promise<PaginatedGoodsReceipts>;
+        upsertVendorLedgerEntriesFromPull: (
+          entries: import("@blackbox/shared").VendorLedgerEntry[],
+        ) => Promise<{ ok: true }>;
         getVendorLedger: (vendorId: string) => Promise<VendorLedger>;
         listVendorPayments: (
           query?: VendorPaymentListQuery,
@@ -352,6 +358,9 @@ declare global {
         appendLocalActivityLog: (
           item: import("@blackbox/shared").ActivityLogItem,
         ) => Promise<{ ok: true }>;
+        upsertActivityLogsFromPull: (
+          items: import("@blackbox/shared").ActivityLogItem[],
+        ) => Promise<{ ok: true }>;
         listLocalActivityLogs: (
           query?: import("@blackbox/shared").ActivityLogListQuery,
         ) => Promise<import("@blackbox/shared").PaginatedActivityLogs>;
@@ -486,6 +495,12 @@ declare global {
           dateFrom: string,
           dateTo: string,
         ) => Promise<InventoryInOutReport>;
+        taxReportSummary: (
+          dateFrom: string,
+          dateTo: string,
+          vendorId?: string | null,
+          taxKind?: TaxReportKind,
+        ) => Promise<TaxReportSummary>;
       };
       identity?: {
         getComputerName: () => Promise<string>;
@@ -545,7 +560,11 @@ declare global {
           changes: import("@blackbox/shared").SyncChangeDto[];
           nextCursor: string;
           stream: string;
+          bootstrapOnly?: boolean;
         }) => Promise<{ ok: true }>;
+        applyCashLedgerBootstrap: (
+          items: import("@blackbox/shared").SyncCashLedgerBootstrapItem[],
+        ) => Promise<{ ok: true }>;
         pendingCount: () => Promise<number>;
         enqueue: (input: unknown) => Promise<{ changeId: string }>;
         commit: (input: unknown) => Promise<{ changeId: string }>;

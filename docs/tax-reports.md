@@ -29,5 +29,5 @@ Response includes totals, `byVendor[]`, and `byMonth[]`.
 
 ### UI
 
-- Web: `/app/reports/taxes`
-- Desktop: `/reports/taxes` (API only; requires online session)
+- Web: `/app/reports/taxes` (cloud API only)
+- Desktop: `/reports/taxes` — reads from **local SQLite** when available (synced receipts, sales, returns); falls back to `GET /tax-reports/summary` if the local query fails or the DB is unavailable (same pattern as inventory in/out report)

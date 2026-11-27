@@ -1,6 +1,8 @@
 import type {
   GoodsReceiptDetail,
   InventoryOutDetail,
+  SaleDetail,
+  SaleReturnDetail,
   VendorReturnDetail,
   PurchaseOrderDetail,
   SkuBarcode,
@@ -12,8 +14,7 @@ import type {
 import { SYNC_CATALOG_PAGE_SIZE } from "@blackbox/shared";
 import { brandsApi } from "@renderer/lib/api/brands";
 import { categoriesApi } from "@renderer/lib/api/categories";
-import { ApiError, getApiErrorMessage } from "@renderer/lib/api/client";
-import { inventoryMovementsApi } from "@renderer/lib/api/inventory-movements";
+import { getApiErrorMessage } from "@renderer/lib/api/client";
 import { getAccessToken } from "@renderer/lib/api/session";
 import { syncApi } from "@renderer/lib/api/sync";
 import { unitsApi } from "@renderer/lib/api/units";
@@ -21,6 +22,9 @@ import { vendorGroupsApi } from "@renderer/lib/api/vendor-groups";
 import { warehousesApi } from "@renderer/lib/api/warehouses";
 import { bumpDataVersion } from "@renderer/lib/sync/sync-status";
 import { seedEntityVersionHeadsFromCloud } from "@renderer/lib/sync/entity-version-seed";
+import { pullInventoryPurchasingIntoLocal } from "@renderer/lib/local-db/inventory-purchasing-pull";
+import { CATALOG_OPERATIONAL_PAGE_KEYS } from "@renderer/lib/local-db/operational-pull-reset";
+import { resetOperationalPullState } from "@renderer/lib/local-db/operational-pull-reset";
 
 export const LAST_FULL_PULL_AT_KEY = "last_full_pull_at";
 
@@ -33,6 +37,9 @@ export type SyncPhase =
   | "goodsReceipts"
   | "inventoryOut"
   | "vendorReturns"
+  | "sales"
+  | "saleReturns"
+  | "activityLogs"
   | "movements"
   | "done";
 
@@ -90,7 +97,10 @@ const CATALOG_PAGE_KEYS = {
   goodsReceipts: "catalog_goods_receipts_next_page",
   inventoryOuts: "catalog_inventory_outs_next_page",
   vendorReturns: "catalog_vendor_returns_next_page",
-  movements: "catalog_movements_next_page",
+  sales: CATALOG_OPERATIONAL_PAGE_KEYS.sales,
+  saleReturns: CATALOG_OPERATIONAL_PAGE_KEYS.saleReturns,
+  activityLogs: CATALOG_OPERATIONAL_PAGE_KEYS.activityLogs,
+  movements: CATALOG_OPERATIONAL_PAGE_KEYS.inventoryMovements,
 } as const;
 
 type PagePullOptions = {
@@ -284,9 +294,13 @@ export async function runMasterDataImportPull(
 
 export async function runFullPull(
   onProgress?: (progress: SyncProgress) => void,
-  options?: { resume?: boolean },
+  options?: { resume?: boolean; fullBootstrap?: boolean },
 ): Promise<{ lastSyncedAt: string }> {
   const localDb = requireLocalDb();
+  const fullBootstrap = options?.fullBootstrap === true;
+  if (fullBootstrap) {
+    await resetOperationalPullState();
+  }
   const report = (
     phase: SyncPhase,
     done: number,
@@ -405,59 +419,61 @@ export async function runFullPull(
     },
   );
 
-  try {
-    await forEachCatalogPage(
-      CATALOG_PAGE_KEYS.movements,
-      { persist: false },
-      (page) =>
-        inventoryMovementsApi.list({
-          page,
-          pageSize: SYNC_CATALOG_PAGE_SIZE,
-        }),
-      async (result) => {
-        if (result.items.length > 0) {
-          await localDb.upsertInventoryMovements(result.items);
-        }
-      },
-      (done, total) => {
-        report(
-          "movements",
-          Math.max(done, total === 0 ? 1 : done),
-          Math.max(total, 1),
-          total === 0
-            ? "No movements to sync"
-            : `Updating movements… ${done}/${total}`,
-        );
-      },
-    );
-  } catch (err: unknown) {
-    if (err instanceof ApiError && err.status === 403) {
-      // #region agent log
-      fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"B",location:"pull.ts:movements",message:"movements 403 skipped",data:{status:err.status},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      report("movements", 1, 1, "Skipping movement history");
-    } else if (err instanceof SyncPullError) {
-      throw err;
-    } else {
-      throw new SyncPullError(
-        "movements",
-        getApiErrorMessage(err, "Failed to sync inventory movements"),
-      );
-    }
-  }
+  await pullDocumentSection(
+    report,
+    pageOptions,
+    "sales",
+    "sales",
+    "sales",
+    async (rows) => {
+      if (rows.length > 0) await localDb.upsertSales?.(rows);
+    },
+  );
 
-  try {
-    report("movements", 1, 1, "Rebuilding POS balance from synced documents…");
-    await localDb.rebuildPosBalanceFromDocuments?.();
-    // #region agent log
-    fetch("http://127.0.0.1:7686/ingest/ab68d8f7-59f7-4472-9baa-3354161bb732",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"abae79"},body:JSON.stringify({sessionId:"abae79",runId:"run1",hypothesisId:"C",location:"pull.ts:rebuild",message:"pos rebuild invoked",data:{},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  } catch (err: unknown) {
-    throw new SyncPullError(
-      "movements",
-      getApiErrorMessage(err, "Failed to rebuild POS balance"),
-    );
-  }
+  await pullDocumentSection(
+    report,
+    pageOptions,
+    "saleReturns",
+    "saleReturns",
+    "sale returns",
+    async (rows) => {
+      const upsert = localDb.upsertSaleReturn;
+      if (!upsert) return;
+      for (const row of rows) {
+        await upsert(row);
+      }
+    },
+  );
+
+  await pullCatalogSection(
+    report,
+    pageOptions,
+    "activityLogs",
+    CATALOG_PAGE_KEYS.activityLogs,
+    (page) => syncApi.catalogActivityLogs(page),
+    async (result) => {
+      if (result.items.length > 0) {
+        await localDb.upsertActivityLogsFromPull?.(result.items);
+      }
+    },
+    "activity log",
+  );
+
+  await pullCatalogSection(
+    report,
+    pageOptions,
+    "movements",
+    CATALOG_PAGE_KEYS.movements,
+    (page) => syncApi.catalogInventoryMovements(page),
+    async (result) => {
+      if (result.items.length > 0) {
+        await localDb.upsertInventoryMovements(result.items);
+      }
+    },
+    "inventory movements",
+  );
+
+  await pullInventoryPurchasingIntoLocal().catch(() => undefined);
 
   try {
     await finalizeCatalogCursors();
@@ -468,8 +484,19 @@ export async function runFullPull(
     );
   }
 
+  try {
+    report("done", 0, 1, "Rebuilding POS balance from synced documents…");
+    await localDb.rebuildPosBalanceFromDocuments?.();
+  } catch (err: unknown) {
+    throw new SyncPullError(
+      "done",
+      getApiErrorMessage(err, "Failed to rebuild POS balance"),
+    );
+  }
+
   const lastSyncedAt = new Date().toISOString();
   await localDb.setSyncMeta(LAST_FULL_PULL_AT_KEY, lastSyncedAt);
+  await localDb.markTillSyncBackfillComplete?.();
   report("done", 1, 1, "Sync complete");
   return { lastSyncedAt };
 }
@@ -515,7 +542,44 @@ type DocumentRow = {
   goodsReceipts: GoodsReceiptDetail;
   inventoryOuts: InventoryOutDetail;
   vendorReturns: VendorReturnDetail;
+  sales: SaleDetail;
+  saleReturns: SaleReturnDetail;
 };
+
+async function pullCatalogSection<T>(
+  report: ProgressReporter,
+  options: PagePullOptions,
+  phase: SyncPhase,
+  pageKey: string,
+  fetchPage: (page: number) => Promise<SyncCatalogPage<T>>,
+  apply: (page: SyncCatalogPage<T>) => Promise<void>,
+  label: string,
+): Promise<void> {
+  try {
+    await forEachCatalogPage(
+      pageKey,
+      options,
+      fetchPage,
+      apply,
+      (done, total) => {
+        report(
+          phase,
+          Math.max(done, total === 0 ? 1 : done),
+          Math.max(total, 1),
+          total === 0
+            ? `No ${label} to sync`
+            : `Updating ${label}… ${done}/${total}`,
+        );
+      },
+    );
+  } catch (err: unknown) {
+    if (err instanceof SyncPullError) throw err;
+    throw new SyncPullError(
+      phase,
+      getApiErrorMessage(err, `Failed to sync ${label}`),
+    );
+  }
+}
 
 async function finalizeCatalogCursors(): Promise<void> {
   if (!getAccessToken()) {

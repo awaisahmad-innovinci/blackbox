@@ -819,6 +819,34 @@ export function applyChange(change: SyncChangeDto): void {
   }
 }
 
+export function applyBootstrapBatch(
+  items: Array<{
+    entityType: SyncEntityType;
+    entityId: string;
+    payload: Record<string, unknown>;
+  }>,
+): void {
+  if (items.length === 0) return;
+  const createdAt = new Date().toISOString();
+  const run = getLocalDb().transaction(() => {
+    for (const item of items) {
+      applyChange({
+        seq: "0",
+        changeId: "bootstrap",
+        originDeviceId: "",
+        stream: "purchasing",
+        entityType: item.entityType,
+        entityId: item.entityId,
+        operation: "UPSERT",
+        entityVersion: 0,
+        payload: item.payload,
+        createdAt,
+      });
+    }
+  });
+  run();
+}
+
 function namedTaxonomy(p: Record<string, unknown>, id: string) {
   return {
     id,

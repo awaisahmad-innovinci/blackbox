@@ -157,6 +157,12 @@ function getSession(id: string): TillRow | undefined {
 
 const TILL_BACKFILL_KEY = "till_sync_backfill_v1";
 
+/** Skip legacy till outbox backfill after tills were loaded from the cloud (full / forced pull). */
+export function markTillSyncBackfillComplete(): void {
+  if (!readIdentity()) return;
+  setSyncMeta(TILL_BACKFILL_KEY, new Date().toISOString());
+}
+
 type WithdrawalSyncRow = {
   id: string;
   tillSessionId: string;

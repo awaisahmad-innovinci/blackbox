@@ -29,6 +29,7 @@ import {
   applyInventoryOutBalanceDelta,
   getInventoryOutBalanceQty,
 } from "../inventory-out/inventory-out-balance";
+import { rebuildInventoryOutBalanceFromDocuments } from "../inventory-out/inventory-out-balance-rebuild";
 import {
   CreateInventoryOutReturnDto,
   ListInventoryOutReturnsQueryDto,
@@ -297,6 +298,7 @@ export class InventoryOutReturnsService {
         await stockRepo.save(line.stock);
       }
 
+      await rebuildInventoryOutBalanceFromDocuments(manager, tenantId);
       return this.getByIdInManager(manager, header.id);
     });
 

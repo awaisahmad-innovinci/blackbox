@@ -45,6 +45,7 @@ import type {
 import {
   closeLocalDb,
   getLocalDbStatus,
+  isLocalDbUnavailable,
   initLocalDb,
   recordLocalDbInitError,
   reopenLocalDb,
@@ -68,6 +69,7 @@ import {
   getVendorLedgerLocal,
   listVendorCreditsLocal,
   listVendorPaymentsLocal,
+  upsertVendorLedgerEntriesFromPull,
 } from "./db/vendor-ledger-local";
 import {
   upsertInventoryOutLocal,
@@ -100,6 +102,7 @@ import {
   listLocalActivityLogs,
   listPendingActivityLogs,
   markActivityLogSynced,
+  upsertActivityLogsFromPull,
 } from "./db/activity-log-local";
 import {
   applyTillCashFromSaleLocal,
@@ -115,6 +118,7 @@ import {
   getLatestTillSessionLocal,
   listTillsLocal,
   enqueueExistingTillsOnce,
+  markTillSyncBackfillComplete,
   openTillLocal,
   reopenTillLocal,
   upsertTillSessionLocal,
@@ -193,6 +197,7 @@ import {
   upsertSkuBarcodeLocal,
 } from "./db/sku-barcodes-local";
 import { getCashFlowLocal, getOwnerCashBalanceLocal } from "./db/cash-flow-local";
+import { getTaxReportSummaryLocal } from "./db/tax-report-local";
 import {
   getCashierDashboardSummaryLocal,
   getDashboardSummaryLocal,
@@ -257,7 +262,11 @@ import {
   getPullCursor,
   resetStalePushing,
 } from "./db/outbox-local";
-import { applyPullBatch, commitLocalMutation } from "./db/sync-apply";
+import {
+  applyBootstrapBatch,
+  applyPullBatch,
+  commitLocalMutation,
+} from "./db/sync-apply";
 import {
   resolveCanonicalEntityId,
   type CanonicalEntityLookup,
@@ -315,6 +324,10 @@ function registerIpc(): void {
     wipeLocalDb();
     return { ok: true as const };
   });
+  ipcMain.handle("localDb:markTillSyncBackfillComplete", () => {
+    markTillSyncBackfillComplete();
+    return { ok: true as const };
+  });
   ipcMain.handle("localDb:reopen", () => {
     reopenLocalDb();
     return { ok: true as const };
@@ -331,9 +344,14 @@ function registerIpc(): void {
     shell.showItemInFolder(status.path);
     return { ok: true as const };
   });
-  ipcMain.handle("localDb:getSyncMeta", (_event, key: string) =>
-    getSyncMeta(key),
-  );
+  ipcMain.handle("localDb:getSyncMeta", (_event, key: string) => {
+    try {
+      return getSyncMeta(key);
+    } catch (err: unknown) {
+      if (isLocalDbUnavailable(err)) return null;
+      throw err;
+    }
+  });
   ipcMain.handle(
     "localDb:setSyncMeta",
     (_event, key: string, value: string) => {
@@ -564,6 +582,16 @@ function registerIpc(): void {
     (_event, query: GoodsReceiptListQuery = {}) =>
       listGoodsReceiptsLocal(query),
   );
+  ipcMain.handle(
+    "localDb:upsertVendorLedgerEntriesFromPull",
+    (
+      _event,
+      entries: import("@blackbox/shared").VendorLedgerEntry[],
+    ) => {
+      upsertVendorLedgerEntriesFromPull(entries);
+      return { ok: true as const };
+    },
+  );
   ipcMain.handle("localDb:getVendorLedger", (_event, vendorId: string) =>
     getVendorLedgerLocal(vendorId),
   );
@@ -742,6 +770,13 @@ function registerIpc(): void {
     "localDb:appendLocalActivityLog",
     (_event, item: import("@blackbox/shared").ActivityLogItem) => {
       appendLocalActivityLog(item);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle(
+    "localDb:upsertActivityLogsFromPull",
+    (_event, items: import("@blackbox/shared").ActivityLogItem[]) => {
+      upsertActivityLogsFromPull(items);
       return { ok: true as const };
     },
   );
@@ -1120,6 +1155,16 @@ function registerIpc(): void {
     (_event, dateFrom: string, dateTo: string) =>
       listInventoryInOutReportLocal(dateFrom, dateTo),
   );
+  ipcMain.handle(
+    "localDb:taxReportSummary",
+    (
+      _event,
+      dateFrom: string,
+      dateTo: string,
+      vendorId?: string | null,
+      taxKind?: import("@blackbox/shared").TaxReportKind,
+    ) => getTaxReportSummaryLocal(dateFrom, dateTo, vendorId, taxKind),
+  );
 
   ipcMain.handle("app:getVersion", () => app.getVersion());
   ipcMain.handle(
@@ -1184,7 +1229,12 @@ function registerIpc(): void {
     } catch {
       // The next sync retries until the local database is open.
     }
-    return listPendingOutbox(limit ?? 100);
+    try {
+      return listPendingOutbox(limit ?? 100);
+    } catch (err: unknown) {
+      if (isLocalDbUnavailable(err)) return [];
+      throw err;
+    }
   });
   ipcMain.handle(
     "sync:listOutboxForEntity",
@@ -1216,9 +1266,14 @@ function registerIpc(): void {
       return { ok: true as const };
     },
   );
-  ipcMain.handle("sync:pullCursor", (_event, stream: string) =>
-    getPullCursor(stream),
-  );
+  ipcMain.handle("sync:pullCursor", (_event, stream: string) => {
+    try {
+      return getPullCursor(stream);
+    } catch (err: unknown) {
+      if (isLocalDbUnavailable(err)) return "0";
+      throw err;
+    }
+  });
   ipcMain.handle(
     "sync:applyPull",
     (
@@ -1227,13 +1282,45 @@ function registerIpc(): void {
         changes: import("@blackbox/shared").SyncChangeDto[];
         nextCursor: string;
         stream: string;
+        bootstrapOnly?: boolean;
       },
     ) => {
+      if (payload.bootstrapOnly) {
+        applyBootstrapBatch(
+          payload.changes.map((change) => ({
+            entityType: change.entityType,
+            entityId: change.entityId,
+            payload: change.payload,
+          })),
+        );
+        return { ok: true as const };
+      }
       applyPullBatch(payload.changes, payload.nextCursor, payload.stream);
       return { ok: true as const };
     },
   );
-  ipcMain.handle("sync:pendingCount", () => pendingOutboxCount());
+  ipcMain.handle(
+    "sync:applyCashLedgerBootstrap",
+    (
+      _event,
+      items: Array<{
+        entityType: import("@blackbox/shared").SyncEntityType;
+        entityId: string;
+        payload: Record<string, unknown>;
+      }>,
+    ) => {
+      applyBootstrapBatch(items);
+      return { ok: true as const };
+    },
+  );
+  ipcMain.handle("sync:pendingCount", () => {
+    try {
+      return pendingOutboxCount();
+    } catch (err: unknown) {
+      if (isLocalDbUnavailable(err)) return 0;
+      throw err;
+    }
+  });
   ipcMain.handle(
     "sync:enqueue",
     (
